@@ -6,7 +6,7 @@
 - public measurement/output contracts;
 - host-side tests, simulation, replay, metrics, and reports;
 - mathematical conventions and references;
-- sanitized recorded datasets when publication is approved.
+- sanitized replay datasets when publication is explicitly approved.
 
 ## Kept private
 
@@ -17,6 +17,8 @@
 - calibration assets tied to a product or serial number;
 - control laws, actuators, safety logic, bootloaders, deployment, and manufacturing code;
 - internal logs and machine-specific build/test scripts.
+
+The public ULog converter is allowed because it exports only the hardware-neutral contract. Raw ULogs, absolute GNSS coordinates, identifiers, private manifests, and generated per-flight reports remain private by default.
 
 ## Admission rule
 

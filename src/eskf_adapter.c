@@ -178,6 +178,10 @@ AerakiaStatus aerakia_eskf_process_imu(
         filter->rejected_samples++;
         return AERAKIA_STATUS_MISSING_MEASUREMENT;
     }
+    if (filter->has_timestamp && sample->timestamp_us <= filter->last_timestamp_us) {
+        filter->rejected_samples++;
+        return AERAKIA_STATUS_TIMESTAMP_ERROR;
+    }
 
     filter->stationary_detected = sample_is_stationary(filter, sample);
     filter->zero_velocity_update_applied = false;
@@ -203,11 +207,6 @@ AerakiaStatus aerakia_eskf_process_imu(
         aerakia_eskf_get_estimate(filter, estimate);
         return AERAKIA_STATUS_INITIALIZED;
     }
-    if (sample->timestamp_us <= filter->last_timestamp_us) {
-        filter->rejected_samples++;
-        return AERAKIA_STATUS_TIMESTAMP_ERROR;
-    }
-
     dt = (float)(sample->timestamp_us - filter->last_timestamp_us) * 1.0e-6f;
     filter->last_timestamp_us = sample->timestamp_us;
     if (dt < filter->config.minimum_dt_s || dt > filter->config.maximum_dt_s) {
