@@ -1,0 +1,15 @@
+{
+  "clean_motion": {
+    "eskf": 0.20,
+    "mahony_robust": 0.50,
+    "mahony_standard": 0.50
+  },
+  "mag_bias": {
+    "eskf": 0.50,
+    "mahony_robust": 4.00
+  },
+  "mag_spike": {
+    "eskf": 0.50,
+    "mahony_robust": 0.50
+  }
+}
