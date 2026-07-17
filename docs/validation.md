@@ -12,7 +12,7 @@ The PC platform exists to make algorithm claims reproducible, reviewable, and pr
 | 4 | Rate table or motion capture | Known physical motion and sensor behavior |
 | 5 | Hardware-in-the-loop and flight logs | Integration timing, transport, and real vehicle behavior |
 
-Only Levels 4–5 support strong hardware/flight reliability claims. The public repository currently establishes Levels 1–2 and provides the format needed to add higher-level evidence without publishing the hardware integration.
+Only Levels 4–5 support strong hardware/flight reliability claims. The public repository establishes Levels 1–2 and provides a private-ULog replay path for Level-5 integration evidence without publishing the hardware integration or raw flight data.
 
 ## Comparison tracks
 
@@ -54,3 +54,16 @@ Metrics: attitude/velocity/position RMSE, bias error, innovation acceptance, NIS
 - `yaw_jump`: discontinuous truth case for wrap/continuity testing.
 
 The native `aerakia_validation_runner` replays the public C code. `run_suite.py` generates reports and `check_thresholds.py` turns reviewed error limits into CI gates.
+
+## Private ULog track
+
+`convert_ulog_to_replay.py` extracts calibrated IMU, sparse magnetometer updates, PX4 attitude reset metadata, relative GPS NED aiding, barometer height, and PX4 local-position references. It intentionally omits absolute latitude/longitude, hardware IDs, parameter dumps, and private topics.
+
+`run_ulog_suite.py` consumes a private manifest and runs conversion, the native C runner, metrics, reset-aware plots, and a cross-scenario summary. Static logs must be explicitly marked `assume_stationary`; this assertion is never inferred from their filename or motion.
+
+PX4 `vehicle_attitude` and `vehicle_local_position` are engineering references, not independent truth. Large PX4 quaternion resets are reported separately. Two observed failure classes must remain visible in reports:
+
+- persistent magnetic disagreement can cause high yaw error even when tilt remains accurate;
+- position accuracy against PX4 depends on origin alignment, aiding availability, and PX4's own estimator configuration.
+
+The correct next comparison is an independent heading source and independent position truth—not tuning metrics against PX4 resets.

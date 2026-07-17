@@ -5,7 +5,7 @@
  * Based on Joan Solà "Quaternion kinematics for the error-state Kalman filter"
  *
  * Architecture:
- *   - Nominal State (19-DOF): Position, Velocity, Quaternion, Accel Bias, Gyro Bias
+ *   - Nominal State (16 components): Position, Velocity, Quaternion, Accel Bias, Gyro Bias
  *   - Error State (15-DOF): δθ, δv, δp, δab, δgb
  *
  * Coordinate Frames:
@@ -39,10 +39,10 @@ typedef double eskf_float_t;
 #define ESKF_IDX_DGB        12  /* Gyro bias error (12-14) */
 
 #define ESKF_ERROR_STATE_DIM    15
-#define ESKF_NOMINAL_STATE_DIM  19  /* 3 + 3 + 4 + 3 + 3 + 3 */
+#define ESKF_NOMINAL_STATE_DIM  16  /* 3 + 3 + 4 + 3 + 3 */
 
 /* ============================================================================
- * Nominal State Structure (19-DOF)
+ * Nominal State Structure (16 components)
  * ============================================================================ */
 
 /**
@@ -122,12 +122,12 @@ typedef struct {
  * It must be allocated by the caller (static or stack).
  *
  * Memory Layout:
- *   - state: 19 * sizeof(double) = 152 bytes
+ *   - state: 16 * sizeof(double) = 128 bytes
  *   - error_state: 15 * sizeof(double) = 120 bytes (transient, often zero)
  *   - P: 15 * 15 * sizeof(double) = 1800 bytes
  *   - cfg: 4 * sizeof(double) = 32 bytes
  *   - misc: ~50 bytes
- *   Total: ~2154 bytes
+ *   Total: ~2130 bytes
  */
 typedef struct {
     /* State Estimates */
