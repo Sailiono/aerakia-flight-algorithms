@@ -11,7 +11,7 @@ Public branch, history, and tagging rules are defined in the [release policy](re
 
 - Public `main` recovery point: `ef03c348e4d73d7e5461c9f4aec0b112760cffda`.
 - The recovered private checkpoint has the same source tree as public `main`.
-- Strict host build, three C tests, and eleven Python tests pass on the recovered local machine.
+- Strict host build plus the C and Python test suites pass on the recovered local machine.
 - Twenty-four private PX4 ULogs and the minimal EuRoC inputs are retained outside the public Git
   history and have verified SHA-256 manifests.
 - Flight qualification, target timing, thermal behavior, and physical heading truth remain open.
@@ -22,8 +22,8 @@ Public branch, history, and tagging rules are defined in the [release policy](re
 | --- | --- | --- |
 | One-command host regression | Configure, build, C tests, Python tests, deterministic scenarios, threshold checks, logs, and environment manifest complete from one command | Implemented by `validation/run_host_regression.py`; keep it passing |
 | Monte Carlo consistency | Reviewed seed set covers IMU bias/noise, timestamp jitter, aiding loss, and recovery; aggregate NIS/NEES confidence bounds and failure seeds are reported | Constant three-axis bias, monotonic timestamp jitter, measurement noise, and five-second aiding loss implemented; thermal drift and transport faults pending |
-| Trusted-heading behavior | Controlled independent heading covers cold-start yaw, normal updates, dropout, outliers, rejection, and recovery without treating GNSS course as body yaw | Pending |
-| Bias convergence | Gyroscope and accelerometer bias error, convergence time, and steady-state uncertainty are reported separately; batch reference-bias correction is not counted as online convergence | Pending |
+| Trusted-heading behavior | Controlled independent heading covers cold-start yaw, normal updates, dropout, outliers, rejection, and recovery without treating GNSS course as body yaw | Deterministic synthetic gate implemented; independent physical heading remains P2 evidence |
+| Bias convergence | Gyroscope and accelerometer bias error, convergence time, and steady-state uncertainty are reported separately; batch reference-bias correction is not counted as online convergence | Multi-axis synthetic gate implemented; thermal and physical characterization remain P2 evidence |
 | Timing and malformed input | Duplicate, stale, out-of-order, delayed, missing, non-finite, and implausible samples have explicit deterministic behavior and tests | Pending |
 | Public dataset runner | Dataset manifest records source, hash, frame transform, time offset, command, code commit, and output summary; selected EuRoC runs reproduce with one command | Pending |
 | FCOne-neutral contract tests | A mock publisher verifies timestamp, FRD/NED frames, SI units, validity flags, update freshness, dropout, and stale-aiding behavior without including private FCOne headers | Pending |

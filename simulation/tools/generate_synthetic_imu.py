@@ -60,6 +60,26 @@ def generate_motion(
         yaw_deg.fill(35.0)
     elif motion == "navigation_outage":
         pass
+    elif motion == "bias_excitation":
+        active_time = np.maximum(time_s - 2.0, 0.0)
+        ramp = np.clip(active_time / 2.0, 0.0, 1.0)
+        roll_deg = ramp * 15.0 * np.sin(2.0 * math.pi * 0.17 * active_time)
+        pitch_deg = ramp * 12.0 * np.sin(2.0 * math.pi * 0.13 * active_time)
+        yaw_deg = ramp * 25.0 * np.sin(2.0 * math.pi * 0.09 * active_time)
+    elif motion == "heading_recovery":
+        yaw_deg = np.where(
+            time_s < 2.0,
+            0.0,
+            np.where(
+                time_s < 6.0,
+                20.0 * (time_s - 2.0),
+                np.where(
+                    time_s < 10.0,
+                    80.0,
+                    np.where(time_s < 14.0, 80.0 - 15.0 * (time_s - 10.0), 20.0),
+                ),
+            ),
+        )
     else:
         raise ValueError(f"unsupported motion: {motion}")
 
@@ -174,6 +194,15 @@ def write_golden_csv(
     gps_updates: np.ndarray,
     position_reference_valid: np.ndarray,
     timestamp_us: np.ndarray,
+    magnetometer_valid: np.ndarray,
+    magnetometer_updates: np.ndarray,
+    heading_valid: np.ndarray,
+    heading_updates: np.ndarray,
+    heading_rad: np.ndarray,
+    heading_variance_rad2: np.ndarray,
+    heading_fault: np.ndarray,
+    acceleration_bias_m_s2: np.ndarray,
+    gyroscope_bias_deg_s: np.ndarray,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     nominal_dt_us = int(round(1_000_000.0 / rate_hz))
@@ -191,6 +220,11 @@ def write_golden_csv(
         "gps_position_n_m", "gps_position_e_m", "gps_position_d_m",
         "gps_velocity_n_m_s", "gps_velocity_e_m_s", "gps_velocity_d_m_s",
         "gps_position_variance_m2", "gps_velocity_variance_m2_s2",
+        "mag_valid", "mag_update",
+        "gnss_heading_valid", "gnss_heading_update", "gnss_heading_rad",
+        "gnss_heading_variance_rad2", "gnss_heading_fault",
+        "truth_accel_bias_x_m_s2", "truth_accel_bias_y_m_s2", "truth_accel_bias_z_m_s2",
+        "truth_gyro_bias_x_rad_s", "truth_gyro_bias_y_rad_s", "truth_gyro_bias_z_rad_s",
     ]
 
     with path.open("w", newline="", encoding="utf-8") as stream:
@@ -217,8 +251,33 @@ def write_golden_csv(
                     *position_ned_m[index], *velocity_ned_m_s[index],
                     *gps_position_ned_m[index], *gps_velocity_ned_m_s[index],
                     0.25, 0.01,
+                    int(magnetometer_valid[index]), int(magnetometer_updates[index]),
+                    int(heading_valid[index]), int(heading_updates[index]), heading_rad[index],
+                    heading_variance_rad2[index], int(heading_fault[index]),
+                    *acceleration_bias_m_s2,
+                    *np.radians(gyroscope_bias_deg_s),
                 ]
             )
+
+
+def trusted_heading_profile(
+    time_s: np.ndarray,
+    yaw_deg: np.ndarray,
+    rate_hz: float,
+    rng: np.random.Generator,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    update_period = max(1, int(round(rate_hz / 10.0)))
+    update = (np.arange(len(time_s)) % update_period == 0)
+    valid = time_s >= 1.0
+    dropout = (time_s >= 8.0) & (time_s < 12.0)
+    valid &= ~dropout
+    update &= valid
+    fault = update & (time_s >= 6.0) & (time_s < 6.2)
+    heading = np.radians(yaw_deg) + rng.normal(0.0, math.radians(1.0), len(time_s))
+    heading[fault] += math.radians(90.0)
+    heading = (heading + math.pi) % (2.0 * math.pi) - math.pi
+    variance = np.full(len(time_s), math.radians(2.0) ** 2, dtype=np.float64)
+    return valid.astype(np.int64), update.astype(np.int64), heading, variance, fault.astype(np.int64)
 
 
 def navigation_profile(time_s: np.ndarray, rate_hz: float) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -227,6 +286,32 @@ def navigation_profile(time_s: np.ndarray, rate_hz: float) -> tuple[np.ndarray, 
     acceleration[(time_s >= 6.0) & (time_s < 8.0), 1] = 0.5
     acceleration[(time_s >= 10.0) & (time_s < 12.0), 0] = -0.8
     acceleration[(time_s >= 14.0) & (time_s < 16.0), 1] = -0.5
+    dt = 1.0 / rate_hz
+    velocity = np.zeros_like(acceleration)
+    position = np.zeros_like(acceleration)
+    for index in range(1, len(time_s)):
+        velocity[index] = velocity[index - 1] + acceleration[index - 1] * dt
+        position[index] = (
+            position[index - 1] + velocity[index - 1] * dt
+            + 0.5 * acceleration[index - 1] * dt * dt
+        )
+    return acceleration, velocity, position
+
+
+def bias_excitation_profile(
+    time_s: np.ndarray, rate_hz: float
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Generate bounded multi-axis specific-force excitation after static alignment."""
+    active_time = np.maximum(time_s - 2.0, 0.0)
+    ramp = np.clip(active_time / 2.0, 0.0, 1.0)
+    acceleration = np.column_stack(
+        (
+            ramp * 0.8 * np.sin(2.0 * math.pi * 0.11 * active_time),
+            ramp * 0.6 * np.sin(2.0 * math.pi * 0.07 * active_time + 0.4),
+            ramp * 0.35 * np.sin(2.0 * math.pi * 0.05 * active_time + 0.8),
+        )
+    )
+    acceleration[time_s < 2.0] = 0.0
     dt = 1.0 / rate_hz
     velocity = np.zeros_like(acceleration)
     position = np.zeros_like(acceleration)
@@ -248,7 +333,7 @@ def main() -> None:
         "--motion",
         choices=[
             "yaw_spin", "slow_sin", "yaw_jump", "roll_flip", "static_tilted",
-            "navigation_outage",
+            "navigation_outage", "bias_excitation", "heading_recovery",
         ],
         default="yaw_spin",
     )
@@ -271,6 +356,14 @@ def main() -> None:
         help="standard deviation of per-interval timestamp jitter; intervals remain monotonic",
     )
     parser.add_argument("--metadata", type=Path, help="optional JSON generation manifest")
+    parser.add_argument(
+        "--trusted-heading", action="store_true",
+        help="generate a 10 Hz trusted-heading stream with dropout and outlier events",
+    )
+    parser.add_argument(
+        "--disable-magnetometer", action="store_true",
+        help="mark magnetometer samples invalid to isolate other heading sources",
+    )
     args = parser.parse_args()
 
     if args.duration <= 0.0 or args.rate <= 0.0:
@@ -281,12 +374,15 @@ def main() -> None:
 
     rng = np.random.default_rng(args.seed)
     timing_rng = np.random.default_rng(args.seed ^ 0xA34A91)
+    heading_rng = np.random.default_rng(args.seed ^ 0x5EAD1A6)
     time_s, roll_deg, pitch_deg, yaw_deg = generate_motion(args.duration, args.rate, args.motion)
     acceleration_ned = np.zeros((len(time_s), 3), dtype=np.float64)
     velocity_ned = np.zeros_like(acceleration_ned)
     position_ned = np.zeros_like(acceleration_ned)
     if args.motion == "navigation_outage":
         acceleration_ned, velocity_ned, position_ned = navigation_profile(time_s, args.rate)
+    elif args.motion == "bias_excitation":
+        acceleration_ned, velocity_ned, position_ned = bias_excitation_profile(time_s, args.rate)
     accel, gyro, magnetic, ideal_accel = synthesize_measurements(
         time_s,
         roll_deg,
@@ -319,9 +415,10 @@ def main() -> None:
         length=max(1, int(round(args.rate * 0.5))),
         rng=rng,
     )
-    navigation_enabled = args.motion == "navigation_outage"
+    navigation_enabled = args.motion in ("navigation_outage", "bias_excitation")
     static_flags = np.full(len(time_s), int(args.static_hint), dtype=np.int64)
-    if navigation_enabled and args.static_hint:
+    if args.motion in ("navigation_outage", "bias_excitation", "heading_recovery") \
+            and args.static_hint:
         static_flags = (time_s < 1.5).astype(np.int64)
     gps_updates = np.zeros(len(time_s), dtype=np.int64)
     position_reference_valid = np.full(len(time_s), int(navigation_enabled), dtype=np.int64)
@@ -329,10 +426,23 @@ def main() -> None:
     gps_velocity = np.zeros_like(velocity_ned)
     if navigation_enabled:
         gps_period = max(1, int(round(args.rate / 10.0)))
-        available = (time_s < 6.0) | (time_s >= 11.0)
+        available = np.ones(len(time_s), dtype=bool)
+        if args.motion == "navigation_outage":
+            available = (time_s < 6.0) | (time_s >= 11.0)
         gps_updates = ((np.arange(len(time_s)) % gps_period == 0) & available).astype(np.int64)
         gps_position = position_ned + rng.normal(0.0, 0.5, position_ned.shape)
         gps_velocity = velocity_ned + rng.normal(0.0, 0.1, velocity_ned.shape)
+    magnetometer_valid = np.full(len(time_s), int(not args.disable_magnetometer), dtype=np.int64)
+    magnetometer_updates = np.ones(len(time_s), dtype=np.int64)
+    heading_valid = np.zeros(len(time_s), dtype=np.int64)
+    heading_updates = np.zeros(len(time_s), dtype=np.int64)
+    heading_rad = np.zeros(len(time_s), dtype=np.float64)
+    heading_variance_rad2 = np.ones(len(time_s), dtype=np.float64)
+    heading_fault = np.zeros(len(time_s), dtype=np.int64)
+    if args.trusted_heading:
+        heading_valid, heading_updates, heading_rad, heading_variance_rad2, heading_fault = (
+            trusted_heading_profile(time_s, yaw_deg, args.rate, heading_rng)
+        )
     write_golden_csv(
         args.out,
         time_s,
@@ -353,6 +463,15 @@ def main() -> None:
         gps_updates,
         position_reference_valid,
         timestamp_us,
+        magnetometer_valid,
+        magnetometer_updates,
+        heading_valid,
+        heading_updates,
+        heading_rad,
+        heading_variance_rad2,
+        heading_fault,
+        acceleration_bias,
+        gyroscope_bias,
     )
     if args.metadata is not None:
         args.metadata.parent.mkdir(parents=True, exist_ok=True)
@@ -370,6 +489,11 @@ def main() -> None:
                     "timestamp_jitter_std_us": args.timestamp_jitter_std_us,
                     "timestamp_interval_min_us": int(np.min(np.diff(timestamp_us))),
                     "timestamp_interval_max_us": int(np.max(np.diff(timestamp_us))),
+                    "trusted_heading_updates": int(np.count_nonzero(heading_updates)),
+                    "trusted_heading_fault_updates": int(np.count_nonzero(heading_fault)),
+                    "trusted_heading_dropout_samples": int(np.count_nonzero(
+                        args.trusted_heading and (heading_valid == 0)
+                    )),
                 },
                 indent=2,
                 sort_keys=True,

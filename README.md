@@ -92,8 +92,10 @@ Example results from the deterministic 20 s / 100 Hz / seed 7 suite:
 | Clean motion | 0.1476° | 0.1547° | 0.3515° |
 | Magnetic spike | 0.2612° | 0.1540° | 0.3741° |
 | Persistent magnetic bias | 27.1650° | 0.2854° | 0.3271° |
-| Tilted cold start (post-alignment) | — | — | 0.0363° |
-| GNSS outage/reacquisition (post-alignment) | — | — | 0.8205° |
+| Tilted cold start (post-alignment) | — | — | 0.0369° |
+| GNSS outage/reacquisition (post-alignment) | — | — | 0.6821° |
+| Trusted heading dropout/recovery (post-alignment) | — | — | 0.2755° |
+| Multi-axis bias convergence (post-alignment) | — | — | 0.8863° |
 
 Attitude values use quaternion geodesic RMSE, which is singularity-free and is not numerically
 comparable to the older RMS of three Euler components. In the outage scenario, position RMSE is 0.497 m and velocity

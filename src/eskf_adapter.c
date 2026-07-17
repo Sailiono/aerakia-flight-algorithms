@@ -433,6 +433,10 @@ void aerakia_eskf_update_heading(
         &filter->last_heading_innovation
     );
     filter->heading_accepted = filter->last_heading_innovation.accepted;
+    if (filter->heading_accepted && filter->static_alignment_complete
+        && filter->static_tilt_alignment_complete) {
+        filter->static_heading_alignment_complete = true;
+    }
 }
 
 void aerakia_eskf_update_barometer(

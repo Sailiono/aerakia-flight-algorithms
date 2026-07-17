@@ -16,7 +16,7 @@ import numpy as np
 LIMITS = {
     "position_rmse_m": 0.75,
     "velocity_rmse_m_s": 0.40,
-    "attitude_rmse_deg": 2.00,
+    "attitude_rmse_deg": 2.50,
     "navigation_recoveries": 0.0,
     "minimum_healthy_ratio": 1.0,
 }

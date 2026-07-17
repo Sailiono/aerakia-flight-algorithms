@@ -192,6 +192,11 @@ static void test_eskf_static_supervisor(void)
     check_true(estimate.static_tilt_alignment_complete, "adapter completes tilt alignment");
     check_true(!estimate.static_heading_alignment_complete,
                "adapter reports missing magnetic heading alignment");
+    aerakia_eskf_update_heading(&filter, 0.0f, 0.01f);
+    aerakia_eskf_get_estimate(&filter, &estimate);
+    check_true(estimate.heading_accepted, "trusted heading is accepted after tilt alignment");
+    check_true(estimate.static_heading_alignment_complete,
+               "trusted heading completes cold-start heading alignment");
     check_true(near(estimate.gyroscope_bias_rad_s.z, 0.01f, 1.0e-6f), "adapter estimates gyro bias");
     for (index = 10; index <= 20; ++index) {
         sample.timestamp_us = (uint64_t)index * 10000U;

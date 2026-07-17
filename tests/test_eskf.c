@@ -360,6 +360,10 @@ static void test_static_bias_alignment(void)
     check_true(near(filter.state.ab[0], 0.10, 1e-12), "accelerometer x bias aligns");
     check_true(near(filter.state.ab[2], 0.30, 1e-12), "accelerometer z bias aligns");
     check_true(near(filter.state.gb[2], -0.03, 1e-12), "gyroscope bias aligns");
+    check_true(near(filter.P[ESKF_IDX_DAB][ESKF_IDX_DAB], 4e-2, 1e-12),
+               "single-pose accel bias uncertainty remains observable later");
+    check_true(near(filter.P[ESKF_IDX_DGB][ESKF_IDX_DGB], 1e-4, 1e-12),
+               "stationary gyro bias alignment is confident");
 }
 
 static void test_static_attitude_alignment(void)

@@ -24,6 +24,15 @@ SCENARIOS = {
         "motion": "navigation_outage", "anomaly": "none", "cold_start": True,
         "static_hint": True,
     },
+    "trusted_heading_recovery": {
+        "motion": "heading_recovery", "anomaly": "none", "cold_start": True,
+        "static_hint": True, "trusted_heading": True, "disable_magnetometer": True,
+    },
+    "bias_convergence": {
+        "motion": "bias_excitation", "anomaly": "none", "cold_start": True,
+        "static_hint": True, "accel_bias_std_m_s2": 0.08,
+        "gyro_bias_std_deg_s": 0.30, "duration": 40.0,
+    },
 }
 
 
@@ -70,18 +79,26 @@ def main() -> None:
             sys.executable,
             str(generator),
             "--out", str(input_csv),
-            "--duration", str(args.duration),
+            "--duration", str(scenario.get("duration", args.duration)),
             "--rate", str(args.rate),
             "--seed", str(args.seed),
             "--motion", str(scenario["motion"]),
             "--anomaly", str(scenario["anomaly"]),
-            "--accel-bias-std-m-s2", str(args.accel_bias_std_m_s2),
-            "--gyro-bias-std-deg-s", str(args.gyro_bias_std_deg_s),
+            "--accel-bias-std-m-s2", str(
+                scenario.get("accel_bias_std_m_s2", args.accel_bias_std_m_s2)
+            ),
+            "--gyro-bias-std-deg-s", str(
+                scenario.get("gyro_bias_std_deg_s", args.gyro_bias_std_deg_s)
+            ),
             "--timestamp-jitter-std-us", str(args.timestamp_jitter_std_us),
             "--metadata", str(generation_metadata),
         ]
         if scenario.get("static_hint"):
             generator_command.append("--static-hint")
+        if scenario.get("trusted_heading"):
+            generator_command.append("--trusted-heading")
+        if scenario.get("disable_magnetometer"):
+            generator_command.append("--disable-magnetometer")
         run(generator_command)
         runner_command = [str(args.runner)]
         if scenario.get("cold_start"):

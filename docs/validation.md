@@ -61,6 +61,11 @@ Metrics: attitude/velocity/position RMSE, bias error, innovation acceptance, NIS
   identity and CI scores only samples after independently reported tilt/heading alignment.
 - `navigation_outage`: stationary cold start, horizontal maneuvers, a five-second GNSS outage, and
   reacquisition with independent synthetic position/velocity truth.
+- `trusted_heading_recovery`: magnetometer-disabled cold start using an explicit 10 Hz body-heading
+  source, two 90° outliers, a four-second dropout, rejection, coast, and recovery.
+- `bias_convergence`: one-pose static initialization followed by multi-axis attitude/specific-force
+  excitation and continuous GNSS aiding; reports accelerometer and gyroscope truth error, reduction,
+  settling time, navigation accuracy, and consistency separately.
 
 The native `aerakia_validation_runner` replays the public C code. `run_suite.py` generates reports and `check_thresholds.py` turns reviewed error limits into CI gates.
 
@@ -76,6 +81,11 @@ consistency metrics. The current phase randomizes measurement noise and includes
 five-second GNSS outage, drawn constant three-axis IMU biases, and monotonic interval jitter. It
 does not yet model temperature-varying bias, transport delay, reordering, or missing IMU samples;
 those remain explicit P0 extensions.
+
+The bias scenario deliberately distinguishes observability phases. A stationary mean directly
+observes gyro bias, but one gravity direction cannot uniquely separate tilt from horizontal
+accelerometer bias. Static alignment therefore keeps accelerometer-bias uncertainty broad; only the
+subsequent multi-axis motion/GNSS interval is scored as online accelerometer-bias convergence.
 
 The staged external intake and the limits of each source are documented in
 [public datasets](public-datasets.md).

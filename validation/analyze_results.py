@@ -383,6 +383,134 @@ def yaw_source_diagnostics(columns: dict[str, np.ndarray]) -> dict[str, object]:
     return result
 
 
+def trusted_heading_metrics(columns: dict[str, np.ndarray]) -> dict[str, object] | None:
+    attempted = columns.get("input_heading_update", np.zeros(len(columns["ts_us"]))) > 0.5
+    if not np.any(attempted):
+        return None
+    accepted = columns.get("eskf_heading_accepted", np.zeros(len(attempted))) > 0.5
+    fault = columns.get("input_heading_fault", np.zeros(len(attempted))) > 0.5
+    normal = attempted & ~fault
+    fault_attempted = attempted & fault
+    time_s = (columns["ts_us"] - columns["ts_us"][0]) * 1.0e-6
+    yaw_error = wrapped_error_deg(columns["eskf_yaw_deg"], columns["truth_yaw_deg"])
+    normal_accepts = np.flatnonzero(normal & accepted)
+
+    valid = columns.get("gnss_heading_valid", np.zeros(len(attempted))) > 0.5
+    valid_indices = np.flatnonzero(valid)
+    longest_start = longest_stop = None
+    if len(valid_indices) > 1:
+        search_start = int(valid_indices[0])
+        search_stop = int(valid_indices[-1])
+        cursor = search_start
+        while cursor <= search_stop:
+            if valid[cursor]:
+                cursor += 1
+                continue
+            start = cursor
+            while cursor <= search_stop and not valid[cursor]:
+                cursor += 1
+            if longest_start is None or cursor - start > longest_stop - longest_start:
+                longest_start, longest_stop = start, cursor
+
+    result: dict[str, object] = {
+        "attempted_updates": int(np.count_nonzero(attempted)),
+        "normal_attempts": int(np.count_nonzero(normal)),
+        "fault_attempts": int(np.count_nonzero(fault_attempted)),
+        "normal_acceptance_ratio": float(np.mean(accepted[normal])) if np.any(normal) else None,
+        "fault_rejection_ratio": (
+            float(np.mean(~accepted[fault_attempted])) if np.any(fault_attempted) else None
+        ),
+        "overall_post_first_accept_yaw_rmse_deg": (
+            float(np.sqrt(np.mean(
+                yaw_error[int(normal_accepts[0]):] * yaw_error[int(normal_accepts[0]):]
+            ))) if len(normal_accepts) else None
+        ),
+    }
+    if np.any(fault_attempted):
+        innovation = np.degrees(np.abs(columns["eskf_heading_innovation_rad"][fault_attempted]))
+        result["fault_innovation_min_abs_deg"] = float(np.min(innovation))
+    if longest_start is not None and longest_stop is not None:
+        recovery_candidates = np.flatnonzero(
+            (np.arange(len(attempted)) >= longest_stop) & normal & accepted
+        )
+        result["dropout_duration_s"] = float(
+            time_s[longest_stop - 1] - time_s[longest_start]
+        )
+        result["dropout_max_abs_yaw_error_deg"] = float(
+            np.max(np.abs(yaw_error[longest_start:longest_stop]))
+        )
+        if len(recovery_candidates):
+            recovery = int(recovery_candidates[0])
+            result["recovery_time_s"] = float(time_s[recovery] - time_s[longest_stop])
+            result["post_recovery_yaw_rmse_deg"] = float(np.sqrt(np.mean(
+                yaw_error[recovery:] * yaw_error[recovery:]
+            )))
+    return result
+
+
+def bias_metrics(columns: dict[str, np.ndarray]) -> dict[str, object] | None:
+    truth_accel_names = [f"truth_accel_bias_{axis}_m_s2" for axis in ("x", "y", "z")]
+    truth_gyro_names = [f"truth_gyro_bias_{axis}_rad_s" for axis in ("x", "y", "z")]
+    estimate_accel_names = [f"eskf_accel_bias_{axis}_m_s2" for axis in ("x", "y", "z")]
+    estimate_gyro_names = [f"eskf_gyro_bias_{axis}_rad_s" for axis in ("x", "y", "z")]
+    names = truth_accel_names + truth_gyro_names + estimate_accel_names + estimate_gyro_names
+    if not all(name in columns for name in names):
+        return None
+    truth_accel = np.column_stack([columns[name] for name in truth_accel_names])
+    truth_gyro = np.column_stack([columns[name] for name in truth_gyro_names])
+    if not np.any(np.isfinite(truth_accel)) or not np.any(np.isfinite(truth_gyro)):
+        return None
+    estimate_accel = np.column_stack([columns[name] for name in estimate_accel_names])
+    estimate_gyro = np.column_stack([columns[name] for name in estimate_gyro_names])
+    aligned = columns.get("eskf_static_aligned", np.ones(len(truth_accel))) > 0.5
+    valid = (
+        aligned
+        & np.all(np.isfinite(truth_accel), axis=1)
+        & np.all(np.isfinite(truth_gyro), axis=1)
+        & np.all(np.isfinite(estimate_accel), axis=1)
+        & np.all(np.isfinite(estimate_gyro), axis=1)
+    )
+    if not np.any(valid):
+        return None
+    accel_error = np.linalg.norm(estimate_accel - truth_accel, axis=1)
+    gyro_error = np.linalg.norm(estimate_gyro - truth_gyro, axis=1)
+    first = int(np.flatnonzero(valid)[0])
+    indices = np.flatnonzero(valid)
+    last = int(indices[-1])
+    time_s = (columns["ts_us"] - columns["ts_us"][0]) * 1.0e-6
+
+    def settling_time(error: np.ndarray, threshold: float) -> float | None:
+        post_alignment = indices[indices >= first]
+        outside = post_alignment[error[post_alignment] > threshold]
+        if len(outside) == 0:
+            return 0.0
+        candidate = int(outside[-1]) + 1
+        remaining = post_alignment[post_alignment >= candidate]
+        if len(remaining) == 0:
+            return None
+        return float(time_s[int(remaining[0])] - time_s[first])
+
+    return {
+        "alignment_time_s": float(time_s[first]),
+        "truth_accel_bias_m_s2": truth_accel[first].tolist(),
+        "truth_gyro_bias_rad_s": truth_gyro[first].tolist(),
+        "accel_error_at_alignment_m_s2": float(accel_error[first]),
+        "gyro_error_at_alignment_rad_s": float(gyro_error[first]),
+        "accel_final_error_m_s2": float(accel_error[last]),
+        "gyro_final_error_rad_s": float(gyro_error[last]),
+        "accel_error_rmse_m_s2": float(np.sqrt(np.mean(accel_error[valid] ** 2))),
+        "gyro_error_rmse_rad_s": float(np.sqrt(np.mean(gyro_error[valid] ** 2))),
+        "accel_error_reduction_ratio": float(
+            1.0 - accel_error[last] / max(accel_error[first], 1.0e-12)
+        ),
+        "gyro_error_reduction_ratio": float(
+            1.0 - gyro_error[last] / max(gyro_error[first], 1.0e-12)
+        ),
+        "accel_settling_time_below_0_05_m_s2_s": settling_time(accel_error, 0.05),
+        "gyro_settling_time_below_0_001_rad_s_s": settling_time(gyro_error, 0.001),
+    }
+
+
 def eskf_integrity_metrics(columns: dict[str, np.ndarray]) -> dict[str, object]:
     input_mag = columns.get("input_mag_update", np.ones(len(columns["ts_us"]))) > 0.5
     accepted = columns["eskf_mag_accepted"] > 0.5
@@ -627,7 +755,7 @@ def write_markdown(
         )
         if cold_start["heading_alignment_completed"]:
             lines.append(
-                f"- Magnetic heading alignment completed at "
+                f"- Heading alignment completed at "
                 f"{cold_start['alignment_time_s']:.3f} s; post-alignment attitude RMSE: "
                 f"{cold_start['post_alignment_attitude_rmse_deg']:.4f}°."
             )
@@ -637,6 +765,35 @@ def write_markdown(
         lines.append(
             f"- Position RMSE against the declared navigation reference: "
             f"{navigation['position_rmse_m']:.3f} m."
+        )
+    trusted_heading = metrics.get("trusted_heading")
+    if trusted_heading:
+        lines.extend(
+            [
+                "", "## Trusted-heading behavior", "",
+                f"- Normal accepted updates: "
+                f"{trusted_heading['normal_acceptance_ratio']:.3%}; fault rejection: "
+                f"{trusted_heading['fault_rejection_ratio']:.3%}.",
+                f"- Longest dropout: {trusted_heading.get('dropout_duration_s', 0.0):.3f} s; "
+                f"maximum yaw error during dropout: "
+                f"{trusted_heading.get('dropout_max_abs_yaw_error_deg', 0.0):.3f}°.",
+                f"- First accepted recovery delay: "
+                f"{trusted_heading.get('recovery_time_s', 0.0):.3f} s; post-recovery yaw RMSE: "
+                f"{trusted_heading.get('post_recovery_yaw_rmse_deg', 0.0):.3f}°.",
+            ]
+        )
+    bias = metrics.get("bias_estimation")
+    if bias:
+        lines.extend(
+            [
+                "", "## IMU bias estimation", "",
+                f"- Accelerometer bias vector error: {bias['accel_error_at_alignment_m_s2']:.5f} "
+                f"m/s² at alignment; {bias['accel_final_error_m_s2']:.5f} m/s² final.",
+                f"- Gyroscope bias vector error: {bias['gyro_error_at_alignment_rad_s']:.6f} "
+                f"rad/s at alignment; {bias['gyro_final_error_rad_s']:.6f} rad/s final.",
+                "- A single stationary pose cannot independently identify horizontal accelerometer "
+                "bias and tilt; this metric reports the resulting error rather than hiding it.",
+            ]
         )
     consistency = metrics.get("eskf_consistency")
     if consistency:
@@ -740,6 +897,8 @@ def main() -> None:
         "navigation": navigation_metrics(columns),
         "eskf_consistency": consistency_metrics(columns, args.reference_kind),
         "reference_resets": reset_summary(columns),
+        "trusted_heading": trusted_heading_metrics(columns),
+        "bias_estimation": bias_metrics(columns),
     }
     cold_start = cold_start_alignment_metrics(columns)
     if cold_start is not None:

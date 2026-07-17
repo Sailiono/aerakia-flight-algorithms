@@ -209,7 +209,10 @@ bool eskf_reset_attitude_covariance(
  * @brief Static Bias Alignment
  *
  * Initialize biases from stationary IMU data.
- * Call this with data collected while vehicle is stationary.
+ * Call this with data collected while vehicle is stationary. Gyroscope bias is
+ * directly observable. A single gravity direction does not fully distinguish
+ * accelerometer bias from tilt, so accelerometer-bias covariance deliberately
+ * remains broad for later motion-aided convergence.
  *
  * @param h         Pointer to filter handle
  * @param acc_buf   Buffer of accelerometer readings [n_samples x 3]

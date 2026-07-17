@@ -985,14 +985,21 @@ void eskf_align_static_bias_means(ESKF_Handle *h,
         h->state.ab[i] = acceleration_mean_m_s2[i] - expected_specific_force_body[i];
     }
 
-    /* Update covariance: high confidence in biases */
-    const eskf_float_t P_bias = 1e-4;
-    h->P[9][9]   = P_bias;
-    h->P[10][10] = P_bias;
-    h->P[11][11] = P_bias;
-    h->P[12][12] = P_bias;
-    h->P[13][13] = P_bias;
-    h->P[14][14] = P_bias;
+    /*
+     * A stationary mean directly observes gyro bias, but a single gravity
+     * direction cannot separate horizontal accelerometer bias from a small
+     * tilt error.  Keep the accelerometer-bias covariance broad enough for
+     * later GNSS-aided motion to correct it; marking all six biases equally
+     * certain makes the filter inconsistent after a one-pose alignment.
+     */
+    const eskf_float_t P_accel_bias = 4e-2; /* conservative 0.2 m/s^2 startup prior */
+    const eskf_float_t P_gyro_bias = 1e-4;  /* (0.01 rad/s)^2 */
+    h->P[9][9]   = P_accel_bias;
+    h->P[10][10] = P_accel_bias;
+    h->P[11][11] = P_accel_bias;
+    h->P[12][12] = P_gyro_bias;
+    h->P[13][13] = P_gyro_bias;
+    h->P[14][14] = P_gyro_bias;
 
     /* Zero cross-correlations with biases */
     for (i = 0; i < 9; i++) {

@@ -94,6 +94,39 @@ class MonteCarloRunnerTests(unittest.TestCase):
         self.assertTrue(np.all(np.diff(first) > 0))
         self.assertNotEqual(len(set(np.diff(first))), 1)
 
+    def test_trusted_heading_profile_has_fault_dropout_and_recovery(self) -> None:
+        import numpy as np
+
+        time_s = np.arange(2000, dtype=np.float64) / 100.0
+        _, _, _, yaw_deg = synthetic_generator.generate_motion(
+            20.0, 100.0, "heading_recovery"
+        )
+        valid, updates, heading, _, fault = synthetic_generator.trusted_heading_profile(
+            time_s, yaw_deg, 100.0, np.random.default_rng(9)
+        )
+        self.assertEqual(np.count_nonzero(updates[(time_s >= 8.0) & (time_s < 12.0)]), 0)
+        self.assertGreater(np.count_nonzero(fault), 0)
+        self.assertGreater(np.count_nonzero(updates[time_s >= 12.0]), 0)
+        self.assertTrue(np.all(np.isfinite(heading)))
+
+    def test_bias_excitation_starts_static_then_excites_all_axes(self) -> None:
+        import numpy as np
+
+        time_s, roll, pitch, yaw = synthetic_generator.generate_motion(
+            40.0, 100.0, "bias_excitation"
+        )
+        acceleration, velocity, position = synthetic_generator.bias_excitation_profile(
+            time_s, 100.0
+        )
+        self.assertTrue(np.allclose(roll[time_s < 2.0], 0.0))
+        self.assertTrue(np.allclose(acceleration[time_s < 2.0], 0.0))
+        self.assertGreater(np.ptp(roll), 20.0)
+        self.assertGreater(np.ptp(pitch), 15.0)
+        self.assertGreater(np.ptp(yaw), 30.0)
+        self.assertTrue(np.all(np.ptp(acceleration, axis=0) > 0.5))
+        self.assertTrue(np.all(np.isfinite(velocity)))
+        self.assertTrue(np.all(np.isfinite(position)))
+
 
 class FakeDataset:
     def __init__(self, name: str, data: dict[str, object]) -> None:
@@ -334,6 +367,44 @@ class EurocConverterTests(unittest.TestCase):
 
 
 class ValidationAnalyzerTests(unittest.TestCase):
+    def test_trusted_heading_metrics_separate_faults_and_dropout(self) -> None:
+        import numpy as np
+
+        columns = {
+            "ts_us": np.arange(8, dtype=np.float64) * 100_000.0,
+            "input_heading_update": np.array([1, 1, 1, 0, 0, 1, 1, 1], dtype=float),
+            "eskf_heading_accepted": np.array([1, 1, 0, 0, 0, 1, 1, 1], dtype=float),
+            "input_heading_fault": np.array([0, 0, 1, 0, 0, 0, 0, 0], dtype=float),
+            "gnss_heading_valid": np.array([1, 1, 1, 0, 0, 1, 1, 1], dtype=float),
+            "eskf_heading_innovation_rad": np.array([0, 0, 1.5, 0, 0, 0, 0, 0], dtype=float),
+            "eskf_yaw_deg": np.array([0, 0.1, 0.1, 0.2, 0.3, 0.1, 0.0, 0.0]),
+            "truth_yaw_deg": np.zeros(8),
+        }
+        metrics = analyzer.trusted_heading_metrics(columns)
+        assert metrics is not None
+        self.assertAlmostEqual(metrics["normal_acceptance_ratio"], 1.0)
+        self.assertAlmostEqual(metrics["fault_rejection_ratio"], 1.0)
+        self.assertAlmostEqual(metrics["dropout_max_abs_yaw_error_deg"], 0.3)
+        self.assertAlmostEqual(metrics["recovery_time_s"], 0.0)
+
+    def test_bias_metrics_report_reduction_and_settling(self) -> None:
+        import numpy as np
+
+        columns = {"ts_us": np.arange(5, dtype=float) * 1_000_000.0}
+        columns["eskf_static_aligned"] = np.array([0, 1, 1, 1, 1], dtype=float)
+        for axis in ("x", "y", "z"):
+            columns[f"truth_accel_bias_{axis}_m_s2"] = np.zeros(5)
+            columns[f"truth_gyro_bias_{axis}_rad_s"] = np.zeros(5)
+            columns[f"eskf_accel_bias_{axis}_m_s2"] = np.zeros(5)
+            columns[f"eskf_gyro_bias_{axis}_rad_s"] = np.zeros(5)
+        columns["eskf_accel_bias_x_m_s2"] = np.array([0.2, 0.2, 0.08, 0.04, 0.03])
+        columns["eskf_gyro_bias_x_rad_s"] = np.array([0.002, 0.002, 0.0008, 0.0006, 0.0005])
+        metrics = analyzer.bias_metrics(columns)
+        assert metrics is not None
+        self.assertAlmostEqual(metrics["accel_error_reduction_ratio"], 0.85)
+        self.assertAlmostEqual(metrics["accel_settling_time_below_0_05_m_s2_s"], 2.0)
+        self.assertAlmostEqual(metrics["gyro_settling_time_below_0_001_rad_s_s"], 1.0)
+
     def test_cold_start_reports_tilt_without_heading(self) -> None:
         import numpy as np
 
