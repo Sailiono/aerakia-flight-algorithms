@@ -15,6 +15,16 @@
     "seed": 7
   },
   "tracks": {
+    "raw_imu_cold_start_tilt_only": {
+      "static_hint_duration_s": 1.2,
+      "stationary_gyro_threshold_rad_s": 0.15,
+      "tilt_alignment_time_s": 1.0,
+      "post_tilt_alignment_tilt_rmse_deg": 1.230283,
+      "heading_alignment_completed": false,
+      "position_rmse_m": 0.137081,
+      "velocity_rmse_m_s": 0.085612,
+      "navigation_nees_mean": 5.618810
+    },
     "raw_imu_trusted_attitude_init": {
       "mahony_robust_attitude_rmse_deg": 95.507551,
       "mahony_robust_tilt_rmse_deg": 3.359699,

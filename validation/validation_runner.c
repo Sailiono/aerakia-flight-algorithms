@@ -284,6 +284,7 @@ int main(int argc, char *argv[])
     int eskf_initialized = 0, mag_reference_initialized = 0, mahony_reference_seeded = 0;
     int cold_start = 0;
     int reference_attitude_init = 0;
+    float stationary_gyro_threshold_rad_s = -1.0f;
     int input_argument;
     int output_argument;
     int argument;
@@ -292,6 +293,7 @@ int main(int argc, char *argv[])
     if (argc < 3) {
         fprintf(stderr,
                 "Usage: %s [--cold-start|--reference-attitude-init] "
+                "[--stationary-gyro-threshold-rad-s VALUE] "
                 "INPUT_REPLAY_CSV OUTPUT_RESULTS_CSV\n",
                 argv[0]);
         return 2;
@@ -303,6 +305,21 @@ int main(int argc, char *argv[])
             cold_start = 1;
         } else if (strcmp(argv[argument], "--reference-attitude-init") == 0) {
             reference_attitude_init = 1;
+        } else if (strcmp(argv[argument], "--stationary-gyro-threshold-rad-s") == 0) {
+            char *end;
+            double value;
+            if (++argument >= input_argument) {
+                fputs("Missing stationary gyro threshold value\n", stderr);
+                return 2;
+            }
+            errno = 0;
+            value = strtod(argv[argument], &end);
+            if (errno != 0 || end == argv[argument] || *end != '\0'
+                || !isfinite(value) || value <= 0.0) {
+                fputs("Invalid stationary gyro threshold\n", stderr);
+                return 2;
+            }
+            stationary_gyro_threshold_rad_s = (float)value;
         } else {
             fprintf(stderr, "Unknown option: %s\n", argv[argument]);
             return 2;
@@ -330,6 +347,9 @@ int main(int argc, char *argv[])
     aerakia_mahony_default_config(&robust_config);
     aerakia_mahony_init(&robust, &robust_config);
     aerakia_eskf_default_config(&eskf_config);
+    if (stationary_gyro_threshold_rad_s > 0.0f) {
+        eskf_config.stationary_gyro_threshold_rad_s = stationary_gyro_threshold_rad_s;
+    }
     eskf_config.fuse_magnetometer = true;
 
     fputs(

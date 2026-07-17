@@ -127,6 +127,12 @@ python simulation/tools/convert_euroc_to_replay.py V1_03_difficult \
 | Raw IMU | 95.508° / 3.360° | 4.102° / 1.047° | 0.136 m / 0.091 m/s | 3.066 / 2.506 | 5.702 |
 | Reference-bias corrected | 2.875° / 2.845° | 2.474° / 0.829° | 0.137 m / 0.086 m/s | 3.065 / 2.427 | 5.628 |
 
+A separate raw-IMU cold-start run marks only the first 1.2 s as stationary from external Vicon
+evidence and raises the validation runner's pre-alignment gyro threshold to 0.15 rad/s to admit the
+observed 0.08 rad/s startup bias. Tilt alignment completes at 1.0 s; post-alignment tilt RMSE is
+1.230°, navigation NEES is 5.619, and covariance remains healthy. Heading alignment correctly
+does not complete because the dataset contains no magnetometer or trusted heading observation.
+
 This sequence repeatedly approaches ±90° pitch. The older combined Euler metric reported false
 14.5°/4.3° errors because equivalent roll/yaw representations jump by 180° at the singularity.
 The retained per-axis plot exposed that validation bug; primary scoring now uses quaternion

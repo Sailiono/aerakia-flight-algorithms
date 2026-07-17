@@ -252,9 +252,12 @@ def convert_euroc(
     apply_reference_bias: bool = False,
     pose_source: str = "batch",
     pose_time_offset_us: float = 0.0,
+    static_hint_duration_s: float = 0.0,
 ) -> dict[str, object]:
     if not math.isfinite(pose_time_offset_us):
         raise ValueError("pose time offset must be finite")
+    if not math.isfinite(static_hint_duration_s) or static_hint_duration_s < 0.0:
+        raise ValueError("static hint duration must be finite and non-negative")
     mav0 = sequence_dir / "mav0"
     imu_path = mav0 / "imu0" / "data.csv"
     imu_yaml_path = mav0 / "imu0" / "sensor.yaml"
@@ -344,6 +347,10 @@ def convert_euroc(
         buckets = (imu_timestamp_ns - imu_timestamp_ns[0]) // period_ns
         position_update[0] = 1
         position_update[1:] = buckets[1:] != buckets[:-1]
+    timestamp_us = np.rint((imu_timestamp_ns - imu_timestamp_ns[0]) * 1.0e-3).astype(np.int64)
+    static_hint = timestamp_us <= int(round(static_hint_duration_s * 1.0e6))
+    if static_hint_duration_s == 0.0:
+        static_hint[:] = False
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     header = [
@@ -365,7 +372,6 @@ def convert_euroc(
     with output_path.open("w", encoding="utf-8", newline="") as stream:
         writer = csv.writer(stream)
         writer.writerow(header)
-        timestamp_us = np.rint((imu_timestamp_ns - imu_timestamp_ns[0]) * 1.0e-3).astype(np.int64)
         for index in range(len(imu)):
             writer.writerow(
                 [
@@ -377,7 +383,8 @@ def convert_euroc(
                     *quaternion_ned_frd[index], 1,
                     *position_ned[index], *velocity_ned[index], int(position_update[index]),
                     *gps_position[index], *gps_velocity[index],
-                    synthetic_position_sigma_m**2, synthetic_velocity_sigma_m_s**2, 0,
+                    synthetic_position_sigma_m**2, synthetic_velocity_sigma_m_s**2,
+                    int(static_hint[index]),
                 ]
             )
 
@@ -434,6 +441,11 @@ def convert_euroc(
             "seed": seed,
             "updates": int(np.count_nonzero(position_update)),
         },
+        "application_static_hint": {
+            "duration_s": static_hint_duration_s,
+            "samples": int(np.count_nonzero(static_hint)),
+            "source": "explicit converter argument; must be justified from external motion truth",
+        },
         "reference_bias_correction": {
             "applied": apply_reference_bias,
             "source": "interpolated EuRoC batch-estimated b_w_RS_S and b_a_RS_S",
@@ -474,6 +486,12 @@ def main() -> None:
         default=0.0,
         help="subtract this recorded latency from raw pose timestamps before interpolation",
     )
+    parser.add_argument(
+        "--static-hint-duration-s",
+        type=float,
+        default=0.0,
+        help="mark only this initial externally verified stationary interval",
+    )
     args = parser.parse_args()
     if args.synthetic_gnss_rate_hz < 0.0:
         parser.error("--synthetic-gnss-rate-hz must be non-negative")
@@ -490,6 +508,7 @@ def main() -> None:
         args.apply_reference_bias,
         args.pose_source,
         args.pose_time_offset_us,
+        args.static_hint_duration_s,
     )
     print(json.dumps(metadata, indent=2, sort_keys=True))
 

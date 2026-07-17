@@ -173,11 +173,37 @@ def cold_start_alignment_metrics(columns: dict[str, np.ndarray]) -> dict[str, ob
     heading_aligned = columns.get(
         "eskf_static_heading_aligned", np.zeros(len(tilt_aligned))
     ) > 0.5
+    if not np.any(tilt_aligned):
+        return None
+    first_tilt = int(np.flatnonzero(tilt_aligned)[0])
+    time_s = (columns["ts_us"] - columns["ts_us"][0]) * 1.0e-6
+    truth_q = _normalized_quaternion_columns(columns, "truth")
+    estimate_q = _normalized_quaternion_columns(columns, "eskf")
+    if truth_q is not None and estimate_q is not None:
+        _, tilt_error = quaternion_attitude_errors_deg(
+            estimate_q[first_tilt:], truth_q[first_tilt:]
+        )
+        post_tilt_rmse = float(np.sqrt(np.mean(tilt_error * tilt_error)))
+    else:
+        roll_error = wrapped_error_deg(
+            columns["eskf_roll_deg"][first_tilt:], columns["truth_roll_deg"][first_tilt:]
+        )
+        pitch_error = wrapped_error_deg(
+            columns["eskf_pitch_deg"][first_tilt:], columns["truth_pitch_deg"][first_tilt:]
+        )
+        post_tilt_rmse = float(
+            np.sqrt(np.mean(np.column_stack((roll_error * roll_error, pitch_error * pitch_error))))
+        )
+    result: dict[str, object] = {
+        "tilt_alignment_time_s": float(time_s[first_tilt]),
+        "post_tilt_alignment_samples": int(len(time_s) - first_tilt),
+        "post_tilt_alignment_tilt_rmse_deg": post_tilt_rmse,
+        "heading_alignment_completed": bool(np.any(heading_aligned)),
+    }
     complete = tilt_aligned & heading_aligned
     if not np.any(complete):
-        return None
+        return result
     first = int(np.flatnonzero(complete)[0])
-    time_s = (columns["ts_us"] - columns["ts_us"][0]) * 1.0e-6
     squared_errors: list[np.ndarray] = []
     axes: dict[str, dict[str, float]] = {}
     for axis in AXES:
@@ -187,19 +213,18 @@ def cold_start_alignment_metrics(columns: dict[str, np.ndarray]) -> dict[str, ob
         squared_errors.append(error * error)
         axes[axis] = _error_summary(error)
     post_alignment_rmse = float(np.sqrt(np.mean(np.column_stack(squared_errors))))
-    truth_q = _normalized_quaternion_columns(columns, "truth")
-    estimate_q = _normalized_quaternion_columns(columns, "eskf")
     if truth_q is not None and estimate_q is not None:
         geodesic_error, _ = quaternion_attitude_errors_deg(
             estimate_q[first:], truth_q[first:]
         )
         post_alignment_rmse = float(np.sqrt(np.mean(geodesic_error * geodesic_error)))
-    return {
+    result.update({
         "alignment_time_s": float(time_s[first]),
         "post_alignment_samples": int(len(time_s) - first),
         "post_alignment_attitude_rmse_deg": post_alignment_rmse,
         "axes": axes,
-    }
+    })
+    return result
 
 
 def segment_aligned_yaw_metrics(columns: dict[str, np.ndarray]) -> dict[str, object]:
@@ -596,10 +621,18 @@ def write_markdown(
     cold_start = metrics.get("cold_start_alignment")
     if cold_start:
         lines.append(
-            f"- Cold-start tilt + magnetic heading alignment completed at "
-            f"{cold_start['alignment_time_s']:.3f} s; post-alignment attitude RMSE: "
-            f"{cold_start['post_alignment_attitude_rmse_deg']:.4f}°."
+            f"- Cold-start tilt alignment completed at "
+            f"{cold_start['tilt_alignment_time_s']:.3f} s; post-alignment tilt RMSE: "
+            f"{cold_start['post_tilt_alignment_tilt_rmse_deg']:.4f}°."
         )
+        if cold_start["heading_alignment_completed"]:
+            lines.append(
+                f"- Magnetic heading alignment completed at "
+                f"{cold_start['alignment_time_s']:.3f} s; post-alignment attitude RMSE: "
+                f"{cold_start['post_alignment_attitude_rmse_deg']:.4f}°."
+            )
+        else:
+            lines.append("- Heading alignment did not complete because no accepted heading source was present.")
     if navigation:
         lines.append(
             f"- Position RMSE against the declared navigation reference: "

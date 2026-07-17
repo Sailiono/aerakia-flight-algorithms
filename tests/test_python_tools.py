@@ -279,7 +279,8 @@ class EurocConverterTests(unittest.TestCase):
             np.savetxt(vicon_dir / "data.csv", vicon, delimiter=",")
             vicon_output = Path(temp_directory) / "replay_vicon.csv"
             vicon_metadata = euroc_converter.convert_euroc(
-                sequence, vicon_output, pose_source="vicon", pose_time_offset_us=5_000.0
+                sequence, vicon_output, pose_source="vicon", pose_time_offset_us=5_000.0,
+                static_hint_duration_s=0.005,
             )
             with vicon_output.open("r", encoding="utf-8", newline="") as stream:
                 vicon_rows = list(csv.DictReader(stream))
@@ -289,6 +290,7 @@ class EurocConverterTests(unittest.TestCase):
             self.assertAlmostEqual(float(vicon_rows[0]["ref_q_y"]), 0.0, places=7)
             self.assertAlmostEqual(float(vicon_rows[0]["ref_q_z"]), 0.0, places=7)
             self.assertEqual(vicon_metadata["pose_reference"]["source"], "vicon")
+            self.assertEqual(sum(int(row["static_hint"]) for row in vicon_rows), 2)
             self.assertEqual(
                 vicon_metadata["pose_reference"]["logged_timestamp_minus_physical_timestamp_us"],
                 5_000.0,
@@ -296,6 +298,32 @@ class EurocConverterTests(unittest.TestCase):
 
 
 class ValidationAnalyzerTests(unittest.TestCase):
+    def test_cold_start_reports_tilt_without_heading(self) -> None:
+        import numpy as np
+
+        columns = {
+            "ts_us": np.array([0.0, 1_000_000.0, 2_000_000.0]),
+            "eskf_static_tilt_aligned": np.array([0.0, 1.0, 1.0]),
+            "eskf_static_heading_aligned": np.zeros(3),
+            "truth_roll_deg": np.zeros(3),
+            "truth_pitch_deg": np.zeros(3),
+            "truth_yaw_deg": np.zeros(3),
+            "eskf_roll_deg": np.zeros(3),
+            "eskf_pitch_deg": np.zeros(3),
+            "eskf_yaw_deg": np.zeros(3),
+        }
+        for prefix in ("truth", "eskf"):
+            columns[f"{prefix}_q_w"] = np.ones(3)
+            columns[f"{prefix}_q_x"] = np.zeros(3)
+            columns[f"{prefix}_q_y"] = np.zeros(3)
+            columns[f"{prefix}_q_z"] = np.zeros(3)
+        result = analyzer.cold_start_alignment_metrics(columns)
+        self.assertIsNotNone(result)
+        assert result is not None
+        self.assertFalse(result["heading_alignment_completed"])
+        self.assertAlmostEqual(result["post_tilt_alignment_tilt_rmse_deg"], 0.0)
+        self.assertNotIn("post_alignment_attitude_rmse_deg", result)
+
     def test_quaternion_metric_ignores_euler_gimbal_lock_representation(self) -> None:
         import numpy as np
 

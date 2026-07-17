@@ -79,6 +79,12 @@ therefore tests propagation/update math only; it must never be presented as onli
 performance. Both use the same trusted initial reference attitude because `MH_01_easy` starts in
 motion and provides neither magnetometer nor an absolute heading sensor.
 
+`V1_03_difficult` adds a third, tilt-only cold-start track. Its initial stationary flag is asserted
+from external Vicon motion, and the validation runner records a gyro threshold chosen to admit the
+measured uncalibrated bias. Tilt completion and post-tilt gravity-direction RMSE are scored even when
+heading alignment cannot complete. Full-attitude cold-start scoring still requires an accepted
+heading source.
+
 ## Private ULog track
 
 `convert_ulog_to_replay.py` extracts calibrated IMU, sparse magnetometer updates, the configured
