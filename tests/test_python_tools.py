@@ -17,6 +17,7 @@ import convert_capture_to_golden as converter  # noqa: E402
 import convert_euroc_to_replay as euroc_converter  # noqa: E402
 import convert_ulog_to_replay as ulog_converter  # noqa: E402
 import analyze_results as analyzer  # noqa: E402
+import generate_synthetic_imu as synthetic_generator  # noqa: E402
 import run_monte_carlo as monte_carlo  # noqa: E402
 
 
@@ -79,6 +80,19 @@ class MonteCarloRunnerTests(unittest.TestCase):
         summary = monte_carlo.summarize_trials([trial])
         self.assertEqual(summary["failures"][0]["seed"], 9)
         self.assertIn("position_rmse_m", summary["failures"][0]["reasons"][0])
+
+    def test_timestamp_jitter_is_deterministic_and_monotonic(self) -> None:
+        import numpy as np
+
+        first = synthetic_generator.jittered_timestamps_us(
+            100, 100.0, 250.0, np.random.default_rng(42)
+        )
+        second = synthetic_generator.jittered_timestamps_us(
+            100, 100.0, 250.0, np.random.default_rng(42)
+        )
+        np.testing.assert_array_equal(first, second)
+        self.assertTrue(np.all(np.diff(first) > 0))
+        self.assertNotEqual(len(set(np.diff(first))), 1)
 
 
 class FakeDataset:

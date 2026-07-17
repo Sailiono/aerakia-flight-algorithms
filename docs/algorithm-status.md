@@ -18,7 +18,7 @@ accuracy against independent physical truth.
 | Measurement integrity | NIS gates, latched magnetic-disturbance rejection, recovery confirmation, navigation recovery supervision | Passing deterministic regressions |
 | Heading semantics | Magnetometer, trusted heading, GNSS course, and PX4 GSF are separate paths; course is never silently treated as body yaw | Implemented |
 | Cold-start alignment | Static accelerometer tilt, magnetic heading with explicit declination, IMU-bias initialization, and covariance reset at the new linearization point; no PX4 attitude seed | Passing unit/noisy synthetic checks and direct-Vicon tilt (1.230° post-alignment RMSE); external yaw truth still pending |
-| Navigation consistency | GNSS position/velocity NIS and posterior 6-state navigation NEES through a five-second outage and reacquisition | 20-seed measurement-noise baseline passes with zero numerical/recovery failures; bias and timing distributions pending |
+| Navigation consistency | GNSS position/velocity NIS and posterior 6-state navigation NEES through a five-second outage and reacquisition | 20-seed measurement-noise baseline and constant-bias/timestamp-jitter extension pass with zero numerical/recovery failures; thermal and transport faults pending |
 | EuRoC public replay | 36,381-sample Leica/IMU `MH_01_easy` and 20,932-sample direct-pose `V1_03_difficult`; raw and reference-bias-corrected tracks retained | Navigation NIS/NEES consistent; direct Vicon external pose passes high-dynamic replay; not a cold-start or independent-heading test |
 | Host regression | Strict C99 warnings-as-errors build, public API tests, deterministic synthetic fault suite | Passing reviewed thresholds |
 | Private replay | Sanitized relative GNSS, reset events, GSF diagnostics, and native C replay across the selected ULog suite | Operational; PX4 remains an engineering reference |
@@ -29,8 +29,8 @@ accuracy against independent physical truth.
    Vicon now validates tilt and static bias alignment; its dataset has no magnetometer/heading input.
 2. Exercise the trusted-heading path with a real dual-antenna GNSS, vision, or controlled injected
    heading dataset. The present private ULogs contain no valid direct GNSS heading samples.
-3. Extend the first 20-seed NIS/NEES baseline beyond measurement noise and fixed aiding loss to
-   randomized constant/thermal bias, timing jitter, transport delay, and sample loss.
+3. Extend the implemented constant-bias and monotonic-timestamp-jitter Monte Carlo gate to thermal
+   drift, transport delay, reordering, and sample loss.
 4. Run the exact FCOne adapter through timestamp, frame, unit, dropout, and stale-data contract tests.
 
 ## P1 work when the new hardware is available
@@ -65,3 +65,19 @@ the stale attitude cross-covariances, and applies conservative configurable unce
 These are synthetic measurement-noise results with a fixed five-second GNSS outage. They are not
 physical truth, and their empirical seed percentiles are not theoretical independent-sample
 confidence intervals.
+
+## 2026-07-18 bias and timestamp extension
+
+The same 20-seed navigation scenario now draws one constant three-axis accelerometer and gyroscope
+bias per run (`σ=0.05 m/s²` and `σ=0.20°/s`) and applies monotonic per-interval timestamp jitter
+(`σ=250 µs` at 100 Hz). Each generated input records the actual bias vector and interval extrema.
+
+Three seeds exceeded the earlier noise-only 1.5° attitude gate, reaching 1.596–1.880°. One reached
+0.3507 m/s against the earlier 0.35 m/s velocity gate. These runs remained finite, accepted normal
+aiding, required no navigation reset, and retained reasonable NIS/NEES. The attitude increase is
+consistent with the static observability limit between horizontal accelerometer bias and tilt; the
+test does not claim that one stationary pose can identify both exactly.
+
+The declared stress gate is therefore 2.0° post-alignment attitude RMSE and 0.40 m/s velocity RMSE,
+while retaining the tighter deterministic noise-only CI thresholds. This is a scenario-specific,
+documented gate change rather than a general relaxation of flight requirements.

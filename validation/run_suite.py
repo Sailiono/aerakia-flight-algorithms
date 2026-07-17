@@ -39,6 +39,9 @@ def main() -> None:
     parser.add_argument("--duration", type=float, default=20.0)
     parser.add_argument("--rate", type=float, default=100.0)
     parser.add_argument("--seed", type=int, default=7)
+    parser.add_argument("--accel-bias-std-m-s2", type=float, default=0.0)
+    parser.add_argument("--gyro-bias-std-deg-s", type=float, default=0.0)
+    parser.add_argument("--timestamp-jitter-std-us", type=float, default=0.0)
     args = parser.parse_args()
 
     root = Path(__file__).resolve().parents[1]
@@ -61,6 +64,7 @@ def main() -> None:
         scenario_dir.mkdir(parents=True, exist_ok=True)
         input_csv = scenario_dir / "input.csv"
         results_csv = scenario_dir / "results.csv"
+        generation_metadata = scenario_dir / "input-metadata.json"
 
         generator_command = [
             sys.executable,
@@ -71,6 +75,10 @@ def main() -> None:
             "--seed", str(args.seed),
             "--motion", str(scenario["motion"]),
             "--anomaly", str(scenario["anomaly"]),
+            "--accel-bias-std-m-s2", str(args.accel_bias_std_m_s2),
+            "--gyro-bias-std-deg-s", str(args.gyro_bias_std_deg_s),
+            "--timestamp-jitter-std-us", str(args.timestamp_jitter_std_us),
+            "--metadata", str(generation_metadata),
         ]
         if scenario.get("static_hint"):
             generator_command.append("--static-hint")

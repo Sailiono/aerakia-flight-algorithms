@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import math
 from pathlib import Path
 
@@ -12,6 +13,23 @@ import numpy as np
 
 
 GRAVITY_M_S2 = 9.80665
+
+
+def jittered_timestamps_us(
+    sample_count: int,
+    rate_hz: float,
+    jitter_std_us: float,
+    rng: np.random.Generator,
+) -> np.ndarray:
+    nominal_dt_us = 1_000_000.0 / rate_hz
+    if jitter_std_us <= 0.0:
+        return np.rint(np.arange(sample_count, dtype=np.float64) * nominal_dt_us).astype(np.int64)
+    increments = nominal_dt_us + rng.normal(0.0, jitter_std_us, max(0, sample_count - 1))
+    increments = np.maximum(increments, 0.25 * nominal_dt_us)
+    timestamps = np.zeros(sample_count, dtype=np.float64)
+    if sample_count > 1:
+        timestamps[1:] = np.cumsum(increments)
+    return np.rint(timestamps).astype(np.int64)
 
 
 def generate_motion(
@@ -155,9 +173,10 @@ def write_golden_csv(
     gps_velocity_ned_m_s: np.ndarray,
     gps_updates: np.ndarray,
     position_reference_valid: np.ndarray,
+    timestamp_us: np.ndarray,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    dt_us = int(round(1_000_000.0 / rate_hz))
+    nominal_dt_us = int(round(1_000_000.0 / rate_hz))
     header = [
         "seq", "host_ts_us", "ts_us", "dt_us",
         "raw_acc_mg_x", "raw_acc_mg_y", "raw_acc_mg_z",
@@ -178,7 +197,8 @@ def write_golden_csv(
         writer = csv.writer(stream)
         writer.writerow(header)
         for index, time_value in enumerate(time_s):
-            ts_us = int(round(time_value * 1_000_000.0))
+            ts_us = int(timestamp_us[index])
+            dt_us = nominal_dt_us if index == 0 else ts_us - int(timestamp_us[index - 1])
             wrapped_yaw = (yaw_deg[index] + 180.0) % 360.0 - 180.0
             writer.writerow(
                 [
@@ -238,12 +258,29 @@ def main() -> None:
         help="mark samples as application-confirmed stationary for alignment and ZUPT",
     )
     parser.add_argument("--seed", type=int, default=0, help="random seed")
+    parser.add_argument(
+        "--accel-bias-std-m-s2", type=float, default=0.0,
+        help="standard deviation used to draw one constant three-axis accelerometer bias",
+    )
+    parser.add_argument(
+        "--gyro-bias-std-deg-s", type=float, default=0.0,
+        help="standard deviation used to draw one constant three-axis gyroscope bias",
+    )
+    parser.add_argument(
+        "--timestamp-jitter-std-us", type=float, default=0.0,
+        help="standard deviation of per-interval timestamp jitter; intervals remain monotonic",
+    )
+    parser.add_argument("--metadata", type=Path, help="optional JSON generation manifest")
     args = parser.parse_args()
 
     if args.duration <= 0.0 or args.rate <= 0.0:
         parser.error("--duration and --rate must be positive")
+    if args.accel_bias_std_m_s2 < 0.0 or args.gyro_bias_std_deg_s < 0.0 \
+            or args.timestamp_jitter_std_us < 0.0:
+        parser.error("bias and timestamp-jitter standard deviations must be non-negative")
 
     rng = np.random.default_rng(args.seed)
+    timing_rng = np.random.default_rng(args.seed ^ 0xA34A91)
     time_s, roll_deg, pitch_deg, yaw_deg = generate_motion(args.duration, args.rate, args.motion)
     acceleration_ned = np.zeros((len(time_s), 3), dtype=np.float64)
     velocity_ned = np.zeros_like(acceleration_ned)
@@ -260,6 +297,20 @@ def main() -> None:
         gyro_noise_deg_s=0.05,
         mag_noise_ut=0.20,
         acceleration_ned_m_s2=acceleration_ned,
+    )
+    # Preserve the historical deterministic random stream when injection is disabled.
+    acceleration_bias = (
+        rng.normal(0.0, args.accel_bias_std_m_s2, 3)
+        if args.accel_bias_std_m_s2 > 0.0 else np.zeros(3, dtype=np.float64)
+    )
+    gyroscope_bias = (
+        rng.normal(0.0, args.gyro_bias_std_deg_s, 3)
+        if args.gyro_bias_std_deg_s > 0.0 else np.zeros(3, dtype=np.float64)
+    )
+    accel += acceleration_bias
+    gyro += gyroscope_bias
+    timestamp_us = jittered_timestamps_us(
+        len(time_s), args.rate, args.timestamp_jitter_std_us, timing_rng
     )
     anomaly_flags = inject_magnetic_anomaly(
         magnetic,
@@ -301,7 +352,30 @@ def main() -> None:
         gps_velocity,
         gps_updates,
         position_reference_valid,
+        timestamp_us,
     )
+    if args.metadata is not None:
+        args.metadata.parent.mkdir(parents=True, exist_ok=True)
+        args.metadata.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "seed": args.seed,
+                    "sample_count": len(time_s),
+                    "rate_hz": args.rate,
+                    "acceleration_bias_m_s2": acceleration_bias.tolist(),
+                    "gyroscope_bias_deg_s": gyroscope_bias.tolist(),
+                    "accel_bias_std_m_s2": args.accel_bias_std_m_s2,
+                    "gyro_bias_std_deg_s": args.gyro_bias_std_deg_s,
+                    "timestamp_jitter_std_us": args.timestamp_jitter_std_us,
+                    "timestamp_interval_min_us": int(np.min(np.diff(timestamp_us))),
+                    "timestamp_interval_max_us": int(np.max(np.diff(timestamp_us))),
+                },
+                indent=2,
+                sort_keys=True,
+            ) + "\n",
+            encoding="utf-8",
+        )
     print(f"Wrote {len(time_s)} samples to {args.out}")
 
 

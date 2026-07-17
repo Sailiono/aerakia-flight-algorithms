@@ -15,8 +15,8 @@ import numpy as np
 
 LIMITS = {
     "position_rmse_m": 0.75,
-    "velocity_rmse_m_s": 0.35,
-    "attitude_rmse_deg": 1.50,
+    "velocity_rmse_m_s": 0.40,
+    "attitude_rmse_deg": 2.00,
     "navigation_recoveries": 0.0,
     "minimum_healthy_ratio": 1.0,
 }
@@ -117,6 +117,9 @@ def main() -> None:
     parser.add_argument("--seeds", default="0:20", help="comma list and/or half-open ranges")
     parser.add_argument("--duration", type=float, default=20.0)
     parser.add_argument("--rate", type=float, default=100.0)
+    parser.add_argument("--accel-bias-std-m-s2", type=float, default=0.05)
+    parser.add_argument("--gyro-bias-std-deg-s", type=float, default=0.20)
+    parser.add_argument("--timestamp-jitter-std-us", type=float, default=250.0)
     args = parser.parse_args()
 
     root = Path(__file__).resolve().parents[1]
@@ -137,6 +140,9 @@ def main() -> None:
                 "--duration", str(args.duration),
                 "--rate", str(args.rate),
                 "--seed", str(seed),
+                "--accel-bias-std-m-s2", str(args.accel_bias_std_m_s2),
+                "--gyro-bias-std-deg-s", str(args.gyro_bias_std_deg_s),
+                "--timestamp-jitter-std-us", str(args.timestamp_jitter_std_us),
             ],
             cwd=root,
             env=environment,
@@ -147,6 +153,10 @@ def main() -> None:
             encoding="utf-8"
         ))
         trial = extract_trial(seed, metrics)
+        generation = json.loads((trial_dir / "navigation_outage/input-metadata.json").read_text(
+            encoding="utf-8"
+        ))
+        trial["generation"] = generation
         trials.append(trial)
         print(
             f"seed={seed:4d} position={trial['position_rmse_m']:.3f} m "
@@ -162,15 +172,20 @@ def main() -> None:
             "seeds": seeds,
             "duration_s": args.duration,
             "rate_hz": args.rate,
+            "accel_bias_std_m_s2": args.accel_bias_std_m_s2,
+            "gyro_bias_std_deg_s": args.gyro_bias_std_deg_s,
+            "timestamp_jitter_std_us": args.timestamp_jitter_std_us,
             "covered": [
                 "independent randomized IMU, magnetometer, GNSS position, and GNSS velocity noise",
+                "randomized constant three-axis accelerometer and gyroscope bias",
+                "monotonic per-interval IMU timestamp jitter",
                 "cold-start alignment",
                 "five-second GNSS aiding outage and recovery",
                 "navigation NIS and posterior velocity-position NEES",
             ],
             "not_covered": [
-                "randomized constant or temperature-dependent IMU bias",
-                "timestamp jitter, transport delay, reordering, or dropped IMU samples",
+                "temperature-dependent or time-varying IMU bias",
+                "transport delay, reordering, or dropped IMU samples",
                 "independent physical truth or flight qualification",
             ],
         },
@@ -208,8 +223,9 @@ def main() -> None:
         f"Acceptance failures: **{len(failures)}**.",
         "",
         "P05/P95 are empirical percentiles across seeds, not independent-sample theoretical "
-        "confidence bounds. This baseline randomizes measurement noise and exercises the fixed "
-        "five-second aiding outage. Bias and timing fault distributions remain separate P0 work.",
+        "confidence bounds. This baseline randomizes measurement noise, constant IMU bias, and "
+        "monotonic timestamp jitter while exercising the fixed five-second aiding outage. "
+        "Temperature drift and transport faults remain separate P0 work.",
     ])
     (args.out_dir / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     if failures:

@@ -73,8 +73,9 @@ coverage is not treated as an independent-sample hypothesis test.
 `run_monte_carlo.py` formalizes the first reviewed multi-seed navigation gate. It retains every
 seed result, reports failure seeds, and aggregates empirical P05/P95 ranges for accuracy and
 consistency metrics. The current phase randomizes measurement noise and includes the fixed
-five-second GNSS outage. It does not yet randomize constant/thermal bias, timestamps, transport
-delay, reordering, or missing IMU samples; those remain explicit P0 extensions.
+five-second GNSS outage, drawn constant three-axis IMU biases, and monotonic interval jitter. It
+does not yet model temperature-varying bias, transport delay, reordering, or missing IMU samples;
+those remain explicit P0 extensions.
 
 The staged external intake and the limits of each source are documented in
 [public datasets](public-datasets.md).
