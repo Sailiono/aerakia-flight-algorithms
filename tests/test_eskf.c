@@ -18,6 +18,22 @@ static int near(double actual, double expected, double tolerance)
     return fabs(actual - expected) <= tolerance;
 }
 
+static double yaw_from_quaternion(const eskf_float_t q[4])
+{
+    return atan2(
+        2.0 * (q[0] * q[3] + q[1] * q[2]),
+        1.0 - 2.0 * (q[2] * q[2] + q[3] * q[3])
+    );
+}
+
+static void yaw_quaternion(double yaw, eskf_float_t q[4])
+{
+    q[0] = cos(0.5 * yaw);
+    q[1] = 0.0;
+    q[2] = 0.0;
+    q[3] = sin(0.5 * yaw);
+}
+
 static void test_initialization(void)
 {
     ESKF_Handle filter;
@@ -102,6 +118,79 @@ static void test_position_update_and_gate(void)
     check_true(near(filter.state.p[2], before[2], 1e-12), "rejected update leaves down unchanged");
 }
 
+static void test_velocity_update_and_gate(void)
+{
+    ESKF_Handle filter;
+    ESKF_InnovResult result;
+    const eskf_float_t nearby[3] = {0.5, -0.25, 0.1};
+    const eskf_float_t outlier[3] = {100.0, 100.0, 100.0};
+    eskf_float_t before[3];
+
+    eskf_init(&filter, NULL, NULL);
+    eskf_update_velocity(&filter, nearby, 1.0, &result);
+    check_true(result.accepted, "nearby velocity update passes innovation gate");
+    before[0] = filter.state.v[0];
+    before[1] = filter.state.v[1];
+    before[2] = filter.state.v[2];
+    eskf_update_velocity(&filter, outlier, 1.0, &result);
+    check_true(!result.accepted, "velocity outlier is rejected");
+    check_true(near(filter.state.v[0], before[0], 1e-12), "rejected velocity leaves state unchanged");
+}
+
+static void test_heading_updates_are_yaw_only(void)
+{
+    ESKF_Handle filter;
+    ESKF_InnovResult result;
+    eskf_float_t q[4];
+    const eskf_float_t north_body[3] = {1.0, 0.0, 0.0};
+    double before;
+    double after;
+
+    yaw_quaternion(20.0 * ESKF_PI / 180.0, q);
+    eskf_init(&filter, NULL, q);
+    before = yaw_from_quaternion(filter.state.q);
+    eskf_update_mag(&filter, north_body, 0.01, &result);
+    after = yaw_from_quaternion(filter.state.q);
+    check_true(result.accepted, "heading-only magnetometer update is accepted");
+    check_true(fabs(after) < fabs(before), "magnetometer update reduces yaw error");
+    check_true(near(filter.state.q[1], 0.0, 1e-12), "magnetometer does not inject roll");
+    check_true(near(filter.state.q[2], 0.0, 1e-12), "magnetometer does not inject pitch");
+
+    yaw_quaternion(-15.0 * ESKF_PI / 180.0, q);
+    eskf_init(&filter, NULL, q);
+    before = yaw_from_quaternion(filter.state.q);
+    eskf_update_heading(&filter, 0.0, 0.01, &result);
+    after = yaw_from_quaternion(filter.state.q);
+    check_true(result.accepted, "trusted heading update is accepted");
+    check_true(fabs(after) < fabs(before), "trusted heading update reduces yaw error");
+}
+
+static void test_navigation_reset_preserves_attitude_and_biases(void)
+{
+    ESKF_Handle filter;
+    eskf_float_t q[4];
+    eskf_float_t q_before[4];
+    const eskf_float_t position[3] = {100.0, -20.0, 5.0};
+    const eskf_float_t velocity[3] = {12.0, 3.0, -1.0};
+    int index;
+
+    yaw_quaternion(0.4, q);
+    eskf_init(&filter, NULL, q);
+    filter.state.ab[0] = 0.12;
+    filter.state.gb[2] = -0.03;
+    for (index = 0; index < 4; ++index) q_before[index] = filter.state.q[index];
+    eskf_reset_navigation(&filter, position, velocity, 25.0, 4.0);
+    check_true(near(filter.state.p[0], 100.0, 1e-12), "navigation reset sets position");
+    check_true(near(filter.state.v[0], 12.0, 1e-12), "navigation reset sets velocity");
+    check_true(near(filter.state.ab[0], 0.12, 1e-12), "navigation reset preserves accel bias");
+    check_true(near(filter.state.gb[2], -0.03, 1e-12), "navigation reset preserves gyro bias");
+    for (index = 0; index < 4; ++index) {
+        check_true(near(filter.state.q[index], q_before[index], 1e-12), "navigation reset preserves attitude");
+    }
+    check_true(near(filter.P[ESKF_IDX_DP][ESKF_IDX_DP], 25.0, 1e-12), "position variance resets");
+    check_true(near(filter.P[ESKF_IDX_DV][ESKF_IDX_DV], 4.0, 1e-12), "velocity variance resets");
+}
+
 static void test_static_bias_alignment(void)
 {
     ESKF_Handle filter;
@@ -130,6 +219,9 @@ int main(void)
     test_stationary_prediction();
     test_yaw_integration();
     test_position_update_and_gate();
+    test_velocity_update_and_gate();
+    test_heading_updates_are_yaw_only();
+    test_navigation_reset_preserves_attitude_and_biases();
     test_static_bias_alignment();
 
     if (failures != 0) {
