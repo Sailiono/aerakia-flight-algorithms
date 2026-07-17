@@ -130,9 +130,15 @@ class ULogConverterTests(unittest.TestCase):
             "epv": np.ones(2),
             "s_variance_m_s": np.ones(2),
         }
+        yaw_estimator = {
+            "timestamp": imu_timestamp,
+            "yaw_composite": np.array([0.1, 0.2, 0.3]),
+            "yaw_variance": np.full(3, 0.01),
+        }
         fake = FakeULog(
             [FakeDataset("sensor_combined", sensor), FakeDataset("vehicle_attitude", attitude),
-             FakeDataset("vehicle_gps_position", gps)]
+             FakeDataset("vehicle_gps_position", gps),
+             FakeDataset("yaw_estimator_status", yaw_estimator)]
         )
         with tempfile.TemporaryDirectory() as temp_directory:
             output = Path(temp_directory) / "replay.csv"
@@ -145,6 +151,9 @@ class ULogConverterTests(unittest.TestCase):
             self.assertNotIn("lat", rows[0])
             self.assertNotIn("lon", rows[0])
             self.assertEqual(metadata["gps_updates"], 2)
+            self.assertEqual(metadata["gsf_yaw_reference_samples"], 3)
+            self.assertEqual(rows[0]["ref_gsf_yaw_valid"], "1")
+            self.assertAlmostEqual(float(rows[0]["ref_gsf_yaw_rad"]), 0.1)
 
 
 if __name__ == "__main__":

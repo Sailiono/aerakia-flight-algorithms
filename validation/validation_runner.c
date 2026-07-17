@@ -30,6 +30,7 @@ typedef struct {
     int baro_update, baro_height, baro_variance, static_hint;
     int reset_counter, reset_event;
     int reset_q_w, reset_q_x, reset_q_y, reset_q_z;
+    int gsf_yaw, gsf_yaw_variance, gsf_yaw_valid;
 } ColumnMap;
 
 static int split_csv(char *line, char *columns[], int maximum_columns)
@@ -88,6 +89,9 @@ static int load_column_map(char *header, ColumnMap *map)
     MAP(reset_counter, "ref_attitude_reset_counter"); MAP(reset_event, "ref_attitude_reset_event");
     MAP(reset_q_w, "ref_delta_q_reset_w"); MAP(reset_q_x, "ref_delta_q_reset_x");
     MAP(reset_q_y, "ref_delta_q_reset_y"); MAP(reset_q_z, "ref_delta_q_reset_z");
+    MAP(gsf_yaw, "ref_gsf_yaw_rad");
+    MAP(gsf_yaw_variance, "ref_gsf_yaw_variance_rad2");
+    MAP(gsf_yaw_valid, "ref_gsf_yaw_valid");
     return map->seq >= 0 && map->ts_us >= 0
         && map->acc_x >= 0 && map->acc_y >= 0 && map->acc_z >= 0
         && map->gyro_x >= 0 && map->gyro_y >= 0 && map->gyro_z >= 0
@@ -224,7 +228,7 @@ int main(int argc, char *argv[])
     aerakia_eskf_default_config(&eskf_config);
     eskf_config.fuse_magnetometer = true;
 
-    fputs(
+    if (fputs(
         "seq,ts_us,truth_roll_deg,truth_pitch_deg,truth_yaw_deg,"
         "mahony_standard_roll_deg,mahony_standard_pitch_deg,mahony_standard_yaw_deg,"
         "mahony_robust_roll_deg,mahony_robust_pitch_deg,mahony_robust_yaw_deg,"
@@ -237,12 +241,18 @@ int main(int argc, char *argv[])
         "input_mag_update,input_position_update,position_ref_valid,"
         "ref_attitude_reset_counter,ref_attitude_reset_event,"
         "ref_delta_q_reset_w,ref_delta_q_reset_x,ref_delta_q_reset_y,ref_delta_q_reset_z,"
+        "ref_gsf_yaw_deg,ref_gsf_yaw_variance_rad2,ref_gsf_yaw_valid,"
         "ref_position_n_m,ref_position_e_m,ref_position_d_m,"
         "ref_velocity_n_m_s,ref_velocity_e_m_s,ref_velocity_d_m_s,"
         "eskf_position_n_m,eskf_position_e_m,eskf_position_d_m,"
         "eskf_velocity_n_m_s,eskf_velocity_e_m_s,eskf_velocity_d_m_s\n",
         output
-    );
+    ) == EOF) {
+        perror("write results header");
+        fclose(input);
+        fclose(output);
+        return 4;
+    }
 
     start_clock = clock();
     while (fgets(line, sizeof(line), input) != NULL) {
@@ -341,12 +351,12 @@ int main(int argc, char *argv[])
         aerakia_eskf_get_estimate(&eskf, &eskf_estimate);
         if (eskf_estimate.zero_velocity_update_applied) zupt_updates++;
 
-        fprintf(
+        if (fprintf(
             output,
             "%ld,%llu,%.9f,%.9f,%.9f,"
             "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,"
             "%.6f,%.6f,%.6f,%d,%.9f,%.9f,%d,%d,%d,%u,%d,%d,%d,%d,%u,"
-            "%d,%d,%d,%.0f,%.0f,%.9f,%.9f,%.9f,%.9f,"
+            "%d,%d,%d,%.0f,%.0f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.0f,"
             "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f\n",
             sequence, (unsigned long long)sample.timestamp_us, truth_roll, truth_pitch, truth_yaw,
             radians_to_degrees(standard_estimate.euler_rad.x),
@@ -374,6 +384,9 @@ int main(int argc, char *argv[])
             parse_double(columns, count, map.reset_q_x, 0.0, &ok),
             parse_double(columns, count, map.reset_q_y, 0.0, &ok),
             parse_double(columns, count, map.reset_q_z, 0.0, &ok),
+            parse_double(columns, count, map.gsf_yaw, 0.0, &ok) * 180.0 / AERAKIA_PI_F,
+            parse_double(columns, count, map.gsf_yaw_variance, 0.0, &ok),
+            parse_double(columns, count, map.gsf_yaw_valid, 0.0, &ok),
             parse_double(columns, count, map.ref_position_n, 0.0, &ok),
             parse_double(columns, count, map.ref_position_e, 0.0, &ok),
             parse_double(columns, count, map.ref_position_d, 0.0, &ok),
@@ -383,8 +396,26 @@ int main(int argc, char *argv[])
             eskf_estimate.position_ned_m.x, eskf_estimate.position_ned_m.y,
             eskf_estimate.position_ned_m.z, eskf_estimate.velocity_ned_m_s.x,
             eskf_estimate.velocity_ned_m_s.y, eskf_estimate.velocity_ned_m_s.z
-        );
+        ) < 0) {
+            perror("write results row");
+            fclose(input);
+            fclose(output);
+            return 4;
+        }
         samples++;
+    }
+
+    if (ferror(input)) {
+        perror("read replay input");
+        fclose(input);
+        fclose(output);
+        return 4;
+    }
+    if (fflush(output) != 0 || ferror(output)) {
+        perror("flush results output");
+        fclose(input);
+        fclose(output);
+        return 4;
     }
 
     fprintf(
@@ -394,6 +425,10 @@ int main(int argc, char *argv[])
         eskf_initialized ? eskf.navigation_recovery_count : 0U,
         (double)(clock() - start_clock) * 1000.0 / (double)CLOCKS_PER_SEC
     );
-    fclose(input); fclose(output);
+    fclose(input);
+    if (fclose(output) != 0) {
+        perror("close results output");
+        return 4;
+    }
     return samples > 0U ? 0 : 3;
 }

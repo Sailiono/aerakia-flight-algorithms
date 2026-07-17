@@ -10,6 +10,13 @@
 
 #include <aerakia/eskf_types.h>
 
+/** First-order right-error transition, including position's dt-squared coupling. */
+void eskf_model_transition(const eskf_float_t q[4],
+                           const eskf_float_t acceleration_body[3],
+                           const eskf_float_t angular_rate_body[3],
+                           eskf_float_t dt,
+                           eskf_float_t F[15][15]);
+
 /** Heading of the body X axis and the right-error axis for a pure NED-yaw correction. */
 bool eskf_model_heading(const eskf_float_t q[4],
                         eskf_float_t *heading_rad,

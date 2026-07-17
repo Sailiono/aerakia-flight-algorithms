@@ -516,6 +516,11 @@ void eskf_predict(ESKF_Handle *h,
     eskf_float_t acc_total[3];
     eskf_vec3_add(acc_earth, h->gravity, acc_total);
 
+    /* Linearize at the pre-integration nominal state, matching the explicit
+     * position/velocity integration below. */
+    eskf_float_t F[15][15];
+    eskf_model_transition(h->state.q, acc_correct, gyr_correct, dt, F);
+
     /* ========================================
      * Step 5: Integrate Nominal State
      * ======================================== */
@@ -560,49 +565,6 @@ void eskf_predict(ESKF_Handle *h,
      *
      * For discrete time: F = I + Fx*dt (first-order approximation)
      * ======================================== */
-    eskf_float_t F[15][15];
-    eskf_mat15_identity(F);
-
-    /* F_θθ = I - [ω]× * dt ≈ exp(-[ω]×*dt) for small angles */
-    /* [ω]× is skew(gyr_correct) */
-    eskf_float_t skew_w[3][3];
-    eskf_mat3_skew(gyr_correct, skew_w);
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 3; j++) {
-            F[i][j] -= skew_w[i][j] * dt;
-        }
-    }
-
-    /* F_θ_gb = -I * dt (gyro bias affects attitude rate) */
-    F[0][12] = -dt;
-    F[1][13] = -dt;
-    F[2][14] = -dt;
-
-    /* F_v_θ = -R * [acc_correct]× * dt (attitude error affects rotated accel) */
-    eskf_float_t skew_a[3][3];
-    eskf_mat3_skew(acc_correct, skew_a);
-
-    eskf_float_t R_skew_a[3][3];
-    eskf_mat3_mul_mat3(R, skew_a, R_skew_a);
-
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 3; j++) {
-            F[3 + i][j] = -R_skew_a[i][j] * dt;
-        }
-    }
-
-    /* F_v_ab = -R * dt (accel bias affects velocity through rotation) */
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 3; j++) {
-            F[3 + i][9 + j] = -R[i][j] * dt;
-        }
-    }
-
-    /* F_p_v = I * dt (velocity affects position) */
-    F[6][3] = dt;
-    F[7][4] = dt;
-    F[8][5] = dt;
-
     /* ========================================
      * Step 7: Build Process Noise Q (15x15)
      *

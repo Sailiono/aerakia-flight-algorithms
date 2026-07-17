@@ -12,6 +12,44 @@ static eskf_float_t wrap_pi(eskf_float_t angle)
     return atan2(sin(angle), cos(angle));
 }
 
+void eskf_model_transition(const eskf_float_t q[4],
+                           const eskf_float_t acceleration_body[3],
+                           const eskf_float_t angular_rate_body[3],
+                           eskf_float_t dt,
+                           eskf_float_t F[15][15])
+{
+    eskf_float_t R_nb[3][3];
+    eskf_float_t acceleration_skew[3][3];
+    eskf_float_t angular_rate_skew[3][3];
+    eskf_float_t R_acceleration_skew[3][3];
+    const eskf_float_t half_dt_squared = 0.5 * dt * dt;
+    int row;
+    int column;
+
+    eskf_mat15_identity(F);
+    eskf_quat_to_rot_mat3(q, R_nb);
+    eskf_mat3_skew(angular_rate_body, angular_rate_skew);
+    eskf_mat3_skew(acceleration_body, acceleration_skew);
+    eskf_mat3_mul_mat3(R_nb, acceleration_skew, R_acceleration_skew);
+
+    for (row = 0; row < 3; ++row) {
+        for (column = 0; column < 3; ++column) {
+            F[ESKF_IDX_DTHETA + row][ESKF_IDX_DTHETA + column]
+                -= angular_rate_skew[row][column] * dt;
+            F[ESKF_IDX_DV + row][ESKF_IDX_DTHETA + column]
+                = -R_acceleration_skew[row][column] * dt;
+            F[ESKF_IDX_DV + row][ESKF_IDX_DAB + column]
+                = -R_nb[row][column] * dt;
+            F[ESKF_IDX_DP + row][ESKF_IDX_DTHETA + column]
+                = -R_acceleration_skew[row][column] * half_dt_squared;
+            F[ESKF_IDX_DP + row][ESKF_IDX_DAB + column]
+                = -R_nb[row][column] * half_dt_squared;
+        }
+        F[ESKF_IDX_DTHETA + row][ESKF_IDX_DGB + row] = -dt;
+        F[ESKF_IDX_DP + row][ESKF_IDX_DV + row] = dt;
+    }
+}
+
 /* A NED-frame yaw rotation maps into the right/body error as R^T e_z. */
 static void ned_yaw_correction_axis(eskf_float_t R_nb[3][3],
                                     eskf_float_t H_theta[3])

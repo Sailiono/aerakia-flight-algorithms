@@ -61,6 +61,22 @@ The model is now isolated in `src/eskf_models.c`. Tests verify that:
 - trusted and magnetic headings change one-for-one along that axis;
 - singular vertical-heading cases are rejected.
 
+### N-004 — prediction transition omitted direct position coupling
+
+The nominal position update contains `0.5 * a * dt²`, but the covariance
+transition previously included only the position-to-velocity block. The
+right-error transition now also includes the direct position-to-attitude and
+position-to-accelerometer-bias blocks:
+
+- `F_p_theta = -0.5 R [a]× dt²`;
+- `F_p_ab = -0.5 R dt²`.
+
+The transition construction is isolated in `eskf_model_transition`. A full
+15-column finite-difference test perturbs the nominal state using the same
+right-error convention, propagates both states, and compares the resulting
+error against the analytical transition. The attitude and gyro-bias blocks
+remain a stated first-order discretization.
+
 ## Evidence from this correction set
 
 Host checks:
@@ -81,20 +97,25 @@ Synthetic ESKF results, seed 7 at 100 Hz:
 | `mag_bias` | 0.235° | 0.008° | 0.408° |
 
 Selected private ULog replay results are intentionally not committed with raw
-data. The current run covered seven scenarios. Fixed-wing and stationary cases
-show 0.079–0.609° tilt RMSE and 1.24–2.05° raw yaw RMSE against the PX4 estimate.
-Two multirotor magnetic/heading-stress cases show 20.25° and 49.41° raw yaw RMSE,
-alongside large PX4 reference resets and magnetic rejection. Those values are
-open diagnostic evidence, not proof of absolute Aerakia or PX4 yaw error.
+data. The current run covered seven scenarios with explicit input/output row
+count checks. Fixed-wing and stationary cases show 0.079–0.609° tilt RMSE and
+1.24–2.04° raw yaw RMSE against the PX4 estimate. Two multirotor
+magnetic/heading-stress cases show approximately 18° and 49° raw yaw RMSE,
+alongside large PX4 reference resets and magnetic rejection.
+
+The ULogs also contain GNSS-velocity-aided GSF yaw. In the two multirotor cases,
+Aerakia's globally aligned trajectory is closer to converged GSF yaw than PX4
+attitude yaw is, although Aerakia still differs by approximately 10–14° RMSE.
+The de-reset PX4 trajectory is explicitly a continuity diagnostic, not physical
+truth; estimator resets may be correcting accumulated heading error. See
+`docs/ulog-yaw-diagnostics.md`.
 
 ## Open audit items
 
 - Monte Carlo NIS/NEES consistency using independent simulated truth;
-- finite-difference checks for the prediction transition matrix;
 - higher-order state transition/process-noise coupling and timing-jitter study;
 - delayed, out-of-sequence and dropped measurement handling;
 - cold-start attitude/bias alignment over varied initial poses;
-- continuous/de-reset PX4 yaw diagnostics and auxiliary GSF-yaw comparison;
 - independent heading truth and a GNSS-velocity yaw fallback;
 - target precision, execution-time, stack and IAR compatibility evidence.
 

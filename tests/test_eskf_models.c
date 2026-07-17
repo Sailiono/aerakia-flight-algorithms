@@ -1,5 +1,7 @@
 #include "eskf_models.h"
 
+#include <aerakia/eskf.h>
+
 #include <math.h>
 #include <stdio.h>
 
@@ -154,11 +156,114 @@ static void test_heading_singularities(void)
                "magnetic heading rejects a vertical measured field");
 }
 
+static void error_between_handles(const ESKF_Handle *nominal,
+                                  const ESKF_Handle *perturbed,
+                                  double error[15])
+{
+    const double q_conjugate[4] = {
+        nominal->state.q[0], -nominal->state.q[1],
+        -nominal->state.q[2], -nominal->state.q[3]
+    };
+    double relative[4];
+    double vector_norm;
+    double scale;
+    int axis;
+
+    quat_multiply(q_conjugate, perturbed->state.q, relative);
+    if (relative[0] < 0.0) {
+        for (axis = 0; axis < 4; ++axis) relative[axis] = -relative[axis];
+    }
+    vector_norm = sqrt(
+        relative[1] * relative[1] + relative[2] * relative[2]
+        + relative[3] * relative[3]
+    );
+    scale = vector_norm > 1.0e-15 ? 2.0 * atan2(vector_norm, relative[0]) / vector_norm : 2.0;
+    for (axis = 0; axis < 3; ++axis) {
+        error[ESKF_IDX_DTHETA + axis] = relative[axis + 1] * scale;
+        error[ESKF_IDX_DV + axis] = perturbed->state.v[axis] - nominal->state.v[axis];
+        error[ESKF_IDX_DP + axis] = perturbed->state.p[axis] - nominal->state.p[axis];
+        error[ESKF_IDX_DAB + axis] = perturbed->state.ab[axis] - nominal->state.ab[axis];
+        error[ESKF_IDX_DGB + axis] = perturbed->state.gb[axis] - nominal->state.gb[axis];
+    }
+}
+
+static void inject_test_error(ESKF_Handle *handle, int index, double epsilon)
+{
+    if (index < ESKF_IDX_DV) {
+        double rotation[3] = {0.0, 0.0, 0.0};
+        double dq[4];
+        double result[4];
+        rotation[index] = epsilon;
+        rotation_vector_quaternion(rotation, dq);
+        quat_multiply(handle->state.q, dq, result);
+        for (int axis = 0; axis < 4; ++axis) handle->state.q[axis] = result[axis];
+    } else if (index < ESKF_IDX_DP) {
+        handle->state.v[index - ESKF_IDX_DV] += epsilon;
+    } else if (index < ESKF_IDX_DAB) {
+        handle->state.p[index - ESKF_IDX_DP] += epsilon;
+    } else if (index < ESKF_IDX_DGB) {
+        handle->state.ab[index - ESKF_IDX_DAB] += epsilon;
+    } else {
+        handle->state.gb[index - ESKF_IDX_DGB] += epsilon;
+    }
+}
+
+static void test_prediction_transition_finite_difference(void)
+{
+    const double dt = 0.005;
+    const double epsilon = 1.0e-5;
+    const double acceleration[3] = {0.8, -0.4, -9.2};
+    const double angular_rate[3] = {0.31, -0.27, 0.19};
+    double corrected_acceleration[3];
+    double corrected_angular_rate[3];
+    double F[15][15];
+    double maximum_error = 0.0;
+    ESKF_Handle initial;
+    ESKF_Handle nominal;
+    int row;
+    int column;
+
+    eskf_init(&initial, NULL, NULL);
+    euler_quaternion(0.6, -0.3, 0.2, initial.state.q);
+    initial.state.v[0] = 3.0; initial.state.v[1] = -1.0; initial.state.v[2] = 0.4;
+    initial.state.p[0] = 0.2; initial.state.p[1] = -0.1; initial.state.p[2] = 0.3;
+    initial.state.ab[0] = 0.03; initial.state.ab[1] = -0.02; initial.state.ab[2] = 0.01;
+    initial.state.gb[0] = 0.002; initial.state.gb[1] = -0.003; initial.state.gb[2] = 0.001;
+    for (row = 0; row < 3; ++row) {
+        corrected_acceleration[row] = acceleration[row] - initial.state.ab[row];
+        corrected_angular_rate[row] = angular_rate[row] - initial.state.gb[row];
+    }
+    eskf_model_transition(
+        initial.state.q, corrected_acceleration, corrected_angular_rate, dt, F
+    );
+
+    nominal = initial;
+    eskf_predict(&nominal, acceleration, angular_rate, dt);
+    for (column = 0; column < 15; ++column) {
+        ESKF_Handle perturbed = initial;
+        double propagated_error[15];
+        inject_test_error(&perturbed, column, epsilon);
+        eskf_predict(&perturbed, acceleration, angular_rate, dt);
+        error_between_handles(&nominal, &perturbed, propagated_error);
+        for (row = 0; row < 15; ++row) {
+            const double difference = fabs(propagated_error[row] / epsilon - F[row][column]);
+            if (difference > maximum_error) maximum_error = difference;
+        }
+    }
+    check_true(maximum_error < 3.0e-5,
+               "prediction transition matches finite-difference nominal propagation");
+    check_true(fabs(F[ESKF_IDX_DP][ESKF_IDX_DTHETA + 1]) > 1.0e-8,
+               "position transition retains dt-squared attitude coupling");
+    check_true(fabs(F[ESKF_IDX_DP][ESKF_IDX_DAB]) > 1.0e-8,
+               "position transition retains dt-squared accelerometer-bias coupling");
+}
+
 int main(void)
 {
     test_trusted_heading_correction_geometry();
     test_magnetic_heading_correction_geometry();
     test_heading_singularities();
+    test_prediction_transition_finite_difference();
     if (failures != 0) {
         fprintf(stderr, "%d ESKF model assertion(s) failed\n", failures);
         return 1;

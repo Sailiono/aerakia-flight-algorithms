@@ -23,6 +23,7 @@ TOPICS = (
     "vehicle_local_position",
     "vehicle_gps_position",
     "vehicle_air_data",
+    "yaw_estimator_status",
 )
 
 
@@ -336,6 +337,28 @@ def convert_ulog(
             barometer_height = held_altitude - held_altitude[first]
         barometer_update = finite & held_fresh
 
+    yaw_estimator = _topic(ulog, "yaw_estimator_status")
+    gsf_yaw_rad = np.zeros(len(imu_t), dtype=np.float64)
+    gsf_yaw_variance_rad2 = np.zeros(len(imu_t), dtype=np.float64)
+    gsf_yaw_valid = np.zeros(len(imu_t), dtype=bool)
+    if yaw_estimator is not None:
+        gsf_t = _timestamps(yaw_estimator)
+        gsf_yaw = _field(yaw_estimator, "yaw_composite").astype(np.float64)
+        gsf_variance = _field(yaw_estimator, "yaw_variance").astype(np.float64)
+        source_valid = np.isfinite(gsf_yaw) & np.isfinite(gsf_variance)
+        # A 0.2-rad one-sigma ceiling excludes the multi-hypothesis convergence
+        # period without pretending GSF is ground truth.
+        source_valid &= (gsf_variance > 0.0) & (gsf_variance <= 0.04)
+        gsf_t, gsf_yaw, gsf_variance, source_valid = _sort_unique(
+            gsf_t, gsf_yaw, gsf_variance, source_valid
+        )
+        held_yaw, held_valid, _ = held_samples(gsf_t, gsf_yaw, imu_t, 0.0)
+        held_variance, _, _ = held_samples(gsf_t, gsf_variance, imu_t, 0.0)
+        held_source_valid, _, _ = held_samples(gsf_t, source_valid.astype(float), imu_t, 0.0)
+        gsf_yaw_rad = held_yaw
+        gsf_yaw_variance_rad2 = held_variance
+        gsf_yaw_valid = held_valid & (held_source_valid > 0.5)
+
     dt_us = np.r_[int(np.median(np.diff(imu_t))), np.diff(imu_t)]
     header = [
         "seq", "host_ts_us", "ts_us", "dt_us",
@@ -347,6 +370,7 @@ def convert_ulog(
         "ref_q_w", "ref_q_x", "ref_q_y", "ref_q_z",
         "ref_attitude_reset_counter", "ref_attitude_reset_event",
         "ref_delta_q_reset_w", "ref_delta_q_reset_x", "ref_delta_q_reset_y", "ref_delta_q_reset_z",
+        "ref_gsf_yaw_rad", "ref_gsf_yaw_variance_rad2", "ref_gsf_yaw_valid",
         "position_ref_valid", "ref_position_n_m", "ref_position_e_m", "ref_position_d_m",
         "ref_velocity_n_m_s", "ref_velocity_e_m_s", "ref_velocity_d_m_s",
         "position_update", "gps_position_n_m", "gps_position_e_m", "gps_position_d_m",
@@ -372,6 +396,7 @@ def convert_ulog(
                     int(held_reset_counter[index]) if reset_valid[index] else 0,
                     int(reset_event[index]),
                     *held_delta_q[index],
+                    gsf_yaw_rad[index], gsf_yaw_variance_rad2[index], int(gsf_yaw_valid[index]),
                     int(reference_position_valid[index]),
                     *reference_position[index], *reference_velocity[index],
                     int(gps_update[index]), *gps_position[index], *gps_velocity[index],
@@ -391,6 +416,7 @@ def convert_ulog(
         "gps_updates": int(np.count_nonzero(gps_update)),
         "barometer_updates": int(np.count_nonzero(barometer_update)),
         "attitude_reset_events": int(np.count_nonzero(reset_event)),
+        "gsf_yaw_reference_samples": int(np.count_nonzero(gsf_yaw_valid)),
         "assume_stationary": bool(assume_stationary),
         "privacy": "Hardware identifiers and absolute GPS coordinates are not exported.",
     }
