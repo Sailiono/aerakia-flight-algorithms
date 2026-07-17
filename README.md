@@ -103,6 +103,14 @@ results demonstrate repeatability and fault response, not flight safety or airwo
 [validation methodology](docs/validation.md) defines the evidence still required from public
 datasets, motion-capture/rate-table tests, HIL, and flight logs.
 
+For the ordered pre-hardware work, acceptance evidence, FCOne v2 integration boundary, and data
+still worth collecting, see the [development roadmap](docs/roadmap.md). The complete current host
+gate can be reproduced and recorded with:
+
+```bash
+python validation/run_host_regression.py
+```
+
 Private PX4 ULogs can be normalized without exporting absolute coordinates or hardware identifiers:
 
 ```bash
