@@ -5,6 +5,8 @@ hardware. The public algorithm repository remains the only editable source for M
 hardware-independent validation code. FCOne repositories consume a reviewed commit through an
 adapter; they do not maintain a second algorithm copy.
 
+Public branch, history, and tagging rules are defined in the [release policy](release-policy.md).
+
 ## Current baseline
 
 - Public `main` recovery point: `ef03c348e4d73d7e5461c9f4aec0b112760cffda`.
