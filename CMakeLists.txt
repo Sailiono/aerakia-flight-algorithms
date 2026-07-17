@@ -45,6 +45,10 @@ if(AERAKIA_BUILD_TESTS)
     add_executable(test_public_api tests/test_public_api.c)
     target_link_libraries(test_public_api PRIVATE Aerakia::Algorithms)
     add_test(NAME public_api COMMAND test_public_api)
+
+    add_executable(aerakia_input_integrity_campaign validation/input_integrity_campaign.c)
+    target_link_libraries(aerakia_input_integrity_campaign PRIVATE Aerakia::Algorithms)
+    add_test(NAME input_integrity_campaign COMMAND aerakia_input_integrity_campaign)
 endif()
 
 if(AERAKIA_BUILD_VALIDATION)

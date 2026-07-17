@@ -20,6 +20,29 @@ static int near(float actual, float expected, float tolerance)
     return fabsf(actual - expected) <= tolerance;
 }
 
+static void set_vector_axis(AerakiaVec3f *vector, int axis, float value)
+{
+    if (axis == 0) vector->x = value;
+    else if (axis == 1) vector->y = value;
+    else vector->z = value;
+}
+
+static int eskf_core_unchanged(const AerakiaEskf *filter, const AerakiaEskf *before)
+{
+    return memcmp(&filter->core.state, &before->core.state, sizeof(filter->core.state)) == 0
+        && memcmp(filter->core.P, before->core.P, sizeof(filter->core.P)) == 0;
+}
+
+static int mahony_state_unchanged(const AerakiaMahony *filter, const AerakiaMahony *before)
+{
+    return memcmp(filter->quaternion_wxyz, before->quaternion_wxyz,
+                  sizeof(filter->quaternion_wxyz)) == 0
+        && memcmp(&filter->integral_feedback_rad_s, &before->integral_feedback_rad_s,
+                  sizeof(filter->integral_feedback_rad_s)) == 0
+        && filter->last_timestamp_us == before->last_timestamp_us
+        && filter->healthy == before->healthy;
+}
+
 static AerakiaImuSample level_sample(uint64_t timestamp_us)
 {
     AerakiaImuSample sample;
@@ -138,6 +161,380 @@ static void test_mahony_adaptive_weight_and_timestamp(void)
     check_true(aerakia_mahony_update(&filter, &sample, &estimate) == AERAKIA_STATUS_OK, "dynamic sample processes");
     check_true(near(estimate.accelerometer_weight, 0.05f, 1.0e-5f), "dynamic acceleration is down-weighted");
     check_true(aerakia_mahony_update(&filter, &sample, &estimate) == AERAKIA_STATUS_TIMESTAMP_ERROR, "duplicate timestamp rejected");
+}
+
+static void test_mahony_input_integrity(void)
+{
+    AerakiaMahony filter;
+    AerakiaMahony before;
+    AerakiaAttitudeEstimate estimate;
+    AerakiaImuSample sample = level_sample(1000U);
+    const float nonfinite[] = {NAN, INFINITY, -INFINITY};
+    int axis;
+    int value_index;
+
+    aerakia_mahony_init(&filter, NULL);
+    (void)aerakia_mahony_update(&filter, &sample, &estimate);
+    sample.timestamp_us = 11000U;
+    (void)aerakia_mahony_update(&filter, &sample, &estimate);
+
+    for (axis = 0; axis < 6; ++axis) {
+        for (value_index = 0; value_index < 3; ++value_index) {
+            sample = level_sample(21000U);
+            if (axis < 3) set_vector_axis(&sample.acceleration_m_s2, axis, nonfinite[value_index]);
+            else set_vector_axis(&sample.angular_rate_rad_s, axis - 3, nonfinite[value_index]);
+            before = filter;
+            check_true(
+                aerakia_mahony_update(&filter, &sample, &estimate)
+                    == AERAKIA_STATUS_MISSING_MEASUREMENT,
+                "Mahony rejects each non-finite required IMU axis"
+            );
+            check_true(mahony_state_unchanged(&filter, &before),
+                       "Mahony rejected IMU value leaves state and time unchanged");
+        }
+    }
+
+    sample = level_sample(11050U);
+    before = filter;
+    check_true(aerakia_mahony_update(&filter, &sample, &estimate)
+                   == AERAKIA_STATUS_TIMESTAMP_ERROR,
+               "Mahony rejects below-minimum dt");
+    check_true(mahony_state_unchanged(&filter, &before),
+               "Mahony below-minimum dt does not advance time");
+
+    sample = level_sample(211000U);
+    before = filter;
+    check_true(aerakia_mahony_update(&filter, &sample, &estimate)
+                   == AERAKIA_STATUS_TIMESTAMP_ERROR,
+               "Mahony rejects a forward gap above maximum dt");
+    check_true(memcmp(filter.quaternion_wxyz, before.quaternion_wxyz,
+                      sizeof(filter.quaternion_wxyz)) == 0,
+               "Mahony forward gap does not propagate attitude");
+    check_true(filter.last_timestamp_us == sample.timestamp_us,
+               "Mahony forward gap re-anchors time");
+    sample.timestamp_us += 10000U;
+    check_true(aerakia_mahony_update(&filter, &sample, &estimate) == AERAKIA_STATUS_OK,
+               "Mahony resumes on the first valid sample after a gap");
+}
+
+static void test_eskf_input_integrity(void)
+{
+    AerakiaEskf filter;
+    AerakiaEskf before;
+    AerakiaEskf candidate;
+    AerakiaEskf control;
+    AerakiaEskfConfig config;
+    AerakiaNavigationEstimate estimate;
+    AerakiaImuSample sample = level_sample(1000U);
+    const float nonfinite[] = {NAN, INFINITY, -INFINITY};
+    int axis;
+    int value_index;
+
+    aerakia_eskf_default_config(&config);
+    config.enable_static_alignment = false;
+    config.fuse_magnetometer = true;
+    config.gate_magnetometer = false;
+    aerakia_eskf_init(&filter, &config, NULL, NULL);
+    (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
+    sample.timestamp_us = 11000U;
+    (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
+
+    for (axis = 0; axis < 6; ++axis) {
+        for (value_index = 0; value_index < 3; ++value_index) {
+            sample = level_sample(21000U);
+            if (axis < 3) set_vector_axis(&sample.acceleration_m_s2, axis, nonfinite[value_index]);
+            else set_vector_axis(&sample.angular_rate_rad_s, axis - 3, nonfinite[value_index]);
+            before = filter;
+            check_true(
+                aerakia_eskf_process_imu(&filter, &sample, &estimate)
+                    == AERAKIA_STATUS_MISSING_MEASUREMENT,
+                "ESKF rejects each non-finite required IMU axis"
+            );
+            check_true(eskf_core_unchanged(&filter, &before),
+                       "ESKF rejected IMU value leaves state and covariance unchanged");
+            check_true(filter.last_timestamp_us == before.last_timestamp_us,
+                       "ESKF rejected IMU value leaves time unchanged");
+        }
+    }
+
+    sample = level_sample(21000U);
+    sample.flags &= ~AERAKIA_SAMPLE_ACCEL_VALID;
+    before = filter;
+    check_true(aerakia_eskf_process_imu(&filter, &sample, &estimate)
+                   == AERAKIA_STATUS_MISSING_MEASUREMENT,
+               "ESKF rejects a missing accelerometer validity flag");
+    check_true(eskf_core_unchanged(&filter, &before),
+               "missing accelerometer flag leaves ESKF core unchanged");
+    sample.flags = AERAKIA_SAMPLE_ACCEL_VALID;
+    check_true(aerakia_eskf_process_imu(&filter, &sample, &estimate)
+                   == AERAKIA_STATUS_MISSING_MEASUREMENT,
+               "ESKF rejects a missing gyroscope validity flag");
+
+    sample = level_sample(11000U);
+    before = filter;
+    check_true(aerakia_eskf_process_imu(&filter, &sample, &estimate)
+                   == AERAKIA_STATUS_TIMESTAMP_ERROR,
+               "ESKF rejects duplicate timestamp");
+    check_true(eskf_core_unchanged(&filter, &before)
+                   && filter.last_timestamp_us == before.last_timestamp_us,
+               "duplicate timestamp leaves ESKF state and time unchanged");
+    sample.timestamp_us = 10000U;
+    check_true(aerakia_eskf_process_imu(&filter, &sample, &estimate)
+                   == AERAKIA_STATUS_TIMESTAMP_ERROR,
+               "ESKF rejects reversed timestamp");
+    sample.timestamp_us = 11050U;
+    before = filter;
+    check_true(aerakia_eskf_process_imu(&filter, &sample, &estimate)
+                   == AERAKIA_STATUS_TIMESTAMP_ERROR,
+               "ESKF rejects below-minimum dt");
+    check_true(eskf_core_unchanged(&filter, &before)
+                   && filter.last_timestamp_us == before.last_timestamp_us,
+               "ESKF below-minimum dt does not advance state or time");
+
+    sample.timestamp_us = 211000U;
+    before = filter;
+    check_true(aerakia_eskf_process_imu(&filter, &sample, &estimate)
+                   == AERAKIA_STATUS_TIMESTAMP_ERROR,
+               "ESKF rejects a forward gap above maximum dt");
+    check_true(eskf_core_unchanged(&filter, &before),
+               "ESKF forward gap does not propagate state or covariance");
+    check_true(filter.last_timestamp_us == sample.timestamp_us,
+               "ESKF forward gap re-anchors time");
+    sample.timestamp_us += 10000U;
+    check_true(aerakia_eskf_process_imu(&filter, &sample, &estimate) == AERAKIA_STATUS_OK,
+               "ESKF resumes on first valid sample after a gap");
+
+    candidate = filter;
+    control = filter;
+    sample.timestamp_us += 10000U;
+    sample.flags &= ~AERAKIA_SAMPLE_MAG_VALID;
+    check_true(aerakia_eskf_process_imu(&control, &sample, &estimate) == AERAKIA_STATUS_OK,
+               "ESKF processes control sample without magnetometer");
+    sample.flags |= AERAKIA_SAMPLE_MAG_VALID;
+    sample.magnetic_field_ut.x = NAN;
+    check_true(aerakia_eskf_process_imu(&candidate, &sample, &estimate) == AERAKIA_STATUS_OK,
+               "non-finite optional magnetometer does not reject valid IMU");
+    check_true(eskf_core_unchanged(&candidate, &control),
+               "non-finite optional magnetometer is equivalent to no magnetometer update");
+}
+
+static void test_eskf_timestamped_aiding_integrity(void)
+{
+    AerakiaEskf filter;
+    AerakiaEskf before;
+    AerakiaEskfConfig config;
+    AerakiaNavigationEstimate estimate;
+    AerakiaImuSample sample = level_sample(1000000U);
+    AerakiaGpsObservation gps = {
+        1010000U, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, 1.0f, 1.0f
+    };
+    AerakiaHeadingObservation heading = {1010000U, 0.0f, 0.01f};
+    AerakiaBarometerObservation barometer = {1010000U, 0.0f, 1.0f};
+
+    aerakia_eskf_default_config(&config);
+    config.enable_static_alignment = false;
+    config.maximum_aiding_age_s = 0.05f;
+    aerakia_eskf_init(&filter, &config, NULL, NULL);
+    check_true(aerakia_eskf_update_gps_observation(&filter, &gps)
+                   == AERAKIA_STATUS_TIMESTAMP_ERROR,
+               "timestamped aiding is rejected before the first IMU timestamp");
+    (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
+    sample.timestamp_us = 1010000U;
+    (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
+
+    check_true(aerakia_eskf_update_gps_observation(&filter, &gps) == AERAKIA_STATUS_OK,
+               "fresh GNSS observation is processed");
+    check_true(aerakia_eskf_update_heading_observation(&filter, &heading) == AERAKIA_STATUS_OK,
+               "fresh trusted-heading observation is processed");
+    check_true(aerakia_eskf_update_barometer_observation(&filter, &barometer)
+                   == AERAKIA_STATUS_OK,
+               "fresh barometer observation is processed");
+
+    before = filter;
+    check_true(aerakia_eskf_update_gps_observation(&filter, &gps)
+                   == AERAKIA_STATUS_TIMESTAMP_ERROR,
+               "duplicate GNSS observation is rejected");
+    check_true(aerakia_eskf_update_heading_observation(&filter, &heading)
+                   == AERAKIA_STATUS_TIMESTAMP_ERROR,
+               "duplicate trusted-heading observation is rejected");
+    check_true(aerakia_eskf_update_barometer_observation(&filter, &barometer)
+                   == AERAKIA_STATUS_TIMESTAMP_ERROR,
+               "duplicate barometer observation is rejected");
+    check_true(eskf_core_unchanged(&filter, &before),
+               "duplicate aiding observations leave state and covariance unchanged");
+
+    gps.timestamp_us = 1009000U;
+    heading.timestamp_us = 1009000U;
+    barometer.timestamp_us = 1009000U;
+    before = filter;
+    check_true(aerakia_eskf_update_gps_observation(&filter, &gps)
+                   == AERAKIA_STATUS_TIMESTAMP_ERROR,
+               "reordered GNSS observation is rejected");
+    check_true(aerakia_eskf_update_heading_observation(&filter, &heading)
+                   == AERAKIA_STATUS_TIMESTAMP_ERROR,
+               "reordered trusted-heading observation is rejected");
+    check_true(aerakia_eskf_update_barometer_observation(&filter, &barometer)
+                   == AERAKIA_STATUS_TIMESTAMP_ERROR,
+               "reordered barometer observation is rejected");
+    check_true(eskf_core_unchanged(&filter, &before),
+               "reordered aiding observations leave state and covariance unchanged");
+
+    gps.timestamp_us = 1010001U;
+    heading.timestamp_us = 1010001U;
+    barometer.timestamp_us = 1010001U;
+    before = filter;
+    check_true(aerakia_eskf_update_gps_observation(&filter, &gps)
+                   == AERAKIA_STATUS_TIMESTAMP_ERROR,
+               "future GNSS observation is rejected");
+    check_true(aerakia_eskf_update_heading_observation(&filter, &heading)
+                   == AERAKIA_STATUS_TIMESTAMP_ERROR,
+               "future trusted-heading observation is rejected");
+    check_true(aerakia_eskf_update_barometer_observation(&filter, &barometer)
+                   == AERAKIA_STATUS_TIMESTAMP_ERROR,
+               "future barometer observation is rejected");
+    check_true(eskf_core_unchanged(&filter, &before),
+               "future aiding observations leave state and covariance unchanged");
+
+    sample.timestamp_us = 1100000U;
+    (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
+    gps.timestamp_us = 1020000U;
+    heading.timestamp_us = 1020000U;
+    barometer.timestamp_us = 1020000U;
+    before = filter;
+    check_true(aerakia_eskf_update_gps_observation(&filter, &gps)
+                   == AERAKIA_STATUS_STALE_MEASUREMENT,
+               "stale GNSS observation is rejected");
+    check_true(aerakia_eskf_update_heading_observation(&filter, &heading)
+                   == AERAKIA_STATUS_STALE_MEASUREMENT,
+               "stale trusted-heading observation is rejected");
+    check_true(aerakia_eskf_update_barometer_observation(&filter, &barometer)
+                   == AERAKIA_STATUS_STALE_MEASUREMENT,
+               "stale barometer observation is rejected");
+    check_true(eskf_core_unchanged(&filter, &before),
+               "stale aiding observations leave state and covariance unchanged");
+
+    gps.timestamp_us = 1100000U;
+    gps.position_ned_m.x = NAN;
+    heading.timestamp_us = 1100000U;
+    heading.heading_ned_rad = INFINITY;
+    barometer.timestamp_us = 1100000U;
+    barometer.variance_m2 = NAN;
+    before = filter;
+    check_true(aerakia_eskf_update_gps_observation(&filter, &gps)
+                   == AERAKIA_STATUS_MISSING_MEASUREMENT,
+               "non-finite GNSS observation is rejected");
+    check_true(aerakia_eskf_update_heading_observation(&filter, &heading)
+                   == AERAKIA_STATUS_MISSING_MEASUREMENT,
+               "non-finite trusted-heading observation is rejected");
+    check_true(aerakia_eskf_update_barometer_observation(&filter, &barometer)
+                   == AERAKIA_STATUS_MISSING_MEASUREMENT,
+               "non-finite barometer observation is rejected");
+    check_true(eskf_core_unchanged(&filter, &before),
+               "non-finite aiding observations leave state and covariance unchanged");
+
+    gps.position_ned_m.x = 0.0f;
+    heading.heading_ned_rad = 0.0f;
+    barometer.variance_m2 = 1.0f;
+    check_true(aerakia_eskf_update_gps_observation(&filter, &gps) == AERAKIA_STATUS_OK,
+               "GNSS recovers after rejected aiding faults");
+    check_true(aerakia_eskf_update_heading_observation(&filter, &heading) == AERAKIA_STATUS_OK,
+               "trusted heading recovers after rejected aiding faults");
+    check_true(aerakia_eskf_update_barometer_observation(&filter, &barometer)
+                   == AERAKIA_STATUS_OK,
+               "barometer recovers after rejected aiding faults");
+}
+
+static void test_eskf_aiding_numeric_exhaustive(void)
+{
+    AerakiaEskf filter;
+    AerakiaEskf before;
+    AerakiaEskfConfig config;
+    AerakiaNavigationEstimate estimate;
+    AerakiaImuSample sample = level_sample(1000000U);
+    const float nonfinite[] = {NAN, INFINITY, -INFINITY};
+    const float bad_variance[] = {NAN, INFINITY, -INFINITY, 0.0f};
+    AerakiaGpsObservation gps = {
+        1010000U, {1.0f, 2.0f, 3.0f}, {0.1f, 0.2f, 0.3f}, 1.0f, 1.0f
+    };
+    AerakiaHeadingObservation heading = {1010000U, 0.1f, 0.01f};
+    AerakiaBarometerObservation barometer = {1010000U, 2.0f, 1.0f};
+    int axis;
+    int value_index;
+
+    aerakia_eskf_default_config(&config);
+    config.enable_static_alignment = false;
+    aerakia_eskf_init(&filter, &config, NULL, NULL);
+    (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
+    sample.timestamp_us = 1010000U;
+    (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
+
+    for (axis = 0; axis < 6; ++axis) {
+        for (value_index = 0; value_index < 3; ++value_index) {
+            gps.position_ned_m = (AerakiaVec3f){1.0f, 2.0f, 3.0f};
+            gps.velocity_ned_m_s = (AerakiaVec3f){0.1f, 0.2f, 0.3f};
+            if (axis < 3) set_vector_axis(&gps.position_ned_m, axis, nonfinite[value_index]);
+            else set_vector_axis(&gps.velocity_ned_m_s, axis - 3, nonfinite[value_index]);
+            before = filter;
+            check_true(aerakia_eskf_update_gps_observation(&filter, &gps)
+                           == AERAKIA_STATUS_MISSING_MEASUREMENT,
+                       "GNSS rejects NaN and signed infinity on every vector axis");
+            check_true(eskf_core_unchanged(&filter, &before),
+                       "invalid GNSS vector leaves state and covariance unchanged");
+        }
+    }
+    gps.position_ned_m = (AerakiaVec3f){1.0f, 2.0f, 3.0f};
+    gps.velocity_ned_m_s = (AerakiaVec3f){0.1f, 0.2f, 0.3f};
+    for (axis = 0; axis < 2; ++axis) {
+        for (value_index = 0; value_index < 4; ++value_index) {
+            gps.position_variance_m2 = 1.0f;
+            gps.velocity_variance_m2_s2 = 1.0f;
+            if (axis == 0) gps.position_variance_m2 = bad_variance[value_index];
+            else gps.velocity_variance_m2_s2 = bad_variance[value_index];
+            before = filter;
+            check_true(aerakia_eskf_update_gps_observation(&filter, &gps)
+                           == AERAKIA_STATUS_MISSING_MEASUREMENT,
+                       "GNSS rejects non-finite and non-positive variances");
+            check_true(eskf_core_unchanged(&filter, &before),
+                       "invalid GNSS variance leaves state and covariance unchanged");
+        }
+    }
+
+    for (value_index = 0; value_index < 3; ++value_index) {
+        heading.heading_ned_rad = nonfinite[value_index];
+        heading.variance_rad2 = 0.01f;
+        before = filter;
+        check_true(aerakia_eskf_update_heading_observation(&filter, &heading)
+                       == AERAKIA_STATUS_MISSING_MEASUREMENT,
+                   "trusted heading rejects NaN and signed infinity");
+        check_true(eskf_core_unchanged(&filter, &before),
+                   "invalid trusted heading leaves state and covariance unchanged");
+        barometer.height_up_m = nonfinite[value_index];
+        barometer.variance_m2 = 1.0f;
+        before = filter;
+        check_true(aerakia_eskf_update_barometer_observation(&filter, &barometer)
+                       == AERAKIA_STATUS_MISSING_MEASUREMENT,
+                   "barometer rejects NaN and signed infinity");
+        check_true(eskf_core_unchanged(&filter, &before),
+                   "invalid barometer height leaves state and covariance unchanged");
+    }
+    heading.heading_ned_rad = 0.1f;
+    barometer.height_up_m = 2.0f;
+    for (value_index = 0; value_index < 4; ++value_index) {
+        heading.variance_rad2 = bad_variance[value_index];
+        before = filter;
+        check_true(aerakia_eskf_update_heading_observation(&filter, &heading)
+                       == AERAKIA_STATUS_MISSING_MEASUREMENT,
+                   "trusted heading rejects non-finite and non-positive variance");
+        check_true(eskf_core_unchanged(&filter, &before),
+                   "invalid heading variance leaves state and covariance unchanged");
+        barometer.variance_m2 = bad_variance[value_index];
+        before = filter;
+        check_true(aerakia_eskf_update_barometer_observation(&filter, &barometer)
+                       == AERAKIA_STATUS_MISSING_MEASUREMENT,
+                   "barometer rejects non-finite and non-positive variance");
+        check_true(eskf_core_unchanged(&filter, &before),
+                   "invalid barometer variance leaves state and covariance unchanged");
+    }
 }
 
 static void test_eskf_adapter_stationary(void)
@@ -282,6 +679,10 @@ int main(void)
     test_mahony_yaw_integration();
     test_mahony_trusted_attitude_seed();
     test_mahony_adaptive_weight_and_timestamp();
+    test_mahony_input_integrity();
+    test_eskf_input_integrity();
+    test_eskf_timestamped_aiding_integrity();
+    test_eskf_aiding_numeric_exhaustive();
     test_eskf_adapter_stationary();
     test_eskf_static_supervisor();
     test_eskf_navigation_recovery_and_heading();

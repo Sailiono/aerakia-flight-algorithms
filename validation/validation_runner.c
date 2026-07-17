@@ -526,37 +526,45 @@ int main(int argc, char *argv[])
         (void)aerakia_eskf_process_imu(&eskf, &sample, &eskf_estimate);
 
         if (position_update) {
-            const AerakiaVec3f gps_position = parse_vector(
+            AerakiaGpsObservation observation;
+            observation.timestamp_us = sample.timestamp_us;
+            observation.position_ned_m = parse_vector(
                 columns, count, map.gps_position_n, map.gps_position_e, map.gps_position_d, 1.0, &ok
             );
-            const AerakiaVec3f gps_velocity = parse_vector(
+            observation.velocity_ned_m_s = parse_vector(
                 columns, count, map.gps_velocity_n, map.gps_velocity_e, map.gps_velocity_d, 1.0, &ok
             );
-            const float position_variance = (float)parse_double(
+            observation.position_variance_m2 = (float)parse_double(
                 columns, count, map.gps_position_variance, 1.0, &ok
             );
-            const float velocity_variance = (float)parse_double(
+            observation.velocity_variance_m2_s2 = (float)parse_double(
                 columns, count, map.gps_velocity_variance, 1.0, &ok
             );
-            if (ok) {
-                aerakia_eskf_update_gps(
-                    &eskf, gps_position, gps_velocity, position_variance, velocity_variance
-                );
+            if (ok && aerakia_eskf_update_gps_observation(&eskf, &observation)
+                    == AERAKIA_STATUS_OK) {
                 gps_updates++;
             }
         }
         if (heading_update && isfinite(heading_rad) && heading_variance > 0.0) {
-            aerakia_eskf_update_heading(
-                &eskf, (float)heading_rad, (float)heading_variance
-            );
-            heading_updates++;
+            AerakiaHeadingObservation observation;
+            observation.timestamp_us = sample.timestamp_us;
+            observation.heading_ned_rad = (float)heading_rad;
+            observation.variance_rad2 = (float)heading_variance;
+            if (aerakia_eskf_update_heading_observation(&eskf, &observation)
+                    == AERAKIA_STATUS_OK) {
+                heading_updates++;
+            }
         }
         if ((int)parse_double(columns, count, map.baro_update, 0.0, &ok) != 0) {
-            aerakia_eskf_update_barometer(
-                &eskf,
-                (float)parse_double(columns, count, map.baro_height, 0.0, &ok),
-                (float)parse_double(columns, count, map.baro_variance, 1.0, &ok)
+            AerakiaBarometerObservation observation;
+            observation.timestamp_us = sample.timestamp_us;
+            observation.height_up_m = (float)parse_double(
+                columns, count, map.baro_height, 0.0, &ok
             );
+            observation.variance_m2 = (float)parse_double(
+                columns, count, map.baro_variance, 1.0, &ok
+            );
+            if (ok) (void)aerakia_eskf_update_barometer_observation(&eskf, &observation);
         }
         aerakia_eskf_get_estimate(&eskf, &eskf_estimate);
         if (eskf_estimate.zero_velocity_update_applied) zupt_updates++;

@@ -13,6 +13,8 @@
 typedef struct {
     float minimum_dt_s;
     float maximum_dt_s;
+    /** Maximum observation age relative to the latest IMU sample; negative disables the check. */
+    float maximum_aiding_age_s;
     bool fuse_magnetometer;
     bool gate_magnetometer;
     float magnetometer_variance;
@@ -32,6 +34,26 @@ typedef struct {
     float zero_velocity_interval_s;
     float zero_velocity_variance_m2_s2;
 } AerakiaEskfConfig;
+
+typedef struct {
+    uint64_t timestamp_us;
+    AerakiaVec3f position_ned_m;
+    AerakiaVec3f velocity_ned_m_s;
+    float position_variance_m2;
+    float velocity_variance_m2_s2;
+} AerakiaGpsObservation;
+
+typedef struct {
+    uint64_t timestamp_us;
+    float heading_ned_rad;
+    float variance_rad2;
+} AerakiaHeadingObservation;
+
+typedef struct {
+    uint64_t timestamp_us;
+    float height_up_m;
+    float variance_m2;
+} AerakiaBarometerObservation;
 
 typedef struct {
     AerakiaAttitudeEstimate attitude;
@@ -66,6 +88,9 @@ typedef struct {
     AerakiaMagGate magnetic_gate;
     AerakiaEskfConfig config;
     uint64_t last_timestamp_us;
+    uint64_t last_gps_timestamp_us;
+    uint64_t last_heading_timestamp_us;
+    uint64_t last_barometer_timestamp_us;
     uint32_t rejected_samples;
     ESKF_InnovResult last_magnetometer_innovation;
     ESKF_InnovResult last_heading_innovation;
@@ -93,6 +118,9 @@ typedef struct {
     bool zero_velocity_update_applied;
     bool attitude_seeded;
     bool has_timestamp;
+    bool has_gps_timestamp;
+    bool has_heading_timestamp;
+    bool has_barometer_timestamp;
 } AerakiaEskf;
 
 void aerakia_eskf_default_config(AerakiaEskfConfig *config);
@@ -132,6 +160,17 @@ void aerakia_eskf_update_gps(
     float velocity_variance_m2_s2
 );
 
+/**
+ * Fuse a timestamped paired GNSS observation.
+ *
+ * Duplicate, reordered, future, and stale observations are rejected before the filter state is
+ * changed. This is the preferred FCOne integration API.
+ */
+AerakiaStatus aerakia_eskf_update_gps_observation(
+    AerakiaEskf *filter,
+    const AerakiaGpsObservation *observation
+);
+
 /** Fuse a trusted yaw/heading source such as dual-GNSS or vision. */
 void aerakia_eskf_update_heading(
     AerakiaEskf *filter,
@@ -139,10 +178,20 @@ void aerakia_eskf_update_heading(
     float variance_rad2
 );
 
+AerakiaStatus aerakia_eskf_update_heading_observation(
+    AerakiaEskf *filter,
+    const AerakiaHeadingObservation *observation
+);
+
 void aerakia_eskf_update_barometer(
     AerakiaEskf *filter,
     float height_up_m,
     float variance_m2
+);
+
+AerakiaStatus aerakia_eskf_update_barometer_observation(
+    AerakiaEskf *filter,
+    const AerakiaBarometerObservation *observation
 );
 
 void aerakia_eskf_apply_zero_velocity(AerakiaEskf *filter, float variance_m2_s2);

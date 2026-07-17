@@ -23,6 +23,7 @@ accuracy against independent physical truth.
 | Navigation consistency | GNSS position/velocity NIS and posterior 6-state navigation NEES through a five-second outage and reacquisition | 20-seed measurement-noise baseline and constant-bias/timestamp-jitter extension pass with zero numerical/recovery failures; thermal and transport faults pending |
 | EuRoC public replay | 36,381-sample Leica/IMU `MH_01_easy` and 20,932-sample direct-pose `V1_03_difficult`; raw and reference-bias-corrected tracks retained | Navigation NIS/NEES consistent; direct Vicon external pose passes high-dynamic replay; not a cold-start or independent-heading test |
 | Host regression | Strict C99 warnings-as-errors build, public API tests, deterministic synthetic fault suite | Passing reviewed thresholds |
+| Input/transport integrity | Exhaustive required-IMU non-finite checks; timestamp order/gap behavior; optional-mag isolation; timestamped GNSS/heading/barometer freshness and recovery | Passing 100 seeds, 1,020,000 IMU attempts, 2,100 aiding attempts, and burst lengths through 100 with zero invariant/health failures |
 | Private replay | Sanitized relative GNSS, reset events, GSF diagnostics, and native C replay across the selected ULog suite | Operational; PX4 remains an engineering reference |
 
 ## P0 work before hardware flight tests
@@ -32,8 +33,8 @@ accuracy against independent physical truth.
 2. Repeat the now-gated trusted-heading dropout/outlier/recovery test with real dual-antenna GNSS,
    vision, or rate-table/Vicon heading. The present private ULogs contain no valid direct GNSS
    heading samples.
-3. Extend the implemented constant-bias and monotonic-timestamp-jitter Monte Carlo gate to thermal
-   drift, transport delay, reordering, and sample loss.
+3. Keep the implemented transport delay, reordering, sample loss, malformed-value, and aiding-age
+   campaign passing; add hardware thermal drift only when temperature data are available.
 4. Run the exact FCOne adapter through timestamp, frame, unit, dropout, and stale-data contract tests.
 
 ## P1 work when the new hardware is available

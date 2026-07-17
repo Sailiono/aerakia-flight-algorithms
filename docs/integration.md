@@ -46,19 +46,37 @@ exists. A trusted seed is an integration contract, not a substitute for validati
 
 ## Scheduling
 
-Call the estimator once per new IMU sample. The timestamp, not task wake-up time, defines the integration interval. Duplicate, reversed, or excessively delayed samples return `AERAKIA_STATUS_TIMESTAMP_ERROR`.
+Call the estimator once per new IMU sample. The timestamp, not task wake-up time, defines the
+integration interval. Duplicate, reversed, and below-minimum intervals return
+`AERAKIA_STATUS_TIMESTAMP_ERROR` without advancing estimator time. A forward interval above the
+configured maximum is also rejected, but re-anchors estimator time so the next fresh sample can
+resume without integrating across the missing interval.
 
 Lower-rate aiding measurements are explicit calls:
 
 ```c
-aerakia_eskf_update_gps(&navigation_filter,
-                        gps_position_ned_m, gps_velocity_ned_m_s,
-                        gps_position_variance_m2, gps_velocity_variance_m2_s2);
-aerakia_eskf_update_barometer(&navigation_filter, barometric_height_up_m, baro_variance_m2);
-aerakia_eskf_update_heading(&navigation_filter, heading_ned_rad, heading_variance_rad2);
+AerakiaGpsObservation gps = {
+    gps_sample_time_us, gps_position_ned_m, gps_velocity_ned_m_s,
+    gps_position_variance_m2, gps_velocity_variance_m2_s2
+};
+AerakiaHeadingObservation heading = {
+    heading_sample_time_us, heading_ned_rad, heading_variance_rad2
+};
+AerakiaBarometerObservation barometer = {
+    barometer_sample_time_us, barometric_height_up_m, baro_variance_m2
+};
+
+gps_status = aerakia_eskf_update_gps_observation(&navigation_filter, &gps);
+heading_status = aerakia_eskf_update_heading_observation(&navigation_filter, &heading);
+barometer_status = aerakia_eskf_update_barometer_observation(&navigation_filter, &barometer);
 ```
 
-The paired GPS API gates position and velocity separately. If both are rejected for the configured consecutive limit, it re-anchors only position/velocity with covariance floors; attitude and learned IMU biases are preserved.
+Use the physical measurement time, not message-delivery or task-wakeup time. The timestamped APIs
+reject observations before the first IMU, from the future, duplicate/reordered per source, or older
+than `maximum_aiding_age_s`. The older untimestamped update functions remain source-compatible for
+existing host applications, but cannot enforce freshness and must not be used by the FCOne adapter.
+
+The paired GPS API gates position and velocity separately. If both are rejected for the configured consecutive limit, it re-anchors only position/velocity with covariance floors; attitude and learned IMU biases are preserved. A syntactically and temporally valid observation consumes its source timestamp even if its innovation is rejected, preventing the same physical sample from being retried as if it were new.
 
 Trusted heading is independent of magnetometer fusion. It can come from dual-antenna GNSS, vision, motion capture, or another upstream estimator, provided the application converts it to clockwise-from-North NED radians and supplies a defensible variance.
 

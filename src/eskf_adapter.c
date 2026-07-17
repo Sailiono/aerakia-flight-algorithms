@@ -24,6 +24,27 @@ static float vector_norm(AerakiaVec3f vector)
     return sqrtf(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
 }
 
+static AerakiaStatus validate_aiding_timestamp(
+    const AerakiaEskf *filter,
+    uint64_t timestamp_us,
+    uint64_t last_source_timestamp_us,
+    bool has_source_timestamp
+)
+{
+    double age_s;
+    if (filter == NULL || !filter->has_timestamp) return AERAKIA_STATUS_TIMESTAMP_ERROR;
+    if (timestamp_us > filter->last_timestamp_us) return AERAKIA_STATUS_TIMESTAMP_ERROR;
+    if (has_source_timestamp && timestamp_us <= last_source_timestamp_us) {
+        return AERAKIA_STATUS_TIMESTAMP_ERROR;
+    }
+    age_s = (double)(filter->last_timestamp_us - timestamp_us) * 1.0e-6;
+    if (filter->config.maximum_aiding_age_s >= 0.0f
+        && age_s > filter->config.maximum_aiding_age_s) {
+        return AERAKIA_STATUS_STALE_MEASUREMENT;
+    }
+    return AERAKIA_STATUS_OK;
+}
+
 static AerakiaVec3f quaternion_to_euler(const eskf_float_t q[4])
 {
     AerakiaVec3f result;
@@ -169,6 +190,7 @@ void aerakia_eskf_default_config(AerakiaEskfConfig *config)
     }
     config->minimum_dt_s = 0.0001f;
     config->maximum_dt_s = 0.1f;
+    config->maximum_aiding_age_s = 0.5f;
     config->fuse_magnetometer = false;
     config->gate_magnetometer = true;
     config->magnetometer_variance = 0.05f;
@@ -267,11 +289,17 @@ AerakiaStatus aerakia_eskf_process_imu(
         return AERAKIA_STATUS_INITIALIZED;
     }
     dt = (float)(sample->timestamp_us - filter->last_timestamp_us) * 1.0e-6f;
-    filter->last_timestamp_us = sample->timestamp_us;
-    if (dt < filter->config.minimum_dt_s || dt > filter->config.maximum_dt_s) {
+    if (dt < filter->config.minimum_dt_s) {
         filter->rejected_samples++;
         return AERAKIA_STATUS_TIMESTAMP_ERROR;
     }
+    if (dt > filter->config.maximum_dt_s) {
+        /* Re-anchor after a forward transport gap; never integrate across it. */
+        filter->last_timestamp_us = sample->timestamp_us;
+        filter->rejected_samples++;
+        return AERAKIA_STATUS_TIMESTAMP_ERROR;
+    }
+    filter->last_timestamp_us = sample->timestamp_us;
 
     acceleration[0] = sample->acceleration_m_s2.x;
     acceleration[1] = sample->acceleration_m_s2.y;
@@ -418,6 +446,35 @@ void aerakia_eskf_update_gps(
     }
 }
 
+AerakiaStatus aerakia_eskf_update_gps_observation(
+    AerakiaEskf *filter,
+    const AerakiaGpsObservation *observation
+)
+{
+    AerakiaStatus status;
+    if (filter == NULL || observation == NULL) return AERAKIA_STATUS_INVALID_ARGUMENT;
+    if (!vector_is_finite(observation->position_ned_m)
+        || !vector_is_finite(observation->velocity_ned_m_s)
+        || !isfinite(observation->position_variance_m2)
+        || !isfinite(observation->velocity_variance_m2_s2)
+        || observation->position_variance_m2 <= 0.0f
+        || observation->velocity_variance_m2_s2 <= 0.0f) {
+        return AERAKIA_STATUS_MISSING_MEASUREMENT;
+    }
+    status = validate_aiding_timestamp(
+        filter, observation->timestamp_us, filter->last_gps_timestamp_us,
+        filter->has_gps_timestamp
+    );
+    if (status != AERAKIA_STATUS_OK) return status;
+    aerakia_eskf_update_gps(
+        filter, observation->position_ned_m, observation->velocity_ned_m_s,
+        observation->position_variance_m2, observation->velocity_variance_m2_s2
+    );
+    filter->last_gps_timestamp_us = observation->timestamp_us;
+    filter->has_gps_timestamp = true;
+    return AERAKIA_STATUS_OK;
+}
+
 void aerakia_eskf_update_heading(
     AerakiaEskf *filter,
     float heading_ned_rad,
@@ -439,6 +496,30 @@ void aerakia_eskf_update_heading(
     }
 }
 
+AerakiaStatus aerakia_eskf_update_heading_observation(
+    AerakiaEskf *filter,
+    const AerakiaHeadingObservation *observation
+)
+{
+    AerakiaStatus status;
+    if (filter == NULL || observation == NULL) return AERAKIA_STATUS_INVALID_ARGUMENT;
+    if (!isfinite(observation->heading_ned_rad) || !isfinite(observation->variance_rad2)
+        || observation->variance_rad2 <= 0.0f) {
+        return AERAKIA_STATUS_MISSING_MEASUREMENT;
+    }
+    status = validate_aiding_timestamp(
+        filter, observation->timestamp_us, filter->last_heading_timestamp_us,
+        filter->has_heading_timestamp
+    );
+    if (status != AERAKIA_STATUS_OK) return status;
+    aerakia_eskf_update_heading(
+        filter, observation->heading_ned_rad, observation->variance_rad2
+    );
+    filter->last_heading_timestamp_us = observation->timestamp_us;
+    filter->has_heading_timestamp = true;
+    return AERAKIA_STATUS_OK;
+}
+
 void aerakia_eskf_update_barometer(
     AerakiaEskf *filter,
     float height_up_m,
@@ -448,6 +529,28 @@ void aerakia_eskf_update_barometer(
     if (filter != NULL && isfinite(height_up_m) && variance_m2 > 0.0f) {
         eskf_update_baro(&filter->core, height_up_m, variance_m2, NULL);
     }
+}
+
+AerakiaStatus aerakia_eskf_update_barometer_observation(
+    AerakiaEskf *filter,
+    const AerakiaBarometerObservation *observation
+)
+{
+    AerakiaStatus status;
+    if (filter == NULL || observation == NULL) return AERAKIA_STATUS_INVALID_ARGUMENT;
+    if (!isfinite(observation->height_up_m) || !isfinite(observation->variance_m2)
+        || observation->variance_m2 <= 0.0f) {
+        return AERAKIA_STATUS_MISSING_MEASUREMENT;
+    }
+    status = validate_aiding_timestamp(
+        filter, observation->timestamp_us, filter->last_barometer_timestamp_us,
+        filter->has_barometer_timestamp
+    );
+    if (status != AERAKIA_STATUS_OK) return status;
+    aerakia_eskf_update_barometer(filter, observation->height_up_m, observation->variance_m2);
+    filter->last_barometer_timestamp_us = observation->timestamp_us;
+    filter->has_barometer_timestamp = true;
+    return AERAKIA_STATUS_OK;
 }
 
 void aerakia_eskf_apply_zero_velocity(AerakiaEskf *filter, float variance_m2_s2)

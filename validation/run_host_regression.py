@@ -81,6 +81,21 @@ def find_runner(build_dir: Path) -> Path:
     raise FileNotFoundError(f"validation runner not found; checked: {locations}")
 
 
+def find_input_integrity_runner(build_dir: Path) -> Path:
+    names = (
+        "aerakia_input_integrity_campaign",
+        "aerakia_input_integrity_campaign.exe",
+    )
+    candidates = tuple(build_dir / name for name in names) + tuple(
+        build_dir / "Release" / name for name in names
+    )
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate.resolve()
+    locations = ", ".join(str(candidate) for candidate in candidates)
+    raise FileNotFoundError(f"input-integrity runner not found; checked: {locations}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--build-dir", type=Path, default=Path("build/host-regression"))
@@ -122,17 +137,22 @@ def main() -> None:
             [sys.executable, "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py"],
             cwd=root, log_path=logs_dir / "04-python-tests.log", environment=environment,
         ))
+        integrity_runner = find_input_integrity_runner(build_dir)
+        commands.append(run_recorded(
+            [str(integrity_runner), str(out_dir / "input-integrity-summary.json")],
+            cwd=root, log_path=logs_dir / "05-input-integrity.log", environment=environment,
+        ))
         runner = find_runner(build_dir)
         commands.append(run_recorded(
             [sys.executable, str(root / "validation" / "run_suite.py"),
              "--runner", str(runner), "--out-dir", str(validation_dir)],
-            cwd=root, log_path=logs_dir / "05-deterministic-suite.log", environment=environment,
+            cwd=root, log_path=logs_dir / "06-deterministic-suite.log", environment=environment,
         ))
         commands.append(run_recorded(
             [sys.executable, str(root / "validation" / "check_thresholds.py"),
              str(validation_dir / "summary.json"), "--thresholds",
              str(root / "validation" / "thresholds.json")],
-            cwd=root, log_path=logs_dir / "06-thresholds.log", environment=environment,
+            cwd=root, log_path=logs_dir / "07-thresholds.log", environment=environment,
         ))
         status = "passed"
     except (OSError, subprocess.CalledProcessError) as error:
