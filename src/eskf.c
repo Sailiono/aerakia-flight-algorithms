@@ -220,6 +220,7 @@ static bool _measurement_update_3d(ESKF_Handle *h,
             result->innov_var[0] = S[0][0];
             result->innov_var[1] = S[1][1];
             result->innov_var[2] = S[2][2];
+            result->nis = (float)nis;
             result->test_ratio = (gate > 0.0) ? (nis / (gate * gate)) : 0.0;
             result->accepted = (gate <= 0.0) || (nis <= gate * gate);
         }
@@ -358,6 +359,7 @@ static bool _measurement_update_1d(ESKF_Handle *h,
             result->innov_var[0] = S;
             result->innov_var[1] = 0.0;
             result->innov_var[2] = 0.0;
+            result->nis = (float)nis;
             result->test_ratio = (gate > 0.0) ? (nis / (gate * gate)) : 0.0;
             result->accepted = (gate <= 0.0) || (nis <= gate * gate);
         }

@@ -13,6 +13,7 @@ Portable C99 flight-estimation algorithms with a reproducible PC validation plat
 - A 15-dimensional error-state Kalman filter (16-component nominal state) with GPS position/velocity, barometer, heading, magnetometer, and zero-velocity updates
 - Independent static cold-start tilt and magnetic-heading alignment with an explicit true-North declination reference
 - Deterministic scenario generation, native C replay, metric calculation, plots, and CI regression gates
+- GNSS NIS and independent-truth navigation NEES diagnostics, including outage/reacquisition replay
 - No heap allocation, operating-system calls, MCU headers, or device drivers in the algorithm library
 
 ## Algorithms
@@ -84,16 +85,22 @@ python validation/run_suite.py \
 
 The suite generates timestamped IMU/magnetic data with ground truth, replays the exact native C code, produces per-axis errors and plots, and checks reviewed regression limits.
 
-Example results from the deterministic 8 s / 100 Hz / seed 7 suite:
+Example results from the deterministic 20 s / 100 Hz / seed 7 suite:
 
 | Scenario | Mahony standard | Mahony robust | ESKF |
 | --- | ---: | ---: | ---: |
-| Clean motion | 0.2090° | 0.2230° | 0.1756° |
-| Magnetic spike | 0.3044° | 0.2041° | 0.2524° |
-| Persistent magnetic bias | 14.0675° | 0.2621° | 0.2353° |
-| Tilted cold start (post-alignment) | — | — | 0.0428° |
+| Clean motion | 0.0852° | 0.0890° | 0.1954° |
+| Magnetic spike | 0.1518° | 0.0886° | 0.2131° |
+| Persistent magnetic bias | 16.1697° | 0.1648° | 0.1809° |
+| Tilted cold start (post-alignment) | — | — | 0.0208° |
+| GNSS outage/reacquisition (post-alignment) | — | — | 0.4912° |
 
-Values are wrapped attitude RMSE. They demonstrate deterministic behavior and fault response under the stated synthetic model; they do not prove flight safety or airworthiness. The [algorithm status](docs/algorithm-status.md) records the current maturity and P0 blockers, while the [validation methodology](docs/validation.md) defines the evidence still required from public datasets, motion-capture/rate-table tests, HIL, and flight logs.
+Values are wrapped attitude RMSE. In the outage scenario, position RMSE is 0.406 m and velocity
+RMSE is 0.184 m/s; NIS and NEES are checked against reviewed deterministic bounds. These synthetic
+results demonstrate repeatability and fault response, not flight safety or airworthiness. The
+[algorithm status](docs/algorithm-status.md) records the current maturity and P0 blockers, while the
+[validation methodology](docs/validation.md) defines the evidence still required from public
+datasets, motion-capture/rate-table tests, HIL, and flight logs.
 
 Private PX4 ULogs can be normalized without exporting absolute coordinates or hardware identifiers:
 

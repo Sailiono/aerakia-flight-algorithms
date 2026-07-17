@@ -5,8 +5,8 @@
 The portable estimator core is suitable for FCOne integration work and further bench testing,
 but it is not yet justified to claim that the complete flight-estimation system is verified.
 The current evidence establishes deterministic host behavior, measurement integrity handling,
-long-run covariance health, and replay tracking after an initial attitude seed. It does not yet
-establish flight safety or cold-start accuracy against independent physical truth.
+long-run covariance health, synthetic cold start, and private PX4-referenced replay tracking. It
+does not yet establish flight safety or cold-start accuracy against independent physical truth.
 
 ## Evidence completed
 
@@ -17,6 +17,7 @@ establish flight safety or cold-start accuracy against independent physical trut
 | Measurement integrity | NIS gates, latched magnetic-disturbance rejection, recovery confirmation, navigation recovery supervision | Passing deterministic regressions |
 | Heading semantics | Magnetometer, trusted heading, GNSS course, and PX4 GSF are separate paths; course is never silently treated as body yaw | Implemented |
 | Cold-start alignment | Static accelerometer tilt, magnetic heading with explicit declination, then IMU-bias initialization; no PX4 attitude seed | Passing unit, noisy synthetic, and private stationary-replay checks |
+| Navigation consistency | GNSS position/velocity NIS and posterior 6-state navigation NEES through a five-second outage and reacquisition | Passing deterministic bounds; Monte Carlo expansion pending |
 | Host regression | Strict C99 warnings-as-errors build, public API tests, deterministic synthetic fault suite | Passing reviewed thresholds |
 | Private replay | Sanitized relative GNSS, reset events, GSF diagnostics, and native C replay across the selected ULog suite | Operational; PX4 remains an engineering reference |
 
@@ -26,8 +27,8 @@ establish flight safety or cold-start accuracy against independent physical trut
    synthetic checks are independent, while private ULog attitude remains a PX4 engineering reference.
 2. Exercise the trusted-heading path with a real dual-antenna GNSS, vision, or controlled injected
    heading dataset. The present private ULogs contain no valid direct GNSS heading samples.
-3. Add Monte Carlo consistency tests (NIS and, where independent truth exists, NEES) with sensor
-   bias, timing jitter, aiding loss, and recovery cases.
+3. Expand the implemented per-run NIS and navigation-substate NEES diagnostics into Monte Carlo
+   confidence tests with bias, timing jitter, aiding loss, and recovery cases.
 4. Run the exact FCOne adapter through timestamp, frame, unit, dropout, and stale-data contract tests.
 
 ## P1 work when the new hardware is available

@@ -54,8 +54,19 @@ Metrics: attitude/velocity/position RMSE, bias error, innovation acceptance, NIS
 - `yaw_jump`: discontinuous truth case for wrap/continuity testing;
 - `cold_start_tilted`: noisy static data at non-zero roll, pitch, and yaw; the ESKF starts from
   identity and CI scores only samples after independently reported tilt/heading alignment.
+- `navigation_outage`: stationary cold start, horizontal maneuvers, a five-second GNSS outage, and
+  reacquisition with independent synthetic position/velocity truth.
 
 The native `aerakia_validation_runner` replays the public C code. `run_suite.py` generates reports and `check_thresholds.py` turns reviewed error limits into CI gates.
+
+GNSS position and velocity updates report their three-degree-of-freedom normalized innovation
+squared (NIS). When the reference is declared synthetic, the runner additionally reports posterior
+six-state `[velocity, position]` normalized estimation error squared (NEES). Reports include
+single-sample chi-square coverage as a diagnostic; consecutive replay samples are correlated, so
+coverage is not treated as an independent-sample hypothesis test.
+
+The staged external intake and the limits of each source are documented in
+[public datasets](public-datasets.md).
 
 ## Private ULog track
 

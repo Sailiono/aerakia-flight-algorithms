@@ -14,6 +14,10 @@ import numpy as np
 
 ALGORITHMS = ("mahony_standard", "mahony_robust", "eskf")
 AXES = ("roll", "pitch", "yaw")
+CHI_SQUARE_95 = {
+    3: (0.215795, 9.348404),
+    6: (1.237344, 14.449375),
+}
 
 
 def wrapped_error_deg(estimate: np.ndarray, truth: np.ndarray) -> np.ndarray:
@@ -355,6 +359,54 @@ def navigation_metrics(columns: dict[str, np.ndarray]) -> dict[str, object] | No
     }
 
 
+def _consistency_summary(values: np.ndarray, degrees_of_freedom: int) -> dict[str, float | int]:
+    finite = values[np.isfinite(values)]
+    lower, upper = CHI_SQUARE_95[degrees_of_freedom]
+    if len(finite) == 0:
+        return {
+            "samples": 0,
+            "degrees_of_freedom": degrees_of_freedom,
+            "expected_mean": float(degrees_of_freedom),
+            "mean": float("nan"),
+            "p95": float("nan"),
+            "single_sample_95_coverage": float("nan"),
+        }
+    return {
+        "samples": int(len(finite)),
+        "degrees_of_freedom": degrees_of_freedom,
+        "expected_mean": float(degrees_of_freedom),
+        "mean": float(np.mean(finite)),
+        "p95": float(np.percentile(finite, 95)),
+        "single_sample_95_coverage": float(np.mean((finite >= lower) & (finite <= upper))),
+    }
+
+
+def consistency_metrics(
+    columns: dict[str, np.ndarray], reference_kind: str
+) -> dict[str, object] | None:
+    if "eskf_position_nis" not in columns or "eskf_velocity_nis" not in columns:
+        return None
+    gps_updates = columns.get("input_position_update", np.zeros(len(columns["ts_us"]))) > 0.5
+    if not np.any(gps_updates):
+        return None
+    result: dict[str, object] = {
+        "interpretation": (
+            "NIS uses each pre-update GNSS innovation. Single-sample chi-square coverage is "
+            "diagnostic because consecutive samples are time-correlated."
+        ),
+        "position_nis": _consistency_summary(columns["eskf_position_nis"][gps_updates], 3),
+        "velocity_nis": _consistency_summary(columns["eskf_velocity_nis"][gps_updates], 3),
+    }
+    if reference_kind == "synthetic" and "eskf_navigation_nees" in columns:
+        result["navigation_nees"] = _consistency_summary(
+            columns["eskf_navigation_nees"][gps_updates], 6
+        )
+        result["navigation_nees_scope"] = (
+            "Posterior [velocity, position] 6-state error against independent synthetic truth."
+        )
+    return result
+
+
 def create_plot(columns: dict[str, np.ndarray], output_path: Path, title: str) -> None:
     time_s = (columns["ts_us"] - columns["ts_us"][0]) * 1.0e-6
     figure, axes = plt.subplots(3, 2, figsize=(14, 10), sharex=True)
@@ -468,9 +520,30 @@ def write_markdown(
         )
     if navigation:
         lines.append(
-            f"- Position RMSE against PX4 local-position reference: "
+            f"- Position RMSE against the declared navigation reference: "
             f"{navigation['position_rmse_m']:.3f} m."
         )
+    consistency = metrics.get("eskf_consistency")
+    if consistency:
+        position_nis = consistency["position_nis"]
+        velocity_nis = consistency["velocity_nis"]
+        lines.extend(
+            [
+                "", "## ESKF consistency diagnostics", "",
+                f"- Position NIS mean: {position_nis['mean']:.3f} "
+                f"(expected {position_nis['expected_mean']:.0f}, "
+                f"n={position_nis['samples']}).",
+                f"- Velocity NIS mean: {velocity_nis['mean']:.3f} "
+                f"(expected {velocity_nis['expected_mean']:.0f}, "
+                f"n={velocity_nis['samples']}).",
+            ]
+        )
+        if "navigation_nees" in consistency:
+            nees = consistency["navigation_nees"]
+            lines.append(
+                f"- Posterior 6-state navigation NEES mean: {nees['mean']:.3f} "
+                f"(expected {nees['expected_mean']:.0f}, n={nees['samples']})."
+            )
     reset = metrics["reference_resets"]
     reset_compensated = metrics.get("eskf_reset_compensated_yaw")
     segment_drift = metrics.get("eskf_segment_aligned_yaw")
@@ -537,6 +610,7 @@ def main() -> None:
         },
         "eskf_integrity": eskf_integrity_metrics(columns),
         "navigation": navigation_metrics(columns),
+        "eskf_consistency": consistency_metrics(columns, args.reference_kind),
         "reference_resets": reset_summary(columns),
     }
     cold_start = cold_start_alignment_metrics(columns)

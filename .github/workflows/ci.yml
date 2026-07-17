@@ -35,8 +35,8 @@ jobs:
           python validation/run_suite.py
           --runner build/aerakia_validation_runner
           --out-dir build/validation
-          --scenarios clean_motion,mag_spike,mag_bias,cold_start_tilted
-          --duration 8 --rate 100 --seed 7
+          --scenarios clean_motion,mag_spike,mag_bias,cold_start_tilted,navigation_outage
+          --duration 20 --rate 100 --seed 7
       - name: Check accuracy and fault-response thresholds
         run: >-
           python validation/check_thresholds.py

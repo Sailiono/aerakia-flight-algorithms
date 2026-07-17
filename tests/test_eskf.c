@@ -169,6 +169,7 @@ static void test_position_update_and_gate(void)
     eskf_init(&filter, NULL, NULL);
     eskf_update_position(&filter, nearby, 1.0, &result);
     check_true(result.accepted, "nearby position update passes innovation gate");
+    check_true(result.nis >= 0.0f && isfinite(result.nis), "position update reports finite NIS");
     check_true(filter.state.p[0] > 0.9, "position update corrects north state");
     check_true(filter.state.p[1] < -1.8, "position update corrects east state");
 
@@ -193,6 +194,7 @@ static void test_velocity_update_and_gate(void)
     eskf_init(&filter, NULL, NULL);
     eskf_update_velocity(&filter, nearby, 1.0, &result);
     check_true(result.accepted, "nearby velocity update passes innovation gate");
+    check_true(result.nis >= 0.0f && isfinite(result.nis), "velocity update reports finite NIS");
     before[0] = filter.state.v[0];
     before[1] = filter.state.v[1];
     before[2] = filter.state.v[2];

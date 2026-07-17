@@ -197,6 +197,77 @@ static float radians_to_degrees(float radians)
     return radians * (180.0f / AERAKIA_PI_F);
 }
 
+static double navigation_nees(
+    const AerakiaEskf *filter,
+    const AerakiaVec3f reference_position,
+    const AerakiaVec3f reference_velocity
+)
+{
+    static const int state_indices[6] = {
+        ESKF_IDX_DV, ESKF_IDX_DV + 1, ESKF_IDX_DV + 2,
+        ESKF_IDX_DP, ESKF_IDX_DP + 1, ESKF_IDX_DP + 2
+    };
+    double augmented[6][12];
+    double error[6];
+    double result = 0.0;
+    int row, column, pivot;
+
+    error[0] = filter->core.state.v[0] - reference_velocity.x;
+    error[1] = filter->core.state.v[1] - reference_velocity.y;
+    error[2] = filter->core.state.v[2] - reference_velocity.z;
+    error[3] = filter->core.state.p[0] - reference_position.x;
+    error[4] = filter->core.state.p[1] - reference_position.y;
+    error[5] = filter->core.state.p[2] - reference_position.z;
+
+    for (row = 0; row < 6; ++row) {
+        for (column = 0; column < 6; ++column) {
+            augmented[row][column] = filter->core.P[state_indices[row]][state_indices[column]];
+            augmented[row][column + 6] = row == column ? 1.0 : 0.0;
+        }
+    }
+    for (column = 0; column < 6; ++column) {
+        double largest = fabs(augmented[column][column]);
+        pivot = column;
+        for (row = column + 1; row < 6; ++row) {
+            const double candidate = fabs(augmented[row][column]);
+            if (candidate > largest) {
+                largest = candidate;
+                pivot = row;
+            }
+        }
+        if (largest < 1.0e-15) return NAN;
+        if (pivot != column) {
+            int entry;
+            for (entry = 0; entry < 12; ++entry) {
+                const double temporary = augmented[column][entry];
+                augmented[column][entry] = augmented[pivot][entry];
+                augmented[pivot][entry] = temporary;
+            }
+        }
+        {
+            const double scale = augmented[column][column];
+            int entry;
+            for (entry = 0; entry < 12; ++entry) augmented[column][entry] /= scale;
+        }
+        for (row = 0; row < 6; ++row) {
+            int entry;
+            const double scale = augmented[row][column];
+            if (row == column) continue;
+            for (entry = 0; entry < 12; ++entry) {
+                augmented[row][entry] -= scale * augmented[column][entry];
+            }
+        }
+    }
+    for (row = 0; row < 6; ++row) {
+        double inverse_times_error = 0.0;
+        for (column = 0; column < 6; ++column) {
+            inverse_times_error += augmented[row][column + 6] * error[column];
+        }
+        result += error[row] * inverse_times_error;
+    }
+    return result >= 0.0 && isfinite(result) ? result : NAN;
+}
+
 int main(int argc, char *argv[])
 {
     FILE *input, *output;
@@ -268,7 +339,8 @@ int main(int argc, char *argv[])
         "ref_position_n_m,ref_position_e_m,ref_position_d_m,"
         "ref_velocity_n_m_s,ref_velocity_e_m_s,ref_velocity_d_m_s,"
         "eskf_position_n_m,eskf_position_e_m,eskf_position_d_m,"
-        "eskf_velocity_n_m_s,eskf_velocity_e_m_s,eskf_velocity_d_m_s\n",
+        "eskf_velocity_n_m_s,eskf_velocity_e_m_s,eskf_velocity_d_m_s,"
+        "eskf_position_nis,eskf_velocity_nis,eskf_navigation_nees\n",
         output
     );
 
@@ -332,6 +404,12 @@ int main(int argc, char *argv[])
         const int position_ref_valid = (int)parse_double(
             columns, count, map.position_ref_valid, 0.0, &ok
         ) != 0;
+        const AerakiaVec3f reference_position = parse_vector(
+            columns, count, map.ref_position_n, map.ref_position_e, map.ref_position_d, 1.0, &ok
+        );
+        const AerakiaVec3f reference_velocity = parse_vector(
+            columns, count, map.ref_velocity_n, map.ref_velocity_e, map.ref_velocity_d, 1.0, &ok
+        );
         double reference_q[4];
         AerakiaImuSample sample;
 
@@ -424,7 +502,8 @@ int main(int argc, char *argv[])
             "%.6f,%.6f,%.6f,%d,%.9f,%.9f,%d,%d,%d,%u,%d,%d,%d,%d,%d,%d,%u,"
             "%d,%d,%d,%.0f,%.0f,%.9f,%.9f,%.9f,%.9f,"
             "%d,%d,%.9f,%d,%.9f,%.9f,%d,%d,%.9f,%.9f,%.9f,%d,%d,%.9f,%.9f,"
-            "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f\n",
+            "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,"
+            "%.9f,%.9f,%.9f\n",
             sequence, (unsigned long long)sample.timestamp_us, truth_roll, truth_pitch, truth_yaw,
             radians_to_degrees(standard_estimate.euler_rad.x),
             radians_to_degrees(standard_estimate.euler_rad.y),
@@ -459,15 +538,15 @@ int main(int argc, char *argv[])
             heading_valid, heading_rad, heading_variance,
             course_valid, course_update, course_rad, course_variance, ground_speed,
             gsf_yaw_valid, gsf_yaw_update, gsf_yaw_rad, gsf_yaw_variance,
-            parse_double(columns, count, map.ref_position_n, 0.0, &ok),
-            parse_double(columns, count, map.ref_position_e, 0.0, &ok),
-            parse_double(columns, count, map.ref_position_d, 0.0, &ok),
-            parse_double(columns, count, map.ref_velocity_n, 0.0, &ok),
-            parse_double(columns, count, map.ref_velocity_e, 0.0, &ok),
-            parse_double(columns, count, map.ref_velocity_d, 0.0, &ok),
+            reference_position.x, reference_position.y, reference_position.z,
+            reference_velocity.x, reference_velocity.y, reference_velocity.z,
             eskf_estimate.position_ned_m.x, eskf_estimate.position_ned_m.y,
             eskf_estimate.position_ned_m.z, eskf_estimate.velocity_ned_m_s.x,
-            eskf_estimate.velocity_ned_m_s.y, eskf_estimate.velocity_ned_m_s.z
+            eskf_estimate.velocity_ned_m_s.y, eskf_estimate.velocity_ned_m_s.z,
+            position_update ? eskf_estimate.last_position_innovation.nis : NAN,
+            position_update ? eskf_estimate.last_velocity_innovation.nis : NAN,
+            position_update && position_ref_valid
+                ? navigation_nees(&eskf, reference_position, reference_velocity) : NAN
         );
         samples++;
     }

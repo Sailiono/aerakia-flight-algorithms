@@ -199,6 +199,27 @@ class ValidationAnalyzerTests(unittest.TestCase):
         self.assertEqual(summary["events"], 1.0)
         self.assertAlmostEqual(summary["event_details"][0]["observed_px4_yaw_jump_deg"], 90.0)
 
+    def test_consistency_metrics_use_only_gnss_update_rows(self) -> None:
+        import numpy as np
+
+        columns = {
+            "ts_us": np.arange(5, dtype=np.float64),
+            "input_position_update": np.array([1.0, 0.0, 1.0, 0.0, 1.0]),
+            "eskf_position_nis": np.array([3.0, np.nan, 6.0, np.nan, 9.0]),
+            "eskf_velocity_nis": np.array([1.0, np.nan, 2.0, np.nan, 3.0]),
+            "eskf_navigation_nees": np.array([4.0, np.nan, 6.0, np.nan, 8.0]),
+        }
+        metrics = analyzer.consistency_metrics(columns, "synthetic")
+        assert metrics is not None
+        self.assertEqual(metrics["position_nis"]["samples"], 3)
+        self.assertAlmostEqual(metrics["position_nis"]["mean"], 6.0)
+        self.assertAlmostEqual(metrics["velocity_nis"]["mean"], 2.0)
+        self.assertAlmostEqual(metrics["navigation_nees"]["mean"], 6.0)
+
+        real_metrics = analyzer.consistency_metrics(columns, "px4_estimate")
+        assert real_metrics is not None
+        self.assertNotIn("navigation_nees", real_metrics)
+
 
 if __name__ == "__main__":
     unittest.main()

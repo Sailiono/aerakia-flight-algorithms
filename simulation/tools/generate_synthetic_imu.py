@@ -40,6 +40,8 @@ def generate_motion(
         roll_deg.fill(25.0)
         pitch_deg.fill(-18.0)
         yaw_deg.fill(35.0)
+    elif motion == "navigation_outage":
+        pass
     else:
         raise ValueError(f"unsupported motion: {motion}")
 
@@ -69,6 +71,7 @@ def synthesize_measurements(
     accel_noise_m_s2: float,
     gyro_noise_deg_s: float,
     mag_noise_ut: float,
+    acceleration_ned_m_s2: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     roll_rad = np.radians(roll_deg)
     pitch_rad = np.radians(pitch_deg)
@@ -88,13 +91,15 @@ def synthesize_measurements(
         )
     )
 
-    specific_force_ned = np.array([0.0, 0.0, -GRAVITY_M_S2])
+    if acceleration_ned_m_s2 is None:
+        acceleration_ned_m_s2 = np.zeros((len(time_s), 3), dtype=np.float64)
+    gravity_ned = np.array([0.0, 0.0, GRAVITY_M_S2])
     magnetic_field_ned_ut = np.array([22.0, 0.0, 44.0])
     ideal_accel = np.empty((len(time_s), 3), dtype=np.float64)
     ideal_mag = np.empty((len(time_s), 3), dtype=np.float64)
     for index in range(len(time_s)):
         rotation = body_to_ned_matrix(roll_rad[index], pitch_rad[index], yaw_rad[index])
-        ideal_accel[index] = rotation.T @ specific_force_ned
+        ideal_accel[index] = rotation.T @ (acceleration_ned_m_s2[index] - gravity_ned)
         ideal_mag[index] = rotation.T @ magnetic_field_ned_ut
 
     measured_accel = ideal_accel + rng.normal(0.0, accel_noise_m_s2, ideal_accel.shape)
@@ -143,7 +148,13 @@ def write_golden_csv(
     ideal_accel_m_s2: np.ndarray,
     anomaly_flags: np.ndarray,
     rate_hz: float,
-    static_hint: bool,
+    static_flags: np.ndarray,
+    position_ned_m: np.ndarray,
+    velocity_ned_m_s: np.ndarray,
+    gps_position_ned_m: np.ndarray,
+    gps_velocity_ned_m_s: np.ndarray,
+    gps_updates: np.ndarray,
+    position_reference_valid: np.ndarray,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     dt_us = int(round(1_000_000.0 / rate_hz))
@@ -155,6 +166,12 @@ def write_golden_csv(
         "g_est_mg_x", "g_est_mg_y", "g_est_mg_z",
         "innov_acc_milli", "innov_mag_milli", "acc_w_milli", "acc_n_milli",
         "roll_mdeg", "pitch_mdeg", "yaw_mdeg", "anomaly", "static_hint",
+        "position_update", "position_ref_valid",
+        "ref_position_n_m", "ref_position_e_m", "ref_position_d_m",
+        "ref_velocity_n_m_s", "ref_velocity_e_m_s", "ref_velocity_d_m_s",
+        "gps_position_n_m", "gps_position_e_m", "gps_position_d_m",
+        "gps_velocity_n_m_s", "gps_velocity_e_m_s", "gps_velocity_d_m_s",
+        "gps_position_variance_m2", "gps_velocity_variance_m2_s2",
     ]
 
     with path.open("w", newline="", encoding="utf-8") as stream:
@@ -175,9 +192,31 @@ def write_golden_csv(
                     int(round(pitch_deg[index] * 1000.0)),
                     int(round(wrapped_yaw * 1000.0)),
                     int(anomaly_flags[index]),
-                    int(static_hint),
+                    int(static_flags[index]),
+                    int(gps_updates[index]), int(position_reference_valid[index]),
+                    *position_ned_m[index], *velocity_ned_m_s[index],
+                    *gps_position_ned_m[index], *gps_velocity_ned_m_s[index],
+                    0.25, 0.01,
                 ]
             )
+
+
+def navigation_profile(time_s: np.ndarray, rate_hz: float) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    acceleration = np.zeros((len(time_s), 3), dtype=np.float64)
+    acceleration[(time_s >= 2.0) & (time_s < 4.0), 0] = 0.8
+    acceleration[(time_s >= 6.0) & (time_s < 8.0), 1] = 0.5
+    acceleration[(time_s >= 10.0) & (time_s < 12.0), 0] = -0.8
+    acceleration[(time_s >= 14.0) & (time_s < 16.0), 1] = -0.5
+    dt = 1.0 / rate_hz
+    velocity = np.zeros_like(acceleration)
+    position = np.zeros_like(acceleration)
+    for index in range(1, len(time_s)):
+        velocity[index] = velocity[index - 1] + acceleration[index - 1] * dt
+        position[index] = (
+            position[index - 1] + velocity[index - 1] * dt
+            + 0.5 * acceleration[index - 1] * dt * dt
+        )
+    return acceleration, velocity, position
 
 
 def main() -> None:
@@ -187,7 +226,10 @@ def main() -> None:
     parser.add_argument("--rate", type=float, default=100.0, help="sample rate in Hz")
     parser.add_argument(
         "--motion",
-        choices=["yaw_spin", "slow_sin", "yaw_jump", "roll_flip", "static_tilted"],
+        choices=[
+            "yaw_spin", "slow_sin", "yaw_jump", "roll_flip", "static_tilted",
+            "navigation_outage",
+        ],
         default="yaw_spin",
     )
     parser.add_argument("--anomaly", choices=["none", "spike", "bias", "drift"], default="none")
@@ -203,6 +245,11 @@ def main() -> None:
 
     rng = np.random.default_rng(args.seed)
     time_s, roll_deg, pitch_deg, yaw_deg = generate_motion(args.duration, args.rate, args.motion)
+    acceleration_ned = np.zeros((len(time_s), 3), dtype=np.float64)
+    velocity_ned = np.zeros_like(acceleration_ned)
+    position_ned = np.zeros_like(acceleration_ned)
+    if args.motion == "navigation_outage":
+        acceleration_ned, velocity_ned, position_ned = navigation_profile(time_s, args.rate)
     accel, gyro, magnetic, ideal_accel = synthesize_measurements(
         time_s,
         roll_deg,
@@ -212,6 +259,7 @@ def main() -> None:
         accel_noise_m_s2=0.02,
         gyro_noise_deg_s=0.05,
         mag_noise_ut=0.20,
+        acceleration_ned_m_s2=acceleration_ned,
     )
     anomaly_flags = inject_magnetic_anomaly(
         magnetic,
@@ -220,6 +268,20 @@ def main() -> None:
         length=max(1, int(round(args.rate * 0.5))),
         rng=rng,
     )
+    navigation_enabled = args.motion == "navigation_outage"
+    static_flags = np.full(len(time_s), int(args.static_hint), dtype=np.int64)
+    if navigation_enabled and args.static_hint:
+        static_flags = (time_s < 1.5).astype(np.int64)
+    gps_updates = np.zeros(len(time_s), dtype=np.int64)
+    position_reference_valid = np.full(len(time_s), int(navigation_enabled), dtype=np.int64)
+    gps_position = np.zeros_like(position_ned)
+    gps_velocity = np.zeros_like(velocity_ned)
+    if navigation_enabled:
+        gps_period = max(1, int(round(args.rate / 10.0)))
+        available = (time_s < 6.0) | (time_s >= 11.0)
+        gps_updates = ((np.arange(len(time_s)) % gps_period == 0) & available).astype(np.int64)
+        gps_position = position_ned + rng.normal(0.0, 0.5, position_ned.shape)
+        gps_velocity = velocity_ned + rng.normal(0.0, 0.1, velocity_ned.shape)
     write_golden_csv(
         args.out,
         time_s,
@@ -232,7 +294,13 @@ def main() -> None:
         ideal_accel,
         anomaly_flags,
         args.rate,
-        args.static_hint,
+        static_flags,
+        position_ned,
+        velocity_ned,
+        gps_position,
+        gps_velocity,
+        gps_updates,
+        position_reference_valid,
     )
     print(f"Wrote {len(time_s)} samples to {args.out}")
 

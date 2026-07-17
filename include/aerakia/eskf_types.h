@@ -106,6 +106,7 @@ typedef struct {
  */
 typedef struct {
     bool accepted;           /**< True if update passed gating and was applied */
+    float nis;               /**< Normalized innovation squared (Mahalanobis distance squared) */
     float test_ratio;        /**< Innovation test ratio: NIS / Gate² (< 1.0 = healthy) */
     float innovation[3];     /**< Raw innovation vector: measurement - prediction */
     float innov_var[3];      /**< Innovation variance (diagonal of S matrix) */

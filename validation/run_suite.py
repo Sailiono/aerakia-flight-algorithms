@@ -20,6 +20,10 @@ SCENARIOS = {
         "motion": "static_tilted", "anomaly": "none", "cold_start": True,
         "static_hint": True,
     },
+    "navigation_outage": {
+        "motion": "navigation_outage", "anomaly": "none", "cold_start": True,
+        "static_hint": True,
+    },
 }
 
 
