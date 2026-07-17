@@ -248,6 +248,26 @@ class ULogConverterTests(unittest.TestCase):
 
 
 class EurocConverterTests(unittest.TestCase):
+    def test_reference_heading_profile_marks_dropout_faults_and_noise(self) -> None:
+        import numpy as np
+
+        timestamp_us = np.arange(0, 2_000_000, 10_000, dtype=np.int64)
+        yaw = np.linspace(-0.2, 0.4, len(timestamp_us))
+        horizontal = np.ones(len(timestamp_us))
+        horizontal[20:30] = 0.1
+        valid, update, heading, variance, fault = euroc_converter._reference_heading_profile(
+            timestamp_us, yaw, horizontal, 10.0, 1.0, 7, 0.5, 0.4, 1.2, 2, 0.25
+        )
+        elapsed_s = timestamp_us * 1.0e-6
+        dropout = (elapsed_s >= 0.5) & (elapsed_s < 0.9)
+        self.assertEqual(int(np.count_nonzero(update[dropout])), 0)
+        self.assertEqual(int(np.count_nonzero(valid[dropout])), 0)
+        self.assertEqual(int(np.count_nonzero(valid[20:30])), 0)
+        self.assertEqual(int(np.count_nonzero(fault)), 2)
+        self.assertTrue(np.all(fault <= update))
+        self.assertTrue(np.allclose(variance, math.radians(1.0) ** 2))
+        self.assertGreater(float(np.max(np.abs(heading - yaw))), math.radians(80.0))
+
     @staticmethod
     def _identity_sensor_yaml() -> str:
         return (
@@ -380,6 +400,7 @@ class ValidationAnalyzerTests(unittest.TestCase):
             "eskf_heading_innovation_rad": np.array([0, 0, 1.5, 0, 0, 0, 0, 0], dtype=float),
             "eskf_yaw_deg": np.array([0, 0.1, 0.1, 0.2, 0.3, 0.1, 0.0, 0.0]),
             "truth_yaw_deg": np.zeros(8),
+            "truth_pitch_deg": np.zeros(8),
         }
         metrics = analyzer.trusted_heading_metrics(columns)
         assert metrics is not None
@@ -387,6 +408,24 @@ class ValidationAnalyzerTests(unittest.TestCase):
         self.assertAlmostEqual(metrics["fault_rejection_ratio"], 1.0)
         self.assertAlmostEqual(metrics["dropout_max_abs_yaw_error_deg"], 0.3)
         self.assertAlmostEqual(metrics["recovery_time_s"], 0.0)
+
+    def test_trusted_heading_metrics_do_not_count_pre_source_gap_as_dropout(self) -> None:
+        import numpy as np
+
+        columns = {
+            "ts_us": np.arange(6, dtype=np.float64) * 100_000.0,
+            "input_heading_update": np.array([0, 0, 1, 1, 1, 1], dtype=float),
+            "eskf_heading_accepted": np.array([0, 0, 1, 1, 1, 1], dtype=float),
+            "input_heading_fault": np.zeros(6),
+            "gnss_heading_valid": np.array([0, 0, 1, 1, 1, 1], dtype=float),
+            "eskf_heading_innovation_rad": np.zeros(6),
+            "eskf_yaw_deg": np.zeros(6),
+            "truth_yaw_deg": np.zeros(6),
+            "truth_pitch_deg": np.zeros(6),
+        }
+        metrics = analyzer.trusted_heading_metrics(columns)
+        assert metrics is not None
+        self.assertNotIn("dropout_duration_s", metrics)
 
     def test_bias_metrics_report_reduction_and_settling(self) -> None:
         import numpy as np

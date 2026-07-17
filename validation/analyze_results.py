@@ -393,24 +393,34 @@ def trusted_heading_metrics(columns: dict[str, np.ndarray]) -> dict[str, object]
     fault_attempted = attempted & fault
     time_s = (columns["ts_us"] - columns["ts_us"][0]) * 1.0e-6
     yaw_error = wrapped_error_deg(columns["eskf_yaw_deg"], columns["truth_yaw_deg"])
+    # A scalar body-forward heading is ill-defined when that axis is nearly vertical. Keep
+    # geometry-driven invalidity separate from an actual source outage, and never turn Euler
+    # wrap behavior near the singularity into a claimed heading error.
+    horizontal_projection = np.abs(np.cos(np.radians(columns["truth_pitch_deg"])))
+    heading_observable = horizontal_projection >= 0.25
     normal_accepts = np.flatnonzero(normal & accepted)
 
     valid = columns.get("gnss_heading_valid", np.zeros(len(attempted))) > 0.5
     valid_indices = np.flatnonzero(valid)
     longest_start = longest_stop = None
-    if len(valid_indices) > 1:
-        search_start = int(valid_indices[0])
-        search_stop = int(valid_indices[-1])
-        cursor = search_start
-        while cursor <= search_stop:
-            if valid[cursor]:
-                cursor += 1
-                continue
-            start = cursor
-            while cursor <= search_stop and not valid[cursor]:
-                cursor += 1
-            if longest_start is None or cursor - start > longest_stop - longest_start:
-                longest_start, longest_stop = start, cursor
+    dropout = ~valid & heading_observable
+    if len(valid_indices):
+        dropout[:int(valid_indices[0])] = False
+        dropout[int(valid_indices[-1]) + 1:] = False
+    cursor = 0
+    while cursor < len(dropout):
+        if not dropout[cursor]:
+            cursor += 1
+            continue
+        start = cursor
+        while cursor < len(dropout) and dropout[cursor]:
+            cursor += 1
+        if longest_start is None or cursor - start > longest_stop - longest_start:
+            longest_start, longest_stop = start, cursor
+    post_first_yaw = np.asarray([], dtype=np.float64)
+    if len(normal_accepts):
+        first_accept = int(normal_accepts[0])
+        post_first_yaw = yaw_error[first_accept:][heading_observable[first_accept:]]
 
     result: dict[str, object] = {
         "attempted_updates": int(np.count_nonzero(attempted)),
@@ -420,10 +430,11 @@ def trusted_heading_metrics(columns: dict[str, np.ndarray]) -> dict[str, object]
         "fault_rejection_ratio": (
             float(np.mean(~accepted[fault_attempted])) if np.any(fault_attempted) else None
         ),
+        "minimum_horizontal_projection": 0.25,
+        "geometry_unobservable_samples": int(np.count_nonzero(~heading_observable)),
         "overall_post_first_accept_yaw_rmse_deg": (
-            float(np.sqrt(np.mean(
-                yaw_error[int(normal_accepts[0]):] * yaw_error[int(normal_accepts[0]):]
-            ))) if len(normal_accepts) else None
+            float(np.sqrt(np.mean(post_first_yaw * post_first_yaw)))
+            if len(post_first_yaw) else None
         ),
     }
     if np.any(fault_attempted):
@@ -442,9 +453,11 @@ def trusted_heading_metrics(columns: dict[str, np.ndarray]) -> dict[str, object]
         if len(recovery_candidates):
             recovery = int(recovery_candidates[0])
             result["recovery_time_s"] = float(time_s[recovery] - time_s[longest_stop])
-            result["post_recovery_yaw_rmse_deg"] = float(np.sqrt(np.mean(
-                yaw_error[recovery:] * yaw_error[recovery:]
-            )))
+            post_recovery = yaw_error[recovery:][heading_observable[recovery:]]
+            result["post_recovery_yaw_rmse_deg"] = (
+                float(np.sqrt(np.mean(post_recovery * post_recovery)))
+                if len(post_recovery) else None
+            )
     return result
 
 

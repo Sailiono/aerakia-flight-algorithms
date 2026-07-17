@@ -280,6 +280,16 @@ static void test_heading_updates_are_yaw_only(void)
             "tilted heading update preserves pitch"
         );
     }
+
+    euler_quaternion(0.0, 90.0 * ESKF_PI / 180.0, 0.0, q);
+    eskf_init(&filter, NULL, q);
+    result.accepted = true;
+    eskf_update_heading(&filter, 0.5, 0.01, &result);
+    check_true(!result.accepted, "vertical body-forward heading is rejected as unobservable");
+    check_true(near(filter.state.q[0], q[0], 1.0e-12), "rejected vertical heading leaves q_w");
+    check_true(near(filter.state.q[1], q[1], 1.0e-12), "rejected vertical heading leaves q_x");
+    check_true(near(filter.state.q[2], q[2], 1.0e-12), "rejected vertical heading leaves q_y");
+    check_true(near(filter.state.q[3], q[3], 1.0e-12), "rejected vertical heading leaves q_z");
 }
 
 static void test_joseph_covariance_stays_psd(void)

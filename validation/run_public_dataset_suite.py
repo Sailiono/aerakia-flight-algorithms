@@ -118,8 +118,9 @@ def write_report(path: Path, manifest: dict[str, Any]) -> None:
         "- Synthetic GNSS is generated deterministically from external reference position and "
         "velocity. Navigation metrics validate fusion and covariance behavior, not a recorded "
         "GNSS receiver.",
-        "- EuRoC has no magnetometer or direct trusted heading. It cannot close physical yaw "
-        "observability or magnetic-disturbance claims.",
+        "- EuRoC has no magnetometer or recorded trusted-heading sensor. A Vicon-derived "
+        "heading track exercises cold-start, geometry validity, faults, dropout, and recovery "
+        "under physical motion, but it is not dual-antenna/vision sensor evidence.",
     ])
     if manifest.get("failure"):
         lines.extend(["", "## Failure", "", f"```text\n{manifest['failure']}\n```"])

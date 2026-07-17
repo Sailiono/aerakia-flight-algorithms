@@ -6,8 +6,9 @@ The portable estimator core is suitable for FCOne integration work and further b
 but it is not yet justified to claim that the complete flight-estimation system is verified.
 The current evidence establishes deterministic host behavior, measurement integrity handling,
 long-run covariance health, synthetic cold start, private PX4-referenced replay tracking, and two
-EuRoC external-reference sequences. It does not yet establish flight safety or cold-start yaw
-accuracy against independent physical truth.
+EuRoC external-reference sequences. Vicon-derived heading now tests yaw alignment and faults under
+recorded aggressive motion, but it does not yet establish flight safety or recorded heading-sensor
+accuracy.
 
 ## Evidence completed
 
@@ -17,22 +18,22 @@ accuracy against independent physical truth.
 | Covariance health | Long mixed predict/update sequence checked for finite, symmetric, positive-semidefinite covariance | Passing |
 | Measurement integrity | NIS gates, latched magnetic-disturbance rejection, recovery confirmation, navigation recovery supervision | Passing deterministic regressions |
 | Heading semantics | Magnetometer, trusted heading, GNSS course, and PX4 GSF are separate paths; course is never silently treated as body yaw | Implemented |
-| Trusted-heading fault behavior | Cold-start completion, normal fusion, four-second dropout, two 90° outliers, rejection, and recovery with magnetometer disabled | Passing deterministic synthetic gate; independent physical heading remains open |
+| Trusted-heading fault behavior | Cold-start completion, normal fusion, four-second dropout, two 90° outliers, rejection, geometry validity, and recovery with magnetometer disabled | Passing deterministic synthetic gate and Vicon-derived-heading physical-motion gate; recorded dual-GNSS/vision heading remains open |
 | Online IMU bias behavior | Static gyro initialization plus motion/GNSS-aided accelerometer-bias convergence, with truth error and settling time reported separately | Passing deterministic multi-axis synthetic gate; single-pose accelerometer observability limit and hardware thermal behavior remain explicit |
 | Cold-start alignment | Static accelerometer tilt, magnetic heading with explicit declination, IMU-bias initialization, and covariance reset at the new linearization point; no PX4 attitude seed | Passing unit/noisy synthetic checks and direct-Vicon tilt (0.862° post-alignment RMSE); external yaw truth still pending |
 | Navigation consistency | GNSS position/velocity NIS and posterior 6-state navigation NEES through a five-second outage and reacquisition | 20-seed measurement-noise baseline and constant-bias/timestamp-jitter extension pass with zero numerical/recovery failures; thermal and transport faults pending |
-| EuRoC public replay | 36,381-sample Leica/IMU `MH_01_easy` and 20,932-sample direct-pose `V1_03_difficult`; raw and reference-bias-corrected tracks retained | Navigation NIS/NEES consistent; direct Vicon external pose passes high-dynamic replay; not a cold-start or independent-heading test |
+| EuRoC public replay | 36,381-sample Leica/IMU `MH_01_easy` and 20,932-sample direct-pose `V1_03_difficult`; raw, cold-start, derived-heading, and reference-bias tracks retained | Navigation NIS/NEES consistent; direct Vicon pose passes high-dynamic replay; derived heading is not a recorded heading sensor |
 | Host regression | Strict C99 warnings-as-errors build, public API tests, deterministic synthetic fault suite | Passing reviewed thresholds |
 | Input/transport integrity | Exhaustive required-IMU non-finite checks; timestamp order/gap behavior; optional-mag isolation; timestamped GNSS/heading/barometer freshness and recovery | Passing 100 seeds, 1,020,000 IMU attempts, 2,100 aiding attempts, and burst lengths through 100 with zero invariant/health failures |
 | Private replay | Sanitized relative GNSS, reset events, GSF diagnostics, and native C replay across the selected ULog suite | Operational; PX4 remains an engineering reference |
 
 ## P0 work before hardware flight tests
 
-1. Validate cold-start yaw against rate-table/Vicon with a real accepted heading source. Direct
-   Vicon now validates tilt and static bias alignment; its dataset has no magnetometer/heading input.
-2. Repeat the now-gated trusted-heading dropout/outlier/recovery test with real dual-antenna GNSS,
-   vision, or rate-table/Vicon heading. The present private ULogs contain no valid direct GNSS
-   heading samples.
+1. Replace the Vicon-derived heading observation with recorded dual-antenna GNSS, vision, or
+   rate-table heading. The derived stream closes real-motion software behavior, not sensor accuracy.
+2. Keep the heading geometry gate explicit: scalar body-forward heading is invalid when its
+   horizontal projection is below 0.25. Validate the source validity/variance semantics on
+   RELLIS-3D VN-300 data before FCOne flight use.
 3. Keep the implemented transport delay, reordering, sample loss, malformed-value, and aiding-age
    campaign passing; add hardware thermal drift only when temperature data are available.
 4. Run the exact FCOne adapter through timestamp, frame, unit, dropout, and stale-data contract tests.
@@ -55,6 +56,10 @@ This document is an engineering maturity statement, not an airworthiness claim.
   magnetic spikes/bias, navigation outage, trusted-heading recovery, and online-bias excitation.
 - Independent-reference EuRoC raw IMU: tilt RMSE is 0.713° on `MH_01_easy`, 1.047° on
   `V1_03_difficult`, and 0.862° after Vicon-declared cold-start tilt alignment.
+- With a 10 Hz, 1°-noise heading stream derived from Vicon truth, the V1_03 cold start completes in
+  1.0 s and post-alignment geodesic attitude RMSE is 1.498°. On geometry-observable samples yaw RMSE
+  is 1.130°; two injected 90° observations are both rejected. These are real-motion software-path
+  results, not recorded heading-sensor accuracy.
 - EuRoC full-attitude raw-IMU RMSE is 8.804° and 4.102°. This is dominated by yaw drift from the
   recorded approximately 0.08 rad/s z-gyro bias with no magnetometer or trusted heading; it is an
   observed limitation, not an acceptable heading-accuracy claim.
@@ -78,6 +83,9 @@ This document is an engineering maturity statement, not an airworthiness claim.
   clipping, magnetic disturbance, and PX4-reset coverage, but they lack independent truth. Thermal
   drift, vibration, installation error, motor current, real GNSS loss, and target timing await
   FCOne v2 or controlled public data.
+- The Vicon heading stress track explicitly excludes 4,582 of 20,932 samples where the body-forward
+  horizontal projection is below 0.25. During the controlled observable outage, maximum yaw error is
+  3.943°; recovery takes 0.995 s and post-recovery yaw RMSE is 1.224°.
 
 ### Maturity judgment
 
@@ -85,12 +93,13 @@ This document is an engineering maturity statement, not an airworthiness claim.
 | --- | ---: | --- |
 | Portable algorithm/math implementation | 80–85% | Core equations, covariance handling, cold start, aiding, recovery, and host gates are mature; full observability/physical truth remains open |
 | Host-side software robustness | 85–90% | High-volume malformed/timing campaign and sanitizer run pass; external dataset breadth is still only two unique EuRoC sequences |
-| Heading robustness | 50–60% | Normal magnetometer/trusted-heading paths work, but no physical dual-GNSS/vision heading dataset and no GNSS-velocity GSF fallback yet |
+| Heading robustness | 60–65% | Real-motion derived-heading cold start/fault/recovery now passes with geometry gating; no recorded dual-GNSS/vision heading and no GNSS-velocity GSF fallback yet |
 | FCOne integration readiness | 65–70% | Hardware-neutral contract is explicit; the exact private adapter, scheduling, target precision, and resource use are unverified |
 | Flight-main-estimator readiness | 45–55% | Suitable for shadow mode and bench/HIL preparation, not justified as the sole flight estimator yet |
 
-The highest-value non-hardware work remaining is broader independent data (`Blackbird` aggressive
-motion and `UrbanNav` real GNSS degradation), followed by the FCOne-neutral mock publisher contract.
+The highest-value non-hardware work remaining is recorded dual-antenna heading (`RELLIS-3D`),
+broader independent data (`Blackbird` aggressive motion and `UrbanNav` real GNSS degradation),
+followed by the FCOne-neutral mock publisher contract.
 The highest-value physical evidence remains synchronized independent yaw truth, thermal/vibration
 characterization, motor magnetic disturbance, and target-MCU timing/stack measurements.
 

@@ -80,6 +80,39 @@
           }
         },
         {
+          "id": "raw_imu_cold_start_reference_derived_heading",
+          "converter_args": [
+            "--pose-source", "vicon", "--pose-time-offset-us", "40000",
+            "--static-hint-duration-s", "1.2", "--synthetic-gnss-rate-hz", "10",
+            "--seed", "7", "--reference-heading-rate-hz", "10",
+            "--reference-heading-sigma-deg", "1",
+            "--reference-heading-dropout-start-s", "40",
+            "--reference-heading-dropout-duration-s", "4",
+            "--reference-heading-fault-start-s", "60",
+            "--reference-heading-fault-count", "2",
+            "--reference-heading-minimum-horizontal-projection", "0.25"
+          ],
+          "runner_args": [
+            "--cold-start", "--stationary-gyro-threshold-rad-s", "0.15"
+          ],
+          "metric_paths": {
+            "alignment_time_s": "cold_start_alignment.alignment_time_s",
+            "post_alignment_attitude_rmse_deg": "cold_start_alignment.post_alignment_attitude_rmse_deg",
+            "post_alignment_tilt_rmse_deg": "cold_start_alignment.post_tilt_alignment_tilt_rmse_deg",
+            "heading_alignment_completed": "cold_start_alignment.heading_alignment_completed",
+            "heading_normal_acceptance_ratio": "trusted_heading.normal_acceptance_ratio",
+            "heading_fault_rejection_ratio": "trusted_heading.fault_rejection_ratio",
+            "heading_observable_yaw_rmse_deg": "trusted_heading.overall_post_first_accept_yaw_rmse_deg",
+            "heading_dropout_max_abs_yaw_error_deg": "trusted_heading.dropout_max_abs_yaw_error_deg",
+            "heading_recovery_time_s": "trusted_heading.recovery_time_s",
+            "heading_post_recovery_yaw_rmse_deg": "trusted_heading.post_recovery_yaw_rmse_deg",
+            "heading_geometry_unobservable_samples": "trusted_heading.geometry_unobservable_samples",
+            "position_rmse_m": "navigation.position_rmse_m",
+            "velocity_rmse_m_s": "navigation.velocity_rmse_m_s",
+            "navigation_nees_mean": "eskf_consistency.navigation_nees.mean"
+          }
+        },
+        {
           "id": "raw_imu_trusted_attitude_init",
           "converter_args": [
             "--pose-source", "vicon", "--pose-time-offset-us", "40000",

@@ -159,3 +159,59 @@ comparisons. The generated directory contains `run-manifest.json`, `report.md`, 
 metadata, replay/results files, plots, metrics, reports, and one log for each of 15 subprocesses.
 The ordinary host gate was then rerun: 4/4 CTest, 20/20 Python tests, the full 1,020,000-attempt
 input campaign, and every deterministic threshold passed.
+
+## 2026-07-18 — real-motion trusted-heading geometry and recovery gate
+
+### Reason
+
+The synthetic trusted-heading scenario covered source dropout and outliers, but did not exercise
+the production heading update through recorded high-dynamic motion. Public dataset review also
+showed that motion-capture attitude truth and a recorded dual-antenna heading observation are
+different evidence classes. EuRoC provides the former; RELLIS-3D's VN-300 is selected for the
+latter intake.
+
+### First run finding retained
+
+A 10 Hz, 1°-noise heading stream derived from direct Vicon yaw was replayed through raw V1_03 IMU,
+with a four-second outage and two 90° outliers. The unqualified run reported 81.5% normal update
+acceptance and false yaw excursions near 180°. Inspection localized them to repeated pitch angles
+of approximately 75–82°, where body-forward Euler heading is poorly conditioned and wrap changes
+do not represent a comparable physical yaw error. The failed interpretation was not used as a
+baseline.
+
+The input contract and analyzer now require a minimum body-forward horizontal projection of 0.25
+for this scalar heading evidence. The core also refuses the mathematically singular near-vertical
+case. This preserves the existing navigation-frame yaw-only correction, which intentionally does
+not use one scalar heading observation to alter independently observed tilt.
+
+### Final evidence
+
+- recorded V1_03 IMU samples: 20,932 over 104.655 s;
+- Vicon-derived 10 Hz heading attempts: 782;
+- geometry-unobservable samples: 4,582;
+- cold-start full alignment: 1.000 s;
+- post-alignment quaternion-geodesic attitude RMSE: 1.498°;
+- observable-heading yaw RMSE: 1.130°;
+- normal heading acceptance: 96.282%;
+- injected 90° outlier rejection: 2/2;
+- observable outage maximum yaw error: 3.943°;
+- recovery time: 0.995 s;
+- post-recovery yaw RMSE: 1.224°;
+- navigation NEES mean: 5.646 for expected mean 6;
+- unhealthy samples and navigation recoveries: zero.
+
+The expanded public suite passed 6/6 tracks, 5/5 immutable input checks, 56/56 selected metric
+comparisons, and 156,490 replayed IMU attempts from 57,313 unique recorded samples. This closes
+real-motion software-path behavior only. Because the heading observations are derived from the
+same Vicon truth used for scoring, it does not claim dual-antenna, vision, or rate-table sensor
+accuracy.
+
+The complete host gate was then rebuilt from a fresh Release directory and passed 4/4 CTest,
+22/22 Python tests, the 1,020,000-attempt input-integrity campaign, every deterministic scenario,
+and all reviewed thresholds. Generated evidence is retained under `build/heading-host-report/` and
+`build/public-dataset-suite-heading/`.
+
+The Debug sanitizer build was rebuilt and rerun with `ASAN_OPTIONS=detect_leaks=0` and
+`UBSAN_OPTIONS=halt_on_error=1`. All 4/4 tests passed; the complete 1,020,000-attempt campaign ran
+under ASan+UBSan in 183.81 seconds with no address or undefined-behavior report. Leak detection
+remains excluded because of the previously documented managed-terminal `ptrace` limitation.

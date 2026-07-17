@@ -772,12 +772,22 @@ void eskf_update_heading(ESKF_Handle *h,
                          ESKF_InnovResult *result) {
     eskf_float_t R_nb[3][3];
     eskf_float_t current_heading;
+    eskf_float_t horizontal_squared;
     eskf_float_t H[15];
+    if (result != NULL) memset(result, 0, sizeof(*result));
     if (!h || !h->initialized || !isfinite(heading_ned_rad) || R_heading <= 0.0) return;
 
     eskf_quat_to_rot_mat3(h->state.q, R_nb);
+    horizontal_squared = R_nb[0][0] * R_nb[0][0] + R_nb[1][0] * R_nb[1][0];
+    /* Body-forward heading is undefined when the forward axis is vertical. */
+    if (horizontal_squared < 1.0e-4) return;
     current_heading = atan2(R_nb[1][0], R_nb[0][0]);
     memset(H, 0, sizeof(H));
+    /* Constrain the update to navigation-frame down/yaw. For the right-multiplicative
+     * attitude error this direction is R_nb^T * down, i.e. the third row of R_nb. This is
+     * intentionally not the unconstrained Euler-yaw derivative: the trusted-heading path
+     * must not use one scalar observation to alter the independently observed tilt.
+     */
     H[ESKF_IDX_DTHETA + 0] = R_nb[2][0];
     H[ESKF_IDX_DTHETA + 1] = R_nb[2][1];
     H[ESKF_IDX_DTHETA + 2] = R_nb[2][2];

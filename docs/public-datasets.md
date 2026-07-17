@@ -9,6 +9,7 @@ and derived reports belong in version control.
 | --- | --- | --- | --- | --- |
 | P0 | [EuRoC MAV](https://www.research-collection.ethz.ch/entities/researchdata/bcaf173e-5dac-484b-bc37-faf97a594f1f) | IMU propagation and attitude/position accuracy against Vicon or Leica truth | No GNSS or magnetometer; Machine Hall orientation is IMU-aided | `MH_01_easy` and direct-pose `V1_03_difficult` complete |
 | P0 | [Blackbird](https://github.com/mit-aera/Blackbird-Dataset) | Aggressive UAV dynamics against high-rate motion-capture truth | No GNSS or magnetometer; the full image dataset is multi-terabyte | Two sensor-only flight chunks at moderate and high speed |
+| P0 | [RELLIS-3D](https://github.com/unmannedlab/RELLIS-3D) | Recorded VectorNav VN-300 dual-antenna GNSS/INS heading and IMU under outdoor off-road motion | Ground vehicle; VN-300 output is a sensor observation rather than independent heading truth | One ROS-bag sequence after topic, frame, timing, and license audit |
 | P1 | [UrbanNav](https://github.com/IPNL-POLYU/UrbanNavDataset) | GNSS/IMU behavior in urban canyons and tunnels against SPAN-CPT truth | Ground vehicle rather than aircraft; download IMU, GNSS, and truth separately | Medium-urban and tunnel sensor subsets |
 | P1 | [GVINS](https://github.com/HKUST-Aerial-Robotics/GVINS) | Raw multi-constellation GNSS, IMU, and intermittent-GNSS comparison | ROS bag and ENU/ECEF conventions need an explicit adapter | Sports-field bag after license and checksum review |
 | P1 | [PX4 Flight Review v2](https://github.com/PX4/flight-review-rs) | Real ULog schema coverage, estimator resets, and unusual sensor combinations | Public PX4 estimates are not independent truth; publication terms and privacy must be checked | Metadata-screened logs only; never bulk-commit raw logs |
@@ -133,7 +134,17 @@ observed 0.08 rad/s startup bias. Tilt alignment completes at 1.0 s; post-alignm
 0.862°, navigation NEES is 5.621, and covariance remains healthy. The earlier 1.230° result was
 superseded by the reviewed absolute-attitude covariance reset added after static alignment; the
 one-command suite retains this change as an explicit baseline update. Heading alignment correctly
-does not complete because the dataset contains no magnetometer or trusted heading observation.
+does not complete in the sensor-free track because the dataset contains no magnetometer or recorded
+trusted-heading observation.
+
+A separate evidence track derives a 10 Hz heading observation from direct Vicon yaw, adds 1°
+deterministic noise, a declared four-second outage, and two 90° outliers, then cold-starts without a
+reference quaternion. It excludes scalar heading whenever the body-forward horizontal projection
+falls below 0.25; V1_03 repeatedly approaches vertical and contributes 4,582 such samples. Alignment
+completes at 1.0 s, post-alignment geodesic attitude RMSE is 1.498°, geometry-observable yaw RMSE is
+1.130°, both outliers are rejected, observable-outage maximum yaw error is 3.943°, and recovery is
+0.995 s with 1.224° post-recovery yaw RMSE. This validates the production heading path under real
+motion, but the observation is derived from the same Vicon truth and is not physical sensor accuracy.
 
 This sequence repeatedly approaches ±90° pitch. The older combined Euler metric reported false
 14.5°/4.3° errors because equivalent roll/yaw representations jump by 180° at the singularity.
@@ -144,7 +155,7 @@ Direct Vicon supplies independent pose, while velocity and optional bias correct
 from EuRoC's batch estimate. Consequently the attitude/position evidence is stronger than the
 velocity-bias evidence, and the corrected track still does not prove online bias observability.
 
-Run all five reviewed tracks from restored minimal inputs with:
+Run all six reviewed tracks from restored minimal inputs with:
 
 ```bash
 python validation/run_public_dataset_suite.py \
@@ -153,12 +164,14 @@ python validation/run_public_dataset_suite.py \
   --out-dir build/public-dataset-suite
 ```
 
-The suite verifies every retained input hash before conversion, logs all 15 subprocesses, compares
+The suite verifies every retained input hash before conversion, logs all 18 subprocesses, compares
 selected metrics against the committed baselines, and writes an environment/commit manifest plus an
-aggregate report. The two sequences contain 57,313 unique recorded IMU samples; five declared tracks
-produce 135,558 replay attempts. Multiple tracks increase algorithm-path coverage but are not counted
+aggregate report. The two sequences contain 57,313 unique recorded IMU samples; six declared tracks
+produce 156,490 replay attempts. Multiple tracks increase algorithm-path coverage but are not counted
 as additional physical data.
 
-Blackbird sensor-only chunks remain desirable for aggressive motion, but its official download
-endpoint was unavailable during this intake. UrbanNav sensor subsets are the next useful download
-for real recorded GNSS degradation and outage behavior.
+RELLIS-3D is the next heading-specific intake because its platform records a VectorNav VN-300
+dual-antenna GNSS/INS. Blackbird sensor-only chunks remain desirable for aggressive aerial motion,
+and UrbanNav sensor subsets remain the next navigation intake for recorded GNSS degradation and
+outage behavior. None should be counted until raw topics, timing, frames, license, and hashes pass
+the same intake checklist.

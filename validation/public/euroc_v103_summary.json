@@ -25,6 +25,22 @@
       "velocity_rmse_m_s": 0.085292,
       "navigation_nees_mean": 5.621088
     },
+    "raw_imu_cold_start_reference_derived_heading": {
+      "alignment_time_s": 1.000000,
+      "post_alignment_attitude_rmse_deg": 1.497943,
+      "post_alignment_tilt_rmse_deg": 0.870134,
+      "heading_alignment_completed": true,
+      "heading_normal_acceptance_ratio": 0.962821,
+      "heading_fault_rejection_ratio": 1.000000,
+      "heading_observable_yaw_rmse_deg": 1.130496,
+      "heading_dropout_max_abs_yaw_error_deg": 3.943216,
+      "heading_recovery_time_s": 0.995000,
+      "heading_post_recovery_yaw_rmse_deg": 1.224310,
+      "heading_geometry_unobservable_samples": 4582,
+      "position_rmse_m": 0.137679,
+      "velocity_rmse_m_s": 0.085048,
+      "navigation_nees_mean": 5.646126
+    },
     "raw_imu_trusted_attitude_init": {
       "mahony_robust_attitude_rmse_deg": 95.507551,
       "mahony_robust_tilt_rmse_deg": 3.359699,
