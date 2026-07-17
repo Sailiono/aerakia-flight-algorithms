@@ -255,6 +255,45 @@ class EurocConverterTests(unittest.TestCase):
             )
             self.assertTrue(corrected["reference_bias_correction"]["applied"])
 
+            vicon_dir = sequence / "mav0" / "vicon0"
+            vicon_dir.mkdir()
+            (vicon_dir / "sensor.yaml").write_text(
+                "sensor_type: pose\n"
+                "T_BS:\n"
+                "  rows: 4\n"
+                "  cols: 4\n"
+                "  data: [0, -1, 0, 1, 1, 0, 0, 2, 0, 0, 1, 3, 0, 0, 0, 1]\n",
+                encoding="utf-8",
+            )
+            root_half = 2.0 ** -0.5
+            vicon = np.array(
+                [
+                    [timestamp + 5_000_000, 1.0, 2.0, 3.0,
+                     root_half, 0.0, 0.0, root_half],
+                    [timestamp + 10_000_000, 1.5, 2.0, 3.0,
+                     root_half, 0.0, 0.0, root_half],
+                    [timestamp + 15_000_000, 2.0, 2.0, 3.0,
+                     root_half, 0.0, 0.0, root_half],
+                ]
+            )
+            np.savetxt(vicon_dir / "data.csv", vicon, delimiter=",")
+            vicon_output = Path(temp_directory) / "replay_vicon.csv"
+            vicon_metadata = euroc_converter.convert_euroc(
+                sequence, vicon_output, pose_source="vicon", pose_time_offset_us=5_000.0
+            )
+            with vicon_output.open("r", encoding="utf-8", newline="") as stream:
+                vicon_rows = list(csv.DictReader(stream))
+            self.assertAlmostEqual(float(vicon_rows[-1]["ref_position_n_m"]), 1.0)
+            self.assertAlmostEqual(float(vicon_rows[0]["ref_q_w"]), 1.0)
+            self.assertAlmostEqual(float(vicon_rows[0]["ref_q_x"]), 0.0, places=7)
+            self.assertAlmostEqual(float(vicon_rows[0]["ref_q_y"]), 0.0, places=7)
+            self.assertAlmostEqual(float(vicon_rows[0]["ref_q_z"]), 0.0, places=7)
+            self.assertEqual(vicon_metadata["pose_reference"]["source"], "vicon")
+            self.assertEqual(
+                vicon_metadata["pose_reference"]["logged_timestamp_minus_physical_timestamp_us"],
+                5_000.0,
+            )
+
 
 class ValidationAnalyzerTests(unittest.TestCase):
     def test_quaternion_metric_ignores_euler_gimbal_lock_representation(self) -> None:

@@ -52,6 +52,29 @@ def _validate_identity_extrinsics(path: Path) -> dict[str, object]:
     return document
 
 
+def _load_extrinsics(path: Path) -> tuple[dict[str, object], np.ndarray]:
+    document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    transform = document.get("T_BS")
+    if not isinstance(transform, dict):
+        raise ValueError(f"missing T_BS in {path}")
+    matrix = np.asarray(transform["data"], dtype=np.float64).reshape(
+        int(transform["rows"]), int(transform["cols"])
+    )
+    if matrix.shape != (4, 4) or not np.allclose(matrix[3], [0.0, 0.0, 0.0, 1.0]):
+        raise ValueError(f"invalid homogeneous T_BS in {path}")
+    rotation = matrix[:3, :3]
+    if (
+        not np.all(np.isfinite(matrix))
+        or not np.allclose(rotation.T @ rotation, np.eye(3), atol=2.0e-5)
+        or not np.isclose(np.linalg.det(rotation), 1.0, atol=2.0e-5)
+    ):
+        raise ValueError(f"T_BS is not a proper rigid transform in {path}")
+    left, _, right = np.linalg.svd(rotation)
+    matrix = matrix.copy()
+    matrix[:3, :3] = left @ right
+    return document, matrix
+
+
 def _normalize_quaternions(quaternions: np.ndarray) -> np.ndarray:
     result = np.asarray(quaternions, dtype=np.float64).copy()
     norms = np.linalg.norm(result, axis=1)
@@ -62,6 +85,100 @@ def _normalize_quaternions(quaternions: np.ndarray) -> np.ndarray:
         if np.dot(result[index - 1], result[index]) < 0.0:
             result[index] *= -1.0
     return result
+
+
+def _quaternion_from_rotation_matrix(rotation: np.ndarray) -> np.ndarray:
+    matrix = np.asarray(rotation, dtype=np.float64)
+    if matrix.shape != (3, 3):
+        raise ValueError("rotation matrix must be 3x3")
+    trace = float(np.trace(matrix))
+    if trace > 0.0:
+        scale = math.sqrt(trace + 1.0) * 2.0
+        quaternion = np.asarray(
+            [
+                0.25 * scale,
+                (matrix[2, 1] - matrix[1, 2]) / scale,
+                (matrix[0, 2] - matrix[2, 0]) / scale,
+                (matrix[1, 0] - matrix[0, 1]) / scale,
+            ]
+        )
+    else:
+        axis = int(np.argmax(np.diag(matrix)))
+        if axis == 0:
+            scale = math.sqrt(1.0 + matrix[0, 0] - matrix[1, 1] - matrix[2, 2]) * 2.0
+            quaternion = np.asarray(
+                [
+                    (matrix[2, 1] - matrix[1, 2]) / scale,
+                    0.25 * scale,
+                    (matrix[0, 1] + matrix[1, 0]) / scale,
+                    (matrix[0, 2] + matrix[2, 0]) / scale,
+                ]
+            )
+        elif axis == 1:
+            scale = math.sqrt(1.0 + matrix[1, 1] - matrix[0, 0] - matrix[2, 2]) * 2.0
+            quaternion = np.asarray(
+                [
+                    (matrix[0, 2] - matrix[2, 0]) / scale,
+                    (matrix[0, 1] + matrix[1, 0]) / scale,
+                    0.25 * scale,
+                    (matrix[1, 2] + matrix[2, 1]) / scale,
+                ]
+            )
+        else:
+            scale = math.sqrt(1.0 + matrix[2, 2] - matrix[0, 0] - matrix[1, 1]) * 2.0
+            quaternion = np.asarray(
+                [
+                    (matrix[1, 0] - matrix[0, 1]) / scale,
+                    (matrix[0, 2] + matrix[2, 0]) / scale,
+                    (matrix[1, 2] + matrix[2, 1]) / scale,
+                    0.25 * scale,
+                ]
+            )
+    return quaternion / np.linalg.norm(quaternion)
+
+
+def _quaternion_multiply(left: np.ndarray, right: np.ndarray) -> np.ndarray:
+    left = np.atleast_2d(left)
+    right = np.atleast_2d(right)
+    if len(right) == 1 and len(left) != 1:
+        right = np.repeat(right, len(left), axis=0)
+    if len(left) != len(right):
+        raise ValueError("quaternion arrays are not broadcast-compatible")
+    w1, x1, y1, z1 = left.T
+    w2, x2, y2, z2 = right.T
+    return _normalize_quaternions(
+        np.column_stack(
+            (
+                w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
+                w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
+                w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
+                w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2,
+            )
+        )
+    )
+
+
+def _vicon_sensor_to_body_pose(
+    sensor_position: np.ndarray,
+    sensor_quaternion: np.ndarray,
+    transform_body_sensor: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    # EuRoC T_BS maps sensor coordinates into body coordinates. The logged
+    # pose is T_RS, so the desired body pose is T_RB = T_RS * inverse(T_BS).
+    rotation_body_sensor = transform_body_sensor[:3, :3]
+    translation_body_sensor = transform_body_sensor[:3, 3]
+    rotation_sensor_body = rotation_body_sensor.T
+    translation_sensor_body = -rotation_sensor_body @ translation_body_sensor
+    quaternion_sensor_body = _quaternion_from_rotation_matrix(rotation_sensor_body)
+    normalized_sensor_quaternion = _normalize_quaternions(sensor_quaternion)
+    rotation_reference_sensor = _rotation_from_quaternion(normalized_sensor_quaternion)
+    body_position = sensor_position + np.einsum(
+        "nij,j->ni", rotation_reference_sensor, translation_sensor_body
+    )
+    body_quaternion = _quaternion_multiply(
+        normalized_sensor_quaternion, quaternion_sensor_body
+    )
+    return body_position, body_quaternion
 
 
 def _interpolate_quaternions(
@@ -133,7 +250,11 @@ def convert_euroc(
     synthetic_velocity_sigma_m_s: float = 0.1,
     seed: int = 7,
     apply_reference_bias: bool = False,
+    pose_source: str = "batch",
+    pose_time_offset_us: float = 0.0,
 ) -> dict[str, object]:
+    if not math.isfinite(pose_time_offset_us):
+        raise ValueError("pose time offset must be finite")
     mav0 = sequence_dir / "mav0"
     imu_path = mav0 / "imu0" / "data.csv"
     imu_yaml_path = mav0 / "imu0" / "sensor.yaml"
@@ -145,17 +266,40 @@ def convert_euroc(
     truth = _load_csv(truth_path, 17)
     imu_timestamp_ns = imu[:, 0].astype(np.int64)
     truth_timestamp_ns = truth[:, 0].astype(np.int64)
-    overlap = (imu_timestamp_ns >= truth_timestamp_ns[0]) & (imu_timestamp_ns <= truth_timestamp_ns[-1])
+    pose_path = truth_path
+    pose_description = "EuRoC state_groundtruth_estimate0 batch pose"
+    pose_timestamp_ns = truth_timestamp_ns
+    pose_position = truth[:, 1:4]
+    pose_quaternion = truth[:, 4:8]
+    if pose_source == "vicon":
+        pose_path = mav0 / "vicon0" / "data.csv"
+        vicon_yaml_path = mav0 / "vicon0" / "sensor.yaml"
+        vicon = _load_csv(pose_path, 8)
+        _, transform_body_sensor = _load_extrinsics(vicon_yaml_path)
+        pose_timestamp_ns = vicon[:, 0].astype(np.int64) - int(
+            round(pose_time_offset_us * 1000.0)
+        )
+        pose_position, pose_quaternion = _vicon_sensor_to_body_pose(
+            vicon[:, 1:4], vicon[:, 4:8], transform_body_sensor
+        )
+        pose_description = "raw EuRoC vicon0 pose transformed from tracking sensor to body"
+    elif pose_source != "batch":
+        raise ValueError(f"unsupported pose source: {pose_source}")
+    elif pose_time_offset_us != 0.0:
+        raise ValueError("pose time offset is supported only with the raw vicon pose source")
+    overlap_start = max(int(truth_timestamp_ns[0]), int(pose_timestamp_ns[0]))
+    overlap_end = min(int(truth_timestamp_ns[-1]), int(pose_timestamp_ns[-1]))
+    overlap = (imu_timestamp_ns >= overlap_start) & (imu_timestamp_ns <= overlap_end)
     if np.count_nonzero(overlap) < 2:
         raise ValueError("IMU and ground-truth streams do not overlap")
     imu = imu[overlap]
     imu_timestamp_ns = imu_timestamp_ns[overlap]
 
     source_quaternion = _interpolate_quaternions(
-        truth_timestamp_ns, truth[:, 4:8], imu_timestamp_ns
+        pose_timestamp_ns, pose_quaternion, imu_timestamp_ns
     )
     source_position = _interpolate_vectors(
-        truth_timestamp_ns, truth[:, 1:4], imu_timestamp_ns
+        pose_timestamp_ns, pose_position, imu_timestamp_ns
     )
     source_velocity = _interpolate_vectors(
         truth_timestamp_ns, truth[:, 8:11], imu_timestamp_ns
@@ -237,6 +381,23 @@ def convert_euroc(
                 ]
             )
 
+    limitations = [
+        "EuRoC contains no magnetometer or GNSS measurements used by this replay.",
+        "Synthetic GNSS, when enabled, is generated from truth and is not a recorded sensor.",
+        "Reference-bias correction, when enabled, validates propagation/update math but not online bias observability.",
+    ]
+    if pose_source == "batch":
+        limitations.append(
+            "The state_groundtruth_estimate0 pose is a batch estimate that may combine external pose/position measurements with IMU; inspect the sequence sensor.yaml."
+        )
+    else:
+        limitations.append(
+            "The vicon pose track uses batch-estimated velocity because raw vicon0 contains pose only."
+        )
+        if pose_time_offset_us != 0.0:
+            limitations.append(
+                "The raw-vicon time offset is an explicit dataset alignment parameter, not estimated per replay."
+            )
     metadata: dict[str, object] = {
         "dataset": "EuRoC MAV",
         "sequence": sequence_dir.name,
@@ -249,6 +410,13 @@ def convert_euroc(
         "input_sha256": {
             "imu0/data.csv": _sha256(imu_path),
             "state_groundtruth_estimate0/data.csv": _sha256(truth_path),
+            **({"vicon0/data.csv": _sha256(pose_path)} if pose_source == "vicon" else {}),
+        },
+        "pose_reference": {
+            "source": pose_source,
+            "description": pose_description,
+            "velocity_source": "state_groundtruth_estimate0 batch velocity",
+            "logged_timestamp_minus_physical_timestamp_us": pose_time_offset_us,
         },
         "frame_conversion": {
             "source": "EuRoC right-handed body/reference frames with world +Z up",
@@ -272,12 +440,7 @@ def convert_euroc(
             "median_gyro_bias_rad_s": np.median(reference_gyro_bias, axis=0).tolist(),
             "median_accel_bias_m_s2": np.median(reference_accel_bias, axis=0).tolist(),
         },
-        "limitations": [
-            "EuRoC contains no magnetometer or GNSS measurements used by this replay.",
-            "Machine Hall orientation is an IMU-aided batch estimate; position uses Leica and IMU.",
-            "Synthetic GNSS, when enabled, is generated from truth and is not a recorded sensor.",
-            "Reference-bias correction, when enabled, validates propagation/update math but not online bias observability.",
-        ],
+        "limitations": limitations,
     }
     if metadata_path is not None:
         metadata_path.parent.mkdir(parents=True, exist_ok=True)
@@ -299,6 +462,18 @@ def main() -> None:
         action="store_true",
         help="subtract EuRoC batch-estimated IMU biases (diagnostic math-validation track)",
     )
+    parser.add_argument(
+        "--pose-source",
+        choices=("batch", "vicon"),
+        default="batch",
+        help="pose reference stream; vicon applies the published non-identity T_BS extrinsic",
+    )
+    parser.add_argument(
+        "--pose-time-offset-us",
+        type=float,
+        default=0.0,
+        help="subtract this recorded latency from raw pose timestamps before interpolation",
+    )
     args = parser.parse_args()
     if args.synthetic_gnss_rate_hz < 0.0:
         parser.error("--synthetic-gnss-rate-hz must be non-negative")
@@ -313,6 +488,8 @@ def main() -> None:
         args.synthetic_velocity_sigma_m_s,
         args.seed,
         args.apply_reference_bias,
+        args.pose_source,
+        args.pose_time_offset_us,
     )
     print(json.dumps(metadata, indent=2, sort_keys=True))
 
