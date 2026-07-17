@@ -27,6 +27,12 @@
 /** GPS position innovation gate (3-sigma) */
 #define ESKF_GATE_POS       3.0
 
+/** GPS velocity innovation gate (3-sigma) */
+#define ESKF_GATE_VEL       3.0
+
+/** Trusted heading innovation gate (3-sigma) */
+#define ESKF_GATE_HEADING   3.0
+
 /** Barometer innovation gate (3-sigma) */
 #define ESKF_GATE_BARO      3.0
 
@@ -95,6 +101,52 @@ static void _inject_error(ESKF_Handle *h, const eskf_float_t dx[15]) {
      * fresh each update cycle from K*z. */
 }
 
+/** Apply the covariance reset Jacobian after attitude-error injection. */
+static void _reset_error_covariance(ESKF_Handle *h, const eskf_float_t dx[15]) {
+    eskf_float_t G[15][15];
+    eskf_float_t Q_zero[15][15];
+    eskf_float_t dtheta[3];
+    eskf_float_t skew[3][3];
+    int i;
+    int j;
+
+    if (!h || !dx) return;
+    dtheta[0] = dx[ESKF_IDX_DTHETA + 0];
+    dtheta[1] = dx[ESKF_IDX_DTHETA + 1];
+    dtheta[2] = dx[ESKF_IDX_DTHETA + 2];
+    eskf_mat3_skew(dtheta, skew);
+    eskf_mat15_identity(G);
+    for (i = 0; i < 3; ++i) {
+        for (j = 0; j < 3; ++j) {
+            G[i][j] -= 0.5 * skew[i][j];
+        }
+    }
+    eskf_mat15_zero(Q_zero);
+    eskf_mat15_propagate(h->P, G, Q_zero);
+    eskf_mat15_symmetrize(h->P);
+}
+
+static eskf_float_t _wrap_pi(eskf_float_t angle) {
+    return atan2(sin(angle), cos(angle));
+}
+
+static void _quaternion_from_euler(eskf_float_t roll,
+                                   eskf_float_t pitch,
+                                   eskf_float_t yaw,
+                                   eskf_float_t q[4]) {
+    const eskf_float_t cr = cos(0.5 * roll);
+    const eskf_float_t sr = sin(0.5 * roll);
+    const eskf_float_t cp = cos(0.5 * pitch);
+    const eskf_float_t sp = sin(0.5 * pitch);
+    const eskf_float_t cy = cos(0.5 * yaw);
+    const eskf_float_t sy = sin(0.5 * yaw);
+    q[0] = cr * cp * cy + sr * sp * sy;
+    q[1] = sr * cp * cy - cr * sp * sy;
+    q[2] = cr * sp * cy + sr * cp * sy;
+    q[3] = cr * cp * sy - sr * sp * cy;
+    eskf_quat_normalize(q);
+}
+
 /**
  * @brief Generic Kalman measurement update for 3D observations with Gating
  *
@@ -102,7 +154,8 @@ static void _inject_error(ESKF_Handle *h, const eskf_float_t dx[15]) {
  *   S = H * P * H^T + R
  *   NIS = z^T * S^{-1} * z  (Normalized Innovation Squared)
  *   If NIS > gate^2: REJECT update
- *   Else: K = P * H^T * S^{-1}, dx = K * z, P = (I - K*H) * P
+ *   Else: K = P * H^T * S^{-1}, dx = K * z,
+ *         P = (I-KH)P(I-KH)^T + KRK^T (Joseph form)
  *
  * @param h       Pointer to filter handle
  * @param z       Residual vector (3x1)
@@ -167,6 +220,7 @@ static bool _measurement_update_3d(ESKF_Handle *h,
             result->innov_var[0] = S[0][0];
             result->innov_var[1] = S[1][1];
             result->innov_var[2] = S[2][2];
+            result->nis = (float)nis;
             result->test_ratio = (gate > 0.0) ? (nis / (gate * gate)) : 0.0;
             result->accepted = (gate <= 0.0) || (nis <= gate * gate);
         }
@@ -195,7 +249,7 @@ static bool _measurement_update_3d(ESKF_Handle *h,
         dx[i] = K[i][0] * z[0] + K[i][1] * z[1] + K[i][2] * z[2];
     }
 
-    /* --- 7. Update Covariance: P = (I - K*H) * P --- */
+    /* --- 7. Joseph covariance update --- */
     /* Compute KH (15x15) */
     eskf_float_t KH[15][15];
     for (int i = 0; i < 15; i++) {
@@ -217,9 +271,26 @@ static bool _measurement_update_3d(ESKF_Handle *h,
         }
     }
 
-    /* P_new = I_KH * P */
+    /* AP = (I - KH) * P */
+    eskf_float_t AP[15][15];
+    eskf_mat15_mul_mat15(I_KH, h->P, AP);
+
+    /* P_new = AP * (I - KH)^T + K * R * K^T */
     eskf_float_t P_new[15][15];
-    eskf_mat15_mul_mat15(I_KH, h->P, P_new);
+    for (int i = 0; i < 15; i++) {
+        for (int j = 0; j < 15; j++) {
+            eskf_float_t sum = 0.0;
+            for (int k = 0; k < 15; k++) {
+                sum += AP[i][k] * I_KH[j][k];
+            }
+            for (int a = 0; a < 3; a++) {
+                for (int b = 0; b < 3; b++) {
+                    sum += K[i][a] * R[a][b] * K[j][b];
+                }
+            }
+            P_new[i][j] = sum;
+        }
+    }
 
     /* Force symmetry and copy back */
     eskf_mat15_symmetrize(P_new);
@@ -227,6 +298,7 @@ static bool _measurement_update_3d(ESKF_Handle *h,
 
     /* --- 8. Inject error into nominal state --- */
     _inject_error(h, dx);
+    _reset_error_covariance(h, dx);
 
     return true;
 }
@@ -287,6 +359,7 @@ static bool _measurement_update_1d(ESKF_Handle *h,
             result->innov_var[0] = S;
             result->innov_var[1] = 0.0;
             result->innov_var[2] = 0.0;
+            result->nis = (float)nis;
             result->test_ratio = (gate > 0.0) ? (nis / (gate * gate)) : 0.0;
             result->accepted = (gate <= 0.0) || (nis <= gate * gate);
         }
@@ -310,7 +383,7 @@ static bool _measurement_update_1d(ESKF_Handle *h,
         dx[i] = K[i] * z;
     }
 
-    /* --- 7. Update Covariance: P = (I - K*H) * P --- */
+    /* --- 7. Joseph covariance update --- */
     /* Compute KH (15x15): KH[i][j] = K[i] * H[j] */
     eskf_float_t KH[15][15];
     for (int i = 0; i < 15; i++) {
@@ -328,9 +401,21 @@ static bool _measurement_update_1d(ESKF_Handle *h,
         }
     }
 
-    /* P_new = I_KH * P */
+    /* AP = (I - KH) * P */
+    eskf_float_t AP[15][15];
+    eskf_mat15_mul_mat15(I_KH, h->P, AP);
+
+    /* P_new = AP * (I - KH)^T + K * R * K^T */
     eskf_float_t P_new[15][15];
-    eskf_mat15_mul_mat15(I_KH, h->P, P_new);
+    for (int i = 0; i < 15; i++) {
+        for (int j = 0; j < 15; j++) {
+            eskf_float_t sum = K[i] * R * K[j];
+            for (int k = 0; k < 15; k++) {
+                sum += AP[i][k] * I_KH[j][k];
+            }
+            P_new[i][j] = sum;
+        }
+    }
 
     /* Force symmetry and copy back */
     eskf_mat15_symmetrize(P_new);
@@ -338,6 +423,7 @@ static bool _measurement_update_1d(ESKF_Handle *h,
 
     /* --- 8. Inject error into nominal state --- */
     _inject_error(h, dx);
+    _reset_error_covariance(h, dx);
 
     return true;
 }
@@ -546,18 +632,26 @@ void eskf_predict(ESKF_Handle *h,
     /* ========================================
      * Step 7: Build Process Noise Q (15x15)
      *
-     * Discrete-time process noise:
-     *   Q_θ  = σ_gyr² * dt²   (attitude from gyro noise)
-     *   Q_v  = σ_acc² * dt²   (velocity from accel noise)
-     *   Q_p  = 0              (no direct process noise on position)
+     * First-order discretization of continuous white-noise densities:
+     *   Q_θθ = σ_gyr² * dt
+     *   Q_vv = σ_acc² * dt
+     *   Q_vp = Q_pv = σ_acc² * dt² / 2
+     *   Q_pp = σ_acc² * dt³ / 3
      *   Q_ab = σ_ab² * dt     (random walk on accel bias)
      *   Q_gb = σ_gb² * dt     (random walk on gyro bias)
+     *
+     * sigma_acc and sigma_gyr are noise densities, not per-sample standard
+     * deviations. Using dt² for them would make covariance depend incorrectly
+     * on sample rate and become overconfident at high IMU rates.
      * ======================================== */
     eskf_float_t Q[15][15];
     eskf_mat15_zero(Q);
 
-    eskf_float_t q_theta = h->cfg.sigma_gyr * h->cfg.sigma_gyr * dt * dt;
-    eskf_float_t q_v = h->cfg.sigma_acc * h->cfg.sigma_acc * dt * dt;
+    eskf_float_t sigma_acc_squared = h->cfg.sigma_acc * h->cfg.sigma_acc;
+    eskf_float_t q_theta = h->cfg.sigma_gyr * h->cfg.sigma_gyr * dt;
+    eskf_float_t q_v = sigma_acc_squared * dt;
+    eskf_float_t q_vp = sigma_acc_squared * dt * dt * 0.5;
+    eskf_float_t q_p = sigma_acc_squared * dt * dt * dt / 3.0;
     eskf_float_t q_ab = h->cfg.sigma_acc_bias * h->cfg.sigma_acc_bias * dt;
     eskf_float_t q_gb = h->cfg.sigma_gyr_bias * h->cfg.sigma_gyr_bias * dt;
 
@@ -565,7 +659,10 @@ void eskf_predict(ESKF_Handle *h,
     Q[0][0] = q_theta; Q[1][1] = q_theta; Q[2][2] = q_theta;
     /* Q_v */
     Q[3][3] = q_v; Q[4][4] = q_v; Q[5][5] = q_v;
-    /* Q_p = 0 (already zero) */
+    /* Integrated acceleration noise in position and velocity-position cross terms. */
+    Q[6][6] = q_p; Q[7][7] = q_p; Q[8][8] = q_p;
+    Q[3][6] = q_vp; Q[4][7] = q_vp; Q[5][8] = q_vp;
+    Q[6][3] = q_vp; Q[7][4] = q_vp; Q[8][5] = q_vp;
     /* Q_ab */
     Q[9][9] = q_ab; Q[10][10] = q_ab; Q[11][11] = q_ab;
     /* Q_gb */
@@ -612,6 +709,27 @@ void eskf_update_position(ESKF_Handle *h,
     _measurement_update_3d(h, z, H, R, ESKF_GATE_POS, result);
 }
 
+void eskf_update_velocity(ESKF_Handle *h,
+                          const eskf_float_t velocity_m_s[3],
+                          eskf_float_t R_velocity,
+                          ESKF_InnovResult *result) {
+    eskf_float_t z[3];
+    eskf_float_t H[3][15];
+    eskf_float_t R[3][3];
+    if (!h || !h->initialized || !velocity_m_s || R_velocity <= 0.0) return;
+
+    eskf_vec3_sub(velocity_m_s, h->state.v, z);
+    memset(H, 0, sizeof(H));
+    H[0][ESKF_IDX_DV + 0] = 1.0;
+    H[1][ESKF_IDX_DV + 1] = 1.0;
+    H[2][ESKF_IDX_DV + 2] = 1.0;
+    eskf_mat3_zero(R);
+    R[0][0] = R_velocity;
+    R[1][1] = R_velocity;
+    R[2][2] = R_velocity;
+    _measurement_update_3d(h, z, H, R, ESKF_GATE_VEL, result);
+}
+
 void eskf_update_mag(ESKF_Handle *h,
                      const eskf_float_t mag_m[3],
                      eskf_float_t R_mag,
@@ -623,41 +741,54 @@ void eskf_update_mag(ESKF_Handle *h,
     eskf_vec3_copy(mag_m, mag_norm);
     if (eskf_vec3_normalize(mag_norm) < ESKF_EPSILON) return;
 
-    /* Get rotation matrix R_nb (Body to Earth) */
+    /* Rotate the measured field into NED. Only its horizontal heading is used. */
     eskf_float_t R_nb[3][3];
     eskf_quat_to_rot_mat3(h->state.q, R_nb);
-
-    /* Predicted measurement: z_pred = R_nb^T * mag_ref */
-    eskf_float_t R_bn[3][3];
-    eskf_mat3_transpose(R_nb, R_bn);
-
-    eskf_float_t z_pred[3];
-    eskf_mat3_mul_vec3(R_bn, h->mag_ref, z_pred);
-
-    /* Residual: z = mag_norm - z_pred */
-    eskf_float_t z[3];
-    eskf_vec3_sub(mag_norm, z_pred, z);
-
-    /* Jacobian H (3x15): H_θ = [z_pred]× at indices 0-2 */
-    eskf_float_t H[3][15];
-    memset(H, 0, sizeof(H));
-
-    eskf_float_t H_theta[3][3];
-    eskf_mat3_skew(z_pred, H_theta);
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 3; j++) {
-            H[i][j] = H_theta[i][j];
-        }
+    {
+        eskf_float_t measured_ned[3];
+        eskf_float_t horizontal_measured;
+        eskf_float_t horizontal_reference;
+        eskf_float_t residual;
+        eskf_float_t H[15];
+        eskf_mat3_mul_vec3(R_nb, mag_norm, measured_ned);
+        horizontal_measured = hypot(measured_ned[0], measured_ned[1]);
+        horizontal_reference = hypot(h->mag_ref[0], h->mag_ref[1]);
+        if (horizontal_measured < ESKF_EPSILON || horizontal_reference < ESKF_EPSILON) return;
+        residual = _wrap_pi(
+            atan2(h->mag_ref[1], h->mag_ref[0])
+            - atan2(measured_ned[1], measured_ned[0])
+        );
+        memset(H, 0, sizeof(H));
+        H[ESKF_IDX_DTHETA + 0] = R_nb[2][0];
+        H[ESKF_IDX_DTHETA + 1] = R_nb[2][1];
+        H[ESKF_IDX_DTHETA + 2] = R_nb[2][2];
+        _measurement_update_1d(h, residual, H, R_mag, ESKF_GATE_MAG, result);
     }
+}
 
-    /* Measurement noise R (3x3 diagonal) */
-    eskf_float_t R[3][3];
-    eskf_mat3_zero(R);
-    R[0][0] = R_mag;
-    R[1][1] = R_mag;
-    R[2][2] = R_mag;
+void eskf_update_heading(ESKF_Handle *h,
+                         eskf_float_t heading_ned_rad,
+                         eskf_float_t R_heading,
+                         ESKF_InnovResult *result) {
+    eskf_float_t R_nb[3][3];
+    eskf_float_t current_heading;
+    eskf_float_t H[15];
+    if (!h || !h->initialized || !isfinite(heading_ned_rad) || R_heading <= 0.0) return;
 
-    _measurement_update_3d(h, z, H, R, ESKF_GATE_MAG, result);
+    eskf_quat_to_rot_mat3(h->state.q, R_nb);
+    current_heading = atan2(R_nb[1][0], R_nb[0][0]);
+    memset(H, 0, sizeof(H));
+    H[ESKF_IDX_DTHETA + 0] = R_nb[2][0];
+    H[ESKF_IDX_DTHETA + 1] = R_nb[2][1];
+    H[ESKF_IDX_DTHETA + 2] = R_nb[2][2];
+    _measurement_update_1d(
+        h,
+        _wrap_pi(heading_ned_rad - current_heading),
+        H,
+        R_heading,
+        ESKF_GATE_HEADING,
+        result
+    );
 }
 
 void eskf_update_baro(ESKF_Handle *h,
@@ -707,9 +838,89 @@ void eskf_update_static_constraint(ESKF_Handle *h, eskf_float_t R_zupt) {
     _measurement_update_3d(h, z, H, R, 0.0, NULL);
 }
 
+void eskf_reset_navigation(ESKF_Handle *h,
+                           const eskf_float_t position_ned_m[3],
+                           const eskf_float_t velocity_ned_m_s[3],
+                           eskf_float_t position_variance_m2,
+                           eskf_float_t velocity_variance_m2_s2) {
+    int i;
+    int j;
+    if (!h || !h->initialized || !position_ned_m || !velocity_ned_m_s
+        || position_variance_m2 <= 0.0 || velocity_variance_m2_s2 <= 0.0) return;
+
+    eskf_vec3_copy(position_ned_m, h->state.p);
+    eskf_vec3_copy(velocity_ned_m_s, h->state.v);
+    for (i = ESKF_IDX_DV; i < ESKF_IDX_DP + 3; ++i) {
+        for (j = 0; j < ESKF_ERROR_STATE_DIM; ++j) {
+            h->P[i][j] = 0.0;
+            h->P[j][i] = 0.0;
+        }
+    }
+    for (i = 0; i < 3; ++i) {
+        h->P[ESKF_IDX_DV + i][ESKF_IDX_DV + i] = velocity_variance_m2_s2;
+        h->P[ESKF_IDX_DP + i][ESKF_IDX_DP + i] = position_variance_m2;
+    }
+}
+
 /* ============================================================================
  * Calibration / Alignment
  * ============================================================================ */
+
+bool eskf_align_static_tilt(ESKF_Handle *h,
+                            const eskf_float_t acceleration_mean_m_s2[3]) {
+    eskf_float_t R_nb[3][3];
+    eskf_float_t q[4];
+    eskf_float_t horizontal;
+    eskf_float_t roll;
+    eskf_float_t pitch;
+    eskf_float_t yaw;
+    if (!h || !h->initialized || !acceleration_mean_m_s2) return false;
+    if (!isfinite(acceleration_mean_m_s2[0])
+        || !isfinite(acceleration_mean_m_s2[1])
+        || !isfinite(acceleration_mean_m_s2[2])) return false;
+
+    horizontal = hypot(acceleration_mean_m_s2[1], acceleration_mean_m_s2[2]);
+    if (hypot(acceleration_mean_m_s2[0], horizontal) < ESKF_EPSILON) return false;
+    roll = atan2(-acceleration_mean_m_s2[1], -acceleration_mean_m_s2[2]);
+    pitch = atan2(acceleration_mean_m_s2[0], horizontal);
+    eskf_quat_to_rot_mat3(h->state.q, R_nb);
+    yaw = atan2(R_nb[1][0], R_nb[0][0]);
+    _quaternion_from_euler(roll, pitch, yaw, q);
+    eskf_quat_copy(q, h->state.q);
+    return true;
+}
+
+bool eskf_align_static_heading(ESKF_Handle *h,
+                               const eskf_float_t magnetic_mean[3]) {
+    eskf_float_t magnetic_body[3];
+    eskf_float_t magnetic_ned[3];
+    eskf_float_t R_nb[3][3];
+    eskf_float_t q[4];
+    eskf_float_t roll;
+    eskf_float_t pitch;
+    eskf_float_t yaw;
+    eskf_float_t residual;
+    if (!h || !h->initialized || !magnetic_mean) return false;
+    if (!isfinite(magnetic_mean[0]) || !isfinite(magnetic_mean[1])
+        || !isfinite(magnetic_mean[2])) return false;
+    eskf_vec3_copy(magnetic_mean, magnetic_body);
+    if (eskf_vec3_normalize(magnetic_body) < ESKF_EPSILON) return false;
+    eskf_quat_to_rot_mat3(h->state.q, R_nb);
+    eskf_mat3_mul_vec3(R_nb, magnetic_body, magnetic_ned);
+    if (hypot(magnetic_ned[0], magnetic_ned[1]) < ESKF_EPSILON
+        || hypot(h->mag_ref[0], h->mag_ref[1]) < ESKF_EPSILON) return false;
+
+    roll = atan2(R_nb[2][1], R_nb[2][2]);
+    pitch = asin(fmax(-1.0, fmin(1.0, -R_nb[2][0])));
+    yaw = atan2(R_nb[1][0], R_nb[0][0]);
+    residual = _wrap_pi(
+        atan2(h->mag_ref[1], h->mag_ref[0])
+        - atan2(magnetic_ned[1], magnetic_ned[0])
+    );
+    _quaternion_from_euler(roll, pitch, _wrap_pi(yaw + residual), q);
+    eskf_quat_copy(q, h->state.q);
+    return true;
+}
 
 void eskf_align_static_biases(ESKF_Handle *h,
                                const eskf_float_t (*acc_buf)[3],
@@ -734,16 +945,24 @@ void eskf_align_static_biases(ESKF_Handle *h,
     eskf_vec3_scale(acc_mean, inv_n, acc_mean);
     eskf_vec3_scale(gyr_mean, inv_n, gyr_mean);
 
-    /* Gyro bias: stationary gyro should read zero */
-    eskf_vec3_copy(gyr_mean, h->state.gb);
+    eskf_align_static_bias_means(h, acc_mean, gyr_mean);
+}
 
-    /* Accel bias: stationary accel should read -gravity in body frame
-     * Assuming level: acc_meas ≈ [0, 0, -g] + bias
-     * Therefore: bias ≈ acc_meas - [0, 0, -g] = acc_meas + [0, 0, g]
-     */
-    h->state.ab[0] = acc_mean[0];
-    h->state.ab[1] = acc_mean[1];
-    h->state.ab[2] = acc_mean[2] + ESKF_GRAVITY;
+void eskf_align_static_bias_means(ESKF_Handle *h,
+                                  const eskf_float_t acceleration_mean_m_s2[3],
+                                  const eskf_float_t angular_rate_mean_rad_s[3]) {
+    eskf_float_t R_nb[3][3];
+    eskf_float_t expected_specific_force_body[3];
+    int i;
+    int j;
+    if (!h || !h->initialized || !acceleration_mean_m_s2 || !angular_rate_mean_rad_s) return;
+
+    eskf_vec3_copy(angular_rate_mean_rad_s, h->state.gb);
+    eskf_quat_to_rot_mat3(h->state.q, R_nb);
+    for (i = 0; i < 3; ++i) {
+        expected_specific_force_body[i] = -R_nb[2][i] * ESKF_GRAVITY;
+        h->state.ab[i] = acceleration_mean_m_s2[i] - expected_specific_force_body[i];
+    }
 
     /* Update covariance: high confidence in biases */
     const eskf_float_t P_bias = 1e-4;
@@ -755,8 +974,8 @@ void eskf_align_static_biases(ESKF_Handle *h,
     h->P[14][14] = P_bias;
 
     /* Zero cross-correlations with biases */
-    for (int i = 0; i < 9; i++) {
-        for (int j = 9; j < 15; j++) {
+    for (i = 0; i < 9; i++) {
+        for (j = 9; j < 15; j++) {
             h->P[i][j] = 0.0;
             h->P[j][i] = 0.0;
         }

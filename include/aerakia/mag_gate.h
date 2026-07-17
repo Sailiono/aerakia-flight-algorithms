@@ -14,13 +14,16 @@ typedef struct {
     float relative_threshold;
     unsigned int confirmation_samples;
     unsigned int rejection_samples;
+    unsigned int recovery_samples;
 } AerakiaMagGateConfig;
 
 typedef struct {
     AerakiaMagGateConfig config;
     float magnitude_ema_ut;
     unsigned int consecutive_anomalies;
+    unsigned int consecutive_recoveries;
     unsigned int rejection_remaining;
+    bool disturbed;
     bool initialized;
     bool enabled;
 } AerakiaMagGate;

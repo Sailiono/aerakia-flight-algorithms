@@ -24,7 +24,28 @@ static void test_default_sequence(void)
     check_true(!aerakia_mag_gate_accept(&gate, 80.0f, 0.0f, 0.0f), "confirmed anomaly rejected");
     check_true(!aerakia_mag_gate_accept(&gate, 50.0f, 0.0f, 0.0f), "rejection window sample one");
     check_true(!aerakia_mag_gate_accept(&gate, 50.0f, 0.0f, 0.0f), "rejection window sample two");
-    check_true(aerakia_mag_gate_accept(&gate, 50.0f, 0.0f, 0.0f), "gate recovers after window");
+    check_true(!aerakia_mag_gate_accept(&gate, 50.0f, 0.0f, 0.0f), "recovery confirmation one");
+    check_true(!aerakia_mag_gate_accept(&gate, 50.0f, 0.0f, 0.0f), "recovery confirmation two");
+    check_true(!aerakia_mag_gate_accept(&gate, 50.0f, 0.0f, 0.0f), "recovery confirmation three");
+    check_true(!aerakia_mag_gate_accept(&gate, 50.0f, 0.0f, 0.0f), "recovery confirmation four");
+    check_true(aerakia_mag_gate_accept(&gate, 50.0f, 0.0f, 0.0f), "gate recovers after stable field");
+}
+
+static void test_persistent_anomaly_stays_latched(void)
+{
+    AerakiaMagGate gate;
+    int index;
+
+    aerakia_mag_gate_init(&gate, NULL);
+    check_true(aerakia_mag_gate_accept(&gate, 50.0f, 0.0f, 0.0f), "persistent baseline");
+    check_true(aerakia_mag_gate_accept(&gate, 80.0f, 0.0f, 0.0f), "persistent first anomaly");
+    check_true(!aerakia_mag_gate_accept(&gate, 80.0f, 0.0f, 0.0f), "persistent anomaly latches");
+    for (index = 0; index < 50; ++index) {
+        check_true(
+            !aerakia_mag_gate_accept(&gate, 80.0f, 0.0f, 0.0f),
+            "persistent anomaly remains rejected"
+        );
+    }
 }
 
 static void test_bypass_and_invalid_input(void)
@@ -53,11 +74,27 @@ static void test_instances_are_independent(void)
     check_true(aerakia_mag_gate_accept(&second, 101.0f, 0.0f, 0.0f), "second instance keeps its baseline");
 }
 
+static void test_zero_recovery_uses_compatible_default(void)
+{
+    AerakiaMagGate gate;
+    AerakiaMagGateConfig config;
+
+    aerakia_mag_gate_default_config(&config);
+    config.absolute_threshold_ut = 9.0f;
+    config.recovery_samples = 0U;
+    aerakia_mag_gate_init(&gate, &config);
+    check_true(fabsf(gate.config.absolute_threshold_ut - 9.0f) < 1.0e-6f,
+               "legacy config fields are preserved");
+    check_true(gate.config.recovery_samples == 5U, "zero recovery selects compatible default");
+}
+
 int main(void)
 {
     test_default_sequence();
     test_bypass_and_invalid_input();
     test_instances_are_independent();
+    test_zero_recovery_uses_compatible_default();
+    test_persistent_anomaly_stays_latched();
 
     if (failures != 0) {
         fprintf(stderr, "%d magnetic-gate assertion(s) failed\n", failures);

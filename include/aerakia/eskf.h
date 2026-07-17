@@ -101,6 +101,12 @@ void eskf_update_position(ESKF_Handle *h,
                           eskf_float_t R_pos,
                           ESKF_InnovResult *result);
 
+/** Correct velocity from a NED-frame observation. */
+void eskf_update_velocity(ESKF_Handle *h,
+                          const eskf_float_t velocity_m_s[3],
+                          eskf_float_t R_velocity,
+                          ESKF_InnovResult *result);
+
 /**
  * @brief Magnetometer Update (Yaw Correction)
  *
@@ -116,6 +122,15 @@ void eskf_update_mag(ESKF_Handle *h,
                      const eskf_float_t mag_m[3],
                      eskf_float_t R_mag,
                      ESKF_InnovResult *result);
+
+/**
+ * Correct yaw from a trusted navigation-frame heading observation.
+ * heading_ned_rad is clockwise from North in the NED convention.
+ */
+void eskf_update_heading(ESKF_Handle *h,
+                         eskf_float_t heading_ned_rad,
+                         eskf_float_t R_heading,
+                         ESKF_InnovResult *result);
 
 /**
  * @brief Barometer Update (Height Correction)
@@ -144,9 +159,41 @@ void eskf_update_baro(ESKF_Handle *h,
  */
 void eskf_update_static_constraint(ESKF_Handle *h, eskf_float_t R_zupt);
 
+/**
+ * Re-anchor only position and velocity after persistent navigation rejection.
+ * Attitude and learned IMU biases are deliberately preserved.
+ */
+void eskf_reset_navigation(ESKF_Handle *h,
+                           const eskf_float_t position_ned_m[3],
+                           const eskf_float_t velocity_ned_m_s[3],
+                           eskf_float_t position_variance_m2,
+                           eskf_float_t velocity_variance_m2_s2);
+
 /* ============================================================================
  * Calibration / Alignment
  * ============================================================================ */
+
+/**
+ * Coarsely align roll and pitch from a stationary specific-force mean.
+ * The current navigation-frame yaw is preserved.
+ *
+ * @return true when the acceleration vector was valid and alignment was applied.
+ */
+bool eskf_align_static_tilt(
+    ESKF_Handle *h,
+    const eskf_float_t acceleration_mean_m_s2[3]
+);
+
+/**
+ * Coarsely align yaw from a stationary magnetic-field mean and configured
+ * navigation-frame magnetic reference. Existing roll and pitch are preserved.
+ *
+ * @return true when both horizontal magnetic vectors were observable.
+ */
+bool eskf_align_static_heading(
+    ESKF_Handle *h,
+    const eskf_float_t magnetic_mean[3]
+);
 
 /**
  * @brief Static Bias Alignment
@@ -163,6 +210,11 @@ void eskf_align_static_biases(ESKF_Handle *h,
                                const eskf_float_t (*acc_buf)[3],
                                const eskf_float_t (*gyr_buf)[3],
                                int n_samples);
+
+/** Align biases from already-computed stationary IMU means. */
+void eskf_align_static_bias_means(ESKF_Handle *h,
+                                  const eskf_float_t acceleration_mean_m_s2[3],
+                                  const eskf_float_t angular_rate_mean_rad_s[3]);
 
 /* ============================================================================
  * State Access

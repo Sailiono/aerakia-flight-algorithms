@@ -1,8 +1,11 @@
 {
   "clean_motion": {
-    "eskf": 0.20,
+    "eskf": 0.45,
     "mahony_robust": 0.50,
     "mahony_standard": 0.50
+  },
+  "cold_start_tilted": {
+    "eskf_post_alignment": 0.20
   },
   "mag_bias": {
     "eskf": 0.50,
@@ -11,5 +14,16 @@
   "mag_spike": {
     "eskf": 0.50,
     "mahony_robust": 0.50
+  },
+  "navigation_outage": {
+    "eskf_post_alignment": 1.00,
+    "navigation_nees_mean": 10.00,
+    "navigation_nees_mean_min": 1.50,
+    "position_nis_mean": 5.00,
+    "position_nis_mean_min": 1.00,
+    "position_rmse_m": 0.70,
+    "velocity_nis_mean": 5.00,
+    "velocity_nis_mean_min": 1.00,
+    "velocity_rmse_m_s": 0.30
   }
 }

@@ -1,0 +1,62 @@
+{
+  "dataset": "EuRoC MAV",
+  "doi": "10.3929/ethz-b-000690084",
+  "license": "In Copyright - Non-Commercial Use Permitted",
+  "sequence": "V1_03_difficult",
+  "pose_source": "raw vicon0 transformed to body",
+  "pose_time_offset_us": 40000.0,
+  "velocity_source": "state_groundtruth_estimate0 batch velocity",
+  "samples": 20932,
+  "duration_s": 104.655,
+  "synthetic_gnss": {
+    "rate_hz": 10.0,
+    "position_sigma_m": 0.5,
+    "velocity_sigma_m_s": 0.1,
+    "seed": 7
+  },
+  "tracks": {
+    "raw_imu_cold_start_tilt_only": {
+      "static_hint_duration_s": 1.2,
+      "stationary_gyro_threshold_rad_s": 0.15,
+      "tilt_alignment_time_s": 1.0,
+      "post_tilt_alignment_tilt_rmse_deg": 1.230283,
+      "heading_alignment_completed": false,
+      "position_rmse_m": 0.137081,
+      "velocity_rmse_m_s": 0.085612,
+      "navigation_nees_mean": 5.618810
+    },
+    "raw_imu_trusted_attitude_init": {
+      "mahony_robust_attitude_rmse_deg": 95.507551,
+      "mahony_robust_tilt_rmse_deg": 3.359699,
+      "eskf_attitude_rmse_deg": 4.101947,
+      "eskf_tilt_rmse_deg": 1.046592,
+      "position_rmse_m": 0.136319,
+      "velocity_rmse_m_s": 0.091216,
+      "position_nis_mean": 3.066152,
+      "velocity_nis_mean": 2.506098,
+      "navigation_nees_mean": 5.702095
+    },
+    "reference_bias_corrected_trusted_attitude_init": {
+      "mahony_robust_attitude_rmse_deg": 2.874530,
+      "mahony_robust_tilt_rmse_deg": 2.845144,
+      "eskf_attitude_rmse_deg": 2.473928,
+      "eskf_tilt_rmse_deg": 0.828635,
+      "position_rmse_m": 0.137133,
+      "velocity_rmse_m_s": 0.086047,
+      "position_nis_mean": 3.065393,
+      "velocity_nis_mean": 2.426695,
+      "navigation_nees_mean": 5.628264
+    }
+  },
+  "metric_definition": {
+    "attitude_rmse": "quaternion geodesic angle, 2*acos(abs(q_est dot q_ref))",
+    "tilt_rmse": "angle between estimated and reference gravity directions in body axes"
+  },
+  "limitations": [
+    "No recorded GNSS or magnetometer is present; GNSS observations are deterministic synthetic samples from reference truth.",
+    "Raw vicon0 provides pose only; navigation velocity truth uses the EuRoC batch estimate.",
+    "The 40 ms pose time offset is a fixed dataset alignment parameter estimated against the published batch trajectory.",
+    "Reference-bias correction validates propagation/update math, not online bias observability.",
+    "Both tracks use the first reference attitude because the sequence begins in motion."
+  ]
+}

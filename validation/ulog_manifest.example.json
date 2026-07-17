@@ -1,0 +1,14 @@
+{
+  "scenarios": [
+    {
+      "alias": "stationary_drift",
+      "path": "/private/path/to/stationary.ulg",
+      "assume_stationary": true
+    },
+    {
+      "alias": "dynamic_flight",
+      "path": "/private/path/to/dynamic.ulg",
+      "assume_stationary": false
+    }
+  ]
+}

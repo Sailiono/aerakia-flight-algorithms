@@ -10,8 +10,10 @@ Portable C99 flight-estimation algorithms with a reproducible PC validation plat
 
 - One hardware-neutral measurement contract shared by embedded targets and PC replay
 - A paper-derived standard Mahony baseline and an Aerakia fault-tolerant configuration
-- A 15-state error-state Kalman filter (ESKF) with position, barometer, magnetometer, and zero-velocity updates
+- A 15-dimensional error-state Kalman filter (16-component nominal state) with GPS position/velocity, barometer, heading, magnetometer, and zero-velocity updates
+- Independent static cold-start tilt and magnetic-heading alignment with an explicit true-North declination reference
 - Deterministic scenario generation, native C replay, metric calculation, plots, and CI regression gates
+- GNSS NIS and independent-truth navigation NEES diagnostics, including outage/reacquisition replay
 - No heap allocation, operating-system calls, MCU headers, or device drivers in the algorithm library
 
 ## Algorithms
@@ -20,7 +22,7 @@ Portable C99 flight-estimation algorithms with a reproducible PC validation plat
 | --- | --- | --- |
 | Mahony standard | Reference baseline | Full accelerometer and magnetometer correction |
 | Mahony robust | Aerakia attitude estimator | Adaptive accelerometer trust, yaw-only magnetic correction, magnitude anomaly gate |
-| 15-state ESKF | Aerakia navigation estimator | IMU propagation, bias states, covariance, aiding updates, innovation gating |
+| 15-error-state ESKF | Aerakia navigation estimator | IMU propagation, bias states, covariance reset Jacobian, aiding gates, navigation recovery |
 
 The Mahony implementation was written against the published nonlinear complementary-filter formulation rather than copied from the previous hardware project. The ESKF follows the quaternion/error-state conventions documented by Joan Solà. See [References](docs/references.md).
 
@@ -47,6 +49,12 @@ aerakia_mahony_update(&mahony, &sample, &attitude);
 
 AerakiaNavigationEstimate navigation;
 aerakia_eskf_process_imu(&eskf, &sample, &navigation);
+
+/* Lower-rate aiding stays hardware-neutral too. */
+aerakia_eskf_update_gps(&eskf, gps_position_ned, gps_velocity_ned,
+                        gps_position_variance, gps_velocity_variance);
+aerakia_eskf_update_heading(&eskf, trusted_heading_ned_rad,
+                            trusted_heading_variance_rad2);
 ```
 
 Sensor register access, axis remapping, calibration, and unit conversion stay in the private adapter. Algorithms validate the monotonic sample timestamp and derive `dt` internally. See [Integration guide](docs/integration.md).
@@ -77,15 +85,43 @@ python validation/run_suite.py \
 
 The suite generates timestamped IMU/magnetic data with ground truth, replays the exact native C code, produces per-axis errors and plots, and checks reviewed regression limits.
 
-Example results from the deterministic 8 s / 100 Hz / seed 7 suite:
+Example results from the deterministic 20 s / 100 Hz / seed 7 suite:
 
 | Scenario | Mahony standard | Mahony robust | ESKF |
 | --- | ---: | ---: | ---: |
-| Clean motion | 0.2090° | 0.2230° | 0.0368° |
-| Magnetic spike | 0.3044° | 0.1862° | 0.1859° |
-| Persistent magnetic bias | 14.0675° | 2.3891° | 0.0164° |
+| Clean motion | 0.1476° | 0.1547° | 0.3515° |
+| Magnetic spike | 0.2612° | 0.1540° | 0.3741° |
+| Persistent magnetic bias | 27.1650° | 0.2854° | 0.3271° |
+| Tilted cold start (post-alignment) | — | — | 0.0363° |
+| GNSS outage/reacquisition (post-alignment) | — | — | 0.8205° |
 
-Values are wrapped attitude RMSE. They demonstrate deterministic behavior and fault response under the stated synthetic model; they do not prove flight safety or airworthiness. The [validation methodology](docs/validation.md) defines the evidence still required from public datasets, motion-capture/rate-table tests, HIL, and flight logs.
+Attitude values use quaternion geodesic RMSE, which is singularity-free and is not numerically
+comparable to the older RMS of three Euler components. In the outage scenario, position RMSE is 0.497 m and velocity
+RMSE is 0.226 m/s; NIS and NEES are checked against reviewed deterministic bounds. These synthetic
+results demonstrate repeatability and fault response, not flight safety or airworthiness. The
+[algorithm status](docs/algorithm-status.md) records the current maturity and P0 blockers, while the
+[validation methodology](docs/validation.md) defines the evidence still required from public
+datasets, motion-capture/rate-table tests, HIL, and flight logs.
+
+Private PX4 ULogs can be normalized without exporting absolute coordinates or hardware identifiers:
+
+```bash
+python simulation/tools/convert_ulog_to_replay.py flight.ulg \
+  --out build/flight/replay.csv --metadata build/flight/source.json
+
+python validation/run_ulog_suite.py private_manifest.json \
+  --runner build/aerakia_validation_runner --out-dir build/ulog-validation
+```
+
+Raw ULogs and private manifests stay outside Git. Only the converter, replay contract, example manifest, and analysis code are public.
+
+ULog reports keep three yaw views separate: raw agreement with PX4, agreement after applying
+the logged PX4 reset deltas, and per-reset-segment drift. Direct dual-antenna GNSS heading is
+fused only when PX4 marks it finite; ordinary GNSS course and PX4's GSF yaw remain diagnostics.
+
+The first public external-reference replay uses EuRoC `MH_01_easy`. Its converter, source hashes,
+raw-versus-reference-bias-corrected results, and limitations are documented in
+[Public datasets](docs/public-datasets.md). Raw dataset archives remain outside Git.
 
 ## Repository layout
 

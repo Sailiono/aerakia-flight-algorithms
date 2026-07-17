@@ -1,2 +1,4 @@
 matplotlib>=3.8,<4
 numpy>=1.26,<3
+pyulog>=1.2,<2
+PyYAML>=6,<7

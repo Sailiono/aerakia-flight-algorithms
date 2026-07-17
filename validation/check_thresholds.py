@@ -25,13 +25,36 @@ def main() -> None:
             continue
         algorithms = by_scenario[scenario]["algorithms"]
         for algorithm, limit in algorithm_limits.items():
-            value = float(algorithms[algorithm]["overall_attitude_rmse_deg"])
-            if value > float(limit):
+            minimum_check = algorithm.endswith("_min")
+            metric = algorithm[:-4] if minimum_check else algorithm
+            if metric == "eskf_post_alignment":
+                cold_start = by_scenario[scenario].get("cold_start_alignment")
+                if cold_start is None:
+                    failures.append(f"{scenario}: cold-start alignment did not complete")
+                    continue
+                value = float(cold_start["post_alignment_attitude_rmse_deg"])
+            elif metric == "position_rmse_m":
+                value = float(by_scenario[scenario]["navigation"]["position_rmse_m"])
+            elif metric == "velocity_rmse_m_s":
+                value = float(by_scenario[scenario]["navigation"]["velocity_rmse_m_s"])
+            elif metric == "position_nis_mean":
+                value = float(by_scenario[scenario]["eskf_consistency"]["position_nis"]["mean"])
+            elif metric == "velocity_nis_mean":
+                value = float(by_scenario[scenario]["eskf_consistency"]["velocity_nis"]["mean"])
+            elif metric == "navigation_nees_mean":
+                value = float(by_scenario[scenario]["eskf_consistency"]["navigation_nees"]["mean"])
+            else:
+                value = float(algorithms[metric]["overall_attitude_rmse_deg"])
+            failed = value < float(limit) if minimum_check else value > float(limit)
+            comparison = ">=" if minimum_check else "<="
+            if failed:
                 failures.append(
-                    f"{scenario}/{algorithm}: {value:.6f} deg exceeds {float(limit):.6f} deg"
+                    f"{scenario}/{algorithm}: {value:.6f} violates {comparison} {float(limit):.6f}"
                 )
             else:
-                print(f"PASS {scenario}/{algorithm}: {value:.6f} <= {float(limit):.6f} deg")
+                print(
+                    f"PASS {scenario}/{algorithm}: {value:.6f} {comparison} {float(limit):.6f}"
+                )
 
     # The fault-tolerant configuration must outperform the un-gated baseline.
     for scenario in ("mag_spike", "mag_bias"):
