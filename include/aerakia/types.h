@@ -21,7 +21,9 @@ typedef struct {
 typedef enum {
     AERAKIA_SAMPLE_ACCEL_VALID = 1U << 0,
     AERAKIA_SAMPLE_GYRO_VALID = 1U << 1,
-    AERAKIA_SAMPLE_MAG_VALID = 1U << 2
+    AERAKIA_SAMPLE_MAG_VALID = 1U << 2,
+    /** Application asserts that the vehicle is stationary for alignment/ZUPT. */
+    AERAKIA_SAMPLE_STATIONARY = 1U << 3
 } AerakiaSampleFlags;
 
 /**
@@ -41,6 +43,7 @@ typedef struct {
 typedef enum {
     AERAKIA_STATUS_OK = 0,
     AERAKIA_STATUS_INITIALIZED = 1,
+    AERAKIA_STATUS_ALIGNING = 2,
     AERAKIA_STATUS_INVALID_ARGUMENT = -1,
     AERAKIA_STATUS_MISSING_MEASUREMENT = -2,
     AERAKIA_STATUS_TIMESTAMP_ERROR = -3,

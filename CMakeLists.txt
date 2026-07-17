@@ -14,6 +14,7 @@ add_library(aerakia_algorithms STATIC
     src/eskf.c
     src/eskf_adapter.c
     src/eskf_math.c
+    src/eskf_models.c
     src/mag_gate.c
     src/mahony.c
 )
@@ -37,6 +38,11 @@ if(AERAKIA_BUILD_TESTS)
     add_executable(test_eskf tests/test_eskf.c)
     target_link_libraries(test_eskf PRIVATE Aerakia::Algorithms)
     add_test(NAME eskf_core COMMAND test_eskf)
+
+    add_executable(test_eskf_models tests/test_eskf_models.c)
+    target_include_directories(test_eskf_models PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(test_eskf_models PRIVATE Aerakia::Algorithms)
+    add_test(NAME eskf_models COMMAND test_eskf_models)
 
     add_executable(test_mag_gate tests/test_mag_gate.c)
     target_link_libraries(test_mag_gate PRIVATE Aerakia::Algorithms)

@@ -112,12 +112,74 @@ static void test_eskf_adapter_stationary(void)
     check_true(estimate.healthy, "ESKF adapter covariance remains healthy");
 }
 
+static void test_eskf_static_supervisor(void)
+{
+    AerakiaEskf filter;
+    AerakiaEskfConfig config;
+    AerakiaNavigationEstimate estimate;
+    AerakiaImuSample sample = level_sample(0U);
+    int index;
+
+    aerakia_eskf_default_config(&config);
+    config.static_alignment_duration_s = 0.08f;
+    config.static_alignment_min_samples = 10U;
+    config.zero_velocity_interval_s = 0.05f;
+    sample.flags |= AERAKIA_SAMPLE_STATIONARY;
+    sample.angular_rate_rad_s.z = 0.01f;
+    aerakia_eskf_init(&filter, &config, NULL, NULL);
+    for (index = 0; index < 10; ++index) {
+        AerakiaStatus status;
+        sample.timestamp_us = (uint64_t)index * 10000U;
+        status = aerakia_eskf_process_imu(&filter, &sample, &estimate);
+        check_true(
+            status == AERAKIA_STATUS_ALIGNING || status == AERAKIA_STATUS_INITIALIZED,
+            "stationary samples are held for static alignment"
+        );
+    }
+    check_true(estimate.static_alignment_complete, "adapter completes static alignment");
+    check_true(near(estimate.gyroscope_bias_rad_s.z, 0.01f, 1.0e-6f), "adapter estimates gyro bias");
+    for (index = 10; index <= 20; ++index) {
+        sample.timestamp_us = (uint64_t)index * 10000U;
+        (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
+    }
+    check_true(estimate.zero_velocity_update_count >= 2U, "stationary supervisor applies periodic ZUPT");
+}
+
+static void test_eskf_navigation_recovery_and_heading(void)
+{
+    AerakiaEskf filter;
+    AerakiaEskfConfig config;
+    AerakiaNavigationEstimate estimate;
+    AerakiaVec3f position = {1000.0f, 1000.0f, 1000.0f};
+    AerakiaVec3f velocity = {100.0f, 100.0f, 100.0f};
+    double initial_q[4] = {cos(0.1), 0.0, 0.0, sin(0.1)};
+    float yaw_before;
+
+    aerakia_eskf_default_config(&config);
+    config.navigation_recovery_rejection_limit = 2U;
+    aerakia_eskf_init(&filter, &config, NULL, initial_q);
+    aerakia_eskf_update_gps(&filter, position, velocity, 1.0f, 1.0f);
+    aerakia_eskf_update_gps(&filter, position, velocity, 1.0f, 1.0f);
+    aerakia_eskf_get_estimate(&filter, &estimate);
+    check_true(estimate.navigation_recovered, "paired GPS rejection triggers navigation recovery");
+    check_true(estimate.navigation_recovery_count == 1U, "navigation recovery is counted");
+    check_true(near(estimate.position_ned_m.x, 1000.0f, 1.0e-4f), "recovery reanchors position");
+
+    yaw_before = fabsf(estimate.attitude.euler_rad.z);
+    aerakia_eskf_update_heading(&filter, 0.0f, 0.01f);
+    aerakia_eskf_get_estimate(&filter, &estimate);
+    check_true(estimate.heading_accepted, "adapter accepts trusted heading");
+    check_true(fabsf(estimate.attitude.euler_rad.z) < yaw_before, "adapter heading reduces yaw error");
+}
+
 int main(void)
 {
     test_mahony_level_initialization();
     test_mahony_yaw_integration();
     test_mahony_adaptive_weight_and_timestamp();
     test_eskf_adapter_stationary();
+    test_eskf_static_supervisor();
+    test_eskf_navigation_recovery_and_heading();
 
     if (failures != 0) {
         fprintf(stderr, "%d public API assertion(s) failed\n", failures);
