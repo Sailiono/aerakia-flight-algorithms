@@ -167,6 +167,49 @@ void aerakia_mahony_init(AerakiaMahony *filter, const AerakiaMahonyConfig *confi
     filter->healthy = true;
 }
 
+AerakiaStatus aerakia_mahony_seed_attitude(
+    AerakiaMahony *filter,
+    const float quaternion_wxyz[4]
+)
+{
+    float norm;
+    float rotation[3][3];
+    int index;
+
+    if (filter == NULL || quaternion_wxyz == NULL) {
+        return AERAKIA_STATUS_INVALID_ARGUMENT;
+    }
+    norm = sqrtf(
+        quaternion_wxyz[0] * quaternion_wxyz[0]
+        + quaternion_wxyz[1] * quaternion_wxyz[1]
+        + quaternion_wxyz[2] * quaternion_wxyz[2]
+        + quaternion_wxyz[3] * quaternion_wxyz[3]
+    );
+    if (!(norm > 1.0e-6f) || !isfinite(norm)) {
+        return AERAKIA_STATUS_INVALID_ARGUMENT;
+    }
+    for (index = 0; index < 4; ++index) {
+        if (!isfinite(quaternion_wxyz[index])) {
+            return AERAKIA_STATUS_INVALID_ARGUMENT;
+        }
+        filter->quaternion_wxyz[index] = quaternion_wxyz[index] / norm;
+    }
+    memset(&filter->integral_feedback_rad_s, 0, sizeof(filter->integral_feedback_rad_s));
+    memset(&filter->accelerometer_error, 0, sizeof(filter->accelerometer_error));
+    memset(&filter->magnetometer_error, 0, sizeof(filter->magnetometer_error));
+    filter->accelerometer_weight = 1.0f;
+    filter->magnetometer_weight = 0.0f;
+    filter->last_timestamp_us = 0U;
+    filter->has_timestamp = false;
+    filter->initialized = true;
+    filter->healthy = true;
+    quaternion_to_rotation(filter->quaternion_wxyz, rotation);
+    filter->gravity_body_unit.x = -rotation[2][0];
+    filter->gravity_body_unit.y = -rotation[2][1];
+    filter->gravity_body_unit.z = -rotation[2][2];
+    return AERAKIA_STATUS_INITIALIZED;
+}
+
 AerakiaStatus aerakia_mahony_initialize_from_sample(
     AerakiaMahony *filter,
     const AerakiaImuSample *sample,
@@ -248,7 +291,7 @@ AerakiaStatus aerakia_mahony_update(
     if (filter == NULL || sample == NULL) {
         return AERAKIA_STATUS_INVALID_ARGUMENT;
     }
-    if (!filter->initialized || !filter->has_timestamp) {
+    if (!filter->initialized) {
         return aerakia_mahony_initialize_from_sample(filter, sample, estimate);
     }
     if ((sample->flags & (AERAKIA_SAMPLE_ACCEL_VALID | AERAKIA_SAMPLE_GYRO_VALID))
@@ -257,6 +300,12 @@ AerakiaStatus aerakia_mahony_update(
         || !vector_is_finite(sample->angular_rate_rad_s)) {
         filter->rejected_samples++;
         return AERAKIA_STATUS_MISSING_MEASUREMENT;
+    }
+    if (!filter->has_timestamp) {
+        filter->last_timestamp_us = sample->timestamp_us;
+        filter->has_timestamp = true;
+        aerakia_mahony_get_estimate(filter, estimate);
+        return AERAKIA_STATUS_INITIALIZED;
     }
     if (sample->timestamp_us <= filter->last_timestamp_us) {
         filter->rejected_samples++;

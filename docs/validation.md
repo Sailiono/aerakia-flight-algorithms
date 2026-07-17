@@ -60,13 +60,19 @@ Metrics: attitude/velocity/position RMSE, bias error, innovation acceptance, NIS
 The native `aerakia_validation_runner` replays the public C code. `run_suite.py` generates reports and `check_thresholds.py` turns reviewed error limits into CI gates.
 
 GNSS position and velocity updates report their three-degree-of-freedom normalized innovation
-squared (NIS). When the reference is declared synthetic, the runner additionally reports posterior
-six-state `[velocity, position]` normalized estimation error squared (NEES). Reports include
+squared (NIS). When the reference is declared synthetic or external truth, the runner additionally
+reports posterior six-state `[velocity, position]` normalized estimation error squared (NEES). Reports include
 single-sample chi-square coverage as a diagnostic; consecutive replay samples are correlated, so
 coverage is not treated as an independent-sample hypothesis test.
 
 The staged external intake and the limits of each source are documented in
 [public datasets](public-datasets.md).
+
+The EuRoC intake also has two deliberately separate tracks. The raw track tests startup and online
+bias handling. The reference-bias-corrected track subtracts EuRoC's batch-estimated IMU biases and
+therefore tests propagation/update math only; it must never be presented as online bias-estimation
+performance. Both use the same trusted initial reference attitude because `MH_01_easy` starts in
+motion and provides neither magnetometer nor an absolute heading sensor.
 
 ## Private ULog track
 

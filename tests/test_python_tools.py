@@ -14,6 +14,7 @@ VALIDATION = Path(__file__).resolve().parents[1] / "validation"
 sys.path.insert(0, str(VALIDATION))
 
 import convert_capture_to_golden as converter  # noqa: E402
+import convert_euroc_to_replay as euroc_converter  # noqa: E402
 import convert_ulog_to_replay as ulog_converter  # noqa: E402
 import analyze_results as analyzer  # noqa: E402
 
@@ -174,6 +175,85 @@ class ULogConverterTests(unittest.TestCase):
             self.assertAlmostEqual(
                 float(rows[0]["magnetic_declination_rad"]), math.radians(-5.5)
             )
+
+
+class EurocConverterTests(unittest.TestCase):
+    @staticmethod
+    def _identity_sensor_yaml() -> str:
+        return (
+            "sensor_type: imu\n"
+            "rate_hz: 200\n"
+            "T_BS:\n"
+            "  rows: 4\n"
+            "  cols: 4\n"
+            "  data: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]\n"
+        )
+
+    def test_flu_z_up_is_converted_to_frd_ned(self) -> None:
+        import numpy as np
+
+        with tempfile.TemporaryDirectory() as temp_directory:
+            sequence = Path(temp_directory) / "MH_test"
+            imu_dir = sequence / "mav0" / "imu0"
+            truth_dir = sequence / "mav0" / "state_groundtruth_estimate0"
+            imu_dir.mkdir(parents=True)
+            truth_dir.mkdir(parents=True)
+            (imu_dir / "sensor.yaml").write_text(
+                self._identity_sensor_yaml(), encoding="utf-8"
+            )
+            (truth_dir / "sensor.yaml").write_text(
+                self._identity_sensor_yaml(), encoding="utf-8"
+            )
+            timestamp = 1_000_000_000
+            imu = np.array(
+                [
+                    [timestamp, 1.0, 2.0, 3.0, 0.0, 0.0, 9.80665],
+                    [timestamp + 5_000_000, 1.0, 2.0, 3.0, 0.0, 0.0, 9.80665],
+                    [timestamp + 10_000_000, 1.0, 2.0, 3.0, 0.0, 0.0, 9.80665],
+                ]
+            )
+            truth = np.array(
+                [
+                    [timestamp, 1.0, 2.0, 3.0, 1.0, 0.0, 0.0, 0.0,
+                     1.0, 2.0, 3.0, 0.1, 0.2, 0.3, 0.0, 0.0, 0.1],
+                    [timestamp + 10_000_000, 2.0, 4.0, 6.0, 1.0, 0.0, 0.0, 0.0,
+                     1.0, 2.0, 3.0, 0.1, 0.2, 0.3, 0.0, 0.0, 0.1],
+                ]
+            )
+            np.savetxt(imu_dir / "data.csv", imu, delimiter=",")
+            np.savetxt(truth_dir / "data.csv", truth, delimiter=",")
+            output = Path(temp_directory) / "replay.csv"
+            metadata = euroc_converter.convert_euroc(
+                sequence, output, synthetic_gnss_rate_hz=100.0, seed=1
+            )
+            with output.open("r", encoding="utf-8", newline="") as stream:
+                rows = list(csv.DictReader(stream))
+
+            self.assertEqual(len(rows), 3)
+            self.assertEqual(rows[0]["raw_acc_mg_z"], "-1000")
+            self.assertEqual(rows[0]["raw_gyro_mdps_y"], str(round(math.degrees(-2.0) * 1000.0)))
+            self.assertAlmostEqual(float(rows[-1]["ref_position_n_m"]), 1.0)
+            self.assertAlmostEqual(float(rows[-1]["ref_position_e_m"]), -2.0)
+            self.assertAlmostEqual(float(rows[-1]["ref_position_d_m"]), -3.0)
+            self.assertAlmostEqual(float(rows[0]["ref_velocity_e_m_s"]), -2.0)
+            self.assertEqual(sum(int(row["position_update"]) for row in rows), 2)
+            self.assertEqual(metadata["reference_kind"], "independent_truth")
+            self.assertAlmostEqual(
+                metadata["frame_conversion"]["median_source_world_specific_force_m_s2"][2],
+                9.80665,
+            )
+
+            corrected_output = Path(temp_directory) / "replay_bias_corrected.csv"
+            corrected = euroc_converter.convert_euroc(
+                sequence, corrected_output, apply_reference_bias=True
+            )
+            with corrected_output.open("r", encoding="utf-8", newline="") as stream:
+                corrected_rows = list(csv.DictReader(stream))
+            self.assertEqual(
+                corrected_rows[0]["raw_gyro_mdps_y"],
+                str(round(math.degrees(-(2.0 - 0.2)) * 1000.0)),
+            )
+            self.assertTrue(corrected["reference_bias_correction"]["applied"])
 
 
 class ValidationAnalyzerTests(unittest.TestCase):

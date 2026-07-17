@@ -50,6 +50,12 @@ void aerakia_mahony_default_config(AerakiaMahonyConfig *config);
 
 void aerakia_mahony_init(AerakiaMahony *filter, const AerakiaMahonyConfig *config);
 
+/** Seed a trusted body-to-NED attitude before the first timestamped sample. */
+AerakiaStatus aerakia_mahony_seed_attitude(
+    AerakiaMahony *filter,
+    const float quaternion_wxyz[4]
+);
+
 /** Initialize attitude from an accelerometer and optional magnetometer sample. */
 AerakiaStatus aerakia_mahony_initialize_from_sample(
     AerakiaMahony *filter,

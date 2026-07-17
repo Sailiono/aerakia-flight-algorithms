@@ -97,6 +97,34 @@ static void test_mahony_yaw_integration(void)
     check_true(near(estimate.euler_rad.z, AERAKIA_PI_F / 2.0f, 2.0e-4f), "Mahony integrates 90-degree yaw");
 }
 
+static void test_mahony_trusted_attitude_seed(void)
+{
+    AerakiaMahony filter;
+    AerakiaAttitudeEstimate estimate;
+    AerakiaImuSample sample = level_sample(1000U);
+    float q[4];
+
+    euler_quaternion(0.0f, 0.0f, AERAKIA_PI_F / 4.0f, q);
+    aerakia_mahony_init(&filter, NULL);
+    check_true(
+        aerakia_mahony_seed_attitude(&filter, q) == AERAKIA_STATUS_INITIALIZED,
+        "Mahony accepts a trusted attitude seed"
+    );
+    check_true(
+        aerakia_mahony_update(&filter, &sample, &estimate) == AERAKIA_STATUS_INITIALIZED,
+        "first sample establishes the seeded Mahony timestamp"
+    );
+    check_true(
+        near(estimate.euler_rad.z, AERAKIA_PI_F / 4.0f, 1.0e-5f),
+        "first sample preserves trusted yaw"
+    );
+    q[0] = NAN;
+    check_true(
+        aerakia_mahony_seed_attitude(&filter, q) == AERAKIA_STATUS_INVALID_ARGUMENT,
+        "Mahony rejects a non-finite attitude seed"
+    );
+}
+
 static void test_mahony_adaptive_weight_and_timestamp(void)
 {
     AerakiaMahony filter;
@@ -247,6 +275,7 @@ int main(void)
 {
     test_mahony_level_initialization();
     test_mahony_yaw_integration();
+    test_mahony_trusted_attitude_seed();
     test_mahony_adaptive_weight_and_timestamp();
     test_eskf_adapter_stationary();
     test_eskf_static_supervisor();

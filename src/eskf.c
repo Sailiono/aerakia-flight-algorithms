@@ -632,18 +632,26 @@ void eskf_predict(ESKF_Handle *h,
     /* ========================================
      * Step 7: Build Process Noise Q (15x15)
      *
-     * Discrete-time process noise:
-     *   Q_θ  = σ_gyr² * dt²   (attitude from gyro noise)
-     *   Q_v  = σ_acc² * dt²   (velocity from accel noise)
-     *   Q_p  = 0              (no direct process noise on position)
+     * First-order discretization of continuous white-noise densities:
+     *   Q_θθ = σ_gyr² * dt
+     *   Q_vv = σ_acc² * dt
+     *   Q_vp = Q_pv = σ_acc² * dt² / 2
+     *   Q_pp = σ_acc² * dt³ / 3
      *   Q_ab = σ_ab² * dt     (random walk on accel bias)
      *   Q_gb = σ_gb² * dt     (random walk on gyro bias)
+     *
+     * sigma_acc and sigma_gyr are noise densities, not per-sample standard
+     * deviations. Using dt² for them would make covariance depend incorrectly
+     * on sample rate and become overconfident at high IMU rates.
      * ======================================== */
     eskf_float_t Q[15][15];
     eskf_mat15_zero(Q);
 
-    eskf_float_t q_theta = h->cfg.sigma_gyr * h->cfg.sigma_gyr * dt * dt;
-    eskf_float_t q_v = h->cfg.sigma_acc * h->cfg.sigma_acc * dt * dt;
+    eskf_float_t sigma_acc_squared = h->cfg.sigma_acc * h->cfg.sigma_acc;
+    eskf_float_t q_theta = h->cfg.sigma_gyr * h->cfg.sigma_gyr * dt;
+    eskf_float_t q_v = sigma_acc_squared * dt;
+    eskf_float_t q_vp = sigma_acc_squared * dt * dt * 0.5;
+    eskf_float_t q_p = sigma_acc_squared * dt * dt * dt / 3.0;
     eskf_float_t q_ab = h->cfg.sigma_acc_bias * h->cfg.sigma_acc_bias * dt;
     eskf_float_t q_gb = h->cfg.sigma_gyr_bias * h->cfg.sigma_gyr_bias * dt;
 
@@ -651,7 +659,10 @@ void eskf_predict(ESKF_Handle *h,
     Q[0][0] = q_theta; Q[1][1] = q_theta; Q[2][2] = q_theta;
     /* Q_v */
     Q[3][3] = q_v; Q[4][4] = q_v; Q[5][5] = q_v;
-    /* Q_p = 0 (already zero) */
+    /* Integrated acceleration noise in position and velocity-position cross terms. */
+    Q[6][6] = q_p; Q[7][7] = q_p; Q[8][8] = q_p;
+    Q[3][6] = q_vp; Q[4][7] = q_vp; Q[5][8] = q_vp;
+    Q[6][3] = q_vp; Q[7][4] = q_vp; Q[8][5] = q_vp;
     /* Q_ab */
     Q[9][9] = q_ab; Q[10][10] = q_ab; Q[11][11] = q_ab;
     /* Q_gb */

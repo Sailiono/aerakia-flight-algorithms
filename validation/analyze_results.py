@@ -397,12 +397,12 @@ def consistency_metrics(
         "position_nis": _consistency_summary(columns["eskf_position_nis"][gps_updates], 3),
         "velocity_nis": _consistency_summary(columns["eskf_velocity_nis"][gps_updates], 3),
     }
-    if reference_kind == "synthetic" and "eskf_navigation_nees" in columns:
+    if reference_kind in ("synthetic", "independent_truth") and "eskf_navigation_nees" in columns:
         result["navigation_nees"] = _consistency_summary(
             columns["eskf_navigation_nees"][gps_updates], 6
         )
         result["navigation_nees_scope"] = (
-            "Posterior [velocity, position] 6-state error against independent synthetic truth."
+            "Posterior [velocity, position] 6-state error against the declared truth source."
         )
     return result
 
@@ -548,10 +548,11 @@ def write_markdown(
     reset_compensated = metrics.get("eskf_reset_compensated_yaw")
     segment_drift = metrics.get("eskf_segment_aligned_yaw")
     yaw_sources = metrics.get("yaw_sources", {})
+    reset_source = "PX4 reference" if metrics["reference_kind"] == "px4_estimate" else "Reference"
     lines.extend(
         [
             "", "## Reference resets", "",
-            f"PX4 reference reset events: {int(reset['events'])}; maximum reset rotation: "
+            f"{reset_source} reset events: {int(reset['events'])}; maximum reset rotation: "
             f"{reset['maximum_rotation_deg']:.3f}°.",
         ]
     )
@@ -581,12 +582,20 @@ def write_markdown(
     )
     if yaw_plot_name is not None:
         lines.extend([f"![Yaw reset and source diagnostics]({yaw_plot_name})", ""])
-    lines.extend(
-        [
-            "> PX4 estimates are an engineering reference, not ground truth or an airworthiness claim.",
-            "> Ordinary single-antenna GNSS course is direction of travel, not guaranteed vehicle heading.",
-        ]
-    )
+    reference_kind = metrics["reference_kind"]
+    if reference_kind == "px4_estimate":
+        lines.extend(
+            [
+                "> PX4 estimates are an engineering reference, not ground truth or an airworthiness claim.",
+                "> Ordinary single-antenna GNSS course is direction of travel, not guaranteed vehicle heading.",
+            ]
+        )
+    elif reference_kind == "independent_truth":
+        lines.append(
+            "> External truth is subject to the source dataset's calibration, synchronization, and observability limits."
+        )
+    else:
+        lines.append("> Synthetic truth validates implementation behavior, not physical flight reliability.")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -595,7 +604,11 @@ def main() -> None:
     parser.add_argument("results_csv", type=Path)
     parser.add_argument("--out-dir", type=Path, required=True)
     parser.add_argument("--scenario", default="validation")
-    parser.add_argument("--reference-kind", choices=("synthetic", "px4_estimate"), default="synthetic")
+    parser.add_argument(
+        "--reference-kind",
+        choices=("synthetic", "independent_truth", "px4_estimate"),
+        default="synthetic",
+    )
     args = parser.parse_args()
 
     args.out_dir.mkdir(parents=True, exist_ok=True)

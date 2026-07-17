@@ -38,6 +38,12 @@ Before publishing `AerakiaImuSample`, the board/application layer must:
 
 The public algorithm layer does not know whether the source is SPI, I²C, CAN, a middleware topic, a file, or a PC simulator.
 
+If the application already has a trusted startup attitude (for example, vision or a retained
+alignment solution), call `aerakia_mahony_seed_attitude` before the first sample. The first update
+then establishes the physical timestamp without replacing the seed. Otherwise Mahony initializes
+tilt from accelerometer and yaw from a valid magnetometer, or zero yaw when no heading observation
+exists. A trusted seed is an integration contract, not a substitute for validating its source.
+
 ## Scheduling
 
 Call the estimator once per new IMU sample. The timestamp, not task wake-up time, defines the integration interval. Duplicate, reversed, or excessively delayed samples return `AERAKIA_STATUS_TIMESTAMP_ERROR`.

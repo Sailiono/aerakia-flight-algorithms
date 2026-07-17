@@ -281,20 +281,35 @@ int main(int argc, char *argv[])
     AerakiaNavigationEstimate eskf_estimate;
     unsigned long samples = 0U, malformed = 0U, gps_updates = 0U, heading_updates = 0U;
     unsigned long zupt_updates = 0U;
-    int eskf_initialized = 0, mag_reference_initialized = 0;
+    int eskf_initialized = 0, mag_reference_initialized = 0, mahony_reference_seeded = 0;
     int cold_start = 0;
-    int input_argument = 1;
-    int output_argument = 2;
+    int reference_attitude_init = 0;
+    int input_argument;
+    int output_argument;
+    int argument;
     clock_t start_clock;
 
-    if (argc == 4 && strcmp(argv[1], "--cold-start") == 0) {
-        cold_start = 1;
-        input_argument = 2;
-        output_argument = 3;
-    } else if (argc != 3) {
+    if (argc < 3) {
         fprintf(stderr,
-                "Usage: %s [--cold-start] INPUT_REPLAY_CSV OUTPUT_RESULTS_CSV\n",
+                "Usage: %s [--cold-start|--reference-attitude-init] "
+                "INPUT_REPLAY_CSV OUTPUT_RESULTS_CSV\n",
                 argv[0]);
+        return 2;
+    }
+    input_argument = argc - 2;
+    output_argument = argc - 1;
+    for (argument = 1; argument < input_argument; ++argument) {
+        if (strcmp(argv[argument], "--cold-start") == 0) {
+            cold_start = 1;
+        } else if (strcmp(argv[argument], "--reference-attitude-init") == 0) {
+            reference_attitude_init = 1;
+        } else {
+            fprintf(stderr, "Unknown option: %s\n", argv[argument]);
+            return 2;
+        }
+    }
+    if (cold_start && reference_attitude_init) {
+        fputs("--cold-start and --reference-attitude-init are mutually exclusive\n", stderr);
         return 2;
     }
     input = fopen(argv[input_argument], "r");
@@ -453,6 +468,20 @@ int main(int argc, char *argv[])
                 &eskf, &eskf_config, NULL, cold_start ? NULL : reference_q
             );
             eskf_initialized = 1;
+        }
+        if (reference_attitude_init && !mahony_reference_seeded) {
+            const float mahony_seed[4] = {
+                (float)reference_q[0], (float)reference_q[1],
+                (float)reference_q[2], (float)reference_q[3]
+            };
+            if (aerakia_mahony_seed_attitude(&standard, mahony_seed)
+                    != AERAKIA_STATUS_INITIALIZED
+                || aerakia_mahony_seed_attitude(&robust, mahony_seed)
+                    != AERAKIA_STATUS_INITIALIZED) {
+                fputs("Invalid reference attitude seed\n", stderr);
+                fclose(input); fclose(output); return 2;
+            }
+            mahony_reference_seeded = 1;
         }
 
         (void)aerakia_mahony_update(&standard, &sample, &standard_estimate);

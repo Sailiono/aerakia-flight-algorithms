@@ -142,6 +142,39 @@ static void test_stationary_prediction(void)
     }
 }
 
+static void test_continuous_process_noise_discretization(void)
+{
+    ESKF_Handle filter;
+    ESKF_Config config;
+    const eskf_float_t acc[3] = {0.0, 0.0, -ESKF_GRAVITY};
+    const eskf_float_t gyro[3] = {0.0, 0.0, 0.0};
+    const double dt = 0.01;
+    int row;
+    int column;
+
+    eskf_init(&filter, NULL, NULL);
+    config.sigma_acc = 0.2;
+    config.sigma_gyr = 0.02;
+    config.sigma_acc_bias = 0.0;
+    config.sigma_gyr_bias = 0.0;
+    eskf_set_config(&filter, &config);
+    for (row = 0; row < 15; ++row) {
+        for (column = 0; column < 15; ++column) {
+            filter.P[row][column] = 0.0;
+        }
+    }
+
+    eskf_predict(&filter, acc, gyro, dt);
+    check_true(near(filter.P[0][0], 0.02 * 0.02 * dt, 1.0e-14),
+               "gyro noise density discretizes with dt");
+    check_true(near(filter.P[3][3], 0.2 * 0.2 * dt, 1.0e-14),
+               "accelerometer noise density discretizes with dt");
+    check_true(near(filter.P[3][6], 0.2 * 0.2 * dt * dt / 2.0, 1.0e-14),
+               "integrated acceleration creates velocity-position covariance");
+    check_true(near(filter.P[6][6], 0.2 * 0.2 * dt * dt * dt / 3.0, 1.0e-14),
+               "integrated acceleration creates position covariance");
+}
+
 static void test_yaw_integration(void)
 {
     ESKF_Handle filter;
@@ -383,6 +416,7 @@ int main(void)
 {
     test_initialization();
     test_stationary_prediction();
+    test_continuous_process_noise_discretization();
     test_yaw_integration();
     test_position_update_and_gate();
     test_velocity_update_and_gate();

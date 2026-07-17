@@ -89,14 +89,14 @@ Example results from the deterministic 20 s / 100 Hz / seed 7 suite:
 
 | Scenario | Mahony standard | Mahony robust | ESKF |
 | --- | ---: | ---: | ---: |
-| Clean motion | 0.0852° | 0.0890° | 0.1954° |
-| Magnetic spike | 0.1518° | 0.0886° | 0.2131° |
-| Persistent magnetic bias | 16.1697° | 0.1648° | 0.1809° |
-| Tilted cold start (post-alignment) | — | — | 0.0208° |
-| GNSS outage/reacquisition (post-alignment) | — | — | 0.4912° |
+| Clean motion | 0.0852° | 0.0890° | 0.2036° |
+| Magnetic spike | 0.1518° | 0.0886° | 0.2169° |
+| Persistent magnetic bias | 16.1697° | 0.1648° | 0.1888° |
+| Tilted cold start (post-alignment) | — | — | 0.0205° |
+| GNSS outage/reacquisition (post-alignment) | — | — | 0.4741° |
 
-Values are wrapped attitude RMSE. In the outage scenario, position RMSE is 0.406 m and velocity
-RMSE is 0.184 m/s; NIS and NEES are checked against reviewed deterministic bounds. These synthetic
+Values are wrapped attitude RMSE. In the outage scenario, position RMSE is 0.497 m and velocity
+RMSE is 0.226 m/s; NIS and NEES are checked against reviewed deterministic bounds. These synthetic
 results demonstrate repeatability and fault response, not flight safety or airworthiness. The
 [algorithm status](docs/algorithm-status.md) records the current maturity and P0 blockers, while the
 [validation methodology](docs/validation.md) defines the evidence still required from public
@@ -117,6 +117,10 @@ Raw ULogs and private manifests stay outside Git. Only the converter, replay con
 ULog reports keep three yaw views separate: raw agreement with PX4, agreement after applying
 the logged PX4 reset deltas, and per-reset-segment drift. Direct dual-antenna GNSS heading is
 fused only when PX4 marks it finite; ordinary GNSS course and PX4's GSF yaw remain diagnostics.
+
+The first public external-reference replay uses EuRoC `MH_01_easy`. Its converter, source hashes,
+raw-versus-reference-bias-corrected results, and limitations are documented in
+[Public datasets](docs/public-datasets.md). Raw dataset archives remain outside Git.
 
 ## Repository layout
 
