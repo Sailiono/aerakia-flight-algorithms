@@ -19,6 +19,7 @@ import convert_ulog_to_replay as ulog_converter  # noqa: E402
 import analyze_results as analyzer  # noqa: E402
 import generate_synthetic_imu as synthetic_generator  # noqa: E402
 import run_monte_carlo as monte_carlo  # noqa: E402
+import run_public_dataset_suite as public_dataset_suite  # noqa: E402
 
 
 def record(sequence: int, timestamp_us: int) -> str:
@@ -499,6 +500,32 @@ class ValidationAnalyzerTests(unittest.TestCase):
         real_metrics = analyzer.consistency_metrics(columns, "px4_estimate")
         assert real_metrics is not None
         self.assertNotIn("navigation_nees", real_metrics)
+
+
+class PublicDatasetSuiteTests(unittest.TestCase):
+    def test_nested_metric_lookup(self) -> None:
+        document = {"navigation": {"position_rmse_m": 0.25}}
+        self.assertEqual(
+            public_dataset_suite.nested_value(document, "navigation.position_rmse_m"), 0.25
+        )
+        with self.assertRaises(KeyError):
+            public_dataset_suite.nested_value(document, "navigation.velocity_rmse_m_s")
+
+    def test_metric_comparison_distinguishes_types_and_tolerance(self) -> None:
+        passed, delta = public_dataset_suite.compare_value(
+            1.00005, 1.0, absolute_tolerance=0.0001, relative_tolerance=0.0
+        )
+        self.assertTrue(passed)
+        self.assertAlmostEqual(delta or 0.0, 0.00005)
+        self.assertFalse(public_dataset_suite.compare_value(
+            1.001, 1.0, absolute_tolerance=0.0001, relative_tolerance=0.0
+        )[0])
+        self.assertTrue(public_dataset_suite.compare_value(
+            False, False, absolute_tolerance=0.0, relative_tolerance=0.0
+        )[0])
+        self.assertFalse(public_dataset_suite.compare_value(
+            True, False, absolute_tolerance=0.0, relative_tolerance=0.0
+        )[0])
 
 
 if __name__ == "__main__":

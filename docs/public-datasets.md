@@ -130,7 +130,9 @@ python simulation/tools/convert_euroc_to_replay.py V1_03_difficult \
 A separate raw-IMU cold-start run marks only the first 1.2 s as stationary from external Vicon
 evidence and raises the validation runner's pre-alignment gyro threshold to 0.15 rad/s to admit the
 observed 0.08 rad/s startup bias. Tilt alignment completes at 1.0 s; post-alignment tilt RMSE is
-1.230°, navigation NEES is 5.619, and covariance remains healthy. Heading alignment correctly
+0.862°, navigation NEES is 5.621, and covariance remains healthy. The earlier 1.230° result was
+superseded by the reviewed absolute-attitude covariance reset added after static alignment; the
+one-command suite retains this change as an explicit baseline update. Heading alignment correctly
 does not complete because the dataset contains no magnetometer or trusted heading observation.
 
 This sequence repeatedly approaches ±90° pitch. The older combined Euler metric reported false
@@ -141,6 +143,21 @@ geodesic and gravity-direction errors. Euler-yaw remains diagnostic only on this
 Direct Vicon supplies independent pose, while velocity and optional bias correction still come
 from EuRoC's batch estimate. Consequently the attitude/position evidence is stronger than the
 velocity-bias evidence, and the corrected track still does not prove online bias observability.
+
+Run all five reviewed tracks from restored minimal inputs with:
+
+```bash
+python validation/run_public_dataset_suite.py \
+  --data-root /path/to/euroc-minimal-inputs \
+  --runner build/aerakia_validation_runner \
+  --out-dir build/public-dataset-suite
+```
+
+The suite verifies every retained input hash before conversion, logs all 15 subprocesses, compares
+selected metrics against the committed baselines, and writes an environment/commit manifest plus an
+aggregate report. The two sequences contain 57,313 unique recorded IMU samples; five declared tracks
+produce 135,558 replay attempts. Multiple tracks increase algorithm-path coverage but are not counted
+as additional physical data.
 
 Blackbird sensor-only chunks remain desirable for aggressive motion, but its official download
 endpoint was unavailable during this intake. UrbanNav sensor subsets are the next useful download

@@ -1,0 +1,123 @@
+{
+  "schema_version": 1,
+  "dataset": "EuRoC MAV",
+  "source_doi": "10.3929/ethz-b-000690084",
+  "source_license": "In Copyright - Non-Commercial Use Permitted",
+  "default_absolute_tolerance": 0.0001,
+  "default_relative_tolerance": 0.00001,
+  "sequences": [
+    {
+      "id": "MH_01_easy",
+      "relative_path": "MH_01_easy",
+      "baseline": "validation/public/euroc_mh01_summary.json",
+      "required_sha256": {
+        "mav0/imu0/data.csv": "226470999dc8ba758c838982fd7eb2bc9f3f2b489e85a38d0ecf8b9d40785a5b",
+        "mav0/state_groundtruth_estimate0/data.csv": "aae2d7c5684724c8afe364d2fd8499a6ed77a9169adf03736531f67d8e7b2117"
+      },
+      "tracks": [
+        {
+          "id": "raw_imu_trusted_attitude_init",
+          "converter_args": ["--synthetic-gnss-rate-hz", "10", "--seed", "7"],
+          "runner_args": ["--reference-attitude-init"],
+          "metric_paths": {
+            "mahony_robust_attitude_rmse_deg": "algorithms.mahony_robust.overall_attitude_rmse_deg",
+            "mahony_robust_yaw_rmse_deg": "algorithms.mahony_robust.axes.yaw.rmse_deg",
+            "eskf_attitude_rmse_deg": "algorithms.eskf.overall_attitude_rmse_deg",
+            "eskf_yaw_rmse_deg": "algorithms.eskf.axes.yaw.rmse_deg",
+            "position_rmse_m": "navigation.position_rmse_m",
+            "velocity_rmse_m_s": "navigation.velocity_rmse_m_s",
+            "position_nis_mean": "eskf_consistency.position_nis.mean",
+            "velocity_nis_mean": "eskf_consistency.velocity_nis.mean",
+            "navigation_nees_mean": "eskf_consistency.navigation_nees.mean"
+          }
+        },
+        {
+          "id": "reference_bias_corrected_trusted_attitude_init",
+          "converter_args": [
+            "--synthetic-gnss-rate-hz", "10", "--seed", "7", "--apply-reference-bias"
+          ],
+          "runner_args": ["--reference-attitude-init"],
+          "metric_paths": {
+            "mahony_robust_attitude_rmse_deg": "algorithms.mahony_robust.overall_attitude_rmse_deg",
+            "mahony_robust_yaw_rmse_deg": "algorithms.mahony_robust.axes.yaw.rmse_deg",
+            "eskf_attitude_rmse_deg": "algorithms.eskf.overall_attitude_rmse_deg",
+            "eskf_yaw_rmse_deg": "algorithms.eskf.axes.yaw.rmse_deg",
+            "position_rmse_m": "navigation.position_rmse_m",
+            "velocity_rmse_m_s": "navigation.velocity_rmse_m_s",
+            "position_nis_mean": "eskf_consistency.position_nis.mean",
+            "velocity_nis_mean": "eskf_consistency.velocity_nis.mean",
+            "navigation_nees_mean": "eskf_consistency.navigation_nees.mean"
+          }
+        }
+      ]
+    },
+    {
+      "id": "V1_03_difficult",
+      "relative_path": "V1_03_difficult",
+      "baseline": "validation/public/euroc_v103_summary.json",
+      "required_sha256": {
+        "mav0/imu0/data.csv": "543835f7b7dd9d1287c9052955e030ade113c51dc97ec2c15d13a318521ad0d7",
+        "mav0/state_groundtruth_estimate0/data.csv": "703ba51a854daba80f20df93e76605c2278b3f227afe2bcbe9eb4255186fc3d9",
+        "mav0/vicon0/data.csv": "766cd2841d5f2e4106c5b7e00b804cb6705f59b054625cbd74dd1b40e2c0c3fa"
+      },
+      "tracks": [
+        {
+          "id": "raw_imu_cold_start_tilt_only",
+          "converter_args": [
+            "--pose-source", "vicon", "--pose-time-offset-us", "40000",
+            "--static-hint-duration-s", "1.2", "--synthetic-gnss-rate-hz", "10", "--seed", "7"
+          ],
+          "runner_args": [
+            "--cold-start", "--stationary-gyro-threshold-rad-s", "0.15"
+          ],
+          "metric_paths": {
+            "tilt_alignment_time_s": "cold_start_alignment.tilt_alignment_time_s",
+            "post_tilt_alignment_tilt_rmse_deg": "cold_start_alignment.post_tilt_alignment_tilt_rmse_deg",
+            "heading_alignment_completed": "cold_start_alignment.heading_alignment_completed",
+            "position_rmse_m": "navigation.position_rmse_m",
+            "velocity_rmse_m_s": "navigation.velocity_rmse_m_s",
+            "navigation_nees_mean": "eskf_consistency.navigation_nees.mean"
+          }
+        },
+        {
+          "id": "raw_imu_trusted_attitude_init",
+          "converter_args": [
+            "--pose-source", "vicon", "--pose-time-offset-us", "40000",
+            "--synthetic-gnss-rate-hz", "10", "--seed", "7"
+          ],
+          "runner_args": ["--reference-attitude-init"],
+          "metric_paths": {
+            "mahony_robust_attitude_rmse_deg": "algorithms.mahony_robust.overall_attitude_rmse_deg",
+            "mahony_robust_tilt_rmse_deg": "algorithms.mahony_robust.tilt_rmse_deg",
+            "eskf_attitude_rmse_deg": "algorithms.eskf.overall_attitude_rmse_deg",
+            "eskf_tilt_rmse_deg": "algorithms.eskf.tilt_rmse_deg",
+            "position_rmse_m": "navigation.position_rmse_m",
+            "velocity_rmse_m_s": "navigation.velocity_rmse_m_s",
+            "position_nis_mean": "eskf_consistency.position_nis.mean",
+            "velocity_nis_mean": "eskf_consistency.velocity_nis.mean",
+            "navigation_nees_mean": "eskf_consistency.navigation_nees.mean"
+          }
+        },
+        {
+          "id": "reference_bias_corrected_trusted_attitude_init",
+          "converter_args": [
+            "--pose-source", "vicon", "--pose-time-offset-us", "40000",
+            "--synthetic-gnss-rate-hz", "10", "--seed", "7", "--apply-reference-bias"
+          ],
+          "runner_args": ["--reference-attitude-init"],
+          "metric_paths": {
+            "mahony_robust_attitude_rmse_deg": "algorithms.mahony_robust.overall_attitude_rmse_deg",
+            "mahony_robust_tilt_rmse_deg": "algorithms.mahony_robust.tilt_rmse_deg",
+            "eskf_attitude_rmse_deg": "algorithms.eskf.overall_attitude_rmse_deg",
+            "eskf_tilt_rmse_deg": "algorithms.eskf.tilt_rmse_deg",
+            "position_rmse_m": "navigation.position_rmse_m",
+            "velocity_rmse_m_s": "navigation.velocity_rmse_m_s",
+            "position_nis_mean": "eskf_consistency.position_nis.mean",
+            "velocity_nis_mean": "eskf_consistency.velocity_nis.mean",
+            "navigation_nees_mean": "eskf_consistency.navigation_nees.mean"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -19,7 +19,7 @@ accuracy against independent physical truth.
 | Heading semantics | Magnetometer, trusted heading, GNSS course, and PX4 GSF are separate paths; course is never silently treated as body yaw | Implemented |
 | Trusted-heading fault behavior | Cold-start completion, normal fusion, four-second dropout, two 90° outliers, rejection, and recovery with magnetometer disabled | Passing deterministic synthetic gate; independent physical heading remains open |
 | Online IMU bias behavior | Static gyro initialization plus motion/GNSS-aided accelerometer-bias convergence, with truth error and settling time reported separately | Passing deterministic multi-axis synthetic gate; single-pose accelerometer observability limit and hardware thermal behavior remain explicit |
-| Cold-start alignment | Static accelerometer tilt, magnetic heading with explicit declination, IMU-bias initialization, and covariance reset at the new linearization point; no PX4 attitude seed | Passing unit/noisy synthetic checks and direct-Vicon tilt (1.230° post-alignment RMSE); external yaw truth still pending |
+| Cold-start alignment | Static accelerometer tilt, magnetic heading with explicit declination, IMU-bias initialization, and covariance reset at the new linearization point; no PX4 attitude seed | Passing unit/noisy synthetic checks and direct-Vicon tilt (0.862° post-alignment RMSE); external yaw truth still pending |
 | Navigation consistency | GNSS position/velocity NIS and posterior 6-state navigation NEES through a five-second outage and reacquisition | 20-seed measurement-noise baseline and constant-bias/timestamp-jitter extension pass with zero numerical/recovery failures; thermal and transport faults pending |
 | EuRoC public replay | 36,381-sample Leica/IMU `MH_01_easy` and 20,932-sample direct-pose `V1_03_difficult`; raw and reference-bias-corrected tracks retained | Navigation NIS/NEES consistent; direct Vicon external pose passes high-dynamic replay; not a cold-start or independent-heading test |
 | Host regression | Strict C99 warnings-as-errors build, public API tests, deterministic synthetic fault suite | Passing reviewed thresholds |
@@ -46,6 +46,53 @@ accuracy against independent physical truth.
 - HIL followed by bounded envelope-expansion flights with reviewed abort criteria.
 
 This document is an engineering maturity statement, not an airworthiness claim.
+
+## Current quantitative assessment
+
+### Accuracy
+
+- Controlled synthetic scenarios: ESKF full-attitude RMSE is 0.33–0.89° across clean motion,
+  magnetic spikes/bias, navigation outage, trusted-heading recovery, and online-bias excitation.
+- Independent-reference EuRoC raw IMU: tilt RMSE is 0.713° on `MH_01_easy`, 1.047° on
+  `V1_03_difficult`, and 0.862° after Vicon-declared cold-start tilt alignment.
+- EuRoC full-attitude raw-IMU RMSE is 8.804° and 4.102°. This is dominated by yaw drift from the
+  recorded approximately 0.08 rad/s z-gyro bias with no magnetometer or trusted heading; it is an
+  observed limitation, not an acceptable heading-accuracy claim.
+- Reference-bias-corrected EuRoC diagnostic tracks reach 3.254° and 2.474° full-attitude RMSE, but
+  batch truth-bias subtraction is not online estimation and is never reported as flight accuracy.
+- EuRoC position RMSE is 0.131–0.137 m and velocity RMSE 0.082–0.091 m/s with deterministic
+  synthetic 10 Hz GNSS generated from external reference truth. These values validate fusion math,
+  covariance, and replay determinism—not a physical GNSS receiver.
+
+### Robustness
+
+- Software/input robustness is strong for the tested contract: 1,020,000 IMU attempts, 2,100
+  timestamped aiding attempts, five sample rates, bursts through 100 samples, exhaustive required
+  non-finite axes, and zero state/covariance invariant or health failures.
+- Numerical robustness is strong on the host: strict C build, long covariance checks, Joseph-form
+  updates, finite-difference Jacobians, and the full million-attempt campaign under ASan+UBSan.
+- Estimation consistency is currently reasonable: EuRoC navigation NEES means are 5.19–5.70 for a
+  six-dimensional expected mean of 6; position NIS is 3.07–3.08 for expected mean 3. Velocity NIS
+  at 2.43–2.58 is mildly conservative rather than overconfident.
+- Physical robustness remains only partly proven. The private ULogs add real fixed-wing/multirotor,
+  clipping, magnetic disturbance, and PX4-reset coverage, but they lack independent truth. Thermal
+  drift, vibration, installation error, motor current, real GNSS loss, and target timing await
+  FCOne v2 or controlled public data.
+
+### Maturity judgment
+
+| Scope | Current judgment | Reason |
+| --- | ---: | --- |
+| Portable algorithm/math implementation | 80–85% | Core equations, covariance handling, cold start, aiding, recovery, and host gates are mature; full observability/physical truth remains open |
+| Host-side software robustness | 85–90% | High-volume malformed/timing campaign and sanitizer run pass; external dataset breadth is still only two unique EuRoC sequences |
+| Heading robustness | 50–60% | Normal magnetometer/trusted-heading paths work, but no physical dual-GNSS/vision heading dataset and no GNSS-velocity GSF fallback yet |
+| FCOne integration readiness | 65–70% | Hardware-neutral contract is explicit; the exact private adapter, scheduling, target precision, and resource use are unverified |
+| Flight-main-estimator readiness | 45–55% | Suitable for shadow mode and bench/HIL preparation, not justified as the sole flight estimator yet |
+
+The highest-value non-hardware work remaining is broader independent data (`Blackbird` aggressive
+motion and `UrbanNav` real GNSS degradation), followed by the FCOne-neutral mock publisher contract.
+The highest-value physical evidence remains synchronized independent yaw truth, thermal/vibration
+characterization, motor magnetic disturbance, and target-MCU timing/stack measurements.
 
 ## 2026-07-18 Monte Carlo finding
 

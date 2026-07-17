@@ -133,6 +133,17 @@ The first public external-reference replay uses EuRoC `MH_01_easy`. Its converte
 raw-versus-reference-bias-corrected results, and limitations are documented in
 [Public datasets](docs/public-datasets.md). Raw dataset archives remain outside Git.
 
+After restoring the minimal EuRoC inputs, reproduce all five reviewed tracks with:
+
+```bash
+python validation/run_public_dataset_suite.py \
+  --data-root /path/to/euroc-minimal-inputs \
+  --runner build/aerakia_validation_runner
+```
+
+The command checks immutable input hashes, runs conversion/native replay/scoring, retains one log
+per subprocess, and fails when a selected metric drifts from the committed baseline.
+
 ## Repository layout
 
 ```text

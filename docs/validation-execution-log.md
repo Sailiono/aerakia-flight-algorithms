@@ -112,3 +112,50 @@ managed environment and must not be described as passing.
 After adding separate reordered-aiding counters and exhaustive aiding numeric cases, the final
 Release gate was rerun with output in `build/input-contract-final-report/`. It again passed 4/4 C
 tests, 18/18 Python tests, all deterministic thresholds, and the complete bulk campaign.
+
+## 2026-07-18 — public EuRoC suite made reproducible
+
+### Reason
+
+The repository contained reviewed EuRoC summaries and a converter, but no single command verified
+that the restored raw inputs still matched their hashes, regenerated every track, used the native C
+runner, and compared the resulting metrics to the reviewed baseline. This left room for stale
+documentation or silent result drift.
+
+### Coverage
+
+The new manifest fixes two sequences and five distinct tracks:
+
+- `MH_01_easy`: raw IMU and reference-bias-corrected diagnostic tracks;
+- `V1_03_difficult`: raw Vicon cold-start tilt, raw trusted-attitude initialization, and
+  reference-bias-corrected diagnostic tracks;
+- unique recorded data: 57,313 IMU samples over 286.555 seconds;
+- total replay volume: 135,558 IMU processing attempts over 677.765 aggregate track-seconds;
+- each input CSV is SHA-256 checked before conversion;
+- every track records converter, native replay, analyzer commands, stdout/stderr, runtime, source
+  metadata, selected metrics, and baseline comparisons.
+
+### First run finding retained
+
+Four tracks reproduced every selected metric within the declared tolerance. The V1_03 cold-start
+track exposed a stale baseline: post-alignment tilt RMSE improved from 1.230° to 0.862° after the
+previously reviewed absolute-attitude covariance reset. Velocity RMSE changed from 0.085612 to
+0.085292 m/s and navigation NEES from 5.618810 to 5.621088. The input hashes, conversion parameters,
+sample count, 1.0 s alignment time, heading-unobservable result, health, and navigation acceptance
+remained consistent. The baseline and capability documentation were updated to the newly reproduced
+values; tolerances were not widened.
+
+### Final command and result
+
+```bash
+python3 validation/run_public_dataset_suite.py \
+  --data-root /path/to/euroc-minimal-inputs \
+  --runner build/aerakia_validation_runner \
+  --out-dir build/public-dataset-suite
+```
+
+The reviewed rerun passed 5/5 tracks, 5/5 immutable input checks, and 42/42 selected metric
+comparisons. The generated directory contains `run-manifest.json`, `report.md`, per-track source
+metadata, replay/results files, plots, metrics, reports, and one log for each of 15 subprocesses.
+The ordinary host gate was then rerun: 4/4 CTest, 20/20 Python tests, the full 1,020,000-attempt
+input campaign, and every deterministic threshold passed.
