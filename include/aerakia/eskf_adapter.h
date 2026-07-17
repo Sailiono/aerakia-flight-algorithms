@@ -25,6 +25,8 @@ typedef struct {
     bool static_align_attitude;
     float static_alignment_duration_s;
     uint32_t static_alignment_min_samples;
+    float static_tilt_uncertainty_rad;
+    float static_heading_uncertainty_rad;
     float stationary_gyro_threshold_rad_s;
     float stationary_acceleration_tolerance_m_s2;
     float zero_velocity_interval_s;

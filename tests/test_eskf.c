@@ -412,6 +412,29 @@ static void test_static_attitude_alignment(void)
     }
 }
 
+static void test_attitude_covariance_reset(void)
+{
+    ESKF_Handle filter;
+    const eskf_float_t variance[3] = {0.001, 0.002, 0.03};
+    int axis;
+    int index;
+
+    eskf_init(&filter, NULL, NULL);
+    filter.P[0][6] = filter.P[6][0] = 0.2;
+    filter.P[1][9] = filter.P[9][1] = -0.1;
+    check_true(eskf_reset_attitude_covariance(&filter, variance),
+               "attitude covariance reset accepts positive variances");
+    for (axis = 0; axis < 3; ++axis) {
+        check_true(near(filter.P[axis][axis], variance[axis], 1.0e-14),
+                   "attitude covariance reset applies requested diagonal");
+        for (index = 3; index < 15; ++index) {
+            check_true(near(filter.P[axis][index], 0.0, 1.0e-14)
+                       && near(filter.P[index][axis], 0.0, 1.0e-14),
+                       "attitude covariance reset clears stale cross covariance");
+        }
+    }
+}
+
 int main(void)
 {
     test_initialization();
@@ -425,6 +448,7 @@ int main(void)
     test_navigation_reset_preserves_attitude_and_biases();
     test_static_bias_alignment();
     test_static_attitude_alignment();
+    test_attitude_covariance_reset();
 
     if (failures != 0) {
         fprintf(stderr, "%d ESKF assertion(s) failed\n", failures);

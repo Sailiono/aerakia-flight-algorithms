@@ -17,8 +17,8 @@ accuracy against independent physical truth.
 | Covariance health | Long mixed predict/update sequence checked for finite, symmetric, positive-semidefinite covariance | Passing |
 | Measurement integrity | NIS gates, latched magnetic-disturbance rejection, recovery confirmation, navigation recovery supervision | Passing deterministic regressions |
 | Heading semantics | Magnetometer, trusted heading, GNSS course, and PX4 GSF are separate paths; course is never silently treated as body yaw | Implemented |
-| Cold-start alignment | Static accelerometer tilt, magnetic heading with explicit declination, then IMU-bias initialization; no PX4 attitude seed | Passing unit/noisy synthetic checks and direct-Vicon tilt (1.230° post-alignment RMSE); external yaw truth still pending |
-| Navigation consistency | GNSS position/velocity NIS and posterior 6-state navigation NEES through a five-second outage and reacquisition | Passing deterministic bounds; Monte Carlo expansion pending |
+| Cold-start alignment | Static accelerometer tilt, magnetic heading with explicit declination, IMU-bias initialization, and covariance reset at the new linearization point; no PX4 attitude seed | Passing unit/noisy synthetic checks and direct-Vicon tilt (1.230° post-alignment RMSE); external yaw truth still pending |
+| Navigation consistency | GNSS position/velocity NIS and posterior 6-state navigation NEES through a five-second outage and reacquisition | 20-seed measurement-noise baseline passes with zero numerical/recovery failures; bias and timing distributions pending |
 | EuRoC public replay | 36,381-sample Leica/IMU `MH_01_easy` and 20,932-sample direct-pose `V1_03_difficult`; raw and reference-bias-corrected tracks retained | Navigation NIS/NEES consistent; direct Vicon external pose passes high-dynamic replay; not a cold-start or independent-heading test |
 | Host regression | Strict C99 warnings-as-errors build, public API tests, deterministic synthetic fault suite | Passing reviewed thresholds |
 | Private replay | Sanitized relative GNSS, reset events, GSF diagnostics, and native C replay across the selected ULog suite | Operational; PX4 remains an engineering reference |
@@ -29,8 +29,8 @@ accuracy against independent physical truth.
    Vicon now validates tilt and static bias alignment; its dataset has no magnetometer/heading input.
 2. Exercise the trusted-heading path with a real dual-antenna GNSS, vision, or controlled injected
    heading dataset. The present private ULogs contain no valid direct GNSS heading samples.
-3. Expand the implemented per-run NIS and navigation-substate NEES diagnostics into Monte Carlo
-   confidence tests with bias, timing jitter, aiding loss, and recovery cases.
+3. Extend the first 20-seed NIS/NEES baseline beyond measurement noise and fixed aiding loss to
+   randomized constant/thermal bias, timing jitter, transport delay, and sample loss.
 4. Run the exact FCOne adapter through timestamp, frame, unit, dropout, and stale-data contract tests.
 
 ## P1 work when the new hardware is available
@@ -42,3 +42,26 @@ accuracy against independent physical truth.
 - HIL followed by bounded envelope-expansion flights with reviewed abort criteria.
 
 This document is an engineering maturity statement, not an airworthiness claim.
+
+## 2026-07-18 Monte Carlo finding
+
+The first formal 20-seed run found one reproducible cold-start transient: seed 17 reached 1.837°
+post-alignment attitude RMSE because a GNSS position update used attitude-position covariance from
+the pre-alignment linearization point and briefly pulled attitude by approximately 8–10°. Static
+alignment had changed the nominal quaternion but had not reset its covariance relationships.
+
+The correction adds an explicit attitude-covariance reset after absolute static alignment, clears
+the stale attitude cross-covariances, and applies conservative configurable uncertainty floors of
+2° for tilt and 10° for magnetic heading. After the correction all 20 seeds pass:
+
+- position RMSE: mean 0.420 m, maximum 0.638 m;
+- velocity RMSE: mean 0.187 m/s, maximum 0.300 m/s;
+- post-alignment attitude RMSE: mean 0.712°, maximum 1.239°;
+- position NIS mean across seeds: 2.943 (three degrees of freedom expected mean 3);
+- velocity NIS mean across seeds: 2.495 (three degrees of freedom expected mean 3);
+- navigation NEES mean across seeds: 5.047 (six degrees of freedom expected mean 6);
+- navigation recoveries and unhealthy samples: zero.
+
+These are synthetic measurement-noise results with a fixed five-second GNSS outage. They are not
+physical truth, and their empirical seed percentiles are not theoretical independent-sample
+confidence intervals.

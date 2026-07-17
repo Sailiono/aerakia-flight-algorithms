@@ -17,6 +17,7 @@ import convert_capture_to_golden as converter  # noqa: E402
 import convert_euroc_to_replay as euroc_converter  # noqa: E402
 import convert_ulog_to_replay as ulog_converter  # noqa: E402
 import analyze_results as analyzer  # noqa: E402
+import run_monte_carlo as monte_carlo  # noqa: E402
 
 
 def record(sequence: int, timestamp_us: int) -> str:
@@ -57,6 +58,27 @@ class CaptureConverterTests(unittest.TestCase):
             self.assertEqual(rows[0]["host_ts_us"], "10000")
             self.assertEqual(rows[1]["seq_delta"], "2")
             self.assertEqual(rows[1]["gap_flag"], "1")
+
+
+class MonteCarloRunnerTests(unittest.TestCase):
+    def test_parse_seed_ranges_deduplicates_in_order(self) -> None:
+        self.assertEqual(monte_carlo.parse_seeds("0:3,2,5"), [0, 1, 2, 5])
+
+    def test_summary_reports_threshold_failure_seed(self) -> None:
+        trial = {
+            "seed": 9,
+            "position_rmse_m": 0.80,
+            "velocity_rmse_m_s": 0.10,
+            "attitude_rmse_deg": 0.20,
+            "position_nis_mean": 3.0,
+            "velocity_nis_mean": 3.0,
+            "navigation_nees_mean": 6.0,
+            "healthy_ratio": 1.0,
+            "navigation_recoveries": 0,
+        }
+        summary = monte_carlo.summarize_trials([trial])
+        self.assertEqual(summary["failures"][0]["seed"], 9)
+        self.assertIn("position_rmse_m", summary["failures"][0]["reasons"][0])
 
 
 class FakeDataset:

@@ -124,8 +124,18 @@ static void collect_static_sample(AerakiaEskf *filter, const AerakiaImuSample *s
             angular_rate_mean[axis] = filter->static_angular_rate_sum[axis] * inverse_count;
         }
         if (filter->config.static_align_attitude && !filter->attitude_seeded) {
+            eskf_float_t attitude_variance[3] = {
+                filter->core.P[0][0], filter->core.P[1][1], filter->core.P[2][2]
+            };
             filter->static_tilt_alignment_complete =
                 eskf_align_static_tilt(&filter->core, acceleration_mean);
+            if (filter->static_tilt_alignment_complete) {
+                const eskf_float_t tilt_variance =
+                    filter->config.static_tilt_uncertainty_rad
+                    * filter->config.static_tilt_uncertainty_rad;
+                attitude_variance[0] = tilt_variance;
+                attitude_variance[1] = tilt_variance;
+            }
             if (filter->static_tilt_alignment_complete
                 && filter->static_magnetic_samples > 0U) {
                 eskf_float_t magnetic_mean[3];
@@ -137,6 +147,13 @@ static void collect_static_sample(AerakiaEskf *filter, const AerakiaImuSample *s
                 }
                 filter->static_heading_alignment_complete =
                     eskf_align_static_heading(&filter->core, magnetic_mean);
+                if (filter->static_heading_alignment_complete) {
+                    attitude_variance[2] = filter->config.static_heading_uncertainty_rad
+                        * filter->config.static_heading_uncertainty_rad;
+                }
+            }
+            if (filter->static_tilt_alignment_complete) {
+                (void)eskf_reset_attitude_covariance(&filter->core, attitude_variance);
             }
         }
         eskf_align_static_bias_means(&filter->core, acceleration_mean, angular_rate_mean);
@@ -165,6 +182,9 @@ void aerakia_eskf_default_config(AerakiaEskfConfig *config)
     config->static_align_attitude = true;
     config->static_alignment_duration_s = 1.0f;
     config->static_alignment_min_samples = 100U;
+    /* Conservative floors include residual calibration and mounting error. */
+    config->static_tilt_uncertainty_rad = 2.0f * AERAKIA_PI_F / 180.0f;
+    config->static_heading_uncertainty_rad = 10.0f * AERAKIA_PI_F / 180.0f;
     config->stationary_gyro_threshold_rad_s = 0.05f;
     config->stationary_acceleration_tolerance_m_s2 = 0.20f * AERAKIA_GRAVITY_M_S2;
     config->zero_velocity_interval_s = 0.10f;

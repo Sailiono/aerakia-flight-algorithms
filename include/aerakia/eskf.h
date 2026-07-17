@@ -196,6 +196,16 @@ bool eskf_align_static_heading(
 );
 
 /**
+ * Replace the three attitude-error variances after an absolute attitude seed.
+ * Existing attitude cross-covariances are cleared because they describe the
+ * pre-alignment linearization point.
+ */
+bool eskf_reset_attitude_covariance(
+    ESKF_Handle *h,
+    const eskf_float_t attitude_variance_rad2[3]
+);
+
+/**
  * @brief Static Bias Alignment
  *
  * Initialize biases from stationary IMU data.

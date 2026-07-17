@@ -922,6 +922,27 @@ bool eskf_align_static_heading(ESKF_Handle *h,
     return true;
 }
 
+bool eskf_reset_attitude_covariance(
+    ESKF_Handle *h,
+    const eskf_float_t attitude_variance_rad2[3]
+) {
+    int axis;
+    int index;
+    if (!h || !h->initialized || !attitude_variance_rad2) return false;
+    for (axis = 0; axis < 3; ++axis) {
+        if (!isfinite(attitude_variance_rad2[axis])
+            || attitude_variance_rad2[axis] <= 0.0) return false;
+    }
+    for (axis = 0; axis < 3; ++axis) {
+        for (index = 0; index < ESKF_ERROR_STATE_DIM; ++index) {
+            h->P[axis][index] = 0.0;
+            h->P[index][axis] = 0.0;
+        }
+        h->P[axis][axis] = attitude_variance_rad2[axis];
+    }
+    return true;
+}
+
 void eskf_align_static_biases(ESKF_Handle *h,
                                const eskf_float_t (*acc_buf)[3],
                                const eskf_float_t (*gyr_buf)[3],
