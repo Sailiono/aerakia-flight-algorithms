@@ -87,11 +87,11 @@ Example results from the deterministic 8 s / 100 Hz / seed 7 suite:
 
 | Scenario | Mahony standard | Mahony robust | ESKF |
 | --- | ---: | ---: | ---: |
-| Clean motion | 0.2090° | 0.2230° | 0.1756° |
-| Magnetic spike | 0.3044° | 0.1862° | 0.1941° |
-| Persistent magnetic bias | 14.0675° | 2.3891° | 0.2353° |
+| Clean motion | 0.0852° | 0.0890° | 0.1954° |
+| Magnetic spike | 0.1518° | 0.0886° | 0.2131° |
+| Persistent magnetic bias | 16.1697° | 0.1648° | 0.1809° |
 
-Values are wrapped attitude RMSE. They demonstrate deterministic behavior and fault response under the stated synthetic model; they do not prove flight safety or airworthiness. The [validation methodology](docs/validation.md) defines the evidence still required from public datasets, motion-capture/rate-table tests, HIL, and flight logs.
+Values are wrapped attitude RMSE. They demonstrate deterministic behavior and fault response under the stated synthetic model; they do not prove flight safety or airworthiness. The [algorithm status](docs/algorithm-status.md) records the current maturity and P0 blockers, while the [validation methodology](docs/validation.md) defines the evidence still required from public datasets, motion-capture/rate-table tests, HIL, and flight logs.
 
 Private PX4 ULogs can be normalized without exporting absolute coordinates or hardware identifiers:
 
@@ -104,6 +104,10 @@ python validation/run_ulog_suite.py private_manifest.json \
 ```
 
 Raw ULogs and private manifests stay outside Git. Only the converter, replay contract, example manifest, and analysis code are public.
+
+ULog reports keep three yaw views separate: raw agreement with PX4, agreement after applying
+the logged PX4 reset deltas, and per-reset-segment drift. Direct dual-antenna GNSS heading is
+fused only when PX4 marks it finite; ordinary GNSS course and PX4's GSF yaw remain diagnostics.
 
 ## Repository layout
 

@@ -94,7 +94,7 @@ def metrics_for(
     return result
 
 
-def reset_aware_yaw_metrics(columns: dict[str, np.ndarray]) -> dict[str, object]:
+def segment_aligned_yaw_metrics(columns: dict[str, np.ndarray]) -> dict[str, object]:
     time_s = (columns["ts_us"] - columns["ts_us"][0]) * 1.0e-6
     counters = columns.get("ref_attitude_reset_counter", np.zeros(len(time_s)))
     estimate = columns["eskf_yaw_deg"]
@@ -122,12 +122,45 @@ def reset_aware_yaw_metrics(columns: dict[str, np.ndarray]) -> dict[str, object]
     return summary
 
 
-def reset_summary(columns: dict[str, np.ndarray]) -> dict[str, float]:
+def reset_yaw_delta_deg(columns: dict[str, np.ndarray]) -> np.ndarray:
+    result = np.zeros(len(columns["ts_us"]), dtype=np.float64)
+    if "ref_delta_q_reset_w" not in columns:
+        return result
+    q = np.column_stack(
+        [columns[f"ref_delta_q_reset_{axis}"] for axis in ("w", "x", "y", "z")]
+    )
+    q /= np.maximum(np.linalg.norm(q, axis=1)[:, None], 1.0e-12)
+    return np.degrees(
+        np.arctan2(
+            2.0 * (q[:, 0] * q[:, 3] + q[:, 1] * q[:, 2]),
+            1.0 - 2.0 * (q[:, 2] ** 2 + q[:, 3] ** 2),
+        )
+    )
+
+
+def reset_compensated_reference_yaw(columns: dict[str, np.ndarray]) -> np.ndarray:
     events = columns.get("ref_attitude_reset_event", np.zeros(len(columns["ts_us"]))) > 0.5
-    result = {
+    cumulative_reset = np.cumsum(np.where(events, reset_yaw_delta_deg(columns), 0.0))
+    return wrapped_error_deg(columns["truth_yaw_deg"], cumulative_reset)
+
+
+def reset_compensated_yaw_metrics(columns: dict[str, np.ndarray]) -> dict[str, float]:
+    time_s = (columns["ts_us"] - columns["ts_us"][0]) * 1.0e-6
+    reference = reset_compensated_reference_yaw(columns)
+    estimate = columns["eskf_yaw_deg"].copy()
+    offset = _initial_alignment_offset(time_s, estimate, reference)
+    result = _error_summary(wrapped_error_deg(estimate + offset, reference))
+    result["initial_yaw_alignment_offset_deg"] = offset
+    return result
+
+
+def reset_summary(columns: dict[str, np.ndarray]) -> dict[str, object]:
+    events = columns.get("ref_attitude_reset_event", np.zeros(len(columns["ts_us"]))) > 0.5
+    result: dict[str, object] = {
         "events": float(np.count_nonzero(events)),
         "maximum_rotation_deg": 0.0,
         "maximum_yaw_delta_deg": 0.0,
+        "event_details": [],
     }
     if not np.any(events) or "ref_delta_q_reset_w" not in columns:
         return result
@@ -138,13 +171,82 @@ def reset_summary(columns: dict[str, np.ndarray]) -> dict[str, float]:
     result["maximum_rotation_deg"] = float(
         np.max(np.degrees(2.0 * np.arccos(np.clip(np.abs(q[:, 0]), 0.0, 1.0))))
     )
-    yaw = np.degrees(
-        np.arctan2(
-            2.0 * (q[:, 0] * q[:, 3] + q[:, 1] * q[:, 2]),
-            1.0 - 2.0 * (q[:, 2] ** 2 + q[:, 3] ** 2),
-        )
-    )
+    yaw = reset_yaw_delta_deg(columns)[events]
     result["maximum_yaw_delta_deg"] = float(np.max(np.abs(yaw)))
+    time_s = (columns["ts_us"] - columns["ts_us"][0]) * 1.0e-6
+    details: list[dict[str, float]] = []
+    for event_index in np.flatnonzero(events):
+        before = max(0, int(event_index) - 1)
+        after = int(event_index)
+        raw_jump = wrapped_error_deg(
+            np.asarray([columns["truth_yaw_deg"][after]]),
+            np.asarray([columns["truth_yaw_deg"][before]]),
+        )[0]
+        error_before = wrapped_error_deg(
+            np.asarray([columns["eskf_yaw_deg"][before]]),
+            np.asarray([columns["truth_yaw_deg"][before]]),
+        )[0]
+        error_after = wrapped_error_deg(
+            np.asarray([columns["eskf_yaw_deg"][after]]),
+            np.asarray([columns["truth_yaw_deg"][after]]),
+        )[0]
+        details.append(
+            {
+                "time_s": float(time_s[after]),
+                "delta_quaternion_yaw_deg": float(reset_yaw_delta_deg(columns)[after]),
+                "observed_px4_yaw_jump_deg": float(raw_jump),
+                "eskf_minus_px4_before_deg": float(error_before),
+                "eskf_minus_px4_after_deg": float(error_after),
+                "agreement_error_step_deg": float(wrapped_error_deg(
+                    np.asarray([error_after]), np.asarray([error_before])
+                )[0]),
+            }
+        )
+    result["event_details"] = details
+    return result
+
+
+def yaw_source_diagnostics(columns: dict[str, np.ndarray]) -> dict[str, object]:
+    time_s = (columns["ts_us"] - columns["ts_us"][0]) * 1.0e-6
+    result: dict[str, object] = {
+        "direct_gnss_heading_updates": int(np.count_nonzero(
+            columns.get("input_heading_update", np.zeros(len(time_s))) > 0.5
+        )),
+        "gnss_course_diagnostic_updates": int(np.count_nonzero(
+            columns.get("gnss_course_update", np.zeros(len(time_s))) > 0.5
+        )),
+        "px4_gsf_updates": int(np.count_nonzero(
+            columns.get("px4_gsf_yaw_update", np.zeros(len(time_s))) > 0.5
+        )),
+    }
+    direct_valid = (
+        (columns.get("gnss_heading_valid", np.zeros(len(time_s))) > 0.5)
+        & (columns.get("input_heading_update", np.zeros(len(time_s))) > 0.5)
+    )
+    gsf_valid = (
+        (columns.get("px4_gsf_yaw_valid", np.zeros(len(time_s))) > 0.5)
+        & (columns.get("px4_gsf_yaw_update", np.zeros(len(time_s))) > 0.5)
+        & (columns.get("px4_gsf_yaw_variance_rad2", np.ones(len(time_s)))
+           <= np.radians(15.0) ** 2)
+        & (columns.get("gnss_ground_speed_m_s", np.zeros(len(time_s))) >= 1.5)
+    )
+    result["px4_gsf_confident_updates"] = int(np.count_nonzero(gsf_valid))
+    sources = (
+        ("direct_gnss_heading", direct_valid, "gnss_heading_rad"),
+        ("px4_gsf_yaw", gsf_valid, "px4_gsf_yaw_rad"),
+    )
+    for label, valid, value_name in sources:
+        if value_name not in columns:
+            continue
+        if not np.any(valid):
+            continue
+        reference = np.degrees(columns[value_name])
+        estimate = columns["eskf_yaw_deg"].copy()
+        offset = _initial_alignment_offset(time_s[valid], estimate[valid], reference[valid])
+        summary = _error_summary(wrapped_error_deg(estimate[valid] + offset, reference[valid]))
+        summary["samples"] = int(np.count_nonzero(valid))
+        summary["initial_yaw_alignment_offset_deg"] = offset
+        result[label] = summary
     return result
 
 
@@ -245,7 +347,58 @@ def create_plot(columns: dict[str, np.ndarray], output_path: Path, title: str) -
     plt.close(figure)
 
 
-def write_markdown(path: Path, scenario: str, metrics: dict[str, object], plot_name: str) -> None:
+def create_yaw_diagnostic_plot(columns: dict[str, np.ndarray], output_path: Path, title: str) -> None:
+    time_s = (columns["ts_us"] - columns["ts_us"][0]) * 1.0e-6
+    raw_reference = columns["truth_yaw_deg"]
+    compensated_reference = reset_compensated_reference_yaw(columns)
+    estimate = columns["eskf_yaw_deg"]
+    reset_events = columns.get("ref_attitude_reset_event", np.zeros(len(time_s))) > 0.5
+    figure, axes = plt.subplots(2, 1, figsize=(14, 7), sharex=True)
+    axes[0].plot(time_s, raw_reference, color="black", linewidth=1.2, label="PX4 raw yaw")
+    axes[0].plot(
+        time_s, compensated_reference, color="#8e44ad", linewidth=1.1,
+        label="PX4 reset-compensated yaw",
+    )
+    axes[0].plot(time_s, estimate, color="#d55e00", linewidth=0.9, label="Aerakia ESKF")
+    gsf_valid = (
+        (columns.get("px4_gsf_yaw_valid", np.zeros(len(time_s))) > 0.5)
+        & (columns.get("px4_gsf_yaw_update", np.zeros(len(time_s))) > 0.5)
+        & (columns.get("px4_gsf_yaw_variance_rad2", np.ones(len(time_s)))
+           <= np.radians(15.0) ** 2)
+        & (columns.get("gnss_ground_speed_m_s", np.zeros(len(time_s))) >= 1.5)
+    )
+    if np.any(gsf_valid):
+        axes[0].plot(
+            time_s[gsf_valid], np.degrees(columns["px4_gsf_yaw_rad"][gsf_valid]),
+            color="#009e73", linewidth=0.0, marker=".", markersize=2.5,
+            alpha=0.8, label="PX4 GSF confident updates",
+        )
+    offset = _initial_alignment_offset(time_s, estimate, compensated_reference)
+    axes[1].plot(
+        time_s, wrapped_error_deg(estimate + offset, compensated_reference),
+        color="#d55e00", linewidth=0.9, label="ESKF minus reset-compensated PX4",
+    )
+    axes[1].plot(
+        time_s, wrapped_error_deg(estimate, raw_reference),
+        color="#777777", linewidth=0.7, alpha=0.75, label="ESKF minus raw PX4",
+    )
+    for event_time in time_s[reset_events]:
+        for axis in axes:
+            axis.axvline(event_time, color="#8e44ad", alpha=0.4, linewidth=0.9)
+    axes[0].set_ylabel("yaw (deg)")
+    axes[1].set_ylabel("wrapped error (deg)")
+    axes[1].set_xlabel("time (s)")
+    axes[0].legend(ncol=2, fontsize=8)
+    axes[1].legend(ncol=2, fontsize=8)
+    axes[0].grid(alpha=0.25); axes[1].grid(alpha=0.25)
+    figure.suptitle(title); figure.tight_layout(); figure.savefig(output_path, dpi=150)
+    plt.close(figure)
+
+
+def write_markdown(
+    path: Path, scenario: str, metrics: dict[str, object], plot_name: str,
+    yaw_plot_name: str | None = None,
+) -> None:
     algorithms = metrics["algorithms"]
     assert isinstance(algorithms, dict)
     lines = [
@@ -276,14 +429,46 @@ def write_markdown(path: Path, scenario: str, metrics: dict[str, object], plot_n
             f"{navigation['position_rmse_m']:.3f} m."
         )
     reset = metrics["reference_resets"]
+    reset_compensated = metrics.get("eskf_reset_compensated_yaw")
+    segment_drift = metrics.get("eskf_segment_aligned_yaw")
+    yaw_sources = metrics.get("yaw_sources", {})
     lines.extend(
         [
             "", "## Reference resets", "",
             f"PX4 reference reset events: {int(reset['events'])}; maximum reset rotation: "
-            f"{reset['maximum_rotation_deg']:.3f}°. Reset-aware segment metrics are diagnostic "
-            "and are not directly comparable to the globally aligned raw metric.",
+            f"{reset['maximum_rotation_deg']:.3f}°.",
+        ]
+    )
+    if reset_compensated and segment_drift:
+        lines.extend(
+            [
+                f"- ESKF yaw RMSE against raw PX4 yaw: "
+                f"{algorithms['eskf']['axes']['yaw']['rmse_deg']:.3f}°.",
+                f"- ESKF yaw RMSE after removing logged PX4 reset deltas: "
+                f"{reset_compensated['rmse_deg']:.3f}°.",
+                f"- Per-segment aligned yaw drift RMSE: {segment_drift['rmse_deg']:.3f}° "
+                "(diagnostic only; every PX4 reset segment gets a new offset).",
+            ]
+        )
+    lines.extend(
+        [
+            "", "## Yaw-source audit", "",
+            f"- Direct dual-GNSS heading updates fused by Aerakia: "
+            f"{yaw_sources.get('direct_gnss_heading_updates', 0)}.",
+            f"- GNSS course-over-ground diagnostic updates (never fused as body yaw): "
+            f"{yaw_sources.get('gnss_course_diagnostic_updates', 0)}.",
+            f"- PX4 GSF diagnostic updates (never fused into Aerakia during comparison): "
+            f"{yaw_sources.get('px4_gsf_updates', 0)}; confident moving updates: "
+            f"{yaw_sources.get('px4_gsf_confident_updates', 0)}.",
             "", f"![Attitude estimates and wrapped errors]({plot_name})", "",
+        ]
+    )
+    if yaw_plot_name is not None:
+        lines.extend([f"![Yaw reset and source diagnostics]({yaw_plot_name})", ""])
+    lines.extend(
+        [
             "> PX4 estimates are an engineering reference, not ground truth or an airworthiness claim.",
+            "> Ordinary single-antenna GNSS course is direction of travel, not guaranteed vehicle heading.",
         ]
     )
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -312,13 +497,22 @@ def main() -> None:
         "reference_resets": reset_summary(columns),
     }
     if args.reference_kind == "px4_estimate":
-        metrics["eskf_reset_aware_yaw"] = reset_aware_yaw_metrics(columns)
+        metrics["eskf_reset_compensated_yaw"] = reset_compensated_yaw_metrics(columns)
+        metrics["eskf_segment_aligned_yaw"] = segment_aligned_yaw_metrics(columns)
+        metrics["yaw_sources"] = yaw_source_diagnostics(columns)
     plot_path = args.out_dir / "attitude_comparison.png"
     create_plot(columns, plot_path, f"Aerakia validation — {args.scenario}")
+    yaw_plot_path: Path | None = None
+    if args.reference_kind == "px4_estimate":
+        yaw_plot_path = args.out_dir / "yaw_diagnostics.png"
+        create_yaw_diagnostic_plot(columns, yaw_plot_path, f"Yaw diagnostics — {args.scenario}")
     (args.out_dir / "metrics.json").write_text(
         json.dumps(metrics, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
-    write_markdown(args.out_dir / "report.md", args.scenario, metrics, plot_path.name)
+    write_markdown(
+        args.out_dir / "report.md", args.scenario, metrics, plot_path.name,
+        yaw_plot_path.name if yaw_plot_path is not None else None,
+    )
     print(json.dumps(metrics, indent=2, sort_keys=True))
 
 

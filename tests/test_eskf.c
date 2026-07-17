@@ -34,6 +34,55 @@ static void yaw_quaternion(double yaw, eskf_float_t q[4])
     q[3] = sin(0.5 * yaw);
 }
 
+static void euler_quaternion(double roll, double pitch, double yaw, eskf_float_t q[4])
+{
+    const double cr = cos(roll * 0.5), sr = sin(roll * 0.5);
+    const double cp = cos(pitch * 0.5), sp = sin(pitch * 0.5);
+    const double cy = cos(yaw * 0.5), sy = sin(yaw * 0.5);
+    q[0] = cr * cp * cy + sr * sp * sy;
+    q[1] = sr * cp * cy - cr * sp * sy;
+    q[2] = cr * sp * cy + sr * cp * sy;
+    q[3] = cr * cp * sy - sr * sp * cy;
+}
+
+static double roll_from_quaternion(const eskf_float_t q[4])
+{
+    return atan2(
+        2.0 * (q[0] * q[1] + q[2] * q[3]),
+        1.0 - 2.0 * (q[1] * q[1] + q[2] * q[2])
+    );
+}
+
+static double pitch_from_quaternion(const eskf_float_t q[4])
+{
+    double value = 2.0 * (q[0] * q[2] - q[3] * q[1]);
+    if (value > 1.0) value = 1.0;
+    if (value < -1.0) value = -1.0;
+    return asin(value);
+}
+
+static int covariance_is_symmetric_psd(eskf_float_t covariance[15][15])
+{
+    double lower[15][15] = {{0.0}};
+    int i, j, k;
+    for (i = 0; i < 15; ++i) {
+        for (j = 0; j <= i; ++j) {
+            double sum = covariance[i][j];
+            if (!isfinite(sum) || fabs(covariance[i][j] - covariance[j][i]) > 1.0e-9) return 0;
+            for (k = 0; k < j; ++k) sum -= lower[i][k] * lower[j][k];
+            if (i == j) {
+                if (sum < -1.0e-9) return 0;
+                lower[i][j] = sqrt(sum > 0.0 ? sum : 0.0);
+            } else if (lower[j][j] > 1.0e-12) {
+                lower[i][j] = sum / lower[j][j];
+            } else if (fabs(sum) > 1.0e-8) {
+                return 0;
+            }
+        }
+    }
+    return 1;
+}
+
 static void test_initialization(void)
 {
     ESKF_Handle filter;
@@ -163,6 +212,56 @@ static void test_heading_updates_are_yaw_only(void)
     after = yaw_from_quaternion(filter.state.q);
     check_true(result.accepted, "trusted heading update is accepted");
     check_true(fabs(after) < fabs(before), "trusted heading update reduces yaw error");
+
+    euler_quaternion(25.0 * ESKF_PI / 180.0, -18.0 * ESKF_PI / 180.0,
+                     30.0 * ESKF_PI / 180.0, q);
+    eskf_init(&filter, NULL, q);
+    {
+        const double roll_before = roll_from_quaternion(filter.state.q);
+        const double pitch_before = pitch_from_quaternion(filter.state.q);
+        eskf_update_heading(&filter, 20.0 * ESKF_PI / 180.0, 0.01, &result);
+        check_true(result.accepted, "tilted trusted heading update is accepted");
+        check_true(
+            near(roll_from_quaternion(filter.state.q), roll_before, 1.0e-10),
+            "tilted heading update preserves roll"
+        );
+        check_true(
+            near(pitch_from_quaternion(filter.state.q), pitch_before, 1.0e-10),
+            "tilted heading update preserves pitch"
+        );
+    }
+}
+
+static void test_joseph_covariance_stays_psd(void)
+{
+    ESKF_Handle filter;
+    ESKF_InnovResult result;
+    const eskf_float_t acc[3] = {0.0, 0.0, -ESKF_GRAVITY};
+    const eskf_float_t gyro[3] = {0.001, -0.002, 0.003};
+    int index;
+
+    eskf_init(&filter, NULL, NULL);
+    for (index = 0; index < 1000; ++index) {
+        eskf_float_t position[3];
+        eskf_float_t velocity[3];
+        eskf_predict(&filter, acc, gyro, 0.005);
+        position[0] = filter.state.p[0] + 0.01;
+        position[1] = filter.state.p[1] - 0.01;
+        position[2] = filter.state.p[2] + 0.005;
+        velocity[0] = filter.state.v[0] + 0.005;
+        velocity[1] = filter.state.v[1] - 0.005;
+        velocity[2] = filter.state.v[2] + 0.002;
+        if ((index % 5) == 0) eskf_update_velocity(&filter, velocity, 0.04, &result);
+        if ((index % 20) == 0) eskf_update_position(&filter, position, 0.25, &result);
+        if ((index % 10) == 0) {
+            eskf_update_heading(&filter, yaw_from_quaternion(filter.state.q) + 0.001, 0.01, &result);
+        }
+        if ((index % 25) == 0) eskf_update_baro(&filter, -filter.state.p[2], 0.25, &result);
+    }
+    check_true(
+        covariance_is_symmetric_psd(filter.P),
+        "Joseph updates keep covariance finite, symmetric, and positive semidefinite"
+    );
 }
 
 static void test_navigation_reset_preserves_attitude_and_biases(void)
@@ -221,6 +320,7 @@ int main(void)
     test_position_update_and_gate();
     test_velocity_update_and_gate();
     test_heading_updates_are_yaw_only();
+    test_joseph_covariance_stays_psd();
     test_navigation_reset_preserves_attitude_and_biases();
     test_static_bias_alignment();
 

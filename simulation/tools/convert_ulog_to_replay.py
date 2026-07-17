@@ -22,6 +22,7 @@ TOPICS = (
     "vehicle_attitude",
     "vehicle_local_position",
     "vehicle_gps_position",
+    "yaw_estimator_status",
     "vehicle_air_data",
 )
 
@@ -295,6 +296,15 @@ def convert_ulog(
     gps_position_variance = np.ones(len(imu_t), dtype=np.float64)
     gps_velocity_variance = np.ones(len(imu_t), dtype=np.float64)
     gps_update = np.zeros(len(imu_t), dtype=bool)
+    gnss_heading = np.zeros(len(imu_t), dtype=np.float64)
+    gnss_heading_variance = np.full(len(imu_t), math.radians(5.0) ** 2, dtype=np.float64)
+    gnss_heading_valid = np.zeros(len(imu_t), dtype=bool)
+    gnss_heading_update = np.zeros(len(imu_t), dtype=bool)
+    gnss_course = np.zeros(len(imu_t), dtype=np.float64)
+    gnss_course_variance = np.ones(len(imu_t), dtype=np.float64)
+    gnss_ground_speed = np.zeros(len(imu_t), dtype=np.float64)
+    gnss_course_valid = np.zeros(len(imu_t), dtype=bool)
+    gnss_course_update = np.zeros(len(imu_t), dtype=bool)
     if gps is not None:
         gps_t = _timestamps(gps)
         gps_p, gps_valid = _relative_gps_ned(gps)
@@ -304,11 +314,39 @@ def convert_ulog(
         eph = _field(gps, "eph", default=np.ones(len(gps_t))).astype(np.float64)
         epv = _field(gps, "epv", default=eph).astype(np.float64)
         speed_sigma = _field(gps, "s_variance_m_s", default=np.ones(len(gps_t))).astype(np.float64)
+        heading = _field(gps, "heading", default=np.full(len(gps_t), np.nan)).astype(np.float64)
+        heading_offset = _field(
+            gps, "heading_offset", default=np.full(len(gps_t), np.nan)
+        ).astype(np.float64)
+        heading_accuracy = _field(
+            gps, "heading_accuracy", default=np.full(len(gps_t), math.radians(5.0))
+        ).astype(np.float64)
+        direct_heading = np.arctan2(
+            np.sin(heading + heading_offset), np.cos(heading + heading_offset)
+        )
+        direct_heading_valid = np.isfinite(heading) & np.isfinite(heading_offset)
+        heading_variance = np.maximum(heading_accuracy, math.radians(1.0)) ** 2
+        course = _field(gps, "cog_rad", default=np.full(len(gps_t), np.nan)).astype(np.float64)
+        course_variance = _field(
+            gps, "c_variance_rad", default=np.full(len(gps_t), 1.0)
+        ).astype(np.float64)
+        ground_speed = _field(
+            gps, "vel_m_s", default=np.hypot(gps_v[:, 0], gps_v[:, 1])
+        ).astype(np.float64)
+        velocity_valid = _field(gps, "vel_ned_valid", default=np.ones(len(gps_t))).astype(bool)
+        course_valid = np.isfinite(course) & np.isfinite(ground_speed) & velocity_valid
+        course_valid &= ground_speed >= 1.5
         position_variance = np.maximum(np.maximum(eph, epv), 0.25) ** 2
         velocity_variance = np.maximum(speed_sigma, 0.05) ** 2
         gps_valid &= np.all(np.isfinite(gps_v), axis=1)
-        gps_t, gps_p, gps_v, position_variance, velocity_variance, gps_valid = _sort_unique(
-            gps_t, gps_p, gps_v, position_variance, velocity_variance, gps_valid
+        (
+            gps_t, gps_p, gps_v, position_variance, velocity_variance, gps_valid,
+            direct_heading, heading_variance, direct_heading_valid,
+            course, course_variance, ground_speed, course_valid,
+        ) = _sort_unique(
+            gps_t, gps_p, gps_v, position_variance, velocity_variance, gps_valid,
+            direct_heading, heading_variance, direct_heading_valid,
+            course, course_variance, ground_speed, course_valid,
         )
         held_p, held_valid, held_fresh = held_samples(gps_t, gps_p, imu_t, 0.0)
         held_v, _, _ = held_samples(gps_t, gps_v, imu_t, 0.0)
@@ -320,6 +358,53 @@ def convert_ulog(
         gps_position_variance = held_p_var
         gps_velocity_variance = held_v_var
         gps_update = held_valid & held_fresh & (held_fix > 0.5)
+
+        held_heading, heading_source_valid, heading_fresh = held_samples(
+            gps_t, direct_heading, imu_t, 0.0
+        )
+        held_heading_variance, _, _ = held_samples(
+            gps_t, heading_variance, imu_t, math.radians(5.0) ** 2
+        )
+        held_heading_valid, _, _ = held_samples(
+            gps_t, direct_heading_valid.astype(float), imu_t, 0.0
+        )
+        gnss_heading = held_heading
+        gnss_heading_variance = held_heading_variance
+        gnss_heading_valid = heading_source_valid & (held_heading_valid > 0.5)
+        gnss_heading_update = gnss_heading_valid & heading_fresh
+
+        held_course, course_source_valid, course_fresh = held_samples(gps_t, course, imu_t, 0.0)
+        held_course_variance, _, _ = held_samples(gps_t, course_variance, imu_t, 1.0)
+        held_ground_speed, _, _ = held_samples(gps_t, ground_speed, imu_t, 0.0)
+        held_course_valid, _, _ = held_samples(
+            gps_t, course_valid.astype(float), imu_t, 0.0
+        )
+        gnss_course = held_course
+        gnss_course_variance = held_course_variance
+        gnss_ground_speed = held_ground_speed
+        gnss_course_valid = course_source_valid & (held_course_valid > 0.5)
+        gnss_course_update = gnss_course_valid & course_fresh
+
+    yaw_estimator = _topic(ulog, "yaw_estimator_status")
+    px4_gsf_yaw = np.zeros(len(imu_t), dtype=np.float64)
+    px4_gsf_yaw_variance = np.ones(len(imu_t), dtype=np.float64)
+    px4_gsf_yaw_valid = np.zeros(len(imu_t), dtype=bool)
+    px4_gsf_yaw_update = np.zeros(len(imu_t), dtype=bool)
+    if yaw_estimator is not None:
+        gsf_t = _timestamps(yaw_estimator)
+        gsf_yaw = _field(yaw_estimator, "yaw_composite").astype(np.float64)
+        gsf_variance = _field(yaw_estimator, "yaw_variance").astype(np.float64)
+        gsf_valid = np.isfinite(gsf_yaw) & np.isfinite(gsf_variance) & (gsf_variance > 0.0)
+        gsf_t, gsf_yaw, gsf_variance, gsf_valid = _sort_unique(
+            gsf_t, gsf_yaw, gsf_variance, gsf_valid
+        )
+        held_yaw, held_valid, held_fresh = held_samples(gsf_t, gsf_yaw, imu_t, 0.0)
+        held_variance, _, _ = held_samples(gsf_t, gsf_variance, imu_t, 1.0)
+        held_gsf_valid, _, _ = held_samples(gsf_t, gsf_valid.astype(float), imu_t, 0.0)
+        px4_gsf_yaw = held_yaw
+        px4_gsf_yaw_variance = held_variance
+        px4_gsf_yaw_valid = held_valid & (held_gsf_valid > 0.5)
+        px4_gsf_yaw_update = px4_gsf_yaw_valid & held_fresh
 
     air_data = _topic(ulog, "vehicle_air_data")
     barometer_height = np.zeros(len(imu_t), dtype=np.float64)
@@ -352,6 +437,12 @@ def convert_ulog(
         "position_update", "gps_position_n_m", "gps_position_e_m", "gps_position_d_m",
         "gps_velocity_n_m_s", "gps_velocity_e_m_s", "gps_velocity_d_m_s",
         "gps_position_variance_m2", "gps_velocity_variance_m2_s2",
+        "gnss_heading_valid", "gnss_heading_update", "gnss_heading_rad",
+        "gnss_heading_variance_rad2",
+        "gnss_course_valid", "gnss_course_update", "gnss_course_rad",
+        "gnss_course_variance_rad", "gnss_ground_speed_m_s",
+        "px4_gsf_yaw_valid", "px4_gsf_yaw_update", "px4_gsf_yaw_rad",
+        "px4_gsf_yaw_variance_rad2",
         "baro_update", "baro_height_up_m", "baro_variance_m2", "static_hint",
     ]
     output_csv.parent.mkdir(parents=True, exist_ok=True)
@@ -376,6 +467,12 @@ def convert_ulog(
                     *reference_position[index], *reference_velocity[index],
                     int(gps_update[index]), *gps_position[index], *gps_velocity[index],
                     gps_position_variance[index], gps_velocity_variance[index],
+                    int(gnss_heading_valid[index]), int(gnss_heading_update[index]),
+                    gnss_heading[index], gnss_heading_variance[index],
+                    int(gnss_course_valid[index]), int(gnss_course_update[index]),
+                    gnss_course[index], gnss_course_variance[index], gnss_ground_speed[index],
+                    int(px4_gsf_yaw_valid[index]), int(px4_gsf_yaw_update[index]),
+                    px4_gsf_yaw[index], px4_gsf_yaw_variance[index],
                     int(barometer_update[index]), barometer_height[index], barometer_variance[index],
                     int(assume_stationary),
                 ]
@@ -389,6 +486,9 @@ def convert_ulog(
         "topics_present": [topic for topic in TOPICS if _topic(ulog, topic) is not None],
         "magnetometer_updates": int(np.count_nonzero(magnetic_update)),
         "gps_updates": int(np.count_nonzero(gps_update)),
+        "gnss_heading_updates": int(np.count_nonzero(gnss_heading_update)),
+        "gnss_course_diagnostic_updates": int(np.count_nonzero(gnss_course_update)),
+        "px4_gsf_yaw_updates": int(np.count_nonzero(px4_gsf_yaw_update)),
         "barometer_updates": int(np.count_nonzero(barometer_update)),
         "attitude_reset_events": int(np.count_nonzero(reset_event)),
         "assume_stationary": bool(assume_stationary),

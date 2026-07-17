@@ -137,7 +137,8 @@ static eskf_float_t _wrap_pi(eskf_float_t angle) {
  *   S = H * P * H^T + R
  *   NIS = z^T * S^{-1} * z  (Normalized Innovation Squared)
  *   If NIS > gate^2: REJECT update
- *   Else: K = P * H^T * S^{-1}, dx = K * z, P = (I - K*H) * P
+ *   Else: K = P * H^T * S^{-1}, dx = K * z,
+ *         P = (I-KH)P(I-KH)^T + KRK^T (Joseph form)
  *
  * @param h       Pointer to filter handle
  * @param z       Residual vector (3x1)
@@ -230,7 +231,7 @@ static bool _measurement_update_3d(ESKF_Handle *h,
         dx[i] = K[i][0] * z[0] + K[i][1] * z[1] + K[i][2] * z[2];
     }
 
-    /* --- 7. Update Covariance: P = (I - K*H) * P --- */
+    /* --- 7. Joseph covariance update --- */
     /* Compute KH (15x15) */
     eskf_float_t KH[15][15];
     for (int i = 0; i < 15; i++) {
@@ -252,9 +253,26 @@ static bool _measurement_update_3d(ESKF_Handle *h,
         }
     }
 
-    /* P_new = I_KH * P */
+    /* AP = (I - KH) * P */
+    eskf_float_t AP[15][15];
+    eskf_mat15_mul_mat15(I_KH, h->P, AP);
+
+    /* P_new = AP * (I - KH)^T + K * R * K^T */
     eskf_float_t P_new[15][15];
-    eskf_mat15_mul_mat15(I_KH, h->P, P_new);
+    for (int i = 0; i < 15; i++) {
+        for (int j = 0; j < 15; j++) {
+            eskf_float_t sum = 0.0;
+            for (int k = 0; k < 15; k++) {
+                sum += AP[i][k] * I_KH[j][k];
+            }
+            for (int a = 0; a < 3; a++) {
+                for (int b = 0; b < 3; b++) {
+                    sum += K[i][a] * R[a][b] * K[j][b];
+                }
+            }
+            P_new[i][j] = sum;
+        }
+    }
 
     /* Force symmetry and copy back */
     eskf_mat15_symmetrize(P_new);
@@ -346,7 +364,7 @@ static bool _measurement_update_1d(ESKF_Handle *h,
         dx[i] = K[i] * z;
     }
 
-    /* --- 7. Update Covariance: P = (I - K*H) * P --- */
+    /* --- 7. Joseph covariance update --- */
     /* Compute KH (15x15): KH[i][j] = K[i] * H[j] */
     eskf_float_t KH[15][15];
     for (int i = 0; i < 15; i++) {
@@ -364,9 +382,21 @@ static bool _measurement_update_1d(ESKF_Handle *h,
         }
     }
 
-    /* P_new = I_KH * P */
+    /* AP = (I - KH) * P */
+    eskf_float_t AP[15][15];
+    eskf_mat15_mul_mat15(I_KH, h->P, AP);
+
+    /* P_new = AP * (I - KH)^T + K * R * K^T */
     eskf_float_t P_new[15][15];
-    eskf_mat15_mul_mat15(I_KH, h->P, P_new);
+    for (int i = 0; i < 15; i++) {
+        for (int j = 0; j < 15; j++) {
+            eskf_float_t sum = K[i] * R * K[j];
+            for (int k = 0; k < 15; k++) {
+                sum += AP[i][k] * I_KH[j][k];
+            }
+            P_new[i][j] = sum;
+        }
+    }
 
     /* Force symmetry and copy back */
     eskf_mat15_symmetrize(P_new);

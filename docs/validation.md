@@ -57,9 +57,11 @@ The native `aerakia_validation_runner` replays the public C code. `run_suite.py`
 
 ## Private ULog track
 
-`convert_ulog_to_replay.py` extracts calibrated IMU, sparse magnetometer updates, PX4 attitude reset metadata, relative GPS NED aiding, barometer height, and PX4 local-position references. It intentionally omits absolute latitude/longitude, hardware IDs, parameter dumps, and private topics.
+`convert_ulog_to_replay.py` extracts calibrated IMU, sparse magnetometer updates, PX4 attitude reset metadata, relative GPS NED aiding, direct dual-antenna GNSS heading when available, GNSS course, PX4 GSF yaw, barometer height, and PX4 local-position references. It intentionally omits absolute latitude/longitude, hardware IDs, parameter dumps, and private topics.
 
-`run_ulog_suite.py` consumes a private manifest and runs conversion, the native C runner, metrics, reset-aware plots, and a cross-scenario summary. Static logs must be explicitly marked `assume_stationary`; this assertion is never inferred from their filename or motion.
+`run_ulog_suite.py` consumes a private manifest and runs conversion, the native C runner, metrics, reset diagnostics, and a cross-scenario summary. Static logs must be explicitly marked `assume_stationary`; this assertion is never inferred from their filename or motion.
+
+Yaw reports publish raw PX4 agreement, a logged-reset-compensated diagnostic, and per-reset-segment drift separately. Removing estimator resets does not create ground truth. PX4 GSF is compared only on fresh, low-variance samples while horizontal speed is sufficient. GNSS course-over-ground is never fused as vehicle yaw; only an explicitly valid dual-antenna heading enters the trusted-heading API.
 
 PX4 `vehicle_attitude` and `vehicle_local_position` are engineering references, not independent truth. Large PX4 quaternion resets are reported separately. Two observed failure classes must remain visible in reports:
 

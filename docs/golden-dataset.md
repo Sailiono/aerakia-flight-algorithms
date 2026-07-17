@@ -27,6 +27,8 @@ The ULog converter writes the same required IMU/timing columns plus optional har
 | Reference reset | `ref_attitude_reset_counter`, `ref_attitude_reset_event`, `ref_delta_q_reset_*` | Segment diagnostics without interpolating across resets |
 | Relative navigation | `position_ref_valid`, `ref_position_*`, `ref_velocity_*` | PX4 local reference with the first valid sample as origin |
 | GPS aiding | `position_update`, `gps_position_*`, `gps_velocity_*`, variance columns | Relative NED aiding; absolute coordinates are discarded |
+| Direct GNSS heading | `gnss_heading_valid`, `gnss_heading_update`, `gnss_heading_rad` | Trusted dual-antenna heading; fused only on a fresh valid publication |
+| Yaw diagnostics | `gnss_course_*`, `px4_gsf_yaw_*` | Course and PX4 GSF comparison channels; never silently fused as body yaw |
 | Barometer/static | `baro_update`, `baro_height_up_m`, `static_hint` | Explicit lower-rate aiding and application assertion |
 
 Quaternion interpolation normalizes sign-equivalent samples and never interpolates across a reset-counter boundary. Raw ULogs are not part of the public dataset contract and should remain outside the repository unless publication is separately approved.

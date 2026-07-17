@@ -1,0 +1,40 @@
+# Algorithm status
+
+## Current verdict
+
+The portable estimator core is suitable for FCOne integration work and further bench testing,
+but it is not yet justified to claim that the complete flight-estimation system is verified.
+The current evidence establishes deterministic host behavior, measurement integrity handling,
+long-run covariance health, and replay tracking after an initial attitude seed. It does not yet
+establish independent cold-start alignment or flight safety.
+
+## Evidence completed
+
+| Area | Evidence | Status |
+| --- | --- | --- |
+| Error-state math | 15-dimensional error state, quaternion injection/reset Jacobian, Joseph-form scalar and vector measurement updates | Implemented and unit tested |
+| Covariance health | Long mixed predict/update sequence checked for finite, symmetric, positive-semidefinite covariance | Passing |
+| Measurement integrity | NIS gates, latched magnetic-disturbance rejection, recovery confirmation, navigation recovery supervision | Passing deterministic regressions |
+| Heading semantics | Magnetometer, trusted heading, GNSS course, and PX4 GSF are separate paths; course is never silently treated as body yaw | Implemented |
+| Host regression | Strict C99 warnings-as-errors build, public API tests, deterministic synthetic fault suite | Passing reviewed thresholds |
+| Private replay | Sanitized relative GNSS, reset events, GSF diagnostics, and native C replay across the selected ULog suite | Operational; PX4 remains an engineering reference |
+
+## P0 work before hardware flight tests
+
+1. Add and validate independent cold-start roll/pitch/yaw alignment. The current ULog comparison
+   seeds the ESKF from the first PX4 attitude, so it validates tracking rather than initialization.
+2. Exercise the trusted-heading path with a real dual-antenna GNSS, vision, or controlled injected
+   heading dataset. The present private ULogs contain no valid direct GNSS heading samples.
+3. Add Monte Carlo consistency tests (NIS and, where independent truth exists, NEES) with sensor
+   bias, timing jitter, aiding loss, and recovery cases.
+4. Run the exact FCOne adapter through timestamp, frame, unit, dropout, and stale-data contract tests.
+
+## P1 work when the new hardware is available
+
+- Static bench and thermal bias characterization.
+- Rate-table or motion-capture attitude tests with independent truth.
+- GNSS outage/reacquisition, magnetic disturbance, and location-change tests.
+- Target-MCU timing, stack, precision, and numerical-stability measurements.
+- HIL followed by bounded envelope-expansion flights with reviewed abort criteria.
+
+This document is an engineering maturity statement, not an airworthiness claim.

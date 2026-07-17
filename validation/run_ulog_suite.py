@@ -59,7 +59,9 @@ def summarize(results: list[dict[str, Any]], output_dir: Path) -> None:
         robust = algorithms["mahony_robust"]
         navigation = metrics.get("navigation")
         integrity = metrics["eskf_integrity"]
-        reset_aware = metrics.get("eskf_reset_aware_yaw", {})
+        reset_compensated = metrics.get("eskf_reset_compensated_yaw", {})
+        segment_aligned = metrics.get("eskf_segment_aligned_yaw", {})
+        yaw_sources = metrics.get("yaw_sources", {})
         rows.append(
             {
                 "alias": result["alias"],
@@ -70,7 +72,14 @@ def summarize(results: list[dict[str, Any]], output_dir: Path) -> None:
                 "eskf_tilt_rmse_deg": eskf["tilt_rmse_deg"],
                 "eskf_attitude_rmse_deg": eskf["overall_attitude_rmse_deg"],
                 "eskf_yaw_rmse_deg": eskf["axes"]["yaw"]["rmse_deg"],
-                "eskf_reset_aware_yaw_rmse_deg": reset_aware.get("rmse_deg"),
+                "eskf_reset_compensated_yaw_rmse_deg": reset_compensated.get("rmse_deg"),
+                "eskf_segment_aligned_yaw_rmse_deg": segment_aligned.get("rmse_deg"),
+                "direct_gnss_heading_updates": yaw_sources.get("direct_gnss_heading_updates", 0),
+                "px4_gsf_yaw_updates": yaw_sources.get("px4_gsf_updates", 0),
+                "px4_gsf_confident_updates": yaw_sources.get("px4_gsf_confident_updates", 0),
+                "eskf_vs_gsf_yaw_rmse_deg": (
+                    yaw_sources.get("px4_gsf_yaw", {}).get("rmse_deg")
+                ),
                 "position_rmse_m": navigation.get("position_rmse_m") if navigation else None,
                 "gps_position_acceptance_ratio": (
                     navigation.get("position_acceptance_ratio") if navigation else None
@@ -89,17 +98,30 @@ def summarize(results: list[dict[str, Any]], output_dir: Path) -> None:
     )
     lines = [
         "# Aerakia private ULog validation summary", "",
-        "| Scenario | Samples | Robust tilt/full | ESKF tilt/full | ESKF yaw raw/reset-aware | Position | GPS accepted | Recovery/ZUPT |",
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| Scenario | Samples | Robust tilt/full | ESKF tilt/full | ESKF yaw raw/de-reset/segment | Direct heading | GSF confident/RMSE | Position | GPS accepted | Recovery/ZUPT |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for row in rows:
         position = "—" if row["position_rmse_m"] is None else f"{row['position_rmse_m']:.3f} m"
-        reset_yaw = "—" if row["eskf_reset_aware_yaw_rmse_deg"] is None else f"{row['eskf_reset_aware_yaw_rmse_deg']:.3f}°"
+        reset_yaw = (
+            "—" if row["eskf_reset_compensated_yaw_rmse_deg"] is None
+            else f"{row['eskf_reset_compensated_yaw_rmse_deg']:.3f}°"
+        )
+        segment_yaw = (
+            "—" if row["eskf_segment_aligned_yaw_rmse_deg"] is None
+            else f"{row['eskf_segment_aligned_yaw_rmse_deg']:.3f}°"
+        )
+        gsf_rmse = (
+            "—" if row["eskf_vs_gsf_yaw_rmse_deg"] is None
+            else f"{row['eskf_vs_gsf_yaw_rmse_deg']:.3f}°"
+        )
         lines.append(
             f"| `{row['alias']}` | {row['samples']} | "
             f"{row['mahony_robust_tilt_rmse_deg']:.3f}° / {row['mahony_robust_attitude_rmse_deg']:.3f}° | "
             f"{row['eskf_tilt_rmse_deg']:.3f}° / {row['eskf_attitude_rmse_deg']:.3f}° | "
-            f"{row['eskf_yaw_rmse_deg']:.3f}° / {reset_yaw} | {position} | "
+            f"{row['eskf_yaw_rmse_deg']:.3f}° / {reset_yaw} / {segment_yaw} | "
+            f"{row['direct_gnss_heading_updates']} | "
+            f"{row['px4_gsf_confident_updates']} / {gsf_rmse} | {position} | "
             f"{percentage(row['gps_position_acceptance_ratio'])} | "
             f"{row['navigation_recoveries']} / {row['zero_velocity_updates']} |"
         )
@@ -109,7 +131,8 @@ def summarize(results: list[dict[str, Any]], output_dir: Path) -> None:
             "- Raw ULogs, absolute coordinates, and vehicle identifiers remain outside the public repository.",
             "- PX4 attitude/local-position values are engineering references, not independent ground truth.",
             "- Static scenarios use an explicit manifest assertion; the converter never infers stationarity silently.",
-            "- Reset-aware yaw is a per-reference-segment diagnostic and can differ materially from globally aligned yaw.",
+            "- De-reset yaw removes logged PX4 delta-quaternion resets; segment yaw additionally realigns every reset segment and is drift-only diagnostic.",
+            "- Dual-GNSS heading is fused only when explicitly valid; GNSS course and PX4 GSF remain comparison diagnostics.",
             "- A position result without GPS updates is ZUPT-aided inertial drift against the PX4 reference.",
         ]
     )

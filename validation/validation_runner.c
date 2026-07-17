@@ -27,6 +27,9 @@ typedef struct {
     int position_update, gps_position_n, gps_position_e, gps_position_d;
     int gps_velocity_n, gps_velocity_e, gps_velocity_d;
     int gps_position_variance, gps_velocity_variance;
+    int heading_valid, heading_update, heading, heading_variance;
+    int course_valid, course_update, course, course_variance, ground_speed;
+    int gsf_yaw_valid, gsf_yaw_update, gsf_yaw, gsf_yaw_variance;
     int baro_update, baro_height, baro_variance, static_hint;
     int reset_counter, reset_event;
     int reset_q_w, reset_q_x, reset_q_y, reset_q_z;
@@ -83,6 +86,14 @@ static int load_column_map(char *header, ColumnMap *map)
     MAP(gps_velocity_d, "gps_velocity_d_m_s");
     MAP(gps_position_variance, "gps_position_variance_m2");
     MAP(gps_velocity_variance, "gps_velocity_variance_m2_s2");
+    MAP(heading_valid, "gnss_heading_valid"); MAP(heading_update, "gnss_heading_update");
+    MAP(heading, "gnss_heading_rad"); MAP(heading_variance, "gnss_heading_variance_rad2");
+    MAP(course_valid, "gnss_course_valid"); MAP(course_update, "gnss_course_update");
+    MAP(course, "gnss_course_rad"); MAP(course_variance, "gnss_course_variance_rad");
+    MAP(ground_speed, "gnss_ground_speed_m_s");
+    MAP(gsf_yaw_valid, "px4_gsf_yaw_valid"); MAP(gsf_yaw_update, "px4_gsf_yaw_update");
+    MAP(gsf_yaw, "px4_gsf_yaw_rad");
+    MAP(gsf_yaw_variance, "px4_gsf_yaw_variance_rad2");
     MAP(baro_update, "baro_update"); MAP(baro_height, "baro_height_up_m");
     MAP(baro_variance, "baro_variance_m2"); MAP(static_hint, "static_hint");
     MAP(reset_counter, "ref_attitude_reset_counter"); MAP(reset_event, "ref_attitude_reset_event");
@@ -196,7 +207,8 @@ int main(int argc, char *argv[])
     AerakiaEskfConfig eskf_config;
     AerakiaAttitudeEstimate standard_estimate, robust_estimate;
     AerakiaNavigationEstimate eskf_estimate;
-    unsigned long samples = 0U, malformed = 0U, gps_updates = 0U, zupt_updates = 0U;
+    unsigned long samples = 0U, malformed = 0U, gps_updates = 0U, heading_updates = 0U;
+    unsigned long zupt_updates = 0U;
     int eskf_initialized = 0, mag_reference_initialized = 0;
     clock_t start_clock;
 
@@ -237,6 +249,11 @@ int main(int argc, char *argv[])
         "input_mag_update,input_position_update,position_ref_valid,"
         "ref_attitude_reset_counter,ref_attitude_reset_event,"
         "ref_delta_q_reset_w,ref_delta_q_reset_x,ref_delta_q_reset_y,ref_delta_q_reset_z,"
+        "input_heading_update,eskf_heading_accepted,eskf_heading_innovation_rad,"
+        "gnss_heading_valid,gnss_heading_rad,gnss_heading_variance_rad2,"
+        "gnss_course_valid,gnss_course_update,gnss_course_rad,gnss_course_variance_rad,"
+        "gnss_ground_speed_m_s,px4_gsf_yaw_valid,px4_gsf_yaw_update,"
+        "px4_gsf_yaw_rad,px4_gsf_yaw_variance_rad2,"
         "ref_position_n_m,ref_position_e_m,ref_position_d_m,"
         "ref_velocity_n_m_s,ref_velocity_e_m_s,ref_velocity_d_m_s,"
         "eskf_position_n_m,eskf_position_e_m,eskf_position_d_m,"
@@ -266,6 +283,37 @@ int main(int argc, char *argv[])
         const int mag_valid = (int)parse_double(columns, count, map.mag_valid, 1.0, &ok) != 0;
         const int mag_update = (int)parse_double(columns, count, map.mag_update, 1.0, &ok) != 0;
         const int position_update = (int)parse_double(columns, count, map.position_update, 0.0, &ok) != 0;
+        const int heading_valid = (int)parse_double(
+            columns, count, map.heading_valid, 0.0, &ok
+        ) != 0;
+        const int heading_update = heading_valid && ((int)parse_double(
+            columns, count, map.heading_update, 0.0, &ok
+        ) != 0);
+        const double heading_rad = parse_double(columns, count, map.heading, 0.0, &ok);
+        const double heading_variance = parse_double(
+            columns, count, map.heading_variance, 1.0, &ok
+        );
+        const int course_valid = (int)parse_double(
+            columns, count, map.course_valid, 0.0, &ok
+        ) != 0;
+        const int course_update = (int)parse_double(
+            columns, count, map.course_update, 0.0, &ok
+        ) != 0;
+        const double course_rad = parse_double(columns, count, map.course, 0.0, &ok);
+        const double course_variance = parse_double(
+            columns, count, map.course_variance, 1.0, &ok
+        );
+        const double ground_speed = parse_double(columns, count, map.ground_speed, 0.0, &ok);
+        const int gsf_yaw_valid = (int)parse_double(
+            columns, count, map.gsf_yaw_valid, 0.0, &ok
+        ) != 0;
+        const int gsf_yaw_update = (int)parse_double(
+            columns, count, map.gsf_yaw_update, 0.0, &ok
+        ) != 0;
+        const double gsf_yaw_rad = parse_double(columns, count, map.gsf_yaw, 0.0, &ok);
+        const double gsf_yaw_variance = parse_double(
+            columns, count, map.gsf_yaw_variance, 1.0, &ok
+        );
         const int static_hint = (int)parse_double(columns, count, map.static_hint, 0.0, &ok) != 0;
         const int position_ref_valid = (int)parse_double(
             columns, count, map.position_ref_valid, 0.0, &ok
@@ -331,6 +379,12 @@ int main(int argc, char *argv[])
                 gps_updates++;
             }
         }
+        if (heading_update && isfinite(heading_rad) && heading_variance > 0.0) {
+            aerakia_eskf_update_heading(
+                &eskf, (float)heading_rad, (float)heading_variance
+            );
+            heading_updates++;
+        }
         if ((int)parse_double(columns, count, map.baro_update, 0.0, &ok) != 0) {
             aerakia_eskf_update_barometer(
                 &eskf,
@@ -347,6 +401,7 @@ int main(int argc, char *argv[])
             "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,"
             "%.6f,%.6f,%.6f,%d,%.9f,%.9f,%d,%d,%d,%u,%d,%d,%d,%d,%u,"
             "%d,%d,%d,%.0f,%.0f,%.9f,%.9f,%.9f,%.9f,"
+            "%d,%d,%.9f,%d,%.9f,%.9f,%d,%d,%.9f,%.9f,%.9f,%d,%d,%.9f,%.9f,"
             "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f\n",
             sequence, (unsigned long long)sample.timestamp_us, truth_roll, truth_pitch, truth_yaw,
             radians_to_degrees(standard_estimate.euler_rad.x),
@@ -374,6 +429,12 @@ int main(int argc, char *argv[])
             parse_double(columns, count, map.reset_q_x, 0.0, &ok),
             parse_double(columns, count, map.reset_q_y, 0.0, &ok),
             parse_double(columns, count, map.reset_q_z, 0.0, &ok),
+            heading_update,
+            heading_update && eskf_estimate.heading_accepted ? 1 : 0,
+            heading_update ? eskf_estimate.last_heading_innovation.innovation[0] : 0.0,
+            heading_valid, heading_rad, heading_variance,
+            course_valid, course_update, course_rad, course_variance, ground_speed,
+            gsf_yaw_valid, gsf_yaw_update, gsf_yaw_rad, gsf_yaw_variance,
             parse_double(columns, count, map.ref_position_n, 0.0, &ok),
             parse_double(columns, count, map.ref_position_e, 0.0, &ok),
             parse_double(columns, count, map.ref_position_d, 0.0, &ok),
@@ -389,8 +450,9 @@ int main(int argc, char *argv[])
 
     fprintf(
         stderr,
-        "replayed=%lu malformed=%lu gps_updates=%lu zupt_updates=%lu recoveries=%u cpu_ms=%.3f\n",
-        samples, malformed, gps_updates, zupt_updates,
+        "replayed=%lu malformed=%lu gps_updates=%lu heading_updates=%lu "
+        "zupt_updates=%lu recoveries=%u cpu_ms=%.3f\n",
+        samples, malformed, gps_updates, heading_updates, zupt_updates,
         eskf_initialized ? eskf.navigation_recovery_count : 0U,
         (double)(clock() - start_clock) * 1000.0 / (double)CLOCKS_PER_SEC
     );

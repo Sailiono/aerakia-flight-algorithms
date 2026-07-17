@@ -9,9 +9,12 @@ from pathlib import Path
 
 TOOLS = Path(__file__).resolve().parents[1] / "simulation" / "tools"
 sys.path.insert(0, str(TOOLS))
+VALIDATION = Path(__file__).resolve().parents[1] / "validation"
+sys.path.insert(0, str(VALIDATION))
 
 import convert_capture_to_golden as converter  # noqa: E402
 import convert_ulog_to_replay as ulog_converter  # noqa: E402
+import analyze_results as analyzer  # noqa: E402
 
 
 def record(sequence: int, timestamp_us: int) -> str:
@@ -129,10 +132,23 @@ class ULogConverterTests(unittest.TestCase):
             "eph": np.ones(2),
             "epv": np.ones(2),
             "s_variance_m_s": np.ones(2),
+            "vel_m_s": np.array([2.0, 3.0]),
+            "vel_ned_valid": np.ones(2),
+            "cog_rad": np.array([0.1, 0.2]),
+            "c_variance_rad": np.full(2, 0.01),
+            "heading": np.array([0.15, 0.25]),
+            "heading_offset": np.zeros(2),
+            "heading_accuracy": np.full(2, 0.05),
+        }
+        yaw_estimator = {
+            "timestamp": np.array([0, 20_000]),
+            "yaw_composite": np.array([0.12, 0.22]),
+            "yaw_variance": np.full(2, 0.02),
         }
         fake = FakeULog(
             [FakeDataset("sensor_combined", sensor), FakeDataset("vehicle_attitude", attitude),
-             FakeDataset("vehicle_gps_position", gps)]
+             FakeDataset("vehicle_gps_position", gps),
+             FakeDataset("yaw_estimator_status", yaw_estimator)]
         )
         with tempfile.TemporaryDirectory() as temp_directory:
             output = Path(temp_directory) / "replay.csv"
@@ -145,6 +161,34 @@ class ULogConverterTests(unittest.TestCase):
             self.assertNotIn("lat", rows[0])
             self.assertNotIn("lon", rows[0])
             self.assertEqual(metadata["gps_updates"], 2)
+            self.assertEqual(metadata["gnss_heading_updates"], 2)
+            self.assertEqual(metadata["gnss_course_diagnostic_updates"], 2)
+            self.assertEqual(metadata["px4_gsf_yaw_updates"], 2)
+            self.assertAlmostEqual(float(rows[0]["gnss_heading_rad"]), 0.15)
+
+
+class ValidationAnalyzerTests(unittest.TestCase):
+    def test_reset_compensation_removes_logged_px4_yaw_step(self) -> None:
+        import numpy as np
+
+        half = 2.0 ** -0.5
+        columns = {
+            "ts_us": np.array([0.0, 1_000_000.0, 2_000_000.0, 3_000_000.0]),
+            "truth_yaw_deg": np.array([10.0, 10.0, 100.0, 100.0]),
+            "eskf_yaw_deg": np.full(4, 10.0),
+            "ref_attitude_reset_event": np.array([0.0, 0.0, 1.0, 0.0]),
+            "ref_delta_q_reset_w": np.array([1.0, 1.0, half, half]),
+            "ref_delta_q_reset_x": np.zeros(4),
+            "ref_delta_q_reset_y": np.zeros(4),
+            "ref_delta_q_reset_z": np.array([0.0, 0.0, half, half]),
+        }
+        compensated = analyzer.reset_compensated_reference_yaw(columns)
+        np.testing.assert_allclose(compensated, np.full(4, 10.0), atol=1.0e-9)
+        metrics = analyzer.reset_compensated_yaw_metrics(columns)
+        self.assertAlmostEqual(metrics["rmse_deg"], 0.0)
+        summary = analyzer.reset_summary(columns)
+        self.assertEqual(summary["events"], 1.0)
+        self.assertAlmostEqual(summary["event_details"][0]["observed_px4_yaw_jump_deg"], 90.0)
 
 
 if __name__ == "__main__":
