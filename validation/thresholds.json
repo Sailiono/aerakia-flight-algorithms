@@ -1,6 +1,6 @@
 {
   "clean_motion": {
-    "eskf": 0.25,
+    "eskf": 0.45,
     "mahony_robust": 0.50,
     "mahony_standard": 0.50
   },

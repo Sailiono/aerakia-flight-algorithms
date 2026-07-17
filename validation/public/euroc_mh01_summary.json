@@ -13,9 +13,9 @@
   },
   "tracks": {
     "raw_imu_trusted_attitude_init": {
-      "mahony_robust_attitude_rmse_deg": 61.889910,
+      "mahony_robust_attitude_rmse_deg": 105.519930,
       "mahony_robust_yaw_rmse_deg": 107.077229,
-      "eskf_attitude_rmse_deg": 4.821294,
+      "eskf_attitude_rmse_deg": 8.804369,
       "eskf_yaw_rmse_deg": 8.145577,
       "position_rmse_m": 0.131396,
       "velocity_rmse_m_s": 0.086339,
@@ -24,9 +24,9 @@
       "navigation_nees_mean": 5.294182
     },
     "reference_bias_corrected_trusted_attitude_init": {
-      "mahony_robust_attitude_rmse_deg": 2.584744,
+      "mahony_robust_attitude_rmse_deg": 2.982805,
       "mahony_robust_yaw_rmse_deg": 3.595834,
-      "eskf_attitude_rmse_deg": 1.973848,
+      "eskf_attitude_rmse_deg": 3.253793,
       "eskf_yaw_rmse_deg": 3.280106,
       "position_rmse_m": 0.131427,
       "velocity_rmse_m_s": 0.082237,
@@ -40,5 +40,9 @@
     "Machine Hall orientation is an IMU-aided batch estimate rather than independent motion-capture orientation.",
     "Reference-bias correction validates propagation/update math, not online bias observability.",
     "Both tracks use the first reference attitude because the sequence begins in motion."
-  ]
+  ],
+  "metric_definition": {
+    "attitude_rmse": "quaternion geodesic angle, 2*acos(abs(q_est dot q_ref))",
+    "yaw_rmse": "wrapped Euler yaw diagnostic; not a full-attitude metric near pitch singularity"
+  }
 }

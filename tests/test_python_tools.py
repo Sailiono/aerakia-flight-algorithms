@@ -257,6 +257,32 @@ class EurocConverterTests(unittest.TestCase):
 
 
 class ValidationAnalyzerTests(unittest.TestCase):
+    def test_quaternion_metric_ignores_euler_gimbal_lock_representation(self) -> None:
+        import numpy as np
+
+        half = 2.0 ** -0.5
+        columns = {
+            "ts_us": np.array([0.0, 10_000.0]),
+            "truth_roll_deg": np.array([0.0, 0.0]),
+            "truth_pitch_deg": np.array([90.0, 90.0]),
+            "truth_yaw_deg": np.array([0.0, 0.0]),
+            "eskf_roll_deg": np.array([180.0, -180.0]),
+            "eskf_pitch_deg": np.array([90.0, 90.0]),
+            "eskf_yaw_deg": np.array([180.0, -180.0]),
+            "truth_q_w": np.array([half, half]),
+            "truth_q_x": np.zeros(2),
+            "truth_q_y": np.array([half, half]),
+            "truth_q_z": np.zeros(2),
+            "eskf_q_w": np.array([half, half]),
+            "eskf_q_x": np.zeros(2),
+            "eskf_q_y": np.array([half, half]),
+            "eskf_q_z": np.zeros(2),
+        }
+        metrics = analyzer.metrics_for(columns, "eskf", "independent_truth")
+        self.assertAlmostEqual(metrics["overall_attitude_rmse_deg"], 0.0)
+        self.assertAlmostEqual(metrics["tilt_rmse_deg"], 0.0)
+        self.assertGreater(metrics["euler_component_rmse_deg"], 100.0)
+
     def test_reset_compensation_removes_logged_px4_yaw_step(self) -> None:
         import numpy as np
 

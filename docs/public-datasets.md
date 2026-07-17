@@ -74,10 +74,10 @@ python simulation/tools/convert_euroc_to_replay.py MH_01_easy \
 Both tracks use the recorded first attitude as a trusted initial condition. `MH_01_easy` starts in
 motion, and there is no magnetometer or other absolute heading source.
 
-| Track | Mahony robust attitude / yaw RMSE | ESKF attitude / yaw RMSE | Position / velocity RMSE | Position / velocity NIS mean | 6D nav NEES mean |
+| Track | Mahony robust geodesic attitude / Euler-yaw RMSE | ESKF geodesic attitude / Euler-yaw RMSE | Position / velocity RMSE | Position / velocity NIS mean | 6D nav NEES mean |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Raw IMU | 61.890° / 107.077° | 4.821° / 8.146° | 0.131 m / 0.086 m/s | 3.080 / 2.585 | 5.294 |
-| Reference-bias corrected | 2.585° / 3.596° | 1.974° / 3.280° | 0.131 m / 0.082 m/s | 3.078 / 2.537 | 5.192 |
+| Raw IMU | 105.520° / 107.077° | 8.804° / 8.146° | 0.131 m / 0.086 m/s | 3.080 / 2.585 | 5.294 |
+| Reference-bias corrected | 2.983° / 3.596° | 3.254° / 3.280° | 0.131 m / 0.082 m/s | 3.078 / 2.537 | 5.192 |
 
 The raw Mahony yaw failure is retained: EuRoC's median z-gyro bias is about 0.0784 rad/s, so yaw is
 not observable without magnetometer/heading aiding and drifts through wrap boundaries. Subtracting
@@ -93,7 +93,12 @@ against an expected mean of 6. The deterministic synthetic suite remains within 
 
 ## Next downloads
 
-Next add one EuRoC Vicon-room difficult sequence for genuinely independent 6D motion-capture truth.
+`V1_03_difficult` has now been range-downloaded (only its 801 MB nested ZIP, not the 6.04 GB outer
+bundle or ROS bag) and passed ZIP integrity checks. Its direct `vicon0` pose stream has a non-identity
+tracking-body extrinsic, so it will be scored only after that transform and raw-pose timestamp
+alignment have dedicated tests. Preliminary batch-reference replay is retained locally but is not
+yet promoted as the direct-Vicon result.
+
 Blackbird sensor-only chunks remain desirable for aggressive motion, but its official download
-endpoint was unavailable during this intake. UrbanNav sensor subsets follow after the second EuRoC
-sequence so navigation/outage comparisons use the same audited conversion contract.
+endpoint was unavailable during this intake. UrbanNav sensor subsets follow after the direct Vicon
+transform is audited so navigation/outage comparisons use the same conversion contract.

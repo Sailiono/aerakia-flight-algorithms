@@ -63,6 +63,59 @@ def _error_summary(error: np.ndarray) -> dict[str, float]:
     }
 
 
+def _normalized_quaternion_columns(
+    columns: dict[str, np.ndarray], prefix: str
+) -> np.ndarray | None:
+    names = [f"{prefix}_q_{axis}" for axis in ("w", "x", "y", "z")]
+    if not all(name in columns for name in names):
+        return None
+    quaternion = np.column_stack([columns[name] for name in names])
+    norms = np.linalg.norm(quaternion, axis=1)
+    if np.any(~np.isfinite(norms) | (norms <= 1.0e-12)):
+        raise ValueError(f"invalid quaternion output for {prefix}")
+    return quaternion / norms[:, None]
+
+
+def _apply_navigation_yaw_offset(quaternion: np.ndarray, yaw_offset_deg: float) -> np.ndarray:
+    if yaw_offset_deg == 0.0:
+        return quaternion
+    half = np.radians(yaw_offset_deg) * 0.5
+    yaw = np.asarray([np.cos(half), 0.0, 0.0, np.sin(half)])
+    w1, x1, y1, z1 = yaw
+    w2, x2, y2, z2 = quaternion.T
+    return np.column_stack(
+        (
+            w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
+            w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
+            w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
+            w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2,
+        )
+    )
+
+
+def quaternion_attitude_errors_deg(
+    estimate: np.ndarray, truth: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    estimate = estimate / np.linalg.norm(estimate, axis=1)[:, None]
+    truth = truth / np.linalg.norm(truth, axis=1)[:, None]
+    dot = np.sum(estimate * truth, axis=1)
+    geodesic = np.degrees(2.0 * np.arccos(np.clip(np.abs(dot), 0.0, 1.0)))
+
+    def down_body(quaternion: np.ndarray) -> np.ndarray:
+        w, x, y, z = quaternion.T
+        return np.column_stack(
+            (
+                2.0 * (x * z - w * y),
+                2.0 * (y * z + w * x),
+                1.0 - 2.0 * (x * x + y * y),
+            )
+        )
+
+    down_dot = np.sum(down_body(estimate) * down_body(truth), axis=1)
+    tilt = np.degrees(np.arccos(np.clip(down_dot, -1.0, 1.0)))
+    return geodesic, tilt
+
+
 def metrics_for(
     columns: dict[str, np.ndarray], algorithm: str, reference_kind: str
 ) -> dict[str, object]:
@@ -86,12 +139,27 @@ def metrics_for(
             roll_pitch_squared.append(error * error)
         axes[axis] = _error_summary(error)
 
+    euler_component_rmse = float(np.sqrt(np.mean(np.column_stack(squared_errors))))
+    euler_roll_pitch_rmse = float(np.sqrt(np.mean(np.column_stack(roll_pitch_squared))))
     result: dict[str, object] = {
-        "overall_attitude_rmse_deg": float(np.sqrt(np.mean(np.column_stack(squared_errors)))),
-        "tilt_rmse_deg": float(np.sqrt(np.mean(np.column_stack(roll_pitch_squared)))),
+        "overall_attitude_rmse_deg": euler_component_rmse,
+        "tilt_rmse_deg": euler_roll_pitch_rmse,
+        "euler_component_rmse_deg": euler_component_rmse,
+        "euler_roll_pitch_component_rmse_deg": euler_roll_pitch_rmse,
         "initial_yaw_alignment_offset_deg": yaw_offset,
         "axes": axes,
     }
+    truth_q = _normalized_quaternion_columns(columns, "truth")
+    estimate_q = _normalized_quaternion_columns(columns, algorithm)
+    if truth_q is not None and estimate_q is not None:
+        estimate_q = _apply_navigation_yaw_offset(estimate_q, yaw_offset)
+        geodesic_error, tilt_error = quaternion_attitude_errors_deg(estimate_q, truth_q)
+        result["overall_attitude_rmse_deg"] = float(
+            np.sqrt(np.mean(geodesic_error * geodesic_error))
+        )
+        result["tilt_rmse_deg"] = float(np.sqrt(np.mean(tilt_error * tilt_error)))
+        result["quaternion_geodesic_error_deg"] = _error_summary(geodesic_error)
+        result["gravity_direction_error_deg"] = _error_summary(tilt_error)
     if algorithm == "mahony_robust":
         result["minimum_accelerometer_weight"] = float(np.min(columns["mahony_robust_acc_weight"]))
         result["mean_magnetometer_weight"] = float(np.mean(columns["mahony_robust_mag_weight"]))
@@ -118,12 +186,18 @@ def cold_start_alignment_metrics(columns: dict[str, np.ndarray]) -> dict[str, ob
         )
         squared_errors.append(error * error)
         axes[axis] = _error_summary(error)
+    post_alignment_rmse = float(np.sqrt(np.mean(np.column_stack(squared_errors))))
+    truth_q = _normalized_quaternion_columns(columns, "truth")
+    estimate_q = _normalized_quaternion_columns(columns, "eskf")
+    if truth_q is not None and estimate_q is not None:
+        geodesic_error, _ = quaternion_attitude_errors_deg(
+            estimate_q[first:], truth_q[first:]
+        )
+        post_alignment_rmse = float(np.sqrt(np.mean(geodesic_error * geodesic_error)))
     return {
         "alignment_time_s": float(time_s[first]),
         "post_alignment_samples": int(len(time_s) - first),
-        "post_alignment_attitude_rmse_deg": float(
-            np.sqrt(np.mean(np.column_stack(squared_errors)))
-        ),
+        "post_alignment_attitude_rmse_deg": post_alignment_rmse,
         "axes": axes,
     }
 
@@ -500,6 +574,14 @@ def write_markdown(
             f"| `{algorithm}` | {values['overall_attitude_rmse_deg']:.4f}° "
             f"| {values['tilt_rmse_deg']:.4f}° | {values['axes']['yaw']['rmse_deg']:.4f}° |"
         )
+    lines.extend(
+        [
+            "",
+            "Full attitude uses quaternion geodesic angle and tilt uses gravity-direction angle "
+            "when quaternion outputs are available. Per-axis Euler errors remain diagnostics and "
+            "must not be combined near pitch singularities.",
+        ]
+    )
     integrity = metrics["eskf_integrity"]
     navigation = metrics.get("navigation")
     lines.extend(["", "## ESKF integrity", ""])

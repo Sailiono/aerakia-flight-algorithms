@@ -355,7 +355,11 @@ int main(int argc, char *argv[])
         "ref_velocity_n_m_s,ref_velocity_e_m_s,ref_velocity_d_m_s,"
         "eskf_position_n_m,eskf_position_e_m,eskf_position_d_m,"
         "eskf_velocity_n_m_s,eskf_velocity_e_m_s,eskf_velocity_d_m_s,"
-        "eskf_position_nis,eskf_velocity_nis,eskf_navigation_nees\n",
+        "eskf_position_nis,eskf_velocity_nis,eskf_navigation_nees,"
+        "truth_q_w,truth_q_x,truth_q_y,truth_q_z,"
+        "mahony_standard_q_w,mahony_standard_q_x,mahony_standard_q_y,mahony_standard_q_z,"
+        "mahony_robust_q_w,mahony_robust_q_x,mahony_robust_q_y,mahony_robust_q_z,"
+        "eskf_q_w,eskf_q_x,eskf_q_y,eskf_q_z\n",
         output
     );
 
@@ -532,7 +536,9 @@ int main(int argc, char *argv[])
             "%d,%d,%d,%.0f,%.0f,%.9f,%.9f,%.9f,%.9f,"
             "%d,%d,%.9f,%d,%.9f,%.9f,%d,%d,%.9f,%.9f,%.9f,%d,%d,%.9f,%.9f,"
             "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,"
-            "%.9f,%.9f,%.9f\n",
+            "%.9f,%.9f,%.9f,"
+            "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,"
+            "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f\n",
             sequence, (unsigned long long)sample.timestamp_us, truth_roll, truth_pitch, truth_yaw,
             radians_to_degrees(standard_estimate.euler_rad.x),
             radians_to_degrees(standard_estimate.euler_rad.y),
@@ -575,7 +581,16 @@ int main(int argc, char *argv[])
             position_update ? eskf_estimate.last_position_innovation.nis : NAN,
             position_update ? eskf_estimate.last_velocity_innovation.nis : NAN,
             position_update && position_ref_valid
-                ? navigation_nees(&eskf, reference_position, reference_velocity) : NAN
+                ? navigation_nees(&eskf, reference_position, reference_velocity) : NAN,
+            reference_q[0], reference_q[1], reference_q[2], reference_q[3],
+            standard_estimate.quaternion_wxyz[0], standard_estimate.quaternion_wxyz[1],
+            standard_estimate.quaternion_wxyz[2], standard_estimate.quaternion_wxyz[3],
+            robust_estimate.quaternion_wxyz[0], robust_estimate.quaternion_wxyz[1],
+            robust_estimate.quaternion_wxyz[2], robust_estimate.quaternion_wxyz[3],
+            eskf_estimate.attitude.quaternion_wxyz[0],
+            eskf_estimate.attitude.quaternion_wxyz[1],
+            eskf_estimate.attitude.quaternion_wxyz[2],
+            eskf_estimate.attitude.quaternion_wxyz[3]
         );
         samples++;
     }

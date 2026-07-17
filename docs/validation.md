@@ -28,6 +28,11 @@ Do not mix fundamentally different estimator scopes in a single leaderboard.
 
 Metrics: roll/pitch/yaw RMSE, maximum error, 95th percentile error, convergence time, yaw drift, disturbance recovery time, rejected-sample ratio, CPU time, and state memory.
 
+The primary full-attitude error is the quaternion geodesic angle
+`2 acos(abs(q_est · q_ref))`. Primary tilt error is the angle between estimated and reference
+gravity directions in body axes. Euler-axis errors remain useful diagnostics but are never combined
+into the primary score because roll/yaw representations jump near ±90° pitch.
+
 ### Navigation track
 
 - Aerakia 15-state ESKF;

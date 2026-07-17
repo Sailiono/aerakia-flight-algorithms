@@ -89,13 +89,14 @@ Example results from the deterministic 20 s / 100 Hz / seed 7 suite:
 
 | Scenario | Mahony standard | Mahony robust | ESKF |
 | --- | ---: | ---: | ---: |
-| Clean motion | 0.0852° | 0.0890° | 0.2036° |
-| Magnetic spike | 0.1518° | 0.0886° | 0.2169° |
-| Persistent magnetic bias | 16.1697° | 0.1648° | 0.1888° |
-| Tilted cold start (post-alignment) | — | — | 0.0205° |
-| GNSS outage/reacquisition (post-alignment) | — | — | 0.4741° |
+| Clean motion | 0.1476° | 0.1547° | 0.3515° |
+| Magnetic spike | 0.2612° | 0.1540° | 0.3741° |
+| Persistent magnetic bias | 27.1650° | 0.2854° | 0.3271° |
+| Tilted cold start (post-alignment) | — | — | 0.0363° |
+| GNSS outage/reacquisition (post-alignment) | — | — | 0.8205° |
 
-Values are wrapped attitude RMSE. In the outage scenario, position RMSE is 0.497 m and velocity
+Attitude values use quaternion geodesic RMSE, which is singularity-free and is not numerically
+comparable to the older RMS of three Euler components. In the outage scenario, position RMSE is 0.497 m and velocity
 RMSE is 0.226 m/s; NIS and NEES are checked against reviewed deterministic bounds. These synthetic
 results demonstrate repeatability and fault response, not flight safety or airworthiness. The
 [algorithm status](docs/algorithm-status.md) records the current maturity and P0 blockers, while the
