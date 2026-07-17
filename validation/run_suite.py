@@ -16,6 +16,10 @@ SCENARIOS = {
     "mag_spike": {"motion": "slow_sin", "anomaly": "spike"},
     "mag_bias": {"motion": "yaw_spin", "anomaly": "bias"},
     "yaw_jump": {"motion": "yaw_jump", "anomaly": "none"},
+    "cold_start_tilted": {
+        "motion": "static_tilted", "anomaly": "none", "cold_start": True,
+        "static_hint": True,
+    },
 }
 
 
@@ -54,19 +58,24 @@ def main() -> None:
         input_csv = scenario_dir / "input.csv"
         results_csv = scenario_dir / "results.csv"
 
-        run(
-            [
-                sys.executable,
-                str(generator),
-                "--out", str(input_csv),
-                "--duration", str(args.duration),
-                "--rate", str(args.rate),
-                "--seed", str(args.seed),
-                "--motion", str(scenario["motion"]),
-                "--anomaly", str(scenario["anomaly"]),
-            ]
-        )
-        run([str(args.runner), str(input_csv), str(results_csv)])
+        generator_command = [
+            sys.executable,
+            str(generator),
+            "--out", str(input_csv),
+            "--duration", str(args.duration),
+            "--rate", str(args.rate),
+            "--seed", str(args.seed),
+            "--motion", str(scenario["motion"]),
+            "--anomaly", str(scenario["anomaly"]),
+        ]
+        if scenario.get("static_hint"):
+            generator_command.append("--static-hint")
+        run(generator_command)
+        runner_command = [str(args.runner)]
+        if scenario.get("cold_start"):
+            runner_command.append("--cold-start")
+        runner_command.extend([str(input_csv), str(results_csv)])
+        run(runner_command)
         run(
             [
                 sys.executable,
@@ -87,16 +96,21 @@ def main() -> None:
     ]
     for summary in summaries:
         algorithms = summary["algorithms"]
+        eskf_metric = algorithms["eskf"]["overall_attitude_rmse_deg"]
+        if "cold_start_alignment" in summary:
+            eskf_metric = summary["cold_start_alignment"]["post_alignment_attitude_rmse_deg"]
         report_lines.append(
             f"| [{summary['scenario']}]({summary['scenario']}/report.md) "
             f"| {algorithms['mahony_standard']['overall_attitude_rmse_deg']:.4f}° "
             f"| {algorithms['mahony_robust']['overall_attitude_rmse_deg']:.4f}° "
-            f"| {algorithms['eskf']['overall_attitude_rmse_deg']:.4f}° |"
+            f"| {eskf_metric:.4f}° |"
         )
     report_lines.extend(
         [
             "",
-            "All values are wrapped attitude RMSE over deterministic synthetic inputs.",
+            "Values are wrapped attitude RMSE over deterministic synthetic inputs. Cold-start "
+            "scenarios use the explicitly reported post-alignment interval in this summary; the "
+            "full startup transient remains visible in each detailed report.",
             "Use real motion-capture or rate-table data before making reliability claims.",
         ]
     )

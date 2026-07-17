@@ -22,7 +22,7 @@ The ULog converter writes the same required IMU/timing columns plus optional har
 
 | Group | Representative columns | Use |
 | --- | --- | --- |
-| Sparse magnetic input | `mag_valid`, `mag_update` | Fuse only newly published valid samples |
+| Sparse magnetic input | `mag_valid`, `mag_update`, `magnetic_declination_rad` | Fuse only newly published valid samples and preserve the true-North heading reference |
 | Attitude reference | `ref_q_*`, `roll_mdeg`, `pitch_mdeg`, `yaw_mdeg` | PX4 engineering reference |
 | Reference reset | `ref_attitude_reset_counter`, `ref_attitude_reset_event`, `ref_delta_q_reset_*` | Segment diagnostics without interpolating across resets |
 | Relative navigation | `position_ref_valid`, `ref_position_*`, `ref_velocity_*` | PX4 local reference with the first valid sample as origin |

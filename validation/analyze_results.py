@@ -94,6 +94,36 @@ def metrics_for(
     return result
 
 
+def cold_start_alignment_metrics(columns: dict[str, np.ndarray]) -> dict[str, object] | None:
+    if "eskf_static_tilt_aligned" not in columns:
+        return None
+    tilt_aligned = columns["eskf_static_tilt_aligned"] > 0.5
+    heading_aligned = columns.get(
+        "eskf_static_heading_aligned", np.zeros(len(tilt_aligned))
+    ) > 0.5
+    complete = tilt_aligned & heading_aligned
+    if not np.any(complete):
+        return None
+    first = int(np.flatnonzero(complete)[0])
+    time_s = (columns["ts_us"] - columns["ts_us"][0]) * 1.0e-6
+    squared_errors: list[np.ndarray] = []
+    axes: dict[str, dict[str, float]] = {}
+    for axis in AXES:
+        error = wrapped_error_deg(
+            columns[f"eskf_{axis}_deg"][first:], columns[f"truth_{axis}_deg"][first:]
+        )
+        squared_errors.append(error * error)
+        axes[axis] = _error_summary(error)
+    return {
+        "alignment_time_s": float(time_s[first]),
+        "post_alignment_samples": int(len(time_s) - first),
+        "post_alignment_attitude_rmse_deg": float(
+            np.sqrt(np.mean(np.column_stack(squared_errors)))
+        ),
+        "axes": axes,
+    }
+
+
 def segment_aligned_yaw_metrics(columns: dict[str, np.ndarray]) -> dict[str, object]:
     time_s = (columns["ts_us"] - columns["ts_us"][0]) * 1.0e-6
     counters = columns.get("ref_attitude_reset_counter", np.zeros(len(time_s)))
@@ -274,6 +304,12 @@ def eskf_integrity_metrics(columns: dict[str, np.ndarray]) -> dict[str, object]:
         "healthy_ratio": float(np.mean(columns.get("eskf_healthy", np.ones(len(accepted))))),
         "navigation_recoveries": int(np.max(columns.get("eskf_navigation_recovery_count", [0]))),
         "static_alignment_completed": bool(np.max(columns.get("eskf_static_aligned", [0])) > 0.5),
+        "static_tilt_alignment_completed": bool(
+            np.max(columns.get("eskf_static_tilt_aligned", [0])) > 0.5
+        ),
+        "static_heading_alignment_completed": bool(
+            np.max(columns.get("eskf_static_heading_aligned", [0])) > 0.5
+        ),
         "zero_velocity_updates": int(np.max(columns.get("eskf_zupt_count", [0]))),
     }
     return result
@@ -423,6 +459,13 @@ def write_markdown(
         f"- Static alignment completed: {integrity['static_alignment_completed']}; "
         f"healthy ratio: {integrity['healthy_ratio']:.4f}."
     )
+    cold_start = metrics.get("cold_start_alignment")
+    if cold_start:
+        lines.append(
+            f"- Cold-start tilt + magnetic heading alignment completed at "
+            f"{cold_start['alignment_time_s']:.3f} s; post-alignment attitude RMSE: "
+            f"{cold_start['post_alignment_attitude_rmse_deg']:.4f}°."
+        )
     if navigation:
         lines.append(
             f"- Position RMSE against PX4 local-position reference: "
@@ -496,6 +539,9 @@ def main() -> None:
         "navigation": navigation_metrics(columns),
         "reference_resets": reset_summary(columns),
     }
+    cold_start = cold_start_alignment_metrics(columns)
+    if cold_start is not None:
+        metrics["cold_start_alignment"] = cold_start
     if args.reference_kind == "px4_estimate":
         metrics["eskf_reset_compensated_yaw"] = reset_compensated_yaw_metrics(columns)
         metrics["eskf_segment_aligned_yaw"] = segment_aligned_yaw_metrics(columns)

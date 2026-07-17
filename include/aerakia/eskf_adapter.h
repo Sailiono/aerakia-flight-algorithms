@@ -22,6 +22,7 @@ typedef struct {
     float recovery_position_variance_floor_m2;
     float recovery_velocity_variance_floor_m2_s2;
     bool enable_static_alignment;
+    bool static_align_attitude;
     float static_alignment_duration_s;
     uint32_t static_alignment_min_samples;
     float stationary_gyro_threshold_rad_s;
@@ -49,6 +50,8 @@ typedef struct {
     uint32_t navigation_recovery_count;
     uint32_t consecutive_navigation_rejections;
     bool static_alignment_complete;
+    bool static_tilt_alignment_complete;
+    bool static_heading_alignment_complete;
     bool stationary_detected;
     bool zero_velocity_update_applied;
     uint32_t static_alignment_samples;
@@ -75,13 +78,18 @@ typedef struct {
     uint32_t consecutive_navigation_rejections;
     double static_acceleration_sum[3];
     double static_angular_rate_sum[3];
+    double static_magnetic_sum[3];
     uint64_t static_alignment_start_timestamp_us;
     uint64_t last_zero_velocity_timestamp_us;
     uint32_t static_alignment_samples;
+    uint32_t static_magnetic_samples;
     uint32_t zero_velocity_update_count;
     bool static_alignment_complete;
+    bool static_tilt_alignment_complete;
+    bool static_heading_alignment_complete;
     bool stationary_detected;
     bool zero_velocity_update_applied;
+    bool attitude_seeded;
     bool has_timestamp;
 } AerakiaEskf;
 

@@ -57,8 +57,10 @@ static void reset_static_collection(AerakiaEskf *filter)
 {
     memset(filter->static_acceleration_sum, 0, sizeof(filter->static_acceleration_sum));
     memset(filter->static_angular_rate_sum, 0, sizeof(filter->static_angular_rate_sum));
+    memset(filter->static_magnetic_sum, 0, sizeof(filter->static_magnetic_sum));
     filter->static_alignment_start_timestamp_us = 0U;
     filter->static_alignment_samples = 0U;
+    filter->static_magnetic_samples = 0U;
 }
 
 static bool sample_is_stationary(const AerakiaEskf *filter, const AerakiaImuSample *sample)
@@ -83,6 +85,7 @@ static bool static_alignment_ready(const AerakiaEskf *filter, uint64_t timestamp
 static void collect_static_sample(AerakiaEskf *filter, const AerakiaImuSample *sample)
 {
     int axis;
+    bool magnetic_accepted = false;
     if (filter->static_alignment_samples == 0U) {
         filter->static_alignment_start_timestamp_us = sample->timestamp_us;
     }
@@ -94,6 +97,24 @@ static void collect_static_sample(AerakiaEskf *filter, const AerakiaImuSample *s
     filter->static_angular_rate_sum[2] += sample->angular_rate_rad_s.z;
     filter->static_alignment_samples++;
 
+    if (filter->config.fuse_magnetometer
+        && (sample->flags & AERAKIA_SAMPLE_MAG_VALID) != 0U
+        && vector_is_finite(sample->magnetic_field_ut)) {
+        magnetic_accepted = !filter->config.gate_magnetometer
+            || aerakia_mag_gate_accept(
+                &filter->magnetic_gate,
+                sample->magnetic_field_ut.x,
+                sample->magnetic_field_ut.y,
+                sample->magnetic_field_ut.z
+            );
+        if (magnetic_accepted) {
+            filter->static_magnetic_sum[0] += sample->magnetic_field_ut.x;
+            filter->static_magnetic_sum[1] += sample->magnetic_field_ut.y;
+            filter->static_magnetic_sum[2] += sample->magnetic_field_ut.z;
+            filter->static_magnetic_samples++;
+        }
+    }
+
     if (static_alignment_ready(filter, sample->timestamp_us)) {
         eskf_float_t acceleration_mean[3];
         eskf_float_t angular_rate_mean[3];
@@ -101,6 +122,22 @@ static void collect_static_sample(AerakiaEskf *filter, const AerakiaImuSample *s
         for (axis = 0; axis < 3; ++axis) {
             acceleration_mean[axis] = filter->static_acceleration_sum[axis] * inverse_count;
             angular_rate_mean[axis] = filter->static_angular_rate_sum[axis] * inverse_count;
+        }
+        if (filter->config.static_align_attitude && !filter->attitude_seeded) {
+            filter->static_tilt_alignment_complete =
+                eskf_align_static_tilt(&filter->core, acceleration_mean);
+            if (filter->static_tilt_alignment_complete
+                && filter->static_magnetic_samples > 0U) {
+                eskf_float_t magnetic_mean[3];
+                const double inverse_magnetic_count =
+                    1.0 / (double)filter->static_magnetic_samples;
+                for (axis = 0; axis < 3; ++axis) {
+                    magnetic_mean[axis] =
+                        filter->static_magnetic_sum[axis] * inverse_magnetic_count;
+                }
+                filter->static_heading_alignment_complete =
+                    eskf_align_static_heading(&filter->core, magnetic_mean);
+            }
         }
         eskf_align_static_bias_means(&filter->core, acceleration_mean, angular_rate_mean);
         filter->static_alignment_complete = true;
@@ -125,6 +162,7 @@ void aerakia_eskf_default_config(AerakiaEskfConfig *config)
     config->recovery_position_variance_floor_m2 = 25.0f;
     config->recovery_velocity_variance_floor_m2_s2 = 4.0f;
     config->enable_static_alignment = true;
+    config->static_align_attitude = true;
     config->static_alignment_duration_s = 1.0f;
     config->static_alignment_min_samples = 100U;
     config->stationary_gyro_threshold_rad_s = 0.05f;
@@ -150,6 +188,7 @@ void aerakia_eskf_init(
     aerakia_eskf_default_config(&defaults);
     memset(filter, 0, sizeof(*filter));
     filter->config = config != NULL ? *config : defaults;
+    filter->attitude_seeded = initial_quaternion_wxyz != NULL;
     eskf_init(&filter->core, initial_position_ned_m, initial_quaternion_wxyz);
     aerakia_mag_gate_init(&filter->magnetic_gate, &filter->config.magnetic_gate);
     reference[0] = filter->config.magnetic_reference_ned[0];
@@ -445,6 +484,8 @@ void aerakia_eskf_get_estimate(
     estimate->navigation_recovery_count = filter->navigation_recovery_count;
     estimate->consecutive_navigation_rejections = filter->consecutive_navigation_rejections;
     estimate->static_alignment_complete = filter->static_alignment_complete;
+    estimate->static_tilt_alignment_complete = filter->static_tilt_alignment_complete;
+    estimate->static_heading_alignment_complete = filter->static_heading_alignment_complete;
     estimate->stationary_detected = filter->stationary_detected;
     estimate->zero_velocity_update_applied = filter->zero_velocity_update_applied;
     estimate->static_alignment_samples = filter->static_alignment_samples;

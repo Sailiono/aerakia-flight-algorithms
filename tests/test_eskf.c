@@ -61,6 +61,21 @@ static double pitch_from_quaternion(const eskf_float_t q[4])
     return asin(value);
 }
 
+static void ned_to_body(const eskf_float_t q[4], const eskf_float_t ned[3],
+                        eskf_float_t body[3])
+{
+    const eskf_float_t w = q[0], x = q[1], y = q[2], z = q[3];
+    body[0] = (1.0 - 2.0 * (y * y + z * z)) * ned[0]
+        + 2.0 * (x * y + w * z) * ned[1]
+        + 2.0 * (x * z - w * y) * ned[2];
+    body[1] = 2.0 * (x * y - w * z) * ned[0]
+        + (1.0 - 2.0 * (x * x + z * z)) * ned[1]
+        + 2.0 * (y * z + w * x) * ned[2];
+    body[2] = 2.0 * (x * z + w * y) * ned[0]
+        + 2.0 * (y * z - w * x) * ned[1]
+        + (1.0 - 2.0 * (x * x + y * y)) * ned[2];
+}
+
 static int covariance_is_symmetric_psd(eskf_float_t covariance[15][15])
 {
     double lower[15][15] = {{0.0}};
@@ -312,6 +327,56 @@ static void test_static_bias_alignment(void)
     check_true(near(filter.state.gb[2], -0.03, 1e-12), "gyroscope bias aligns");
 }
 
+static void test_static_attitude_alignment(void)
+{
+    ESKF_Handle filter;
+    eskf_float_t truth_q[4];
+    eskf_float_t initial_q[4];
+    eskf_float_t acceleration_body[3];
+    eskf_float_t magnetic_body[3];
+    const eskf_float_t acceleration_ned[3] = {0.0, 0.0, -ESKF_GRAVITY};
+    const eskf_float_t magnetic_ned[3] = {22.0, 0.0, 44.0};
+    const double truth_roll = 25.0 * ESKF_PI / 180.0;
+    const double truth_pitch = -18.0 * ESKF_PI / 180.0;
+    const double truth_yaw = 35.0 * ESKF_PI / 180.0;
+
+    euler_quaternion(truth_roll, truth_pitch, truth_yaw, truth_q);
+    ned_to_body(truth_q, acceleration_ned, acceleration_body);
+    ned_to_body(truth_q, magnetic_ned, magnetic_body);
+    eskf_init(&filter, NULL, NULL);
+    eskf_set_mag_reference(&filter, magnetic_ned);
+    check_true(eskf_align_static_tilt(&filter, acceleration_body),
+               "static acceleration aligns tilt");
+    check_true(near(roll_from_quaternion(filter.state.q), truth_roll, 1.0e-10),
+               "static tilt recovers roll");
+    check_true(near(pitch_from_quaternion(filter.state.q), truth_pitch, 1.0e-10),
+               "static tilt recovers pitch");
+    check_true(near(yaw_from_quaternion(filter.state.q), 0.0, 1.0e-10),
+               "static tilt preserves initial yaw");
+    check_true(eskf_align_static_heading(&filter, magnetic_body),
+               "static magnetic field aligns heading");
+    check_true(near(roll_from_quaternion(filter.state.q), truth_roll, 1.0e-10),
+               "static heading preserves roll");
+    check_true(near(pitch_from_quaternion(filter.state.q), truth_pitch, 1.0e-10),
+               "static heading preserves pitch");
+    check_true(near(yaw_from_quaternion(filter.state.q), truth_yaw, 1.0e-10),
+               "static heading recovers yaw");
+
+    yaw_quaternion(-0.7, initial_q);
+    eskf_init(&filter, NULL, initial_q);
+    check_true(eskf_align_static_tilt(&filter, acceleration_body),
+               "tilt alignment works with an existing yaw");
+    check_true(near(yaw_from_quaternion(filter.state.q), -0.7, 1.0e-10),
+               "tilt alignment leaves an existing yaw unchanged");
+    {
+        const eskf_float_t zero[3] = {0.0, 0.0, 0.0};
+        check_true(!eskf_align_static_tilt(&filter, zero),
+                   "zero acceleration cannot align tilt");
+        check_true(!eskf_align_static_heading(&filter, zero),
+                   "zero magnetic field cannot align heading");
+    }
+}
+
 int main(void)
 {
     test_initialization();
@@ -323,6 +388,7 @@ int main(void)
     test_joseph_covariance_stays_psd();
     test_navigation_reset_preserves_attitude_and_biases();
     test_static_bias_alignment();
+    test_static_attitude_alignment();
 
     if (failures != 0) {
         fprintf(stderr, "%d ESKF assertion(s) failed\n", failures);

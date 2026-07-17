@@ -51,13 +51,19 @@ Metrics: attitude/velocity/position RMSE, bias error, innovation acceptance, NIS
 - `clean_motion`: combined roll, pitch, and yaw without injected magnetic faults;
 - `mag_spike`: short magnetic magnitude spikes;
 - `mag_bias`: persistent magnetic bias;
-- `yaw_jump`: discontinuous truth case for wrap/continuity testing.
+- `yaw_jump`: discontinuous truth case for wrap/continuity testing;
+- `cold_start_tilted`: noisy static data at non-zero roll, pitch, and yaw; the ESKF starts from
+  identity and CI scores only samples after independently reported tilt/heading alignment.
 
 The native `aerakia_validation_runner` replays the public C code. `run_suite.py` generates reports and `check_thresholds.py` turns reviewed error limits into CI gates.
 
 ## Private ULog track
 
-`convert_ulog_to_replay.py` extracts calibrated IMU, sparse magnetometer updates, PX4 attitude reset metadata, relative GPS NED aiding, direct dual-antenna GNSS heading when available, GNSS course, PX4 GSF yaw, barometer height, and PX4 local-position references. It intentionally omits absolute latitude/longitude, hardware IDs, parameter dumps, and private topics.
+`convert_ulog_to_replay.py` extracts calibrated IMU, sparse magnetometer updates, the configured
+magnetic declination, PX4 attitude reset metadata, relative GPS NED aiding, direct dual-antenna GNSS
+heading when available, GNSS course, PX4 GSF yaw, barometer height, and PX4 local-position
+references. It intentionally omits absolute latitude/longitude, hardware IDs, parameter dumps, and
+private topics.
 
 `run_ulog_suite.py` consumes a private manifest and runs conversion, the native C runner, metrics, reset diagnostics, and a cross-scenario summary. Static logs must be explicitly marked `assume_stationary`; this assertion is never inferred from their filename or motion.
 

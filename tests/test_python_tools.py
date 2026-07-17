@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import math
 import sys
 import tempfile
 import unittest
@@ -65,8 +66,11 @@ class FakeDataset:
 
 
 class FakeULog:
-    def __init__(self, datasets: list[FakeDataset]) -> None:
+    def __init__(
+        self, datasets: list[FakeDataset], initial_parameters: dict[str, object] | None = None
+    ) -> None:
         self.data_list = datasets
+        self.initial_parameters = initial_parameters or {}
 
     def get_dataset(self, name: str) -> FakeDataset:
         return next(dataset for dataset in self.data_list if dataset.name == name)
@@ -148,7 +152,8 @@ class ULogConverterTests(unittest.TestCase):
         fake = FakeULog(
             [FakeDataset("sensor_combined", sensor), FakeDataset("vehicle_attitude", attitude),
              FakeDataset("vehicle_gps_position", gps),
-             FakeDataset("yaw_estimator_status", yaw_estimator)]
+             FakeDataset("yaw_estimator_status", yaw_estimator)],
+            {"EKF2_MAG_DECL": -5.5},
         )
         with tempfile.TemporaryDirectory() as temp_directory:
             output = Path(temp_directory) / "replay.csv"
@@ -165,6 +170,10 @@ class ULogConverterTests(unittest.TestCase):
             self.assertEqual(metadata["gnss_course_diagnostic_updates"], 2)
             self.assertEqual(metadata["px4_gsf_yaw_updates"], 2)
             self.assertAlmostEqual(float(rows[0]["gnss_heading_rad"]), 0.15)
+            self.assertAlmostEqual(metadata["magnetic_declination_deg"], -5.5)
+            self.assertAlmostEqual(
+                float(rows[0]["magnetic_declination_rad"]), math.radians(-5.5)
+            )
 
 
 class ValidationAnalyzerTests(unittest.TestCase):

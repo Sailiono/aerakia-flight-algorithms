@@ -25,7 +25,14 @@ def main() -> None:
             continue
         algorithms = by_scenario[scenario]["algorithms"]
         for algorithm, limit in algorithm_limits.items():
-            value = float(algorithms[algorithm]["overall_attitude_rmse_deg"])
+            if algorithm == "eskf_post_alignment":
+                cold_start = by_scenario[scenario].get("cold_start_alignment")
+                if cold_start is None:
+                    failures.append(f"{scenario}: cold-start alignment did not complete")
+                    continue
+                value = float(cold_start["post_alignment_attitude_rmse_deg"])
+            else:
+                value = float(algorithms[algorithm]["overall_attitude_rmse_deg"])
             if value > float(limit):
                 failures.append(
                     f"{scenario}/{algorithm}: {value:.6f} deg exceeds {float(limit):.6f} deg"

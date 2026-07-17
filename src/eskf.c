@@ -130,6 +130,23 @@ static eskf_float_t _wrap_pi(eskf_float_t angle) {
     return atan2(sin(angle), cos(angle));
 }
 
+static void _quaternion_from_euler(eskf_float_t roll,
+                                   eskf_float_t pitch,
+                                   eskf_float_t yaw,
+                                   eskf_float_t q[4]) {
+    const eskf_float_t cr = cos(0.5 * roll);
+    const eskf_float_t sr = sin(0.5 * roll);
+    const eskf_float_t cp = cos(0.5 * pitch);
+    const eskf_float_t sp = sin(0.5 * pitch);
+    const eskf_float_t cy = cos(0.5 * yaw);
+    const eskf_float_t sy = sin(0.5 * yaw);
+    q[0] = cr * cp * cy + sr * sp * sy;
+    q[1] = sr * cp * cy - cr * sp * sy;
+    q[2] = cr * sp * cy + sr * cp * sy;
+    q[3] = cr * cp * sy - sr * sp * cy;
+    eskf_quat_normalize(q);
+}
+
 /**
  * @brief Generic Kalman measurement update for 3D observations with Gating
  *
@@ -835,6 +852,62 @@ void eskf_reset_navigation(ESKF_Handle *h,
 /* ============================================================================
  * Calibration / Alignment
  * ============================================================================ */
+
+bool eskf_align_static_tilt(ESKF_Handle *h,
+                            const eskf_float_t acceleration_mean_m_s2[3]) {
+    eskf_float_t R_nb[3][3];
+    eskf_float_t q[4];
+    eskf_float_t horizontal;
+    eskf_float_t roll;
+    eskf_float_t pitch;
+    eskf_float_t yaw;
+    if (!h || !h->initialized || !acceleration_mean_m_s2) return false;
+    if (!isfinite(acceleration_mean_m_s2[0])
+        || !isfinite(acceleration_mean_m_s2[1])
+        || !isfinite(acceleration_mean_m_s2[2])) return false;
+
+    horizontal = hypot(acceleration_mean_m_s2[1], acceleration_mean_m_s2[2]);
+    if (hypot(acceleration_mean_m_s2[0], horizontal) < ESKF_EPSILON) return false;
+    roll = atan2(-acceleration_mean_m_s2[1], -acceleration_mean_m_s2[2]);
+    pitch = atan2(acceleration_mean_m_s2[0], horizontal);
+    eskf_quat_to_rot_mat3(h->state.q, R_nb);
+    yaw = atan2(R_nb[1][0], R_nb[0][0]);
+    _quaternion_from_euler(roll, pitch, yaw, q);
+    eskf_quat_copy(q, h->state.q);
+    return true;
+}
+
+bool eskf_align_static_heading(ESKF_Handle *h,
+                               const eskf_float_t magnetic_mean[3]) {
+    eskf_float_t magnetic_body[3];
+    eskf_float_t magnetic_ned[3];
+    eskf_float_t R_nb[3][3];
+    eskf_float_t q[4];
+    eskf_float_t roll;
+    eskf_float_t pitch;
+    eskf_float_t yaw;
+    eskf_float_t residual;
+    if (!h || !h->initialized || !magnetic_mean) return false;
+    if (!isfinite(magnetic_mean[0]) || !isfinite(magnetic_mean[1])
+        || !isfinite(magnetic_mean[2])) return false;
+    eskf_vec3_copy(magnetic_mean, magnetic_body);
+    if (eskf_vec3_normalize(magnetic_body) < ESKF_EPSILON) return false;
+    eskf_quat_to_rot_mat3(h->state.q, R_nb);
+    eskf_mat3_mul_vec3(R_nb, magnetic_body, magnetic_ned);
+    if (hypot(magnetic_ned[0], magnetic_ned[1]) < ESKF_EPSILON
+        || hypot(h->mag_ref[0], h->mag_ref[1]) < ESKF_EPSILON) return false;
+
+    roll = atan2(R_nb[2][1], R_nb[2][2]);
+    pitch = asin(fmax(-1.0, fmin(1.0, -R_nb[2][0])));
+    yaw = atan2(R_nb[1][0], R_nb[0][0]);
+    residual = _wrap_pi(
+        atan2(h->mag_ref[1], h->mag_ref[0])
+        - atan2(magnetic_ned[1], magnetic_ned[0])
+    );
+    _quaternion_from_euler(roll, pitch, _wrap_pi(yaw + residual), q);
+    eskf_quat_copy(q, h->state.q);
+    return true;
+}
 
 void eskf_align_static_biases(ESKF_Handle *h,
                                const eskf_float_t (*acc_buf)[3],

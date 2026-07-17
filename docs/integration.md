@@ -60,10 +60,16 @@ Trusted heading is independent of magnetometer fusion. It can come from dual-ant
 
 Set `AERAKIA_SAMPLE_STATIONARY` only when the application has independent reason to know the vehicle is stationary (for example, pre-arm state plus actuator/landing checks). The adapter also checks gyro norm and acceleration magnitude. While the configured sample-count and duration requirements are accumulating, `aerakia_eskf_process_imu` returns `AERAKIA_STATUS_ALIGNING` and does not propagate navigation.
 
+When `aerakia_eskf_init` receives no initial quaternion and `static_align_attitude` is enabled, the
+completed static window first aligns roll/pitch from mean specific force, then aligns yaw from the
+accepted mean magnetic field, and finally initializes IMU biases. The estimate reports separate
+`static_tilt_alignment_complete` and `static_heading_alignment_complete` flags. Magnetic heading is
+optional: tilt and bias alignment can finish without it, but yaw then retains its initial value.
+
 After alignment, the same flag enables periodic zero-velocity updates. The adapter exposes alignment status, sample count, per-row ZUPT application, and total ZUPT count. If the flag is absent, existing streaming behavior is unchanged; the library never guesses stationarity from IMU data alone.
 
 ## Coordinate and magnetic reference configuration
 
-The ESKF magnetic update compares horizontal heading only; magnetic inclination is deliberately excluded so it cannot inject roll/pitch error. Configure a valid local horizontal field direction before enabling magnetometer fusion. For changing locations, refresh that reference or prefer a trusted heading observation. The magnitude anomaly gate still uses the measured field norm.
+The ESKF magnetic update compares horizontal heading only; magnetic inclination is deliberately excluded so it cannot inject roll/pitch error. Configure a valid local horizontal field direction before enabling magnetometer fusion. For a magnetic declination `D`, a sufficient heading reference is `[cos(D), sin(D), 0]` in NED. The FCOne application should obtain `D` from a reviewed geomagnetic model using the current GNSS location, refresh it after a material location change, or prefer a trusted heading observation. Omitting declination produces a stable magnetic-north/true-north yaw offset rather than estimator divergence. The magnitude anomaly gate still uses the measured field norm.
 
 See [Coordinate conventions](coordinate-conventions.md) for the complete frame and sign contract.

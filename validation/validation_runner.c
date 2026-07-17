@@ -19,7 +19,7 @@
 typedef struct {
     int seq, ts_us;
     int acc_x, acc_y, acc_z, gyro_x, gyro_y, gyro_z, mag_x, mag_y, mag_z;
-    int mag_valid, mag_update;
+    int mag_valid, mag_update, magnetic_declination;
     int truth_roll, truth_pitch, truth_yaw;
     int ref_q_w, ref_q_x, ref_q_y, ref_q_z;
     int position_ref_valid, ref_position_n, ref_position_e, ref_position_d;
@@ -72,6 +72,7 @@ static int load_column_map(char *header, ColumnMap *map)
     MAP(gyro_x, "raw_gyro_mdps_x"); MAP(gyro_y, "raw_gyro_mdps_y"); MAP(gyro_z, "raw_gyro_mdps_z");
     MAP(mag_x, "raw_mag_cuT_x"); MAP(mag_y, "raw_mag_cuT_y"); MAP(mag_z, "raw_mag_cuT_z");
     MAP(mag_valid, "mag_valid"); MAP(mag_update, "mag_update");
+    MAP(magnetic_declination, "magnetic_declination_rad");
     MAP(truth_roll, "roll_mdeg"); MAP(truth_pitch, "pitch_mdeg"); MAP(truth_yaw, "yaw_mdeg");
     MAP(ref_q_w, "ref_q_w"); MAP(ref_q_x, "ref_q_x"); MAP(ref_q_y, "ref_q_y"); MAP(ref_q_z, "ref_q_z");
     MAP(position_ref_valid, "position_ref_valid");
@@ -210,15 +211,24 @@ int main(int argc, char *argv[])
     unsigned long samples = 0U, malformed = 0U, gps_updates = 0U, heading_updates = 0U;
     unsigned long zupt_updates = 0U;
     int eskf_initialized = 0, mag_reference_initialized = 0;
+    int cold_start = 0;
+    int input_argument = 1;
+    int output_argument = 2;
     clock_t start_clock;
 
-    if (argc != 3) {
-        fprintf(stderr, "Usage: %s INPUT_REPLAY_CSV OUTPUT_RESULTS_CSV\n", argv[0]);
+    if (argc == 4 && strcmp(argv[1], "--cold-start") == 0) {
+        cold_start = 1;
+        input_argument = 2;
+        output_argument = 3;
+    } else if (argc != 3) {
+        fprintf(stderr,
+                "Usage: %s [--cold-start] INPUT_REPLAY_CSV OUTPUT_RESULTS_CSV\n",
+                argv[0]);
         return 2;
     }
-    input = fopen(argv[1], "r");
+    input = fopen(argv[input_argument], "r");
     if (input == NULL) { perror("open input"); return 2; }
-    output = fopen(argv[2], "w");
+    output = fopen(argv[output_argument], "w");
     if (output == NULL) { perror("open output"); fclose(input); return 2; }
     if (fgets(line, sizeof(line), input) == NULL || !load_column_map(line, &map)) {
         fputs("Input does not satisfy the replay CSV contract\n", stderr);
@@ -245,6 +255,7 @@ int main(int argc, char *argv[])
         "eskf_mag_accepted,eskf_mag_innovation_rad,eskf_mag_test_ratio,"
         "eskf_position_accepted,eskf_velocity_accepted,eskf_navigation_recovered,"
         "eskf_navigation_recovery_count,eskf_healthy,eskf_static_aligned,"
+        "eskf_static_tilt_aligned,eskf_static_heading_aligned,"
         "eskf_stationary_detected,eskf_zupt_applied,eskf_zupt_count,"
         "input_mag_update,input_position_update,position_ref_valid,"
         "ref_attitude_reset_counter,ref_attitude_reset_event,"
@@ -282,6 +293,9 @@ int main(int argc, char *argv[])
         );
         const int mag_valid = (int)parse_double(columns, count, map.mag_valid, 1.0, &ok) != 0;
         const int mag_update = (int)parse_double(columns, count, map.mag_update, 1.0, &ok) != 0;
+        const double magnetic_declination_rad = parse_double(
+            columns, count, map.magnetic_declination, 0.0, &ok
+        );
         const int position_update = (int)parse_double(columns, count, map.position_update, 0.0, &ok) != 0;
         const int heading_valid = (int)parse_double(
             columns, count, map.heading_valid, 0.0, &ok
@@ -336,7 +350,13 @@ int main(int argc, char *argv[])
         if (mag_valid && mag_update) sample.flags |= AERAKIA_SAMPLE_MAG_VALID;
         if (static_hint) sample.flags |= AERAKIA_SAMPLE_STATIONARY;
 
-        if (!mag_reference_initialized && mag_valid && mag_update) {
+        if (cold_start && !mag_reference_initialized) {
+            eskf_config.magnetic_reference_ned[0] = (float)cos(magnetic_declination_rad);
+            eskf_config.magnetic_reference_ned[1] = (float)sin(magnetic_declination_rad);
+            eskf_config.magnetic_reference_ned[2] = 0.0f;
+            mag_reference_initialized = 1;
+        }
+        if (!cold_start && !mag_reference_initialized && mag_valid && mag_update) {
             double reference_ned[3];
             body_to_ned(reference_q, magnetic, reference_ned);
             eskf_config.magnetic_reference_ned[0] = (float)reference_ned[0];
@@ -351,7 +371,9 @@ int main(int argc, char *argv[])
             mag_reference_initialized = 1;
         }
         if (!eskf_initialized) {
-            aerakia_eskf_init(&eskf, &eskf_config, NULL, reference_q);
+            aerakia_eskf_init(
+                &eskf, &eskf_config, NULL, cold_start ? NULL : reference_q
+            );
             eskf_initialized = 1;
         }
 
@@ -399,7 +421,7 @@ int main(int argc, char *argv[])
             output,
             "%ld,%llu,%.9f,%.9f,%.9f,"
             "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,"
-            "%.6f,%.6f,%.6f,%d,%.9f,%.9f,%d,%d,%d,%u,%d,%d,%d,%d,%u,"
+            "%.6f,%.6f,%.6f,%d,%.9f,%.9f,%d,%d,%d,%u,%d,%d,%d,%d,%d,%d,%u,"
             "%d,%d,%d,%.0f,%.0f,%.9f,%.9f,%.9f,%.9f,"
             "%d,%d,%.9f,%d,%.9f,%.9f,%d,%d,%.9f,%.9f,%.9f,%d,%d,%.9f,%.9f,"
             "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f\n",
@@ -420,6 +442,8 @@ int main(int argc, char *argv[])
             eskf_estimate.position_accepted ? 1 : 0, eskf_estimate.velocity_accepted ? 1 : 0,
             eskf_estimate.navigation_recovered ? 1 : 0, eskf_estimate.navigation_recovery_count,
             eskf_estimate.healthy ? 1 : 0, eskf_estimate.static_alignment_complete ? 1 : 0,
+            eskf_estimate.static_tilt_alignment_complete ? 1 : 0,
+            eskf_estimate.static_heading_alignment_complete ? 1 : 0,
             eskf_estimate.stationary_detected ? 1 : 0,
             eskf_estimate.zero_velocity_update_applied ? 1 : 0,
             eskf_estimate.zero_velocity_update_count, mag_update, position_update, position_ref_valid,

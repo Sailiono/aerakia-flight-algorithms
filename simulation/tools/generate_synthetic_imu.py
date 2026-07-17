@@ -36,6 +36,10 @@ def generate_motion(
         yaw_deg[sample_count // 2 :] += 30.0
     elif motion == "roll_flip":
         roll_deg = 170.0 * np.sin(2.0 * math.pi * 0.10 * time_s)
+    elif motion == "static_tilted":
+        roll_deg.fill(25.0)
+        pitch_deg.fill(-18.0)
+        yaw_deg.fill(35.0)
     else:
         raise ValueError(f"unsupported motion: {motion}")
 
@@ -139,6 +143,7 @@ def write_golden_csv(
     ideal_accel_m_s2: np.ndarray,
     anomaly_flags: np.ndarray,
     rate_hz: float,
+    static_hint: bool,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     dt_us = int(round(1_000_000.0 / rate_hz))
@@ -149,7 +154,7 @@ def write_golden_csv(
         "raw_mag_cuT_x", "raw_mag_cuT_y", "raw_mag_cuT_z",
         "g_est_mg_x", "g_est_mg_y", "g_est_mg_z",
         "innov_acc_milli", "innov_mag_milli", "acc_w_milli", "acc_n_milli",
-        "roll_mdeg", "pitch_mdeg", "yaw_mdeg", "anomaly",
+        "roll_mdeg", "pitch_mdeg", "yaw_mdeg", "anomaly", "static_hint",
     ]
 
     with path.open("w", newline="", encoding="utf-8") as stream:
@@ -170,6 +175,7 @@ def write_golden_csv(
                     int(round(pitch_deg[index] * 1000.0)),
                     int(round(wrapped_yaw * 1000.0)),
                     int(anomaly_flags[index]),
+                    int(static_hint),
                 ]
             )
 
@@ -181,10 +187,14 @@ def main() -> None:
     parser.add_argument("--rate", type=float, default=100.0, help="sample rate in Hz")
     parser.add_argument(
         "--motion",
-        choices=["yaw_spin", "slow_sin", "yaw_jump", "roll_flip"],
+        choices=["yaw_spin", "slow_sin", "yaw_jump", "roll_flip", "static_tilted"],
         default="yaw_spin",
     )
     parser.add_argument("--anomaly", choices=["none", "spike", "bias", "drift"], default="none")
+    parser.add_argument(
+        "--static-hint", action="store_true",
+        help="mark samples as application-confirmed stationary for alignment and ZUPT",
+    )
     parser.add_argument("--seed", type=int, default=0, help="random seed")
     args = parser.parse_args()
 
@@ -222,6 +232,7 @@ def main() -> None:
         ideal_accel,
         anomaly_flags,
         args.rate,
+        args.static_hint,
     )
     print(f"Wrote {len(time_s)} samples to {args.out}")
 

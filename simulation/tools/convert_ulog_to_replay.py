@@ -207,6 +207,9 @@ def convert_ulog(
 ) -> dict[str, Any]:
     ulog_path = Path(ulog_path)
     ulog = ulog_factory(ulog_path)
+    initial_parameters = getattr(ulog, "initial_parameters", {})
+    magnetic_declination_deg = float(initial_parameters.get("EKF2_MAG_DECL", 0.0))
+    magnetic_declination_rad = math.radians(magnetic_declination_deg)
     sensor = _topic(ulog, "sensor_combined")
     attitude = _topic(ulog, "vehicle_attitude")
     if sensor is None or attitude is None:
@@ -427,6 +430,7 @@ def convert_ulog(
         "raw_acc_mg_x", "raw_acc_mg_y", "raw_acc_mg_z",
         "raw_gyro_mdps_x", "raw_gyro_mdps_y", "raw_gyro_mdps_z",
         "raw_mag_cuT_x", "raw_mag_cuT_y", "raw_mag_cuT_z", "mag_valid", "mag_update",
+        "magnetic_declination_rad",
         "g_est_mg_x", "g_est_mg_y", "g_est_mg_z",
         "roll_mdeg", "pitch_mdeg", "yaw_mdeg",
         "ref_q_w", "ref_q_x", "ref_q_y", "ref_q_z",
@@ -457,6 +461,7 @@ def convert_ulog(
                     *np.rint(np.degrees(angular_rate[index]) * 1000.0).astype(int),
                     *np.rint(magnetic_ut[index] * 100.0).astype(int),
                     int(magnetic_valid[index]), int(magnetic_update[index]),
+                    magnetic_declination_rad,
                     *np.rint(gravity_mg[index]).astype(int),
                     *np.rint(reference_euler[index] * 1000.0).astype(int),
                     *reference_q[index],
@@ -492,6 +497,7 @@ def convert_ulog(
         "barometer_updates": int(np.count_nonzero(barometer_update)),
         "attitude_reset_events": int(np.count_nonzero(reset_event)),
         "assume_stationary": bool(assume_stationary),
+        "magnetic_declination_deg": magnetic_declination_deg,
         "privacy": "Hardware identifiers and absolute GPS coordinates are not exported.",
     }
     if metadata_path is not None:

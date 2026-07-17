@@ -174,6 +174,28 @@ void eskf_reset_navigation(ESKF_Handle *h,
  * ============================================================================ */
 
 /**
+ * Coarsely align roll and pitch from a stationary specific-force mean.
+ * The current navigation-frame yaw is preserved.
+ *
+ * @return true when the acceleration vector was valid and alignment was applied.
+ */
+bool eskf_align_static_tilt(
+    ESKF_Handle *h,
+    const eskf_float_t acceleration_mean_m_s2[3]
+);
+
+/**
+ * Coarsely align yaw from a stationary magnetic-field mean and configured
+ * navigation-frame magnetic reference. Existing roll and pitch are preserved.
+ *
+ * @return true when both horizontal magnetic vectors were observable.
+ */
+bool eskf_align_static_heading(
+    ESKF_Handle *h,
+    const eskf_float_t magnetic_mean[3]
+);
+
+/**
  * @brief Static Bias Alignment
  *
  * Initialize biases from stationary IMU data.
