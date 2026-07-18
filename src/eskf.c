@@ -206,14 +206,15 @@ static bool _measurement_update_3d(ESKF_Handle *h,
 
         /* Fill result structure if provided */
         if (result != NULL) {
-            result->innovation[0] = z[0];
-            result->innovation[1] = z[1];
-            result->innovation[2] = z[2];
-            result->innov_var[0] = S[0][0];
-            result->innov_var[1] = S[1][1];
-            result->innov_var[2] = S[2][2];
+            result->innovation[0] = (float)z[0];
+            result->innovation[1] = (float)z[1];
+            result->innovation[2] = (float)z[2];
+            result->innov_var[0] = (float)S[0][0];
+            result->innov_var[1] = (float)S[1][1];
+            result->innov_var[2] = (float)S[2][2];
             result->nis = (float)nis;
-            result->test_ratio = (nis_limit > 0.0) ? (nis / nis_limit) : 0.0;
+            result->test_ratio =
+                (nis_limit > 0.0) ? (float)(nis / nis_limit) : 0.0f;
             result->accepted = (nis_limit <= 0.0) || (nis <= nis_limit);
         }
 
@@ -345,14 +346,15 @@ static bool _measurement_update_1d(ESKF_Handle *h,
 
         /* Fill result structure if provided */
         if (result != NULL) {
-            result->innovation[0] = z;
-            result->innovation[1] = 0.0;
-            result->innovation[2] = 0.0;
-            result->innov_var[0] = S;
-            result->innov_var[1] = 0.0;
-            result->innov_var[2] = 0.0;
+            result->innovation[0] = (float)z;
+            result->innovation[1] = 0.0f;
+            result->innovation[2] = 0.0f;
+            result->innov_var[0] = (float)S;
+            result->innov_var[1] = 0.0f;
+            result->innov_var[2] = 0.0f;
             result->nis = (float)nis;
-            result->test_ratio = (nis_limit > 0.0) ? (nis / nis_limit) : 0.0;
+            result->test_ratio =
+                (nis_limit > 0.0) ? (float)(nis / nis_limit) : 0.0f;
             result->accepted = (nis_limit <= 0.0) || (nis <= nis_limit);
         }
 

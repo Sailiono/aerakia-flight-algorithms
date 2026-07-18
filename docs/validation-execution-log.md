@@ -1062,3 +1062,10 @@ The final deterministic outage result is `0.507 m` position RMSE, `0.231 m/s` ve
 `0.686 deg` post-alignment attitude RMSE. The online-bias scenario ends at `0.030 m/s²`
 accelerometer-bias error and `0.000522 rad/s` gyroscope-bias error while retaining navigation NEES
 `4.998`. These are host/synthetic acceptance figures, not target-hardware or flight claims.
+
+The first remote G0 candidate exposed a Windows-only warnings-as-errors failure: nine innovation
+diagnostic assignments narrowed the internal `eskf_float_t` values into the public float result
+structure implicitly. The Windows log reported MSVC `C4244`; Ubuntu and macOS had already passed.
+The API boundary now uses explicit float conversions while all NIS and innovation calculations
+remain in `eskf_float_t`. A local clang-cl `/W4 /WX` compile of all C sources and the focused native
+core/model/public-API tests passed before the correction was republished.
