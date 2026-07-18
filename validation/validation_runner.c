@@ -16,6 +16,16 @@
 #define MAX_LINE_LENGTH 16384
 #define MAX_COLUMNS 128
 
+static FILE *open_portable_file(const char *path, const char *mode)
+{
+#if defined(_MSC_VER)
+    FILE *stream = NULL;
+    return fopen_s(&stream, path, mode) == 0 ? stream : NULL;
+#else
+    return fopen(path, mode);
+#endif
+}
+
 typedef struct {
     int seq, ts_us;
     int acc_x, acc_y, acc_z, gyro_x, gyro_y, gyro_z, mag_x, mag_y, mag_z;
@@ -341,9 +351,9 @@ int main(int argc, char *argv[])
         fputs("--cold-start and --reference-attitude-init are mutually exclusive\n", stderr);
         return 2;
     }
-    input = fopen(argv[input_argument], "r");
+    input = open_portable_file(argv[input_argument], "r");
     if (input == NULL) { perror("open input"); return 2; }
-    output = fopen(argv[output_argument], "w");
+    output = open_portable_file(argv[output_argument], "w");
     if (output == NULL) { perror("open output"); fclose(input); return 2; }
     if (fgets(line, sizeof(line), input) == NULL || !load_column_map(line, &map)) {
         fputs("Input does not satisfy the replay CSV contract\n", stderr);
@@ -375,7 +385,8 @@ int main(int argc, char *argv[])
         "eskf_navigation_recovery_count,eskf_healthy,eskf_static_aligned,"
         "eskf_static_tilt_aligned,eskf_static_heading_aligned,"
         "eskf_stationary_detected,eskf_zupt_applied,eskf_zupt_count,"
-        "eskf_horizontal_aiding_age_s,eskf_horizontal_position_valid,"
+        "eskf_horizontal_aiding_age_s,eskf_horizontal_position_aiding_age_s,"
+        "eskf_horizontal_velocity_aiding_age_s,eskf_horizontal_position_valid,"
         "eskf_horizontal_velocity_valid,eskf_horizontal_navigation_valid,"
         "input_mag_update,input_position_update,input_velocity_update,position_ref_valid,"
         "ref_attitude_reset_counter,ref_attitude_reset_event,"
@@ -397,7 +408,13 @@ int main(int argc, char *argv[])
         "truth_accel_bias_x_m_s2,truth_accel_bias_y_m_s2,truth_accel_bias_z_m_s2,"
         "truth_gyro_bias_x_rad_s,truth_gyro_bias_y_rad_s,truth_gyro_bias_z_rad_s,"
         "eskf_accel_bias_x_m_s2,eskf_accel_bias_y_m_s2,eskf_accel_bias_z_m_s2,"
-        "eskf_gyro_bias_x_rad_s,eskf_gyro_bias_y_rad_s,eskf_gyro_bias_z_rad_s\n",
+        "eskf_gyro_bias_x_rad_s,eskf_gyro_bias_y_rad_s,eskf_gyro_bias_z_rad_s,"
+        "eskf_accel_bias_cov_xx_m2_s4,eskf_accel_bias_cov_xy_m2_s4,"
+        "eskf_accel_bias_cov_xz_m2_s4,eskf_accel_bias_cov_yy_m2_s4,"
+        "eskf_accel_bias_cov_yz_m2_s4,eskf_accel_bias_cov_zz_m2_s4,"
+        "eskf_gyro_bias_cov_xx_rad2_s2,eskf_gyro_bias_cov_xy_rad2_s2,"
+        "eskf_gyro_bias_cov_xz_rad2_s2,eskf_gyro_bias_cov_yy_rad2_s2,"
+        "eskf_gyro_bias_cov_yz_rad2_s2,eskf_gyro_bias_cov_zz_rad2_s2\n",
         output
     );
 
@@ -539,7 +556,7 @@ int main(int argc, char *argv[])
         (void)aerakia_eskf_process_imu(&eskf, &sample, &eskf_estimate);
 
         if (position_update && velocity_update) {
-            AerakiaGpsObservation observation;
+            AerakiaGpsObservation observation = {0};
             observation.timestamp_us = sample.timestamp_us;
             observation.position_ned_m = parse_vector(
                 columns, count, map.gps_position_n, map.gps_position_e, map.gps_position_d, 1.0, &ok
@@ -615,14 +632,16 @@ int main(int argc, char *argv[])
             "%ld,%llu,%.9f,%.9f,%.9f,"
             "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,"
             "%.6f,%.6f,%.6f,%d,%.9f,%.9f,%d,%d,%d,%u,%d,%d,%d,%d,%d,%d,%u,"
-            "%.9f,%d,%d,%d,"
+            "%.9f,%.9f,%.9f,%d,%d,%d,"
             "%d,%d,%d,%d,%.0f,%.0f,%.9f,%.9f,%.9f,%.9f,"
             "%d,%d,%.9f,%d,%.9f,%.9f,%d,%d,%d,%.9f,%.9f,%.9f,%d,%d,%.9f,%.9f,"
             "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,"
             "%.9f,%.9f,%.9f,"
             "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,"
             "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,"
-            "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f\n",
+            "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,"
+            "%.12g,%.12g,%.12g,%.12g,%.12g,%.12g,"
+            "%.12g,%.12g,%.12g,%.12g,%.12g,%.12g\n",
             sequence, (unsigned long long)sample.timestamp_us, truth_roll, truth_pitch, truth_yaw,
             radians_to_degrees(standard_estimate.euler_rad.x),
             radians_to_degrees(standard_estimate.euler_rad.y),
@@ -646,6 +665,8 @@ int main(int argc, char *argv[])
             eskf_estimate.zero_velocity_update_applied ? 1 : 0,
             eskf_estimate.zero_velocity_update_count,
             eskf_estimate.horizontal_aiding_age_s,
+            eskf_estimate.horizontal_position_aiding_age_s,
+            eskf_estimate.horizontal_velocity_aiding_age_s,
             eskf_estimate.horizontal_position_valid ? 1 : 0,
             eskf_estimate.horizontal_velocity_valid ? 1 : 0,
             eskf_estimate.horizontal_navigation_valid ? 1 : 0,
@@ -692,7 +713,19 @@ int main(int argc, char *argv[])
             eskf_estimate.accelerometer_bias_m_s2.z,
             eskf_estimate.gyroscope_bias_rad_s.x,
             eskf_estimate.gyroscope_bias_rad_s.y,
-            eskf_estimate.gyroscope_bias_rad_s.z
+            eskf_estimate.gyroscope_bias_rad_s.z,
+            eskf.core.P[ESKF_IDX_DAB + 0][ESKF_IDX_DAB + 0],
+            eskf.core.P[ESKF_IDX_DAB + 0][ESKF_IDX_DAB + 1],
+            eskf.core.P[ESKF_IDX_DAB + 0][ESKF_IDX_DAB + 2],
+            eskf.core.P[ESKF_IDX_DAB + 1][ESKF_IDX_DAB + 1],
+            eskf.core.P[ESKF_IDX_DAB + 1][ESKF_IDX_DAB + 2],
+            eskf.core.P[ESKF_IDX_DAB + 2][ESKF_IDX_DAB + 2],
+            eskf.core.P[ESKF_IDX_DGB + 0][ESKF_IDX_DGB + 0],
+            eskf.core.P[ESKF_IDX_DGB + 0][ESKF_IDX_DGB + 1],
+            eskf.core.P[ESKF_IDX_DGB + 0][ESKF_IDX_DGB + 2],
+            eskf.core.P[ESKF_IDX_DGB + 1][ESKF_IDX_DGB + 1],
+            eskf.core.P[ESKF_IDX_DGB + 1][ESKF_IDX_DGB + 2],
+            eskf.core.P[ESKF_IDX_DGB + 2][ESKF_IDX_DGB + 2]
         );
         samples++;
     }

@@ -51,6 +51,28 @@ Metrics: attitude/velocity/position RMSE, bias error, innovation acceptance, NIS
 6. Failed or numerically unhealthy runs remain in the report.
 7. Synthetic results are labeled synthetic and never presented as flight proof.
 
+The internal numerical gate validates all 15 columns of the discrete transition against finite
+differences. All 225 process-noise entries are checked by a complete structure oracle, full-Q
+finiteness/symmetry/positive-semidefiniteness, and an independent numerical integration of the
+declared reduced continuous model. That reduced model includes direct IMU/bias white noise and
+velocity-to-position integration; it does not yet include every within-step higher-order coupling
+from attitude, specific force, angular rate, and bias random walk. Multi-rate NIS/NEES evidence
+supports the approximation at 100--1000 Hz, but a full coupled Van Loan or equivalent oracle remains
+open.
+
+Trusted physical heading uses the complete right-error Jacobian of raw body-X `atan2` heading and
+is checked per axis over 10,000 attitudes. Magnetometer fusion is deliberately a separate,
+tilt-conditioned NED-yaw-only pseudo correction so magnetic inclination/model error cannot request
+roll/pitch correction. Its tuning variance and pseudo-NIS are not represented as general
+physical-heading consistency at arbitrary tilt. Near-singular threshold cases fail closed.
+
+Horizontal accelerometer-bias generalization uses the frozen
+[`bias_observability_protocol_v1.json`](../validation/bias_observability_protocol_v1.json) and
+`run_bias_observability_cross_validation.py`. It contains five non-multisine VTOL profiles, nine
+exact horizontal bias vectors, disjoint train/tune/holdout seeds, interval-start ZOH truth, and
+per-trajectory/vector release gates. Smoke mode may report rather than enforce capability gates,
+but its JSON and Markdown status must still say `capability_failed` whenever any metric fails.
+
 ## Current deterministic scenarios
 
 - `clean_motion`: combined roll, pitch, and yaw without injected magnetic faults;
@@ -86,12 +108,16 @@ longest gap, missing nominal epochs, error immediately before the gap, peak posi
 the first resumed posterior error, resume NIS, and sustained recovery time. A whole-run RMSE that
 mixes a long outage with nominal aiding is retained but is never presented as receiver accuracy.
 
-`run_monte_carlo.py` formalizes the first reviewed multi-seed navigation gate. It retains every
-seed result, reports failure seeds, and aggregates empirical P05/P95 ranges for accuracy and
-consistency metrics. The current phase randomizes measurement noise and includes the fixed
-five-second GNSS outage, drawn constant three-axis IMU biases, and monotonic interval jitter. It
-does not yet model temperature-varying bias, transport delay, reordering, or missing IMU samples;
-those remain explicit P0 extensions.
+`run_monte_carlo.py` formalizes the reviewed multi-seed navigation gate. It retains every seed
+result, reports failure seeds, aggregates empirical P05/P95 ranges, and at 1,000 or more trials
+adds deterministic 10,000-resample 99% bootstrap bounds plus the exact 95% zero-failure probability
+upper bound. The current calibrated-input profile randomizes measurement noise, includes a fixed
+five-second GNSS outage, draws constant three-axis IMU biases inside a declared per-axis three-sigma
+residual-calibration envelope, and applies monotonic interval jitter. The first unbounded-prior
+confirmation and its one 4-sigma attitude failure remain public evidence; the later bounded range
+uses new seeds. Temperature-varying bias, delay compensation, vibration, and physical calibration
+remain separate hardware/profile gates, while deterministic transport reordering/loss/malformed
+values are covered by the input-integrity campaign.
 
 The bias scenario deliberately distinguishes observability phases. A stationary mean directly
 observes gyro bias, but one gravity direction cannot uniquely separate tilt from horizontal

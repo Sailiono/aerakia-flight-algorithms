@@ -13,10 +13,13 @@
 typedef struct {
     float minimum_dt_s;
     float maximum_dt_s;
+    /** Core continuous process-noise profile; initialize with aerakia_eskf_default_config(). */
+    ESKF_Config process_noise;
     /** Maximum observation age relative to the latest IMU sample; negative disables the check. */
     float maximum_aiding_age_s;
-    /** Maximum time without accepted horizontal position/velocity constraint before invalidation. */
-    float maximum_horizontal_dead_reckoning_s;
+    /** Independent horizontal position/velocity validity timeouts. */
+    float maximum_horizontal_position_dead_reckoning_s;
+    float maximum_horizontal_velocity_dead_reckoning_s;
     /** Maximum time without an accepted magnetic/trusted heading observation. */
     float maximum_heading_dead_reckoning_s;
     /** Independent vertical position/velocity validity timeouts. */
@@ -30,6 +33,11 @@ typedef struct {
     uint32_t navigation_recovery_rejection_limit;
     uint32_t navigation_recovery_min_consistent_observations;
     uint32_t navigation_recovery_probationary_acceptances;
+    float navigation_recovery_max_candidate_gap_s;
+    float navigation_recovery_min_candidate_duration_s;
+    float navigation_recovery_authorization_max_age_s;
+    float navigation_recovery_probation_min_duration_s;
+    float navigation_recovery_probation_max_update_gap_s;
     float recovery_max_position_variance_m2;
     float recovery_max_velocity_variance_m2_s2;
     float recovery_position_consistency_m;
@@ -56,6 +64,10 @@ typedef struct {
     AerakiaVec3f velocity_ned_m_s;
     float position_variance_m2;
     float velocity_variance_m2_s2;
+    /** Stable private-supervisor identity and quality sequence used only by recovery safety. */
+    uint32_t source_id;
+    uint32_t source_generation;
+    uint64_t quality_sequence;
 } AerakiaGpsObservation;
 
 typedef struct {
@@ -94,6 +106,9 @@ typedef struct {
     bool source_quality_verified;
     float maximum_position_correction_m;
     float maximum_velocity_correction_m_s;
+    uint32_t source_id;
+    uint32_t source_generation;
+    uint64_t quality_sequence;
 } AerakiaNavigationRecoveryAuthorization;
 
 typedef struct {
@@ -119,6 +134,7 @@ typedef struct {
     uint32_t consecutive_position_rejections;
     uint32_t consecutive_velocity_rejections;
     uint32_t recovery_candidate_consistent_observations;
+    float recovery_candidate_duration_s;
     bool navigation_recovery_candidate_ready;
     bool navigation_recovery_probationary;
     uint32_t navigation_recovery_probation_acceptances;
@@ -129,7 +145,10 @@ typedef struct {
     bool zero_velocity_update_applied;
     uint32_t static_alignment_samples;
     uint32_t zero_velocity_update_count;
+    /** Maximum of independent horizontal position/velocity ages; infinity if either is absent. */
     float horizontal_aiding_age_s;
+    float horizontal_position_aiding_age_s;
+    float horizontal_velocity_aiding_age_s;
     float heading_aiding_age_s;
     float vertical_position_aiding_age_s;
     float vertical_velocity_aiding_age_s;
@@ -153,7 +172,8 @@ typedef struct {
     uint64_t last_velocity_timestamp_us;
     uint64_t last_heading_timestamp_us;
     uint64_t last_barometer_timestamp_us;
-    uint64_t last_horizontal_aiding_timestamp_us;
+    uint64_t last_horizontal_position_aiding_timestamp_us;
+    uint64_t last_horizontal_velocity_aiding_timestamp_us;
     uint64_t last_heading_aiding_timestamp_us;
     uint64_t last_vertical_position_aiding_timestamp_us;
     uint64_t last_vertical_velocity_aiding_timestamp_us;
@@ -174,8 +194,14 @@ typedef struct {
     uint32_t consecutive_position_rejections;
     uint32_t consecutive_velocity_rejections;
     AerakiaGpsObservation recovery_candidate;
+    uint64_t recovery_candidate_start_timestamp_us;
     uint32_t recovery_candidate_consistent_observations;
     uint32_t navigation_recovery_probation_acceptances;
+    uint64_t navigation_recovery_probation_start_timestamp_us;
+    uint64_t navigation_recovery_probation_last_timestamp_us;
+    uint32_t navigation_recovery_source_id;
+    uint32_t navigation_recovery_source_generation;
+    uint64_t navigation_recovery_quality_sequence;
     double static_acceleration_sum[3];
     double static_angular_rate_sum[3];
     double static_magnetic_sum[3];
@@ -196,7 +222,8 @@ typedef struct {
     bool has_velocity_timestamp;
     bool has_heading_timestamp;
     bool has_barometer_timestamp;
-    bool has_horizontal_aiding_timestamp;
+    bool has_horizontal_position_aiding_timestamp;
+    bool has_horizontal_velocity_aiding_timestamp;
     bool has_heading_aiding_timestamp;
     bool has_vertical_position_aiding_timestamp;
     bool has_vertical_velocity_aiding_timestamp;

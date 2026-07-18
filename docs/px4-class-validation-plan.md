@@ -70,9 +70,11 @@ compatibility and stress evidence but do not become grade-A accuracy evidence.
 
 These gates precede claims based on additional datasets or PX4 ratios:
 
-1. Restore executable finite-difference validation for the prediction Jacobian, process-noise
-   mapping, and every nonlinear measurement Jacobian. Run across ordinary and near-singular
-   geometries, and make unobservable geometry an explicit result.
+1. Restore executable finite-difference validation for prediction, an explicitly scoped
+   process-noise oracle, and every declared nonlinear measurement geometry. A projected
+   pseudo-measurement must be named
+   and tested as such rather than presented as the full raw measurement Jacobian. Run across
+   ordinary and near-singular geometries, and make unobservable geometry an explicit result.
 2. Replace the generic `gate²` interpretation with measurement-dimension-aware chi-square/NIS
    thresholds. A one-dimensional 3-sigma gate and a three-dimensional 99.73% gate do not share the
    same NIS limit.
@@ -91,6 +93,14 @@ These gates precede claims based on additional datasets or PX4 ratios:
 Initial G0 scale is 10,000 randomized derivative points and at least 1,000 independent Monte Carlo
 trials for consistency intervals. Exact numerical derivative tolerances are frozen only after the
 finite-difference step size and conditioning audit are documented.
+
+Current G0 evidence includes a 225-element structure oracle/PSD test plus independent numerical
+integration of the declared reduced continuous Q model, source/generation/quality-
+snapshot and time-window-bound recovery, independent horizontal position/velocity validity, and a
+new 1,000-seed calibrated-input confirmation with 10,000-resample 99% bootstrap bounds. The prior
+unbounded-bias confirmation is retained with its one hard failure. G0 therefore applies only to the
+declared calibrated-input host profile; FCOne hardware must verify the provisional residual-bias
+envelope before the result can become a target profile.
 
 ## G1 — independent-truth capability
 
@@ -113,6 +123,11 @@ These are project gates, not airworthiness standards. Control-system error budge
 tighter limits and take precedence.
 
 ## G2 — same-input PX4 non-inferiority
+
+The first narrow implementation is the
+[accelerometer-bias A/B protocol](px4-bias-ab-protocol.md), which fixes the PX4 source revision,
+module defaults, identical-input contract, stock and matched-Q tracks, VTOL hover-first motion, and
+per-direction scoring before a broader feature comparison is attempted.
 
 PX4 is pinned to official commit
 `de8158101c96ad6b04170dc91f087148104c58eb`. The unversioned PX4 snapshot under FCOne v1 may help

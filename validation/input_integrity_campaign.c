@@ -15,6 +15,16 @@
 #define CAMPAIGN_SEEDS 100U
 #define SAMPLES_PER_SEED 10000U
 
+static FILE *open_portable_file(const char *path, const char *mode)
+{
+#if defined(_MSC_VER)
+    FILE *stream = NULL;
+    return fopen_s(&stream, path, mode) == 0 ? stream : NULL;
+#else
+    return fopen(path, mode);
+#endif
+}
+
 typedef struct {
     uint64_t attempted;
     uint64_t accepted;
@@ -82,7 +92,11 @@ static void run_aiding_contract(
     AerakiaImuSample sample;
     const uint64_t fresh_timestamp = eskf->last_timestamp_us;
     AerakiaGpsObservation gps = {
-        fresh_timestamp, {1.0f, -2.0f, 0.5f}, {0.1f, -0.2f, 0.0f}, 2.0f, 0.25f
+        .timestamp_us = fresh_timestamp,
+        .position_ned_m = {1.0f, -2.0f, 0.5f},
+        .velocity_ned_m_s = {0.1f, -0.2f, 0.0f},
+        .position_variance_m2 = 2.0f,
+        .velocity_variance_m2_s2 = 0.25f,
     };
     AerakiaHeadingObservation heading = {fresh_timestamp, 0.1f, 0.02f};
     AerakiaBarometerObservation barometer = {fresh_timestamp, 0.5f, 1.5f};
@@ -457,7 +471,7 @@ int main(int argc, char *argv[])
         return 2;
     }
     if (argc == 2) {
-        output = fopen(argv[1], "w");
+        output = open_portable_file(argv[1], "w");
         if (output == NULL) {
             perror("open summary");
             return 2;

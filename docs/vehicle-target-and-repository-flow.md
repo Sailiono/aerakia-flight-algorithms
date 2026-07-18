@@ -24,12 +24,13 @@ configuration profiles and private supervisor policy express justified differenc
 ## Source-of-truth rule
 
 `aerakia-flight-algorithms` is the only editable source for Mahony, ESKF, their public data
-contracts, mathematical tests, and hardware-independent validation. The private FCOne/eVTOL stack
-pins a reviewed algorithm commit and owns:
+contracts, mathematical tests, reusable delayed-fusion mathematics, and hardware-independent
+validation. The private FCOne/eVTOL stack pins a reviewed algorithm commit and owns:
 
 - board drivers and calibrated redundant-sensor publications;
 - sensor voting, isolation, switch policy, and switch event logging;
-- physical-to-arrival timestamp tracking and delayed-observation handling;
+- sensor-specific physical-to-arrival delay characterization, buffering/scheduling, and source
+  switch policy; a reusable estimator rewind/output-prediction algorithm belongs in the public core;
 - vehicle-mode profiles, estimator supervision, controller/failsafe policy, and HIL/flight logs;
 - hardware schematics, production calibration, target resource results, and confidential datasets.
 

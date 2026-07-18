@@ -20,6 +20,19 @@ static int near(float actual, float expected, float tolerance)
     return fabsf(actual - expected) <= tolerance;
 }
 
+static int near_double(double actual, double expected, double tolerance)
+{
+    return fabs(actual - expected) <= tolerance;
+}
+
+static void set_process_noise_field(ESKF_Config *config, int field, double value)
+{
+    if (field == 0) config->sigma_acc = value;
+    else if (field == 1) config->sigma_gyr = value;
+    else if (field == 2) config->sigma_acc_bias = value;
+    else config->sigma_gyr_bias = value;
+}
+
 static void set_vector_axis(AerakiaVec3f *vector, int axis, float value)
 {
     if (axis == 0) vector->x = value;
@@ -318,6 +331,61 @@ static void test_eskf_input_integrity(void)
                "non-finite optional magnetometer is equivalent to no magnetometer update");
 }
 
+static void test_eskf_process_noise_profile(void)
+{
+    AerakiaEskf filter;
+    AerakiaEskfConfig config;
+    AerakiaEskfConfig defaults;
+    const double invalid_values[] = {NAN, INFINITY, -0.001};
+    int field;
+    int invalid_index;
+
+    aerakia_eskf_default_config(&defaults);
+    check_true(near_double(defaults.process_noise.sigma_acc, 0.1, 1.0e-15)
+                   && near_double(defaults.process_noise.sigma_gyr, 0.01, 1.0e-15)
+                   && near_double(defaults.process_noise.sigma_acc_bias, 0.001, 1.0e-15)
+                   && near_double(defaults.process_noise.sigma_gyr_bias, 0.0001, 1.0e-15),
+               "adapter process-noise defaults match the current portable core profile");
+
+    aerakia_eskf_init(&filter, &defaults, NULL, NULL);
+    check_true(memcmp(&filter.core.cfg, &defaults.process_noise,
+                      sizeof(defaults.process_noise)) == 0,
+               "default adapter process-noise profile reaches the ESKF core");
+
+    config = defaults;
+    config.process_noise.sigma_acc = 0.24;
+    config.process_noise.sigma_gyr = 0.031;
+    config.process_noise.sigma_acc_bias = 0.0042;
+    config.process_noise.sigma_gyr_bias = 0.00073;
+    aerakia_eskf_init(&filter, &config, NULL, NULL);
+    check_true(memcmp(&filter.config.process_noise, &config.process_noise,
+                      sizeof(config.process_noise)) == 0
+                   && memcmp(&filter.core.cfg, &config.process_noise,
+                             sizeof(config.process_noise)) == 0,
+               "custom process-noise profile is retained and applied atomically");
+
+    config = defaults;
+    config.process_noise.sigma_acc_bias = 0.0;
+    aerakia_eskf_init(&filter, &config, NULL, NULL);
+    check_true(filter.core.cfg.sigma_acc_bias == 0.0,
+               "zero is an explicit valid process-noise configuration");
+
+    for (field = 0; field < 4; ++field) {
+        for (invalid_index = 0; invalid_index < 3; ++invalid_index) {
+            config = defaults;
+            set_process_noise_field(
+                &config.process_noise, field, invalid_values[invalid_index]
+            );
+            aerakia_eskf_init(&filter, &config, NULL, NULL);
+            check_true(memcmp(&filter.config.process_noise, &defaults.process_noise,
+                              sizeof(defaults.process_noise)) == 0
+                           && memcmp(&filter.core.cfg, &defaults.process_noise,
+                                     sizeof(defaults.process_noise)) == 0,
+                       "non-finite or negative process-noise field falls back to the full default profile");
+        }
+    }
+}
+
 static void test_eskf_timestamped_aiding_integrity(void)
 {
     AerakiaEskf filter;
@@ -326,7 +394,11 @@ static void test_eskf_timestamped_aiding_integrity(void)
     AerakiaNavigationEstimate estimate;
     AerakiaImuSample sample = level_sample(1000000U);
     AerakiaGpsObservation gps = {
-        1010000U, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, 1.0f, 1.0f
+        .timestamp_us = 1010000U,
+        .position_ned_m = {0.0f, 0.0f, 0.0f},
+        .velocity_ned_m_s = {0.0f, 0.0f, 0.0f},
+        .position_variance_m2 = 1.0f,
+        .velocity_variance_m2_s2 = 1.0f,
     };
     AerakiaHeadingObservation heading = {1010000U, 0.0f, 0.01f};
     AerakiaBarometerObservation barometer = {1010000U, 0.0f, 1.0f};
@@ -458,7 +530,11 @@ static void test_eskf_independent_navigation_observations(void)
         1010000U, {100.0f, 100.0f, 100.0f}, 1.0f
     };
     AerakiaGpsObservation paired = {
-        1020000U, {1.0f, 2.0f, 3.0f}, {0.1f, 0.2f, 0.3f}, 1.0f, 1.0f
+        .timestamp_us = 1020000U,
+        .position_ned_m = {1.0f, 2.0f, 3.0f},
+        .velocity_ned_m_s = {0.1f, 0.2f, 0.3f},
+        .position_variance_m2 = 1.0f,
+        .velocity_variance_m2_s2 = 1.0f,
     };
 
     aerakia_eskf_default_config(&config);
@@ -552,11 +628,13 @@ static void test_eskf_horizontal_navigation_validity_timeout(void)
     };
 
     aerakia_eskf_default_config(&config);
-    check_true(near(config.maximum_horizontal_dead_reckoning_s, 5.0f, 1.0e-6f),
-               "default horizontal no-aiding validity limit is five seconds");
+    check_true(near(config.maximum_horizontal_position_dead_reckoning_s, 5.0f, 1.0e-6f)
+                   && near(config.maximum_horizontal_velocity_dead_reckoning_s, 5.0f, 1.0e-6f),
+               "default independent horizontal validity limits are five seconds");
     config.enable_static_alignment = false;
     config.navigation_recovery_rejection_limit = 0U;
-    config.maximum_horizontal_dead_reckoning_s = 0.05f;
+    config.maximum_horizontal_position_dead_reckoning_s = 0.05f;
+    config.maximum_horizontal_velocity_dead_reckoning_s = 0.05f;
     aerakia_eskf_init(&filter, &config, NULL, NULL);
 
     (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
@@ -565,7 +643,9 @@ static void test_eskf_horizontal_navigation_validity_timeout(void)
     check_true(!estimate.horizontal_navigation_valid
                    && !estimate.horizontal_position_valid
                    && !estimate.horizontal_velocity_valid
-                   && isinf(estimate.horizontal_aiding_age_s),
+                   && isinf(estimate.horizontal_aiding_age_s)
+                   && isinf(estimate.horizontal_position_aiding_age_s)
+                   && isinf(estimate.horizontal_velocity_aiding_age_s),
                "navigation is invalid before any accepted horizontal constraint");
 
     check_true(aerakia_eskf_update_velocity_observation(&filter, &velocity)
@@ -574,7 +654,9 @@ static void test_eskf_horizontal_navigation_validity_timeout(void)
     aerakia_eskf_get_estimate(&filter, &estimate);
     check_true(!estimate.horizontal_navigation_valid
                    && !estimate.horizontal_position_valid
-                   && estimate.horizontal_velocity_valid,
+                   && estimate.horizontal_velocity_valid
+                   && isinf(estimate.horizontal_position_aiding_age_s)
+                   && near(estimate.horizontal_velocity_aiding_age_s, 0.0f, 1.0e-6f),
                "velocity-only aiding cannot invent a horizontal position origin");
 
     check_true(aerakia_eskf_update_position_observation(&filter, &position)
@@ -584,8 +666,9 @@ static void test_eskf_horizontal_navigation_validity_timeout(void)
     check_true(estimate.horizontal_navigation_valid
                    && estimate.horizontal_position_valid
                    && estimate.horizontal_velocity_valid
-                   && near(estimate.horizontal_aiding_age_s, 0.0f, 1.0e-6f),
-               "fresh accepted position qualifies position and velocity outputs");
+                   && near(estimate.horizontal_position_aiding_age_s, 0.0f, 1.0e-6f)
+                   && near(estimate.horizontal_velocity_aiding_age_s, 0.0f, 1.0e-6f),
+               "fresh independent position and velocity qualify navigation");
 
     sample.timestamp_us = 50000U;
     (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
@@ -618,27 +701,46 @@ static void test_eskf_horizontal_navigation_validity_timeout(void)
                    == AERAKIA_STATUS_OK,
                "accepted velocity can refresh an initialized horizontal solution");
     aerakia_eskf_get_estimate(&filter, &estimate);
-    check_true(estimate.velocity_accepted && estimate.horizontal_navigation_valid
-                   && near(estimate.horizontal_aiding_age_s, 0.0f, 1.0e-6f),
-               "accepted velocity refreshes horizontal validity without changing origin");
+    check_true(estimate.velocity_accepted && !estimate.horizontal_navigation_valid
+                   && !estimate.horizontal_position_valid
+                   && estimate.horizontal_velocity_valid
+                   && near(estimate.horizontal_position_aiding_age_s, 0.06f, 1.0e-6f)
+                   && near(estimate.horizontal_velocity_aiding_age_s, 0.0f, 1.0e-6f),
+               "accepted velocity refreshes only velocity validity");
+
+    sample.timestamp_us = 80000U;
+    (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
+    position.timestamp_us = 80000U;
+    position.position_ned_m.x = 0.0f;
+    position.variance_m2 = 1.0f;
+    (void)aerakia_eskf_update_position_observation(&filter, &position);
+    aerakia_eskf_get_estimate(&filter, &estimate);
+    check_true(estimate.horizontal_navigation_valid
+                   && estimate.horizontal_position_valid
+                   && estimate.horizontal_velocity_valid,
+               "fresh position restores navigation while velocity remains independently fresh");
 
     sample.timestamp_us = 130000U;
     (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
-    check_true(!estimate.horizontal_navigation_valid,
-               "horizontal navigation expires again after velocity aiding stops");
+    check_true(!estimate.horizontal_navigation_valid && estimate.horizontal_position_valid
+                   && !estimate.horizontal_velocity_valid,
+               "horizontal velocity expires independently from position");
     aerakia_eskf_apply_zero_velocity(&filter, 0.01f);
     aerakia_eskf_get_estimate(&filter, &estimate);
     check_true(estimate.horizontal_navigation_valid
-                   && near(estimate.horizontal_aiding_age_s, 0.0f, 1.0e-6f),
-               "explicit zero velocity refreshes drift constraint after position initialization");
+                   && near(estimate.horizontal_position_aiding_age_s, 0.05f, 1.0e-6f)
+                   && near(estimate.horizontal_velocity_aiding_age_s, 0.0f, 1.0e-6f),
+               "zero velocity refreshes velocity without refreshing position");
 
     sample.timestamp_us = 200000U;
-    filter.config.maximum_horizontal_dead_reckoning_s = -1.0f;
+    filter.config.maximum_horizontal_position_dead_reckoning_s = -1.0f;
+    filter.config.maximum_horizontal_velocity_dead_reckoning_s = -1.0f;
     (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
     check_true(estimate.horizontal_navigation_valid
-                   && near(estimate.horizontal_aiding_age_s, 0.07f, 1.0e-6f),
+                   && near(estimate.horizontal_aiding_age_s, 0.12f, 1.0e-6f),
                "negative timeout explicitly disables age-based invalidation");
-    filter.config.maximum_horizontal_dead_reckoning_s = 0.0f;
+    filter.config.maximum_horizontal_position_dead_reckoning_s = 0.0f;
+    filter.config.maximum_horizontal_velocity_dead_reckoning_s = 0.0f;
     aerakia_eskf_get_estimate(&filter, &estimate);
     check_true(!estimate.horizontal_navigation_valid,
                "zero timeout accepts only a same-timestamp horizontal constraint");
@@ -654,7 +756,11 @@ static void test_eskf_aiding_numeric_exhaustive(void)
     const float nonfinite[] = {NAN, INFINITY, -INFINITY};
     const float bad_variance[] = {NAN, INFINITY, -INFINITY, 0.0f};
     AerakiaGpsObservation gps = {
-        1010000U, {1.0f, 2.0f, 3.0f}, {0.1f, 0.2f, 0.3f}, 1.0f, 1.0f
+        .timestamp_us = 1010000U,
+        .position_ned_m = {1.0f, 2.0f, 3.0f},
+        .velocity_ned_m_s = {0.1f, 0.2f, 0.3f},
+        .position_variance_m2 = 1.0f,
+        .velocity_variance_m2_s2 = 1.0f,
     };
     AerakiaHeadingObservation heading = {1010000U, 0.1f, 0.01f};
     AerakiaBarometerObservation barometer = {1010000U, 2.0f, 1.0f};
@@ -833,10 +939,17 @@ static void test_eskf_navigation_recovery_and_heading(void)
     AerakiaNavigationEstimate estimate;
     AerakiaImuSample sample = level_sample(1000000U);
     AerakiaGpsObservation observation = {
-        1010000U, {50.0f, 0.0f, 0.0f}, {10.0f, 0.0f, 0.0f}, 1.0f, 1.0f
+        .timestamp_us = 1010000U,
+        .position_ned_m = {50.0f, 0.0f, 0.0f},
+        .velocity_ned_m_s = {10.0f, 0.0f, 0.0f},
+        .position_variance_m2 = 1.0f,
+        .velocity_variance_m2_s2 = 1.0f,
     };
     AerakiaNavigationRecoveryAuthorization authorization = {
-        1010000U, false, 60.0f, 15.0f
+        .observation_timestamp_us = 1010000U,
+        .source_quality_verified = false,
+        .maximum_position_correction_m = 60.0f,
+        .maximum_velocity_correction_m_s = 15.0f,
     };
     double initial_q[4] = {cos(0.1), 0.0, 0.0, sin(0.1)};
     float yaw_before;
@@ -846,30 +959,90 @@ static void test_eskf_navigation_recovery_and_heading(void)
     config.enable_static_alignment = false;
     config.navigation_recovery_rejection_limit = 3U;
     config.navigation_recovery_min_consistent_observations = 3U;
-    config.navigation_recovery_probationary_acceptances = 2U;
+    config.navigation_recovery_probationary_acceptances = 3U;
     aerakia_eskf_init(&filter, &config, NULL, initial_q);
     (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
 
-    for (index = 0; index < 3; ++index) {
-        sample.timestamp_us = 1010000U + (uint64_t)index * 10000U;
+    observation.source_id = 7U;
+    observation.source_generation = 2U;
+    observation.quality_sequence = 11U;
+    for (index = 0; index < 5; ++index) {
+        sample.timestamp_us = index < 2
+            ? 1100000U + (uint64_t)index * 100000U
+            : 2000000U + (uint64_t)(index - 2) * 100000U;
         observation.timestamp_us = sample.timestamp_us;
         observation.position_ned_m.x = 50.0f + 0.10f * (float)index;
         (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
         check_true(aerakia_eskf_update_gps_observation(&filter, &observation)
                        == AERAKIA_STATUS_OK,
                    "consistent rejected GNSS candidate is recorded");
+        if (index == 2) {
+            aerakia_eskf_get_estimate(&filter, &estimate);
+            check_true(estimate.recovery_candidate_consistent_observations == 1U
+                           && !estimate.navigation_recovery_candidate_ready,
+                       "candidate gap above 0.3 seconds restarts the evidence window");
+        }
     }
     aerakia_eskf_get_estimate(&filter, &estimate);
     check_true(!estimate.navigation_recovered
                    && estimate.navigation_recovery_candidate_ready
-                   && estimate.recovery_candidate_consistent_observations == 3U,
-               "rejection count alone only makes a supervised recovery candidate ready");
+                   && estimate.recovery_candidate_consistent_observations == 3U
+                   && near(estimate.recovery_candidate_duration_s, 0.2f, 1.0e-6f),
+               "candidate requires count, continuity, and minimum physical duration");
+    {
+        AerakiaEskf changed_quality_filter = filter;
+        AerakiaGpsObservation changed_quality = observation;
+        AerakiaImuSample changed_quality_sample = sample;
+        changed_quality_sample.timestamp_us += 100000U;
+        changed_quality.timestamp_us = changed_quality_sample.timestamp_us;
+        changed_quality.quality_sequence++;
+        (void)aerakia_eskf_process_imu(
+            &changed_quality_filter, &changed_quality_sample, NULL
+        );
+        (void)aerakia_eskf_update_gps_observation(
+            &changed_quality_filter, &changed_quality
+        );
+        aerakia_eskf_get_estimate(&changed_quality_filter, &estimate);
+        check_true(estimate.recovery_candidate_consistent_observations == 1U
+                       && !estimate.navigation_recovery_candidate_ready,
+                   "quality snapshot change restarts the candidate evidence window");
+    }
 
     authorization.observation_timestamp_us = observation.timestamp_us;
+    authorization.source_id = observation.source_id;
+    authorization.source_generation = observation.source_generation;
+    authorization.quality_sequence = observation.quality_sequence;
     check_true(aerakia_eskf_authorize_navigation_recovery(&filter, &authorization)
                    == AERAKIA_STATUS_RECOVERY_REJECTED,
                "recovery requires explicit physical source-quality attestation");
     authorization.source_quality_verified = true;
+    authorization.source_id++;
+    check_true(aerakia_eskf_authorize_navigation_recovery(&filter, &authorization)
+                   == AERAKIA_STATUS_RECOVERY_REJECTED,
+               "authorization is bound to the exact physical source");
+    authorization.source_id = observation.source_id;
+    authorization.source_generation++;
+    check_true(aerakia_eskf_authorize_navigation_recovery(&filter, &authorization)
+                   == AERAKIA_STATUS_RECOVERY_REJECTED,
+               "authorization is bound to the exact source generation");
+    authorization.source_generation = observation.source_generation;
+    authorization.quality_sequence++;
+    check_true(aerakia_eskf_authorize_navigation_recovery(&filter, &authorization)
+                   == AERAKIA_STATUS_RECOVERY_REJECTED,
+               "authorization is bound to the exact quality snapshot");
+    authorization.quality_sequence = observation.quality_sequence;
+    {
+        AerakiaEskf stale_filter = filter;
+        AerakiaImuSample stale_sample = sample;
+        stale_sample.timestamp_us += 300000U;
+        (void)aerakia_eskf_process_imu(&stale_filter, &stale_sample, NULL);
+        check_true(aerakia_eskf_authorize_navigation_recovery(&stale_filter, &authorization)
+                       == AERAKIA_STATUS_NOT_READY,
+                   "authorization older than 0.25 seconds fails closed");
+        aerakia_eskf_get_estimate(&stale_filter, &estimate);
+        check_true(!estimate.navigation_recovery_candidate_ready,
+                   "stale candidate is not advertised as ready");
+    }
     authorization.maximum_position_correction_m = 10.0f;
     check_true(aerakia_eskf_authorize_navigation_recovery(&filter, &authorization)
                    == AERAKIA_STATUS_RECOVERY_REJECTED,
@@ -882,23 +1055,72 @@ static void test_eskf_navigation_recovery_and_heading(void)
     check_true(estimate.navigation_recovered && estimate.navigation_recovery_probationary,
                "authorized reset enters probation rather than declaring navigation valid");
     check_true(estimate.navigation_recovery_count == 1U, "navigation recovery is counted");
-    check_true(near(estimate.position_ned_m.x, 50.2f, 1.0e-4f),
+    check_true(near(estimate.position_ned_m.x, 50.4f, 1.0e-4f),
                "authorized recovery uses the timestamp-bound candidate");
     check_true(!estimate.horizontal_navigation_valid,
                "probationary recovery does not qualify controller-facing navigation");
 
+    sample.timestamp_us += 100000U;
+    observation.timestamp_us = sample.timestamp_us;
+    (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
+    {
+        int mismatch_index;
+        const AerakiaEskf probation_before_mismatch = filter;
+        for (mismatch_index = 0; mismatch_index < 3; ++mismatch_index) {
+            AerakiaEskf attempted_filter = probation_before_mismatch;
+            AerakiaGpsObservation mismatched_observation = observation;
+            if (mismatch_index == 0) mismatched_observation.source_id++;
+            else if (mismatch_index == 1) mismatched_observation.source_generation++;
+            else mismatched_observation.quality_sequence++;
+
+            check_true(aerakia_eskf_update_gps_observation(
+                           &attempted_filter, &mismatched_observation)
+                           == AERAKIA_STATUS_RECOVERY_REJECTED,
+                       "mismatched probation source stamp is rejected before GPS fusion");
+            check_true(eskf_core_unchanged(&attempted_filter, &probation_before_mismatch),
+                       "mismatched probation source stamp leaves state and full covariance unchanged");
+            check_true(attempted_filter.last_gps_timestamp_us
+                           == probation_before_mismatch.last_gps_timestamp_us
+                           && attempted_filter.last_position_timestamp_us
+                               == probation_before_mismatch.last_position_timestamp_us
+                           && attempted_filter.last_velocity_timestamp_us
+                               == probation_before_mismatch.last_velocity_timestamp_us,
+                       "mismatched probation source stamp does not consume GPS timestamps");
+            check_true(memcmp(&attempted_filter, &probation_before_mismatch,
+                              sizeof(attempted_filter)) == 0,
+                       "mismatched probation source stamp leaves innovations and all bookkeeping unchanged");
+        }
+    }
+
     for (index = 0; index < 2; ++index) {
-        sample.timestamp_us += 10000U;
+        sample.timestamp_us += 100000U;
         observation.timestamp_us = sample.timestamp_us;
         observation.position_ned_m.x += 0.10f;
         (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
         (void)aerakia_eskf_update_gps_observation(&filter, &observation);
         aerakia_eskf_get_estimate(&filter, &estimate);
-        if (index == 0) {
-            check_true(estimate.navigation_recovery_probationary
-                           && !estimate.horizontal_navigation_valid,
-                       "one accepted post-reset pair is not enough to qualify navigation");
-        }
+        check_true(estimate.navigation_recovery_probationary
+                       && !estimate.horizontal_navigation_valid,
+                   "rapid accepted pairs cannot bypass minimum probation duration");
+    }
+
+    sample.timestamp_us += 400000U;
+    observation.timestamp_us = sample.timestamp_us;
+    observation.position_ned_m.x += 0.40f;
+    (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
+    (void)aerakia_eskf_update_gps_observation(&filter, &observation);
+    aerakia_eskf_get_estimate(&filter, &estimate);
+    check_true(estimate.navigation_recovery_probationary
+                   && estimate.navigation_recovery_probation_acceptances == 1U,
+               "probation update gap above 0.3 seconds restarts the dwell");
+
+    for (index = 0; index < 3; ++index) {
+        sample.timestamp_us += 100000U;
+        observation.timestamp_us = sample.timestamp_us;
+        observation.position_ned_m.x += 0.10f;
+        (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
+        (void)aerakia_eskf_update_gps_observation(&filter, &observation);
+        aerakia_eskf_get_estimate(&filter, &estimate);
     }
     check_true(!estimate.navigation_recovery_probationary
                    && estimate.horizontal_navigation_valid,
@@ -1012,6 +1234,7 @@ int main(void)
     test_mahony_trusted_attitude_seed();
     test_mahony_adaptive_weight_and_timestamp();
     test_mahony_input_integrity();
+    test_eskf_process_noise_profile();
     test_eskf_input_integrity();
     test_eskf_timestamped_aiding_integrity();
     test_eskf_independent_navigation_observations();

@@ -50,6 +50,9 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--accel-bias-std-m-s2", type=float, default=0.0)
     parser.add_argument("--gyro-bias-std-deg-s", type=float, default=0.0)
+    parser.add_argument("--accel-bias-vector-m-s2", type=float, nargs=3, metavar=("X", "Y", "Z"))
+    parser.add_argument("--gyro-bias-vector-deg-s", type=float, nargs=3, metavar=("X", "Y", "Z"))
+    parser.add_argument("--bias-sigma-limit", type=float, default=0.0)
     parser.add_argument("--timestamp-jitter-std-us", type=float, default=0.0)
     parser.add_argument("--accel-noise-m-s2", type=float, default=0.02)
     parser.add_argument("--gyro-noise-deg-s", type=float, default=0.05)
@@ -98,6 +101,7 @@ def main() -> None:
             "--gyro-bias-std-deg-s", str(
                 scenario.get("gyro_bias_std_deg_s", args.gyro_bias_std_deg_s)
             ),
+            "--bias-sigma-limit", str(args.bias_sigma_limit),
             "--timestamp-jitter-std-us", str(args.timestamp_jitter_std_us),
             "--accel-noise-m-s2", str(args.accel_noise_m_s2),
             "--gyro-noise-deg-s", str(args.gyro_noise_deg_s),
@@ -108,6 +112,16 @@ def main() -> None:
         ]
         if args.mag_rate_hz is not None:
             generator_command.extend(["--mag-rate-hz", str(args.mag_rate_hz)])
+        if args.accel_bias_vector_m_s2 is not None:
+            generator_command.extend([
+                "--accel-bias-vector-m-s2",
+                *(str(value) for value in args.accel_bias_vector_m_s2),
+            ])
+        if args.gyro_bias_vector_deg_s is not None:
+            generator_command.extend([
+                "--gyro-bias-vector-deg-s",
+                *(str(value) for value in args.gyro_bias_vector_deg_s),
+            ])
         if args.rate_invariant_streams:
             generator_command.append("--rate-invariant-streams")
         if scenario.get("static_hint"):

@@ -74,22 +74,58 @@ These items precede numerical PX4 parity claims. PX4 M0 scaffolding and small in
 dataset intake may proceed in parallel because they do not require changing the shared estimator
 source.
 
-### G0 closure checkpoint
+### G0 closure candidate and retained failures
 
 The audited G0 blockers are now implemented and executable:
 
-- 10,000-case transition/process/heading model campaigns;
+- 10,000-case transition and full trusted-heading Jacobian campaigns, a 225-element Q structure
+  oracle/PSD check, a reduced-continuous-model Q integration oracle, and magnetometer yaw-only
+  boundary tests;
 - degree-of-freedom-aware NIS gates;
-- source-quality and supervisor-authorized bounded recovery with probation;
-- continuous horizontal, heading, vertical-position, and vertical-velocity validity;
+- source/generation/quality-snapshot and time-window-bound supervisor-authorized recovery with
+  bounded correction and probation;
+- independent horizontal-position/horizontal-velocity, heading, vertical-position, and
+  vertical-velocity validity;
 - separate public reproducibility and one-way capability gates;
 - repository-wide warnings-as-errors plus sanitizer CI;
 - 32-seed accuracy/consistency invariance at 100/200/400/1000 Hz;
-- 1,000-seed navigation Monte Carlo with empirical P05/P95, hard envelopes, resumable per-seed
-  evidence, and zero health/recovery failures.
+- a consumed 1,000-seed unbounded-prior confirmation that retained one 4-sigma startup-bias tail
+  failure, followed by a newly frozen 1,000-seed calibrated-bias confirmation with 10,000-resample
+  bootstrap bounds, zero hard failures, and zero health/recovery failures.
+- protocol-fingerprinted Monte Carlo checkpoints that reject resume across code, binary, threshold,
+  noise, timing, or bias-profile changes;
+- a 137-case deterministic three-sigma bias-box campaign covering every axis/sign, all signed
+  pairs, and all 64 six-dimensional corners.
 
-G0 closes known mathematical/safety blockers in the declared host model. It does not close G1
+G0 is not declared fully closed yet. The 137-case campaign passes every numerical-health and
+navigation-consistency gate, but only 120 cases meet every accuracy/convergence gate. All 17 first-
+run misses share the `+X/-Y` acceleration-bias direction and exceeded the reviewed 35 s settling
+budget. A follow-up 32-seed paired diagnostic confirmed direction-sensitive convergence: the target
+direction missed in 22/32 trials, its mirror in 8/32, and zero injected bias in 3/32. The threshold
+is not widened after observing that result; the observability/covariance cause must be corrected or
+the product budget reviewed independently.
+
+The causal analysis and frozen non-multisine cross-validation design are recorded in
+[Horizontal accelerometer-bias observability](bias-observability.md). New bias reports include
+three-axis covariance/NEES, per-axis and terminal-window error, continuous-five-second convergence,
+and explicit right-censoring; they intentionally do not claim a tilt+bias joint NEES until the
+complete right-error 6x6 covariance block is exported.
+
+The first protocol smoke is deliberately not green at the capability layer: 15/15 trials execute,
+all five zero-bias tracks pass, and all ten boundary-bias tracks fail stable convergence. The next
+G0 work is therefore the predeclared data-contract/observability experiment matrix and a small
+train/tune covariance/process-noise study, followed by one opening of the 1,152-trial holdout. The
+release holdout is not run merely to produce a larger known failure set before a candidate exists.
+
+The statistical result assumes each calibrated startup residual-bias component lies within three sigma
+(`0.15 m/s²` accelerometer and `0.6 deg/s` gyroscope under the current provisional prior). FCOne
+hardware characterization must confirm or replace that input contract. G0 does not close G1
 physical-truth volume, G2 same-input PX4 non-inferiority, or G3 FCOne target evidence.
+
+The current Q discretization is also explicitly a high-rate reduced-model approximation. Its
+100--1000 Hz accuracy/consistency invariance passes, but a full coupled continuous-model Qd oracle
+remains a mathematical hardening item before claiming unrestricted transition/high-dynamic
+statistical consistency.
 
 ## P1 — FCOne v2 integration before hardware arrival
 

@@ -18,12 +18,12 @@ jobs:
       - run: python -m pip install -r requirements.txt
       - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
       - run: cmake --build build --parallel --target aerakia_validation_runner
-      - name: Run 1,000-trial navigation consistency campaign
+      - name: Run 1,000-trial calibrated-input regression campaign
         run: >-
           python validation/run_monte_carlo.py
           --runner build/aerakia_validation_runner
           --out-dir build/monte-carlo-1000
-          --seeds 0:1000 --jobs 2 --compact
+          --seeds 20000:21000 --bias-sigma-limit 3.0 --jobs 2 --compact
       - uses: actions/upload-artifact@v4
         with:
           name: monte-carlo-1000

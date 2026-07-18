@@ -684,11 +684,13 @@ accuracy ratio. A same-input A/B protocol is retained in `docs/px4-ekf2-comparis
 
 ### Contract correction
 
-- `AerakiaEskfConfig.maximum_horizontal_dead_reckoning_s` defaults to five seconds.
+- The original checkpoint used one five-second horizontal timeout. The later independent G0 review
+  split it into `maximum_horizontal_position_dead_reckoning_s` and
+  `maximum_horizontal_velocity_dead_reckoning_s`, both defaulting to five seconds.
 - Numerical `healthy` is retained separately from horizontal position, velocity, and combined
   navigation validity.
-- Only an accepted horizontal position/velocity constraint, an accepted zero-velocity constraint,
-  or an explicit navigation recovery refreshes the horizontal aiding timestamp.
+- Accepted position and velocity constraints refresh only their own timestamps; ZUPT refreshes
+  velocity only, and recovery probation keeps both invalid until its paired dwell completes.
 - A rejected observation cannot refresh validity, and velocity-only aiding cannot invent an
   uninitialized position origin.
 - The estimator-supervisor executable contract now consumes the production validity flag instead
@@ -1075,3 +1077,169 @@ build. A stricter local `-Wconversion -Werror` audit of every source, test, and 
 then exposed four enum-complement signedness conversions and one integer-to-double timestamp
 conversion in the public-API/input-integrity tests. Those test-harness boundaries now use explicit
 `uint32_t`/`double` conversions, and the complete conversion audit passes with zero diagnostics.
+
+## 2026-07-18 — independent G0 review, failed confirmation, and corrected confirmation
+
+### Why G0 was reopened
+
+The first closure checkpoint was given to an independent validation-gap review. It identified four
+ways a green suite could still overstate capability: recovery authorization was not bound to one
+physical source generation and one quality decision window; position and velocity reused one
+horizontal-validity timestamp; Q/H claims exceeded the actual executable oracle; and the first
+1,000 Monte Carlo seeds were development-visible.
+
+### Recovery and validity correction
+
+Recovery observations now carry `source_id`, `source_generation`, and `quality_sequence`.
+`source_id == 0` may still use ordinary fusion but can never form a recovery candidate. The default
+5--10 Hz recovery profile requires three consistent paired samples spanning at least 0.20 s, no
+sample gap above 0.30 s, authorization no more than 0.25 s after the exact candidate, bounded
+position/velocity correction, and three same-source probation accepts spanning at least 0.20 s.
+Any source/generation/quality change, rejection, reorder, or excessive gap restarts the applicable
+window. Tests include stale authorization, source/generation/quality mismatch, candidate gap,
+probation source switch, burst-without-duration, probation gap, and exact dwell completion.
+
+Horizontal position and velocity now carry independent accepted-aiding timestamps, ages, timeouts,
+and validity. Position-only, velocity-only, paired, rejected, and ZUPT cases are tested separately.
+The old summary age remains the maximum of the two required ages for conservative telemetry; flight
+qualification must use the individual validity booleans.
+
+### Q scope and heading-model audit
+
+The randomized process-noise gate evaluates all 225 entries against a complete structure oracle,
+including the integrated acceleration velocity-position block. It checks every entry finite, full
+symmetry, zero-noise output, and full-matrix positive semidefiniteness. A separate RK4 integration
+of `dQ/dt = A Q + Q A^T + W` matches to `5.2042e-18`, but that continuous oracle deliberately covers
+only the declared reduced within-step model: direct IMU/bias white noise plus velocity-position
+integration. It does not close every higher-order transition/bias coupling. The production Q remains
+a tested high-rate approximation, not an exact full-model discretization claim.
+
+The first correction replaced the old projected heading H with the complete raw body-X heading
+Jacobian for both trusted and magnetic heading. Its 10,000-case finite-difference error was below
+`1.0e-8`, but the deterministic clean/magnetic ESKF tracks regressed to `4.594°`, `2.631°`, and
+`9.580°`: scalar magnetic heading began injecting model error into unobserved tilt. That failed
+track is retained; the implementation was not accepted merely because the Jacobian test was green.
+
+The final split uses the complete raw Jacobian for trusted dual-GNSS/vision-style heading. The
+magnetometer path is explicitly a tilt-conditioned local NED-yaw pseudo correction with
+`R_nb^T e_D`; its tuning variance and pseudo-NIS are not presented as a general physical-heading
+measurement at arbitrary tilt. The raw-heading finite-difference maximum is `1.1054e-08`, the
+magnetic pure-yaw directional error is `1.2102e-08`, and finite yaw corrections preserve gravity
+direction within `8.8818e-16`. The seven deterministic scenarios again pass all reviewed gates.
+
+### Consumed failure: unbounded startup-bias confirmation
+
+After freezing the existing limits, seeds 10000--10999 ran the complete 20 s cold-start,
+translation, 5 s GNSS outage, and reacquisition scenario. All 1,000 executions completed, but seed
+10988 reached `3.715137°` attitude RMSE against the `3.5°` per-trial hard limit. It had drawn
+`0.199252 m/s²` residual y-axis accelerometer bias from the unbounded Gaussian. Health remained
+100%, position/velocity RMSE were `0.598 m / 0.300 m/s`, navigation NEES was `4.451`, and no recovery
+occurred. The failed range is retained and marked consumed.
+
+The diagnosis is an observability boundary, not a reason to widen the accuracy gate. The scenario
+keeps attitude nearly fixed; one static gravity direction cannot distinguish horizontal bias from
+tilt. FCOne's public algorithm input is already specified as calibrated SI data, so the statistical
+profile was revised to declare rather than imply a calibration envelope.
+
+### Revised profile and new confirmation
+
+The provisional pre-hardware input profile now truncates each constant startup residual-bias
+component at three standard deviations: `0.15 m/s²` accelerometer and `0.6 deg/s` gyroscope under
+the existing priors. Rejection sampling preserves the Gaussian shape inside the declared envelope;
+metadata records the limit and actual vector. All development seeds whose old draws exceeded the
+new envelope, plus seed 10988, passed before opening a new range.
+
+Seeds 20000--20999 then produced:
+
+| Metric | Mean | P95 | Maximum | 99% bootstrap P95 upper |
+| --- | ---: | ---: | ---: | ---: |
+| position RMSE | 0.3930 m | 0.6392 m | 0.9156 m | 0.6830 m |
+| velocity RMSE | 0.1739 m/s | 0.2973 m/s | 0.4318 m/s | 0.3110 m/s |
+| attitude RMSE | 0.9624 deg | 1.7120 deg | 2.9810 deg | 1.8594 deg |
+
+Position NIS mean was `2.9750`, velocity NIS mean `2.5269`, and six-state navigation NEES mean
+`5.0243`. Their 99% bootstrap mean intervals were `[2.9575, 2.9917]`, `[2.5118, 2.5411]`, and
+`[4.9328, 5.1202]`. All 1,000 states were healthy, no navigation recovery occurred, and there were
+zero execution, hard, distribution, aggregate-consistency, or bootstrap-bound failures. With zero
+failures, the exact 95% binomial upper failure probability is `0.00299125`.
+
+The bound remains a pre-hardware hypothesis. FCOne v2 static multi-orientation and thermal tests
+must verify or replace it; a hardware violation fails the profile instead of silently expanding the
+host gate.
+
+### Post-confirmation audit closures
+
+The probation source/generation/quality check was found to occur after the core GPS update. A wrong
+source could therefore modify state and covariance even though it did not advance probation. The
+check now runs before fusion. Three mismatch cases assert byte-identical adapter state, nominal
+state, full covariance, innovations, counters, and aiding timestamps.
+
+Monte Carlo resume checkpoints now carry one canonical SHA-256 protocol fingerprint covering the
+scenario, duration/rate/jitter, all sensor noise, bias distribution and bound, generator,
+orchestrator, analyzer, runner binary, deterministic thresholds, threshold checker, gate policy,
+Git commit, and dirty state. Resume rejects missing or mismatched directory and per-seed
+fingerprints instead of silently mixing the old unbounded and new bounded protocols.
+
+The breaking adapter changes are versioned as public API `0.3.0`. The migration note records split
+horizontal position/velocity validity, source-stamped recovery observations, exact authorization
+binding, and fail-closed probation. A compile-time version test is part of CTest.
+
+### Deterministic residual-bias boundary campaign
+
+Random truncation alone did not prove the six-dimensional three-sigma box. A new deterministic
+campaign therefore covers zero bias, all six axes at both signs, all 60 signed isolated pairs, and
+all 64 six-axis corners: 137 cases total. The first run passes 120/137 strict gates. All cases remain
+100% numerically healthy with zero navigation recovery; worst attitude/position/velocity RMSE are
+`1.178° / 0.179 m / 0.079 m/s`. The 17 failures share accelerometer `+X/-Y`: settling below
+`0.05 m/s²` takes 36.4 s versus the frozen 35 s budget.
+
+A paired 32-seed follow-up retains the same physical bias vectors and matched noise streams. The
+`+X/-Y` direction misses in 22/32 trials, the mirrored direction in 8/32, and zero injected bias in
+3/32. Fifteen target-direction trials remain above `0.05 m/s²` at 40 s; final target-direction
+error has median/P95/maximum `0.0486 / 0.0650 / 0.0840 m/s²`. All 96 trials remain healthy with
+zero recovery. This establishes a real direction-sensitive convergence/observability gap; the
+35 s gate is retained rather than widened after seeing the data.
+
+### Trusted-heading model and EuRoC rebaseline
+
+Trusted heading now uses the complete raw right-error Jacobian while the magnetic path remains the
+explicit yaw-only pseudo correction described above. Six EuRoC tracks replay 156,490 IMU samples.
+Five unaffected baselines reproduce; the derived-heading track changes as expected and still passes
+all four one-way capability gates. After review, its new baseline is `1.549°` post-alignment
+geodesic attitude, `0.920°` observable yaw, `99.7436%` normal heading acceptance, `5.100°` maximum
+four-second-outage yaw error, `0.995 s` recovery, and `0.890°` post-recovery yaw RMSE. The source is
+still derived Vicon yaw, not a recorded heading sensor.
+
+## 2026-07-18 — G0 horizontal-bias causal audit and independent VTOL cross-validation
+
+The 137-case boundary failure was not treated as a reason to increase the 35 s gate. A paired
+32-seed causal audit showed that one-pose alignment maps the `0.15 m/s²` horizontal residual into
+about `0.876°` of tilt, as predicted by `bias/g`. Replaying the same 96 inputs with correct initial
+attitude while retaining sensor-derived bias initialization reduced the three groups to nearly the
+same final distribution: median bias error about `0.0184 m/s²`, P95 about `0.0374 m/s²`. Together
+with near-odd-symmetric sign response, this rejects an axis-sign bug as the leading cause.
+
+The runner now exports both complete 3x3 bias covariance blocks. The analyzer adds bias NEES,
+per-axis/terminal-five-second error, continuous-five-second convergence, and right-censoring. It
+does not synthesize a tilt+bias joint NEES without the complete 6x6 right-error covariance. The
+focused `+X/-Y` replay gives accelerometer/gyro bias NEES means `0.782 / 0.113`; the accelerometer
+bias remains right-censored at `38.99 s` while the gyro reaches its continuous window at `19.10 s`.
+
+A new frozen protocol then replaced reliance on the old multisine with five minimum-jerk VTOL
+profiles: hover axis pulses, takeoff-box-land, yaw-quadrant hover, early-transition S-curve, and
+landing gust recovery. It freezes nine horizontal bias vectors, train seeds 0--15, tune seeds
+1000--1031, and previously unopened holdout seeds 30000--30063, totaling 1,728 release trials. It
+uses interval-start ZOH acceleration/truth, sensor-only cold start, protocol/source/binary hashes,
+and per-trajectory/vector gates.
+
+The 15-trial smoke completed with zero execution failures. Capability failed on all ten boundary-
+bias trials and passed on all five zero-bias trials. Boundary terminal horizontal-bias P95 ranged
+from `0.0595` to `0.2154 m/s²`; all ten were right-censored. The report status was changed from a
+potentially misleading generic pass to separate `execution=passed` and `capability=failed` fields.
+No release holdout was opened.
+
+The high-level adapter also gained one explicit, validated `process_noise` profile so private
+FCOne VTOL/transition/fixed-wing configurations can be named and pinned without forking algorithm
+source. Invalid profile fields fall back atomically to the public default; zero remains an explicit
+valid value. PX4 numerical values are not copied because the two implementations use different
+discrete process-noise semantics.

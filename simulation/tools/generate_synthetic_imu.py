@@ -14,6 +14,267 @@ import numpy as np
 
 GRAVITY_M_S2 = 9.80665
 
+BIAS_OBSERVABILITY_TRAJECTORY_DURATIONS_S = {
+    "bias_cv_hover_axis_pulses": 32.0,
+    "bias_cv_takeoff_box_land": 38.0,
+    "bias_cv_yaw_quadrant_hover": 40.0,
+    "bias_cv_early_transition_s_curve": 42.0,
+    "bias_cv_landing_gust_recovery": 36.0,
+}
+
+
+def _quintic_segment(
+    time_s: np.ndarray,
+    start_s: float,
+    stop_s: float,
+    start_position: np.ndarray,
+    start_velocity: np.ndarray,
+    start_acceleration: np.ndarray,
+    stop_position: np.ndarray,
+    stop_velocity: np.ndarray,
+    stop_acceleration: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Evaluate a fifth-order Hermite segment with continuous p/v/a endpoints."""
+    duration = stop_s - start_s
+    if duration <= 0.0:
+        raise ValueError("quintic segment duration must be positive")
+    u = np.clip((time_s - start_s) / duration, 0.0, 1.0)
+    c0 = np.asarray(start_position, dtype=np.float64)
+    c1 = np.asarray(start_velocity, dtype=np.float64) * duration
+    c2 = 0.5 * np.asarray(start_acceleration, dtype=np.float64) * duration * duration
+    right_hand_side = np.vstack((
+        np.asarray(stop_position, dtype=np.float64) - c0 - c1 - c2,
+        np.asarray(stop_velocity, dtype=np.float64) * duration - c1 - 2.0 * c2,
+        np.asarray(stop_acceleration, dtype=np.float64) * duration * duration - 2.0 * c2,
+    ))
+    coefficients = np.linalg.solve(
+        np.array(((1.0, 1.0, 1.0), (3.0, 4.0, 5.0), (6.0, 12.0, 20.0))),
+        right_hand_side,
+    )
+    c3, c4, c5 = coefficients
+    position = (
+        c0 + u[:, None] * (c1 + u[:, None] * (
+            c2 + u[:, None] * (c3 + u[:, None] * (c4 + u[:, None] * c5))
+        ))
+    )
+    velocity = (
+        c1 + u[:, None] * (
+            2.0 * c2 + u[:, None] * (3.0 * c3 + u[:, None] * (4.0 * c4 + u[:, None] * 5.0 * c5))
+        )
+    ) / duration
+    acceleration = (
+        2.0 * c2 + u[:, None] * (
+            6.0 * c3 + u[:, None] * (12.0 * c4 + u[:, None] * 20.0 * c5)
+        )
+    ) / (duration * duration)
+    return position, velocity, acceleration
+
+
+def _piecewise_quintic(
+    time_s: np.ndarray,
+    waypoints: list[tuple[float, list[float], list[float]]],
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Evaluate vector waypoints whose acceleration is zero at every boundary."""
+    dimension = len(waypoints[0][1])
+    position = np.zeros((len(time_s), dimension), dtype=np.float64)
+    velocity = np.zeros_like(position)
+    acceleration = np.zeros_like(position)
+    zero_acceleration = np.zeros(dimension, dtype=np.float64)
+    for index in range(len(waypoints) - 1):
+        start_time, start_position, start_velocity = waypoints[index]
+        stop_time, stop_position, stop_velocity = waypoints[index + 1]
+        is_last = index == len(waypoints) - 2
+        selected = (time_s >= start_time) & (
+            (time_s <= stop_time) if is_last else (time_s < stop_time)
+        )
+        segment_position, segment_velocity, segment_acceleration = _quintic_segment(
+            time_s[selected],
+            start_time,
+            stop_time,
+            np.asarray(start_position),
+            np.asarray(start_velocity),
+            zero_acceleration,
+            np.asarray(stop_position),
+            np.asarray(stop_velocity),
+            zero_acceleration,
+        )
+        position[selected] = segment_position
+        velocity[selected] = segment_velocity
+        acceleration[selected] = segment_acceleration
+    return position, velocity, acceleration
+
+
+def _vtol_attitude_from_acceleration(
+    acceleration_ned_m_s2: np.ndarray,
+    yaw_deg: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Align body down with the ideal VTOL thrust direction for the requested yaw."""
+    gravity = np.array((0.0, 0.0, GRAVITY_M_S2), dtype=np.float64)
+    body_down_ned = gravity - acceleration_ned_m_s2
+    body_down_ned /= np.linalg.norm(body_down_ned, axis=1)[:, None]
+    yaw_rad = np.radians(yaw_deg)
+    yaw_frame_x = np.cos(yaw_rad) * body_down_ned[:, 0] + np.sin(yaw_rad) * body_down_ned[:, 1]
+    yaw_frame_y = -np.sin(yaw_rad) * body_down_ned[:, 0] + np.cos(yaw_rad) * body_down_ned[:, 1]
+    roll_rad = np.arcsin(np.clip(-yaw_frame_y, -1.0, 1.0))
+    pitch_rad = np.arctan2(yaw_frame_x, body_down_ned[:, 2])
+    return np.degrees(roll_rad), np.degrees(pitch_rad)
+
+
+def generate_bias_observability_trajectory(
+    name: str,
+    duration_s: float,
+    rate_hz: float,
+) -> tuple[
+    np.ndarray, np.ndarray, np.ndarray, np.ndarray,
+    np.ndarray, np.ndarray, np.ndarray, np.ndarray,
+]:
+    """Generate frozen, non-multisine VTOL trajectories for bias cross-validation."""
+    expected_duration = BIAS_OBSERVABILITY_TRAJECTORY_DURATIONS_S.get(name)
+    if expected_duration is None:
+        raise ValueError(f"unsupported bias-observability trajectory: {name}")
+    if not math.isclose(duration_s, expected_duration, rel_tol=0.0, abs_tol=1.0e-9):
+        raise ValueError(
+            f"{name} is frozen at {expected_duration:g} s, received {duration_s:g} s"
+        )
+    sample_count = max(2, int(round(duration_s * rate_hz)))
+    time_s = np.arange(sample_count, dtype=np.float64) / rate_hz
+    zero_velocity = [0.0, 0.0, 0.0]
+
+    if name == "bias_cv_hover_axis_pulses":
+        position_waypoints = [
+            (0.0, [0.0, 0.0, 0.0], zero_velocity),
+            (3.0, [0.0, 0.0, 0.0], zero_velocity),
+            (7.0, [2.0, 0.0, 0.0], zero_velocity),
+            (11.0, [0.0, 0.0, 0.0], zero_velocity),
+            (15.0, [0.0, 2.0, 0.0], zero_velocity),
+            (19.0, [0.0, 0.0, 0.0], zero_velocity),
+            (23.0, [1.5, 1.5, 0.0], zero_velocity),
+            (27.0, [0.0, 0.0, 0.0], zero_velocity),
+            (32.0, [0.0, 0.0, 0.0], zero_velocity),
+        ]
+        yaw_waypoints = [(0.0, [0.0], [0.0]), (32.0, [0.0], [0.0])]
+        static_flags = ((time_s < 3.0) | (time_s >= 27.0)).astype(np.int64)
+    elif name == "bias_cv_takeoff_box_land":
+        position_waypoints = [
+            (0.0, [0.0, 0.0, 0.0], zero_velocity),
+            (3.0, [0.0, 0.0, 0.0], zero_velocity),
+            (7.0, [0.0, 0.0, -2.0], zero_velocity),
+            (11.0, [2.0, 0.0, -2.0], zero_velocity),
+            (15.0, [2.0, 2.0, -2.0], zero_velocity),
+            (19.0, [0.0, 2.0, -2.0], zero_velocity),
+            (23.0, [0.0, 0.0, -2.0], zero_velocity),
+            (29.0, [0.0, 0.0, -2.0], zero_velocity),
+            (35.0, [0.0, 0.0, 0.0], zero_velocity),
+            (38.0, [0.0, 0.0, 0.0], zero_velocity),
+        ]
+        yaw_waypoints = [(0.0, [0.0], [0.0]), (38.0, [0.0], [0.0])]
+        static_flags = ((time_s < 3.0) | (time_s >= 35.0)).astype(np.int64)
+    elif name == "bias_cv_yaw_quadrant_hover":
+        position_waypoints = [
+            (0.0, [0.0, 0.0, 0.0], zero_velocity),
+            (3.0, [0.0, 0.0, 0.0], zero_velocity),
+            (4.5, [0.5, 0.0, 0.0], zero_velocity),
+            (6.0, [0.0, 0.0, 0.0], zero_velocity),
+            (10.0, [0.0, 0.0, 0.0], zero_velocity),
+            (11.5, [0.5, 0.0, 0.0], zero_velocity),
+            (13.0, [0.0, 0.0, 0.0], zero_velocity),
+            (17.0, [0.0, 0.0, 0.0], zero_velocity),
+            (18.5, [0.5, 0.0, 0.0], zero_velocity),
+            (20.0, [0.0, 0.0, 0.0], zero_velocity),
+            (24.0, [0.0, 0.0, 0.0], zero_velocity),
+            (25.5, [0.5, 0.0, 0.0], zero_velocity),
+            (27.0, [0.0, 0.0, 0.0], zero_velocity),
+            (31.0, [0.0, 0.0, 0.0], zero_velocity),
+            (40.0, [0.0, 0.0, 0.0], zero_velocity),
+        ]
+        yaw_waypoints = [
+            (0.0, [0.0], [0.0]), (6.0, [0.0], [0.0]),
+            (10.0, [90.0], [0.0]), (13.0, [90.0], [0.0]),
+            (17.0, [180.0], [0.0]), (20.0, [180.0], [0.0]),
+            (24.0, [270.0], [0.0]), (27.0, [270.0], [0.0]),
+            (31.0, [360.0], [0.0]), (40.0, [360.0], [0.0]),
+        ]
+        static_flags = ((time_s < 3.0) | (time_s >= 31.0)).astype(np.int64)
+    elif name == "bias_cv_early_transition_s_curve":
+        position_waypoints = [
+            (0.0, [0.0, 0.0, 0.0], zero_velocity),
+            (3.0, [0.0, 0.0, 0.0], zero_velocity),
+            (7.0, [0.0, 0.0, -2.0], zero_velocity),
+            (13.0, [24.0, 0.0, -2.0], [8.0, 0.0, 0.0]),
+            (23.0, [104.0, 10.0, -2.0], [7.0, 2.0, 0.0]),
+            (31.0, [144.0, 20.0, -2.0], zero_velocity),
+            (36.0, [144.0, 20.0, -2.0], zero_velocity),
+            (40.0, [144.0, 20.0, 0.0], zero_velocity),
+            (42.0, [144.0, 20.0, 0.0], zero_velocity),
+        ]
+        yaw_waypoints = [
+            (0.0, [0.0], [0.0]), (13.0, [0.0], [0.0]),
+            (23.0, [18.0], [0.0]), (31.0, [0.0], [0.0]),
+            (42.0, [0.0], [0.0]),
+        ]
+        static_flags = ((time_s < 3.0) | (time_s >= 40.0)).astype(np.int64)
+    else:
+        position_waypoints = [
+            (0.0, [0.0, 0.0, 0.0], zero_velocity),
+            (3.0, [0.0, 0.0, 0.0], zero_velocity),
+            (7.0, [0.0, 0.0, -3.0], zero_velocity),
+            (12.0, [0.0, 0.0, -3.0], zero_velocity),
+            (15.0, [0.8, -0.5, -2.5], zero_velocity),
+            (18.0, [-0.7, 0.8, -2.0], zero_velocity),
+            (21.0, [0.4, -0.6, -1.2], zero_velocity),
+            (24.0, [0.0, 0.0, -0.5], zero_velocity),
+            (28.0, [0.0, 0.0, 0.0], zero_velocity),
+            (36.0, [0.0, 0.0, 0.0], zero_velocity),
+        ]
+        yaw_waypoints = [
+            (0.0, [0.0], [0.0]), (12.0, [0.0], [0.0]),
+            (18.0, [45.0], [0.0]), (24.0, [-30.0], [0.0]),
+            (28.0, [0.0], [0.0]), (36.0, [0.0], [0.0]),
+        ]
+        static_flags = ((time_s < 3.0) | (time_s >= 28.0)).astype(np.int64)
+
+    position_ned, velocity_ned, acceleration_ned = _piecewise_quintic(
+        time_s, position_waypoints
+    )
+    yaw_values, _, _ = _piecewise_quintic(time_s, yaw_waypoints)
+    yaw_deg = yaw_values[:, 0]
+    roll_deg, pitch_deg = _vtol_attitude_from_acceleration(acceleration_ned, yaw_deg)
+    return (
+        time_s, roll_deg, pitch_deg, yaw_deg,
+        acceleration_ned, velocity_ned, position_ned, static_flags,
+    )
+
+
+def interval_start_zoh_kinematics(
+    time_s: np.ndarray,
+    endpoint_acceleration_ned_m_s2: np.ndarray,
+    initial_velocity_ned_m_s: np.ndarray,
+    initial_position_ned_m: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Shift acceleration to interval-start ZOH and integrate matching endpoint truth.
+
+    Row ``i`` (for ``i > 0``) contains the acceleration sampled at ``t[i-1]`` and
+    held on ``(t[i-1], t[i]]``. Velocity and position at row ``i`` are integrated
+    with that same held value. Row zero has no preceding interval and retains the
+    first endpoint acceleration sample.
+    """
+    acceleration = np.asarray(endpoint_acceleration_ned_m_s2, dtype=np.float64).copy()
+    if len(acceleration) > 1:
+        acceleration[1:] = endpoint_acceleration_ned_m_s2[:-1]
+    velocity = np.zeros_like(acceleration)
+    position = np.zeros_like(acceleration)
+    velocity[0] = np.asarray(initial_velocity_ned_m_s, dtype=np.float64)
+    position[0] = np.asarray(initial_position_ned_m, dtype=np.float64)
+    for index in range(1, len(time_s)):
+        dt = float(time_s[index] - time_s[index - 1])
+        velocity[index] = velocity[index - 1] + acceleration[index] * dt
+        position[index] = (
+            position[index - 1]
+            + velocity[index - 1] * dt
+            + 0.5 * acceleration[index] * dt * dt
+        )
+    return acceleration, velocity, position
+
 
 def jittered_timestamps_us(
     sample_count: int,
@@ -370,6 +631,45 @@ def bias_excitation_profile(
     return acceleration, velocity, position
 
 
+def draw_bounded_normal_vector(
+    rng: np.random.Generator,
+    standard_deviation: float,
+    sigma_limit: float,
+) -> np.ndarray:
+    """Draw a three-axis Gaussian prior, optionally truncated per axis by rejection sampling."""
+    if standard_deviation <= 0.0:
+        return np.zeros(3, dtype=np.float64)
+    values = rng.normal(0.0, standard_deviation, 3)
+    if sigma_limit <= 0.0:
+        return values
+    bound = standard_deviation * sigma_limit
+    outside = np.abs(values) > bound
+    while np.any(outside):
+        values[outside] = rng.normal(
+            0.0, standard_deviation, int(np.count_nonzero(outside))
+        )
+        outside = np.abs(values) > bound
+    return values
+
+
+def resolve_bias_vector(
+    rng: np.random.Generator,
+    standard_deviation: float,
+    sigma_limit: float,
+    explicit_vector: list[float] | tuple[float, float, float] | np.ndarray | None,
+) -> tuple[np.ndarray, str]:
+    """Return an explicit three-axis bias or draw the configured random prior."""
+    if explicit_vector is not None:
+        values = np.asarray(explicit_vector, dtype=np.float64)
+        if values.shape != (3,) or not np.all(np.isfinite(values)):
+            raise ValueError("explicit bias vectors must contain three finite values")
+        return values.copy(), "explicit_vector"
+    return (
+        draw_bounded_normal_vector(rng, standard_deviation, sigma_limit),
+        "bounded_random_prior" if standard_deviation > 0.0 else "zero_default",
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, required=True, help="output golden CSV path")
@@ -380,6 +680,7 @@ def main() -> None:
         choices=[
             "yaw_spin", "slow_sin", "yaw_jump", "roll_flip", "static_tilted",
             "navigation_outage", "bias_excitation", "heading_recovery",
+            *BIAS_OBSERVABILITY_TRAJECTORY_DURATIONS_S,
         ],
         default="yaw_spin",
     )
@@ -398,8 +699,30 @@ def main() -> None:
         help="standard deviation used to draw one constant three-axis gyroscope bias",
     )
     parser.add_argument(
+        "--accel-bias-vector-m-s2", type=float, nargs=3, metavar=("X", "Y", "Z"),
+        help="explicit constant accelerometer bias vector; overrides the random prior",
+    )
+    parser.add_argument(
+        "--gyro-bias-vector-deg-s", type=float, nargs=3, metavar=("X", "Y", "Z"),
+        help="explicit constant gyroscope bias vector; overrides the random prior",
+    )
+    parser.add_argument(
+        "--bias-sigma-limit", type=float, default=0.0,
+        help="optional per-axis truncation of the startup residual-bias prior; zero is unbounded",
+    )
+    parser.add_argument(
         "--timestamp-jitter-std-us", type=float, default=0.0,
         help="standard deviation of per-interval timestamp jitter; intervals remain monotonic",
+    )
+    parser.add_argument(
+        "--accel-time-semantics",
+        choices=("legacy_endpoint", "interval_start_zoh"),
+        default="legacy_endpoint",
+        help=(
+            "legacy keeps acceleration evaluated at each row timestamp; interval_start_zoh "
+            "shifts acceleration to the start of each propagation interval and reintegrates "
+            "matching velocity/position truth"
+        ),
     )
     parser.add_argument(
         "--accel-noise-m-s2", type=float, default=0.02,
@@ -454,6 +777,7 @@ def main() -> None:
         args.mag_noise_ut,
         args.gps_position_noise_m,
         args.gps_velocity_noise_m_s,
+        args.bias_sigma_limit,
     )
     if any(value < 0.0 for value in non_negative):
         parser.error("noise, bias, and timestamp-jitter values must be non-negative")
@@ -466,14 +790,39 @@ def main() -> None:
     timing_rng = np.random.default_rng(args.seed ^ 0xA34A91)
     heading_rng = np.random.default_rng(args.seed ^ 0x5EAD1A6)
     gps_rng = np.random.default_rng(args.seed ^ 0x6A5A1D)
-    time_s, roll_deg, pitch_deg, yaw_deg = generate_motion(args.duration, args.rate, args.motion)
-    acceleration_ned = np.zeros((len(time_s), 3), dtype=np.float64)
-    velocity_ned = np.zeros_like(acceleration_ned)
-    position_ned = np.zeros_like(acceleration_ned)
-    if args.motion == "navigation_outage":
-        acceleration_ned, velocity_ned, position_ned = navigation_profile(time_s, args.rate)
-    elif args.motion == "bias_excitation":
-        acceleration_ned, velocity_ned, position_ned = bias_excitation_profile(time_s, args.rate)
+    bias_observability_motion = args.motion in BIAS_OBSERVABILITY_TRAJECTORY_DURATIONS_S
+    if bias_observability_motion:
+        (
+            time_s, roll_deg, pitch_deg, yaw_deg,
+            acceleration_ned, velocity_ned, position_ned, profile_static_flags,
+        ) = generate_bias_observability_trajectory(args.motion, args.duration, args.rate)
+    else:
+        time_s, roll_deg, pitch_deg, yaw_deg = generate_motion(
+            args.duration, args.rate, args.motion
+        )
+        acceleration_ned = np.zeros((len(time_s), 3), dtype=np.float64)
+        velocity_ned = np.zeros_like(acceleration_ned)
+        position_ned = np.zeros_like(acceleration_ned)
+        profile_static_flags = np.zeros(len(time_s), dtype=np.int64)
+        if args.motion == "navigation_outage":
+            acceleration_ned, velocity_ned, position_ned = navigation_profile(
+                time_s, args.rate
+            )
+        elif args.motion == "bias_excitation":
+            acceleration_ned, velocity_ned, position_ned = bias_excitation_profile(
+                time_s, args.rate
+            )
+    if args.accel_time_semantics == "interval_start_zoh":
+        acceleration_ned, velocity_ned, position_ned = interval_start_zoh_kinematics(
+            time_s,
+            acceleration_ned,
+            velocity_ned[0],
+            position_ned[0],
+        )
+        if bias_observability_motion:
+            roll_deg, pitch_deg = _vtol_attitude_from_acceleration(
+                acceleration_ned, yaw_deg
+            )
     accel, gyro, magnetic, ideal_accel = synthesize_measurements(
         time_s,
         roll_deg,
@@ -486,13 +835,17 @@ def main() -> None:
         acceleration_ned_m_s2=acceleration_ned,
     )
     # Preserve the historical deterministic random stream when injection is disabled.
-    acceleration_bias = (
-        rng.normal(0.0, args.accel_bias_std_m_s2, 3)
-        if args.accel_bias_std_m_s2 > 0.0 else np.zeros(3, dtype=np.float64)
+    acceleration_bias, acceleration_bias_source = resolve_bias_vector(
+        rng,
+        args.accel_bias_std_m_s2,
+        args.bias_sigma_limit,
+        args.accel_bias_vector_m_s2,
     )
-    gyroscope_bias = (
-        rng.normal(0.0, args.gyro_bias_std_deg_s, 3)
-        if args.gyro_bias_std_deg_s > 0.0 else np.zeros(3, dtype=np.float64)
+    gyroscope_bias, gyroscope_bias_source = resolve_bias_vector(
+        rng,
+        args.gyro_bias_std_deg_s,
+        args.bias_sigma_limit,
+        args.gyro_bias_vector_deg_s,
     )
     accel += acceleration_bias
     gyro += gyroscope_bias
@@ -506,9 +859,12 @@ def main() -> None:
         length=max(1, int(round(args.rate * 0.5))),
         rng=rng,
     )
-    navigation_enabled = args.motion in ("navigation_outage", "bias_excitation")
+    navigation_enabled = args.motion in ("navigation_outage", "bias_excitation") \
+        or bias_observability_motion
     static_flags = np.full(len(time_s), int(args.static_hint), dtype=np.int64)
-    if args.motion in ("navigation_outage", "bias_excitation", "heading_recovery") \
+    if bias_observability_motion and args.static_hint:
+        static_flags = profile_static_flags
+    elif args.motion in ("navigation_outage", "bias_excitation", "heading_recovery") \
             and args.static_hint:
         static_flags = (time_s < 1.5).astype(np.int64)
     gps_updates = np.zeros(len(time_s), dtype=np.int64)
@@ -589,13 +945,23 @@ def main() -> None:
             json.dumps(
                 {
                     "schema_version": 1,
+                    "motion": args.motion,
+                    "acceleration_time_semantics": args.accel_time_semantics,
+                    "truth_kinematics_time_semantics": (
+                        "row_i_acceleration_held_on_previous_to_current_interval_with_matching_zoh_truth"
+                        if args.accel_time_semantics == "interval_start_zoh"
+                        else "legacy_acceleration_evaluated_at_row_timestamp"
+                    ),
                     "seed": args.seed,
                     "sample_count": len(time_s),
                     "rate_hz": args.rate,
                     "acceleration_bias_m_s2": acceleration_bias.tolist(),
                     "gyroscope_bias_deg_s": gyroscope_bias.tolist(),
+                    "acceleration_bias_source": acceleration_bias_source,
+                    "gyroscope_bias_source": gyroscope_bias_source,
                     "accel_bias_std_m_s2": args.accel_bias_std_m_s2,
                     "gyro_bias_std_deg_s": args.gyro_bias_std_deg_s,
+                    "bias_sigma_limit": args.bias_sigma_limit,
                     "timestamp_jitter_std_us": args.timestamp_jitter_std_us,
                     "accel_noise_m_s2": args.accel_noise_m_s2,
                     "gyro_noise_deg_s": args.gyro_noise_deg_s,

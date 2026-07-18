@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import csv
+import copy
 import math
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 
@@ -72,6 +74,114 @@ class MonteCarloRunnerTests(unittest.TestCase):
     def test_parse_seed_ranges_deduplicates_in_order(self) -> None:
         self.assertEqual(monte_carlo.parse_seeds("0:3,2,5"), [0, 1, 2, 5])
 
+    def test_protocol_fingerprint_is_canonical_and_covers_protocol_changes(self) -> None:
+        protocol = {
+            "scenario": "navigation_outage",
+            "duration_s": 20.0,
+            "rate_hz": 100.0,
+            "timestamp_jitter_std_us": 250.0,
+            "measurement_noise": {
+                "accel_noise_m_s2": 0.02,
+                "gyro_noise_deg_s": 0.05,
+            },
+            "bias_prior": {"bias_sigma_limit": 3.0},
+            "sources": {
+                "generator_sha256": "a" * 64,
+                "runner_sha256": "b" * 64,
+                "threshold_sha256": "c" * 64,
+            },
+            "git": {"commit": "d" * 40, "dirty": False},
+        }
+        first = monte_carlo.make_protocol_fingerprint(protocol)
+        reordered = {name: protocol[name] for name in reversed(list(protocol))}
+        self.assertEqual(first, monte_carlo.make_protocol_fingerprint(reordered))
+
+        mutations = [
+            ("scenario", "different"),
+            ("duration_s", 21.0),
+            ("rate_hz", 200.0),
+            ("timestamp_jitter_std_us", 251.0),
+        ]
+        for name, value in mutations:
+            changed = copy.deepcopy(protocol)
+            changed[name] = value
+            self.assertNotEqual(
+                first["sha256"], monte_carlo.make_protocol_fingerprint(changed)["sha256"]
+            )
+        for path, value in (
+            (("measurement_noise", "accel_noise_m_s2"), 0.03),
+            (("bias_prior", "bias_sigma_limit"), 2.0),
+            (("sources", "generator_sha256"), "e" * 64),
+            (("sources", "runner_sha256"), "f" * 64),
+            (("sources", "threshold_sha256"), "0" * 64),
+            (("git", "commit"), "1" * 40),
+            (("git", "dirty"), True),
+        ):
+            changed = copy.deepcopy(protocol)
+            changed[path[0]][path[1]] = value
+            self.assertNotEqual(
+                first["sha256"], monte_carlo.make_protocol_fingerprint(changed)["sha256"]
+            )
+
+    def test_resume_checkpoint_requires_exact_protocol_fingerprint(self) -> None:
+        expected = monte_carlo.make_protocol_fingerprint({"scenario": "navigation_outage"})
+        monte_carlo.require_protocol_match(
+            {"protocol_fingerprint": copy.deepcopy(expected)}, expected, source="checkpoint"
+        )
+        with self.assertRaisesRegex(ValueError, "found missing"):
+            monte_carlo.require_protocol_match({}, expected, source="checkpoint")
+        changed = monte_carlo.make_protocol_fingerprint({"scenario": "different"})
+        with self.assertRaisesRegex(ValueError, changed["sha256"]):
+            monte_carlo.require_protocol_match(
+                {"protocol_fingerprint": changed}, expected, source="checkpoint"
+            )
+
+    def test_built_protocol_fingerprint_records_sources_noise_and_git(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            generator = root / "simulation/tools/generate_synthetic_imu.py"
+            orchestrator = root / "validation/run_suite.py"
+            analyzer = root / "validation/analyze_results.py"
+            thresholds = root / "validation/thresholds.json"
+            threshold_checker = root / "validation/check_thresholds.py"
+            runner = root / "build/aerakia_validation_runner"
+            for index, path in enumerate(
+                (generator, orchestrator, analyzer, thresholds, threshold_checker, runner), start=1
+            ):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(f"content-{index}".encode())
+            with mock.patch.object(
+                monte_carlo, "git_identity",
+                return_value={"commit": "a" * 40, "dirty": True},
+            ):
+                fingerprint = monte_carlo.build_protocol_fingerprint(
+                    root=root,
+                    runner=runner,
+                    scenario="navigation_outage",
+                    duration_s=20.0,
+                    rate_hz=100.0,
+                    timestamp_jitter_std_us=250.0,
+                    accel_noise_m_s2=0.02,
+                    gyro_noise_deg_s=0.05,
+                    mag_noise_ut=0.20,
+                    gps_position_noise_m=0.5,
+                    gps_velocity_noise_m_s=0.1,
+                    accel_bias_std_m_s2=0.05,
+                    gyro_bias_std_deg_s=0.20,
+                    bias_sigma_limit=3.0,
+                )
+            protocol = fingerprint["protocol"]
+            self.assertEqual(protocol["git"], {"commit": "a" * 40, "dirty": True})
+            self.assertEqual(protocol["measurement_noise"]["gps_position_noise_m"], 0.5)
+            self.assertEqual(protocol["bias_prior"]["bias_sigma_limit"], 3.0)
+            self.assertEqual(protocol["sources"]["runner_sha256"], monte_carlo.file_sha256(runner))
+            self.assertEqual(
+                len(protocol["sources"]["deterministic_thresholds_sha256"]), 64
+            )
+            self.assertEqual(
+                len(protocol["sources"]["threshold_checker_sha256"]), 64
+            )
+
     def test_summary_reports_threshold_failure_seed(self) -> None:
         trial = {
             "seed": 9,
@@ -107,6 +217,30 @@ class MonteCarloRunnerTests(unittest.TestCase):
         self.assertIn("position_rmse_m.p95", summary["distribution_failures"][0])
         self.assertEqual(summary["consistency_failures"], [])
 
+    def test_confidence_summary_applies_full_gate_only_at_declared_volume(self) -> None:
+        trial = {
+            "seed": 0,
+            "position_rmse_m": 0.40,
+            "velocity_rmse_m_s": 0.18,
+            "attitude_rmse_deg": 0.90,
+            "position_nis_mean": 3.0,
+            "velocity_nis_mean": 3.0,
+            "navigation_nees_mean": 6.0,
+            "healthy_ratio": 1.0,
+            "navigation_recoveries": 0,
+        }
+        smoke = monte_carlo.confidence_summary(
+            [trial] * 20, hard_failure_count=0, resamples=100
+        )
+        self.assertFalse(smoke["full_gate_applied"])
+        self.assertEqual(smoke["failures"], [])
+        release = monte_carlo.confidence_summary(
+            [trial] * 1000, hard_failure_count=0, resamples=100
+        )
+        self.assertTrue(release["full_gate_applied"])
+        self.assertEqual(release["failures"], [])
+        self.assertLessEqual(release["zero_failure_probability_upper_95"], 0.003)
+
     def test_timestamp_jitter_is_deterministic_and_monotonic(self) -> None:
         import numpy as np
 
@@ -118,6 +252,18 @@ class MonteCarloRunnerTests(unittest.TestCase):
         )
         np.testing.assert_array_equal(first, second)
         self.assertTrue(np.all(np.diff(first) > 0))
+
+    def test_bounded_bias_prior_is_deterministic_and_respects_limit(self) -> None:
+        import numpy as np
+
+        first = synthetic_generator.draw_bounded_normal_vector(
+            np.random.default_rng(10988), 0.05, 3.0
+        )
+        second = synthetic_generator.draw_bounded_normal_vector(
+            np.random.default_rng(10988), 0.05, 3.0
+        )
+        np.testing.assert_array_equal(first, second)
+        self.assertTrue(np.all(np.abs(first) <= 0.15))
         self.assertNotEqual(len(set(np.diff(first))), 1)
 
     def test_trusted_heading_profile_has_fault_dropout_and_recovery(self) -> None:
@@ -772,6 +918,57 @@ class ValidationAnalyzerTests(unittest.TestCase):
         self.assertAlmostEqual(metrics["accel_error_reduction_ratio"], 0.85)
         self.assertAlmostEqual(metrics["accel_settling_time_below_0_05_m_s2_s"], 2.0)
         self.assertAlmostEqual(metrics["gyro_settling_time_below_0_001_rad_s_s"], 1.0)
+        self.assertTrue(metrics["accel_continuous_5s_convergence"]["right_censored"])
+        self.assertIsNone(metrics["accel_continuous_5s_convergence"]["time_after_alignment_s"])
+        self.assertFalse(metrics["bias_consistency_available"])
+        self.assertIsNone(metrics["tilt_accel_bias_joint_nees"])
+
+    def test_bias_metrics_report_covariance_nees_terminal_and_continuous_dwell(self) -> None:
+        import numpy as np
+
+        count = 8
+        columns = {
+            "ts_us": np.arange(count, dtype=float) * 1_000_000.0,
+            "eskf_static_aligned": np.ones(count),
+        }
+        for axis in ("x", "y", "z"):
+            columns[f"truth_accel_bias_{axis}_m_s2"] = np.zeros(count)
+            columns[f"truth_gyro_bias_{axis}_rad_s"] = np.zeros(count)
+            columns[f"eskf_accel_bias_{axis}_m_s2"] = np.zeros(count)
+            columns[f"eskf_gyro_bias_{axis}_rad_s"] = np.zeros(count)
+        columns["eskf_accel_bias_x_m_s2"] = np.array(
+            [0.10, 0.06, 0.04, 0.03, 0.02, 0.02, 0.01, 0.01]
+        )
+        columns["eskf_gyro_bias_x_rad_s"] = np.array(
+            [0.0020, 0.0015, 0.0005, 0.0004, 0.0003, 0.0002, 0.0001, 0.0001]
+        )
+        for prefix, diagonal in (
+            ("eskf_accel_bias", 0.01),
+            ("eskf_gyro_bias", 1.0e-6),
+        ):
+            suffix = "m2_s4" if "accel" in prefix else "rad2_s2"
+            for component in ("xx", "xy", "xz", "yy", "yz", "zz"):
+                value = diagonal if component in ("xx", "yy", "zz") else 0.0
+                columns[f"{prefix}_cov_{component}_{suffix}"] = np.full(count, value)
+
+        metrics = analyzer.bias_metrics(columns)
+        assert metrics is not None
+        self.assertTrue(metrics["bias_consistency_available"])
+        self.assertAlmostEqual(metrics["accel_bias_nees"]["mean"], 0.21375)
+        self.assertAlmostEqual(metrics["gyro_bias_nees"]["mean"], 0.85125)
+        self.assertEqual(metrics["accel_bias_nees"]["invalid_covariance_samples"], 0)
+        self.assertEqual(metrics["accel_continuous_5s_convergence"]["time_after_alignment_s"], 2.0)
+        self.assertEqual(metrics["gyro_continuous_5s_convergence"]["time_after_alignment_s"], 2.0)
+        self.assertFalse(metrics["accel_continuous_5s_convergence"]["right_censored"])
+        self.assertEqual(metrics["accel_terminal_5s"]["samples"], 6)
+        self.assertAlmostEqual(metrics["accel_terminal_5s"]["actual_duration_s"], 5.0)
+        self.assertAlmostEqual(
+            metrics["accel_axes"]["x"]["terminal_5s_mean_error_m_s2"], 0.13 / 6.0
+        )
+        self.assertEqual(
+            metrics["accel_bias_final_covariance_m2_s4"],
+            [[0.01, 0.0, 0.0], [0.0, 0.01, 0.0], [0.0, 0.0, 0.01]],
+        )
 
     def test_cold_start_reports_tilt_without_heading(self) -> None:
         import numpy as np

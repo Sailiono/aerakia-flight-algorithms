@@ -14,6 +14,12 @@ static eskf_float_t wrap_pi(eskf_float_t angle)
     return atan2(sin(angle), cos(angle));
 }
 
+/* Keep nominal threshold-boundary cases fail-closed despite round-off in q -> R. */
+static bool exceeds_observability_threshold(eskf_float_t value, eskf_float_t threshold)
+{
+    return isfinite(value) && value > threshold * (1.0 + 1.0e-12);
+}
+
 void eskf_model_transition(const eskf_float_t q[4],
                            const eskf_float_t acceleration_body[3],
                            const eskf_float_t angular_rate_body[3],
@@ -108,8 +114,20 @@ void eskf_model_process_noise(const ESKF_Config *config,
     }
 }
 
-static void ned_yaw_correction_axis(eskf_float_t R_nb[3][3],
+static void body_x_heading_jacobian(eskf_float_t R_nb[3][3],
+                                    eskf_float_t horizontal_squared,
                                     eskf_float_t H_theta[3])
+{
+    H_theta[0] = 0.0;
+    H_theta[1] = (
+        -R_nb[0][0] * R_nb[1][2] + R_nb[1][0] * R_nb[0][2]
+    ) / horizontal_squared;
+    H_theta[2] = (
+        R_nb[0][0] * R_nb[1][1] - R_nb[1][0] * R_nb[0][1]
+    ) / horizontal_squared;
+}
+
+static void ned_yaw_error_axis(eskf_float_t R_nb[3][3], eskf_float_t H_theta[3])
 {
     int axis;
     for (axis = 0; axis < 3; ++axis) H_theta[axis] = R_nb[2][axis];
@@ -124,17 +142,17 @@ bool eskf_model_heading(const eskf_float_t q[4],
     if (q == NULL || heading_rad == NULL || H_theta == NULL) return false;
     eskf_quat_to_rot_mat3(q, R_nb);
     horizontal_squared = R_nb[0][0] * R_nb[0][0] + R_nb[1][0] * R_nb[1][0];
-    if (!isfinite(horizontal_squared) || horizontal_squared <= 1.0e-4) return false;
+    if (!exceeds_observability_threshold(horizontal_squared, 1.0e-4)) return false;
     *heading_rad = atan2(R_nb[1][0], R_nb[0][0]);
-    ned_yaw_correction_axis(R_nb, H_theta);
+    body_x_heading_jacobian(R_nb, horizontal_squared, H_theta);
     return true;
 }
 
-bool eskf_model_magnetic_heading(const eskf_float_t q[4],
-                                 const eskf_float_t mag_body[3],
-                                 const eskf_float_t mag_reference_ned[3],
-                                 eskf_float_t *residual_rad,
-                                 eskf_float_t H_theta[3])
+bool eskf_model_magnetic_yaw_correction(const eskf_float_t q[4],
+                                        const eskf_float_t mag_body[3],
+                                        const eskf_float_t mag_reference_ned[3],
+                                        eskf_float_t *residual_rad,
+                                        eskf_float_t H_theta[3])
 {
     eskf_float_t R_nb[3][3];
     eskf_float_t measured_ned[3];
@@ -145,19 +163,19 @@ bool eskf_model_magnetic_heading(const eskf_float_t q[4],
         || residual_rad == NULL || H_theta == NULL) return false;
     reference_horizontal_squared = mag_reference_ned[0] * mag_reference_ned[0]
         + mag_reference_ned[1] * mag_reference_ned[1];
-    if (!isfinite(reference_horizontal_squared)
-        || reference_horizontal_squared <= ESKF_EPSILON) return false;
+    if (!exceeds_observability_threshold(reference_horizontal_squared, ESKF_EPSILON)) {
+        return false;
+    }
     eskf_quat_to_rot_mat3(q, R_nb);
     eskf_mat3_mul_vec3(R_nb, mag_body, measured_ned);
     measured_horizontal_squared = measured_ned[0] * measured_ned[0]
         + measured_ned[1] * measured_ned[1];
-    if (!isfinite(measured_horizontal_squared)
-        || measured_horizontal_squared <= ESKF_EPSILON) return false;
+    if (!exceeds_observability_threshold(measured_horizontal_squared, ESKF_EPSILON)) return false;
 
     *residual_rad = wrap_pi(
         atan2(mag_reference_ned[1], mag_reference_ned[0])
         - atan2(measured_ned[1], measured_ned[0])
     );
-    ned_yaw_correction_axis(R_nb, H_theta);
+    ned_yaw_error_axis(R_nb, H_theta);
     return true;
 }

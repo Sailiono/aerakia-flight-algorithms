@@ -4,6 +4,9 @@
 
 Portable C99 flight-estimation algorithms with a reproducible PC validation platform.
 
+Current pre-1.0 public API: **v0.3.0**. Existing integrations should review the
+[v0.3 migration guide](docs/api-migration-v0.3.md).
+
 > 中文简介：这是 Aerakia 的公开算法层和验证工具，不包含飞控硬件、CubeMX、HAL/RTOS、传感器驱动、板级 HIL 协议或产品控制逻辑。
 
 ## What this repository demonstrates
@@ -14,7 +17,7 @@ Portable C99 flight-estimation algorithms with a reproducible PC validation plat
 - Independent static cold-start tilt and magnetic-heading alignment with an explicit true-North declination reference
 - Deterministic scenario generation, native C replay, metric calculation, plots, and CI regression gates
 - GNSS NIS and independent-truth navigation NEES diagnostics, including outage/reacquisition replay
-- Separate numerical-health and horizontal-navigation-validity outputs with a configurable no-aiding timeout
+- Separate numerical health from independently aged horizontal position/velocity validity
 - No heap allocation, operating-system calls, MCU headers, or device drivers in the algorithm library
 
 ## Algorithms
@@ -23,7 +26,7 @@ Portable C99 flight-estimation algorithms with a reproducible PC validation plat
 | --- | --- | --- |
 | Mahony standard | Reference baseline | Full accelerometer and magnetometer correction |
 | Mahony robust | Short-duration degraded-attitude fallback / cross-monitor | Adaptive accelerometer trust, yaw-only magnetic correction, magnitude anomaly gate |
-| 15-error-state ESKF | Aerakia navigation estimator | IMU propagation, bias states, covariance reset Jacobian, aiding gates, navigation recovery |
+| 15-error-state ESKF | Aerakia navigation estimator | IMU propagation, bias states, covariance reset Jacobian, aiding gates, source/time-bound supervised recovery |
 
 The Mahony implementation was written against the published nonlinear complementary-filter formulation rather than copied from the previous hardware project. The ESKF follows the quaternion/error-state conventions documented by Joan Solà. See [References](docs/references.md).
 
@@ -86,6 +89,9 @@ G0--G4 acceptance gates are defined in the
 [PX4-class validation plan](docs/px4-class-validation-plan.md).
 The eVTOL hover/transition/fixed-wing profiles and the public-algorithm/private-product source flow
 are defined in [FCOne/eVTOL target profiles](docs/vehicle-target-and-repository-flow.md).
+The retained horizontal-bias failure, frozen 1,728-trial cross-validation protocol, and fair PX4
+bias comparison are documented in [Bias observability](docs/bias-observability.md) and the
+[same-input PX4/Aerakia bias protocol](docs/px4-bias-ab-protocol.md).
 
 ## Build and test
 

@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 
 project(
     aerakia_flight_algorithms
-    VERSION 0.1.0
+    VERSION 0.3.0
     DESCRIPTION "Hardware-independent flight estimation algorithms and validation tools"
     LANGUAGES C
 )
@@ -37,6 +37,10 @@ add_library(aerakia_algorithms STATIC
     src/mahony.c
 )
 add_library(Aerakia::Algorithms ALIAS aerakia_algorithms)
+set_target_properties(aerakia_algorithms PROPERTIES
+    VERSION ${PROJECT_VERSION}
+    SOVERSION ${PROJECT_VERSION_MAJOR}
+)
 target_include_directories(aerakia_algorithms
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -66,6 +70,16 @@ if(AERAKIA_BUILD_TESTS)
     add_executable(test_public_api tests/test_public_api.c)
     target_link_libraries(test_public_api PRIVATE Aerakia::Algorithms)
     add_test(NAME public_api COMMAND test_public_api)
+
+    add_executable(test_version tests/test_version.c)
+    target_link_libraries(test_version PRIVATE Aerakia::Algorithms)
+    target_compile_definitions(test_version PRIVATE
+        AERAKIA_CMAKE_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
+        AERAKIA_CMAKE_VERSION_MINOR=${PROJECT_VERSION_MINOR}
+        AERAKIA_CMAKE_VERSION_PATCH=${PROJECT_VERSION_PATCH}
+        AERAKIA_CMAKE_VERSION_STRING="${PROJECT_VERSION}"
+    )
+    add_test(NAME public_version COMMAND test_version)
 
     add_executable(aerakia_input_integrity_campaign validation/input_integrity_campaign.c)
     target_link_libraries(aerakia_input_integrity_campaign PRIVATE Aerakia::Algorithms)

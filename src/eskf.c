@@ -664,7 +664,7 @@ void eskf_update_mag(ESKF_Handle *h,
         eskf_float_t residual;
         eskf_float_t H[15];
         memset(H, 0, sizeof(H));
-        if (!eskf_model_magnetic_heading(
+        if (!eskf_model_magnetic_yaw_correction(
                 h->state.q, mag_norm, h->mag_ref,
                 &residual, &H[ESKF_IDX_DTHETA])) return;
         _measurement_update_1d(

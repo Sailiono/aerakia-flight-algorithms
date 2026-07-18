@@ -16,7 +16,7 @@ development state from stable integration points.
 
 ## Releases
 
-- Use semantic pre-1.0 tags such as `v0.2.0` for reviewed integration milestones.
+- Use semantic pre-1.0 tags such as `v0.3.0` for reviewed integration milestones.
 - Release notes state the supported inputs, validated scenarios, known limitations, and any public
   API or state-model change.
 - Experimental results do not become reliability claims merely because they appear in a release.

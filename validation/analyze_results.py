@@ -535,8 +535,10 @@ def bias_metrics(columns: dict[str, np.ndarray]) -> dict[str, object] | None:
     )
     if not np.any(valid):
         return None
-    accel_error = np.linalg.norm(estimate_accel - truth_accel, axis=1)
-    gyro_error = np.linalg.norm(estimate_gyro - truth_gyro, axis=1)
+    accel_error_vector = estimate_accel - truth_accel
+    gyro_error_vector = estimate_gyro - truth_gyro
+    accel_error = np.linalg.norm(accel_error_vector, axis=1)
+    gyro_error = np.linalg.norm(gyro_error_vector, axis=1)
     first = int(np.flatnonzero(valid)[0])
     indices = np.flatnonzero(valid)
     last = int(indices[-1])
@@ -553,7 +555,123 @@ def bias_metrics(columns: dict[str, np.ndarray]) -> dict[str, object] | None:
             return None
         return float(time_s[int(remaining[0])] - time_s[first])
 
-    return {
+    def continuous_convergence(
+        error: np.ndarray, threshold: float, hold_s: float
+    ) -> dict[str, object]:
+        run_start: int | None = None
+        achieved_time: float | None = None
+        previous_time: float | None = None
+        for index in range(first, last + 1):
+            sample_time = float(time_s[index])
+            monotonic = previous_time is None or sample_time > previous_time
+            if not valid[index] or not monotonic or error[index] > threshold:
+                run_start = None
+            elif run_start is None:
+                run_start = index
+            if run_start is not None and sample_time - float(time_s[run_start]) >= hold_s:
+                achieved_time = float(time_s[run_start] - time_s[first])
+                break
+            previous_time = sample_time
+        observation_s = float(time_s[last] - time_s[first])
+        return {
+            "threshold": threshold,
+            "required_continuous_duration_s": hold_s,
+            "achieved": achieved_time is not None,
+            "time_after_alignment_s": achieved_time,
+            "right_censored": achieved_time is None,
+            "censoring_time_s": observation_s if achieved_time is None else None,
+            "observation_duration_after_alignment_s": observation_s,
+        }
+
+    terminal_mask = valid & (time_s >= time_s[last] - 5.0)
+    terminal_indices = np.flatnonzero(terminal_mask)
+
+    def terminal_summary(
+        error_vector: np.ndarray, error_norm: np.ndarray, unit: str
+    ) -> dict[str, object]:
+        selected = error_vector[terminal_mask]
+        norms = error_norm[terminal_mask]
+        return {
+            "requested_duration_s": 5.0,
+            "actual_duration_s": float(
+                time_s[int(terminal_indices[-1])] - time_s[int(terminal_indices[0])]
+            ),
+            "samples": int(len(terminal_indices)),
+            f"mean_error_vector_{unit}": np.mean(selected, axis=0).tolist(),
+            f"rmse_vector_norm_{unit}": float(np.sqrt(np.mean(norms * norms))),
+            f"mean_vector_norm_{unit}": float(np.mean(norms)),
+            f"p95_vector_norm_{unit}": float(np.percentile(norms, 95)),
+            f"max_vector_norm_{unit}": float(np.max(norms)),
+        }
+
+    def per_axis_summary(error_vector: np.ndarray, unit: str) -> dict[str, object]:
+        result: dict[str, object] = {}
+        for axis_index, axis in enumerate(("x", "y", "z")):
+            terminal = error_vector[terminal_mask, axis_index]
+            result[axis] = {
+                f"error_at_alignment_{unit}": float(error_vector[first, axis_index]),
+                f"final_error_{unit}": float(error_vector[last, axis_index]),
+                f"terminal_5s_mean_error_{unit}": float(np.mean(terminal)),
+                f"terminal_5s_rmse_{unit}": float(np.sqrt(np.mean(terminal * terminal))),
+                f"terminal_5s_p95_abs_error_{unit}": float(
+                    np.percentile(np.abs(terminal), 95)
+                ),
+                f"terminal_5s_max_abs_error_{unit}": float(np.max(np.abs(terminal))),
+            }
+        return result
+
+    def covariance_columns(prefix: str) -> list[str]:
+        return [
+            f"{prefix}_cov_xx", f"{prefix}_cov_xy", f"{prefix}_cov_xz",
+            f"{prefix}_cov_yy", f"{prefix}_cov_yz", f"{prefix}_cov_zz",
+        ]
+
+    def covariance_series(prefix: str) -> np.ndarray | None:
+        suffix = "m2_s4" if "accel" in prefix else "rad2_s2"
+        names = [f"{name}_{suffix}" for name in covariance_columns(prefix)]
+        if not all(name in columns for name in names):
+            return None
+        values = np.column_stack([columns[name] for name in names])
+        covariance = np.empty((len(values), 3, 3), dtype=np.float64)
+        covariance[:, 0, 0] = values[:, 0]
+        covariance[:, 0, 1] = covariance[:, 1, 0] = values[:, 1]
+        covariance[:, 0, 2] = covariance[:, 2, 0] = values[:, 2]
+        covariance[:, 1, 1] = values[:, 3]
+        covariance[:, 1, 2] = covariance[:, 2, 1] = values[:, 4]
+        covariance[:, 2, 2] = values[:, 5]
+        return covariance
+
+    def bias_nees(
+        error_vector: np.ndarray, covariance: np.ndarray
+    ) -> tuple[dict[str, object], np.ndarray]:
+        nees = np.full(len(error_vector), np.nan, dtype=np.float64)
+        covariance_valid = np.zeros(len(error_vector), dtype=bool)
+        for index in indices:
+            matrix = 0.5 * (covariance[index] + covariance[index].T)
+            if not np.all(np.isfinite(matrix)):
+                continue
+            eigenvalues = np.linalg.eigvalsh(matrix)
+            if eigenvalues[-1] <= 0.0 or eigenvalues[0] <= eigenvalues[-1] * 1.0e-12:
+                continue
+            nees[index] = float(
+                error_vector[index] @ np.linalg.solve(matrix, error_vector[index])
+            )
+            covariance_valid[index] = True
+        summary: dict[str, object] = _consistency_summary(nees[valid], 3)
+        finite = nees[valid & np.isfinite(nees)]
+        terminal = nees[terminal_mask & np.isfinite(nees)]
+        summary.update(
+            {
+                "median": float(np.median(finite)) if len(finite) else float("nan"),
+                "terminal_5s_mean": (
+                    float(np.mean(terminal)) if len(terminal) else float("nan")
+                ),
+                "invalid_covariance_samples": int(np.count_nonzero(valid & ~covariance_valid)),
+            }
+        )
+        return summary, covariance_valid
+
+    result: dict[str, object] = {
         "alignment_time_s": float(time_s[first]),
         "truth_accel_bias_m_s2": truth_accel[first].tolist(),
         "truth_gyro_bias_rad_s": truth_gyro[first].tolist(),
@@ -571,7 +689,44 @@ def bias_metrics(columns: dict[str, np.ndarray]) -> dict[str, object] | None:
         ),
         "accel_settling_time_below_0_05_m_s2_s": settling_time(accel_error, 0.05),
         "gyro_settling_time_below_0_001_rad_s_s": settling_time(gyro_error, 0.001),
+        "accel_continuous_5s_convergence": continuous_convergence(accel_error, 0.05, 5.0),
+        "gyro_continuous_5s_convergence": continuous_convergence(gyro_error, 0.001, 5.0),
+        "accel_terminal_5s": terminal_summary(accel_error_vector, accel_error, "m_s2"),
+        "gyro_terminal_5s": terminal_summary(gyro_error_vector, gyro_error, "rad_s"),
+        "accel_axes": per_axis_summary(accel_error_vector, "m_s2"),
+        "gyro_axes": per_axis_summary(gyro_error_vector, "rad_s"),
+        "bias_consistency_available": False,
+        "tilt_accel_bias_joint_nees": None,
+        "tilt_accel_bias_joint_nees_status": (
+            "not_reported: the runner does not export the complete attitude-bias 6x6 "
+            "covariance in the ESKF right-error tangent frame"
+        ),
     }
+    accel_covariance = covariance_series("eskf_accel_bias")
+    gyro_covariance = covariance_series("eskf_gyro_bias")
+    if accel_covariance is not None and gyro_covariance is not None:
+        accel_nees, accel_covariance_valid = bias_nees(accel_error_vector, accel_covariance)
+        gyro_nees, gyro_covariance_valid = bias_nees(gyro_error_vector, gyro_covariance)
+        accel_terminal_covariance = terminal_mask & accel_covariance_valid
+        gyro_terminal_covariance = terminal_mask & gyro_covariance_valid
+        result.update(
+            {
+                "bias_consistency_available": True,
+                "accel_bias_nees": accel_nees,
+                "gyro_bias_nees": gyro_nees,
+                "accel_bias_final_covariance_m2_s4": accel_covariance[last].tolist(),
+                "gyro_bias_final_covariance_rad2_s2": gyro_covariance[last].tolist(),
+                "accel_bias_terminal_5s_mean_covariance_m2_s4": (
+                    np.mean(accel_covariance[accel_terminal_covariance], axis=0).tolist()
+                    if np.any(accel_terminal_covariance) else None
+                ),
+                "gyro_bias_terminal_5s_mean_covariance_rad2_s2": (
+                    np.mean(gyro_covariance[gyro_terminal_covariance], axis=0).tolist()
+                    if np.any(gyro_terminal_covariance) else None
+                ),
+            }
+        )
+    return result
 
 
 def eskf_integrity_metrics(columns: dict[str, np.ndarray]) -> dict[str, object]:
@@ -591,6 +746,14 @@ def eskf_integrity_metrics(columns: dict[str, np.ndarray]) -> dict[str, object]:
         "eskf_horizontal_aiding_age_s", np.full(len(accepted), np.inf)
     )
     finite_aiding_age = aiding_age[np.isfinite(aiding_age)]
+    position_aiding_age = columns.get(
+        "eskf_horizontal_position_aiding_age_s", np.full(len(accepted), np.inf)
+    )
+    velocity_aiding_age = columns.get(
+        "eskf_horizontal_velocity_aiding_age_s", np.full(len(accepted), np.inf)
+    )
+    finite_position_aiding_age = position_aiding_age[np.isfinite(position_aiding_age)]
+    finite_velocity_aiding_age = velocity_aiding_age[np.isfinite(velocity_aiding_age)]
     result: dict[str, object] = {
         "magnetometer_source_updates": input_count,
         "magnetometer_outer_gate_pass_ratio": (
@@ -616,6 +779,14 @@ def eskf_integrity_metrics(columns: dict[str, np.ndarray]) -> dict[str, object]:
         "horizontal_navigation_valid_samples": int(np.count_nonzero(navigation_valid)),
         "maximum_finite_horizontal_aiding_age_s": (
             float(np.max(finite_aiding_age)) if len(finite_aiding_age) else None
+        ),
+        "maximum_finite_horizontal_position_aiding_age_s": (
+            float(np.max(finite_position_aiding_age))
+            if len(finite_position_aiding_age) else None
+        ),
+        "maximum_finite_horizontal_velocity_aiding_age_s": (
+            float(np.max(finite_velocity_aiding_age))
+            if len(finite_velocity_aiding_age) else None
         ),
     }
     return result
@@ -1041,6 +1212,18 @@ def write_markdown(
         )
     bias = metrics.get("bias_estimation")
     if bias:
+        accel_convergence = bias["accel_continuous_5s_convergence"]
+        gyro_convergence = bias["gyro_continuous_5s_convergence"]
+        accel_convergence_text = (
+            f"{accel_convergence['time_after_alignment_s']:.3f} s"
+            if accel_convergence["achieved"] else
+            f"right-censored at {accel_convergence['censoring_time_s']:.3f} s"
+        )
+        gyro_convergence_text = (
+            f"{gyro_convergence['time_after_alignment_s']:.3f} s"
+            if gyro_convergence["achieved"] else
+            f"right-censored at {gyro_convergence['censoring_time_s']:.3f} s"
+        )
         lines.extend(
             [
                 "", "## IMU bias estimation", "",
@@ -1048,10 +1231,27 @@ def write_markdown(
                 f"m/s² at alignment; {bias['accel_final_error_m_s2']:.5f} m/s² final.",
                 f"- Gyroscope bias vector error: {bias['gyro_error_at_alignment_rad_s']:.6f} "
                 f"rad/s at alignment; {bias['gyro_final_error_rad_s']:.6f} rad/s final.",
+                f"- First continuous 5 s below the accelerometer/gyroscope thresholds: "
+                f"{accel_convergence_text} / {gyro_convergence_text} after alignment.",
                 "- A single stationary pose cannot independently identify horizontal accelerometer "
                 "bias and tilt; this metric reports the resulting error rather than hiding it.",
             ]
         )
+        if bias.get("bias_consistency_available"):
+            accel_nees = bias["accel_bias_nees"]
+            gyro_nees = bias["gyro_bias_nees"]
+            lines.extend(
+                [
+                    f"- Accelerometer-bias 3D NEES mean: {accel_nees['mean']:.3f} "
+                    f"(expected 3, n={accel_nees['samples']}, invalid covariance="
+                    f"{accel_nees['invalid_covariance_samples']}).",
+                    f"- Gyroscope-bias 3D NEES mean: {gyro_nees['mean']:.3f} "
+                    f"(expected 3, n={gyro_nees['samples']}, invalid covariance="
+                    f"{gyro_nees['invalid_covariance_samples']}).",
+                    "- Tilt-plus-accelerometer-bias joint NEES is not reported because the full "
+                    "right-error 6x6 cross-covariance is not exported.",
+                ]
+            )
     consistency = metrics.get("eskf_consistency")
     if consistency:
         position_nis = consistency["position_nis"]

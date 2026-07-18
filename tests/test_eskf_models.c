@@ -191,93 +191,345 @@ static void test_randomized_prediction_transition(void)
     printf("transition finite-difference maximum absolute error: %.9g\n", maximum_error);
 }
 
+static int matrix15_is_positive_semidefinite(const double matrix[15][15])
+{
+    double lower[15][15] = {{0.0}};
+    const double tolerance = 1.0e-13;
+    int row;
+    int column;
+    int inner;
+
+    for (row = 0; row < 15; ++row) {
+        for (column = 0; column <= row; ++column) {
+            double value = matrix[row][column];
+            for (inner = 0; inner < column; ++inner) {
+                value -= lower[row][inner] * lower[column][inner];
+            }
+            if (row == column) {
+                if (value < -tolerance) return 0;
+                lower[row][column] = value > 0.0 ? sqrt(value) : 0.0;
+            } else if (lower[column][column] > tolerance) {
+                lower[row][column] = value / lower[column][column];
+            } else if (fabs(value) > tolerance) {
+                return 0;
+            }
+        }
+    }
+    return 1;
+}
+
+static void expected_process_noise(const ESKF_Config *config,
+                                   double dt,
+                                   double expected[15][15])
+{
+    const double sigma_acc_squared = config->sigma_acc * config->sigma_acc;
+    const double q_theta = config->sigma_gyr * config->sigma_gyr * dt;
+    const double q_v = sigma_acc_squared * dt;
+    const double q_vp = sigma_acc_squared * dt * dt * 0.5;
+    const double q_p = sigma_acc_squared * dt * dt * dt / 3.0;
+    const double q_ab = config->sigma_acc_bias * config->sigma_acc_bias * dt;
+    const double q_gb = config->sigma_gyr_bias * config->sigma_gyr_bias * dt;
+    int row;
+    int column;
+    int axis;
+
+    for (row = 0; row < 15; ++row) {
+        for (column = 0; column < 15; ++column) expected[row][column] = 0.0;
+    }
+    for (axis = 0; axis < 3; ++axis) {
+        expected[ESKF_IDX_DTHETA + axis][ESKF_IDX_DTHETA + axis] = q_theta;
+        expected[ESKF_IDX_DV + axis][ESKF_IDX_DV + axis] = q_v;
+        expected[ESKF_IDX_DV + axis][ESKF_IDX_DP + axis] = q_vp;
+        expected[ESKF_IDX_DP + axis][ESKF_IDX_DV + axis] = q_vp;
+        expected[ESKF_IDX_DP + axis][ESKF_IDX_DP + axis] = q_p;
+        expected[ESKF_IDX_DAB + axis][ESKF_IDX_DAB + axis] = q_ab;
+        expected[ESKF_IDX_DGB + axis][ESKF_IDX_DGB + axis] = q_gb;
+    }
+}
+
+static void reduced_covariance_derivative(const double Q[15][15],
+                                          const double A[15][15],
+                                          const double W[15][15],
+                                          double derivative[15][15])
+{
+    int row;
+    int column;
+    int inner;
+    for (row = 0; row < 15; ++row) {
+        for (column = 0; column < 15; ++column) {
+            double value = W[row][column];
+            for (inner = 0; inner < 15; ++inner) {
+                value += A[row][inner] * Q[inner][column]
+                    + Q[row][inner] * A[column][inner];
+            }
+            derivative[row][column] = value;
+        }
+    }
+}
+
+static void numerical_reduced_process_noise(const ESKF_Config *config,
+                                            double dt,
+                                            double Q[15][15])
+{
+    const int integration_steps = 20;
+    const double step = dt / (double)integration_steps;
+    double A[15][15] = {{0.0}};
+    double W[15][15] = {{0.0}};
+    double k1[15][15];
+    double k2[15][15];
+    double k3[15][15];
+    double k4[15][15];
+    double stage[15][15];
+    int axis;
+    int iteration;
+    int row;
+    int column;
+
+    for (axis = 0; axis < 3; ++axis) {
+        A[ESKF_IDX_DP + axis][ESKF_IDX_DV + axis] = 1.0;
+        W[ESKF_IDX_DTHETA + axis][ESKF_IDX_DTHETA + axis]
+            = config->sigma_gyr * config->sigma_gyr;
+        W[ESKF_IDX_DV + axis][ESKF_IDX_DV + axis]
+            = config->sigma_acc * config->sigma_acc;
+        W[ESKF_IDX_DAB + axis][ESKF_IDX_DAB + axis]
+            = config->sigma_acc_bias * config->sigma_acc_bias;
+        W[ESKF_IDX_DGB + axis][ESKF_IDX_DGB + axis]
+            = config->sigma_gyr_bias * config->sigma_gyr_bias;
+    }
+    for (row = 0; row < 15; ++row) {
+        for (column = 0; column < 15; ++column) Q[row][column] = 0.0;
+    }
+    for (iteration = 0; iteration < integration_steps; ++iteration) {
+        reduced_covariance_derivative(Q, A, W, k1);
+        for (row = 0; row < 15; ++row) {
+            for (column = 0; column < 15; ++column) {
+                stage[row][column] = Q[row][column] + 0.5 * step * k1[row][column];
+            }
+        }
+        reduced_covariance_derivative(stage, A, W, k2);
+        for (row = 0; row < 15; ++row) {
+            for (column = 0; column < 15; ++column) {
+                stage[row][column] = Q[row][column] + 0.5 * step * k2[row][column];
+            }
+        }
+        reduced_covariance_derivative(stage, A, W, k3);
+        for (row = 0; row < 15; ++row) {
+            for (column = 0; column < 15; ++column) {
+                stage[row][column] = Q[row][column] + step * k3[row][column];
+            }
+        }
+        reduced_covariance_derivative(stage, A, W, k4);
+        for (row = 0; row < 15; ++row) {
+            for (column = 0; column < 15; ++column) {
+                Q[row][column] += step * (
+                    k1[row][column] + 2.0 * k2[row][column]
+                    + 2.0 * k3[row][column] + k4[row][column]
+                ) / 6.0;
+            }
+        }
+    }
+}
+
 static void test_randomized_process_noise_mapping(void)
 {
+    static const double deterministic_dt[] = {
+        0.0001, 0.001, 0.0025, 0.005, 0.01, 0.02, 0.1
+    };
+    const uint32_t deterministic_count = (uint32_t)(
+        sizeof(deterministic_dt) / sizeof(deterministic_dt[0])
+    );
+    double maximum_scaled_error = 0.0;
+    int all_finite = 1;
+    int all_symmetric = 1;
+    int all_psd = 1;
+    int all_elements_match = 1;
     uint32_t case_index;
-    for (case_index = 0U; case_index < JACOBIAN_RANDOM_CASES; ++case_index) {
+    for (case_index = 0U;
+         case_index < JACOBIAN_RANDOM_CASES + deterministic_count;
+         ++case_index) {
         ESKF_Config config;
         double Q[15][15];
-        const double dt = uniform(0.0005, 0.02);
-        int axis;
-        config.sigma_acc = uniform(0.01, 1.0);
-        config.sigma_gyr = uniform(0.0001, 0.1);
-        config.sigma_acc_bias = uniform(1.0e-5, 0.01);
-        config.sigma_gyr_bias = uniform(1.0e-6, 0.001);
+        double expected[15][15];
+        const double dt = case_index < deterministic_count
+            ? deterministic_dt[case_index] : pow(10.0, uniform(-4.0, -1.0));
+        int row;
+        int column;
+        config.sigma_acc = pow(10.0, uniform(-2.0, 0.0));
+        config.sigma_gyr = pow(10.0, uniform(-4.0, -1.0));
+        config.sigma_acc_bias = pow(10.0, uniform(-5.0, -2.0));
+        config.sigma_gyr_bias = pow(10.0, uniform(-6.0, -3.0));
         eskf_model_process_noise(&config, dt, Q);
-        for (axis = 0; axis < 3; ++axis) {
-            const double determinant =
-                Q[ESKF_IDX_DV + axis][ESKF_IDX_DV + axis]
-                    * Q[ESKF_IDX_DP + axis][ESKF_IDX_DP + axis]
-                - Q[ESKF_IDX_DV + axis][ESKF_IDX_DP + axis]
-                    * Q[ESKF_IDX_DP + axis][ESKF_IDX_DV + axis];
-            check_true(Q[ESKF_IDX_DTHETA + axis][ESKF_IDX_DTHETA + axis] > 0.0,
-                       "gyro process noise is positive");
-            check_true(Q[ESKF_IDX_DV + axis][ESKF_IDX_DP + axis]
-                           == Q[ESKF_IDX_DP + axis][ESKF_IDX_DV + axis],
-                       "velocity-position process noise is symmetric");
-            check_true(determinant >= 0.0,
-                       "integrated acceleration process-noise block is PSD");
+        expected_process_noise(&config, dt, expected);
+        for (row = 0; row < 15; ++row) {
+            for (column = 0; column < 15; ++column) {
+                const double error = fabs(Q[row][column] - expected[row][column]);
+                const double tolerance = fmax(1.0e-15, 1.0e-12 * fabs(expected[row][column]));
+                const double scaled_error = error / tolerance;
+                all_finite = all_finite && isfinite(Q[row][column]);
+                all_symmetric = all_symmetric
+                    && fabs(Q[row][column] - Q[column][row]) < 1.0e-15;
+                all_elements_match = all_elements_match && error <= tolerance;
+                if (scaled_error > maximum_scaled_error) maximum_scaled_error = scaled_error;
+            }
         }
-        if (failures != 0) break;
+        all_psd = all_psd && matrix15_is_positive_semidefinite(Q);
     }
+    {
+        const ESKF_Config zero_config = {0.0, 0.0, 0.0, 0.0};
+        double zero_Q[15][15];
+        int row;
+        int column;
+        eskf_model_process_noise(&zero_config, 0.01, zero_Q);
+        for (row = 0; row < 15; ++row) {
+            for (column = 0; column < 15; ++column) {
+                all_elements_match = all_elements_match && zero_Q[row][column] == 0.0;
+            }
+        }
+        all_psd = all_psd && matrix15_is_positive_semidefinite(zero_Q);
+    }
+    check_true(all_finite, "all 225 process-noise elements remain finite");
+    check_true(all_symmetric, "full process-noise matrices are symmetric");
+    check_true(all_psd, "full process-noise matrices are positive semidefinite");
+    check_true(all_elements_match,
+               "all 225 process-noise elements match the complete structure oracle");
+    printf("process-noise oracle maximum tolerance ratio: %.9g\n", maximum_scaled_error);
+}
+
+static void test_process_noise_continuous_model_oracle(void)
+{
+    static const double dt_values[] = {0.0025, 0.005, 0.01, 0.1};
+    const ESKF_Config config = {0.37, 0.018, 0.004, 0.0007};
+    double maximum_error = 0.0;
+    uint32_t index;
+    for (index = 0U; index < (uint32_t)(sizeof(dt_values) / sizeof(dt_values[0]));
+         ++index) {
+        double production[15][15];
+        double numerical[15][15];
+        int row;
+        int column;
+        eskf_model_process_noise(&config, dt_values[index], production);
+        numerical_reduced_process_noise(&config, dt_values[index], numerical);
+        for (row = 0; row < 15; ++row) {
+            for (column = 0; column < 15; ++column) {
+                const double error = fabs(production[row][column] - numerical[row][column]);
+                if (error > maximum_error) maximum_error = error;
+            }
+        }
+    }
+    check_true(maximum_error < 1.0e-12,
+               "process noise matches independent continuous reduced-model integration");
+    printf("continuous reduced-model Q maximum absolute error: %.9g\n", maximum_error);
 }
 
 static void test_randomized_heading_models(void)
 {
     const double epsilon = 1.0e-7;
+    const double vertical_ned[3] = {0.0, 0.0, 1.0};
     uint32_t case_index;
     double maximum_heading_error = 0.0;
     double maximum_magnetic_error = 0.0;
+    double maximum_yaw_axis_error = 0.0;
+    double maximum_tilt_invariance_error = 0.0;
 
     for (case_index = 0U; case_index < JACOBIAN_RANDOM_CASES; ++case_index) {
         double q[4];
         double heading;
-        double H[3];
+        double heading_H[3];
+        double yaw_error_H[3];
+        double magnetic_H[3];
+        double expected_yaw_axis[3];
         double perturbation[3];
         double dq[4];
-        double perturbed_q[4];
-        double perturbed_heading;
+        double plus_q[4];
+        double minus_q[4];
+        double plus_heading;
+        double minus_heading;
         double unused_H[3];
         double reference_ned[3] = {
             uniform(0.2, 1.0), uniform(-0.8, 0.8), uniform(-1.0, 1.0)
         };
         double mag_body[3];
         double residual;
-        double perturbed_residual;
+        double plus_residual;
         int axis;
 
         euler_quaternion(
             uniform(-ESKF_PI, ESKF_PI), uniform(-1.35, 1.35),
             uniform(-ESKF_PI, ESKF_PI), q
         );
-        check_true(eskf_model_heading(q, &heading, H),
+        check_true(eskf_model_heading(q, &heading, heading_H),
                    "random trusted-heading geometry is observable");
-        for (axis = 0; axis < 3; ++axis) perturbation[axis] = epsilon * H[axis];
-        rotation_vector_quaternion(perturbation, dq);
-        quat_multiply(q, dq, perturbed_q);
-        check_true(eskf_model_heading(perturbed_q, &perturbed_heading, unused_H),
-                   "perturbed trusted heading remains observable");
+        for (axis = 0; axis < 3; ++axis) {
+            double derivative;
+            perturbation[0] = 0.0;
+            perturbation[1] = 0.0;
+            perturbation[2] = 0.0;
+            perturbation[axis] = epsilon;
+            rotation_vector_quaternion(perturbation, dq);
+            quat_multiply(q, dq, plus_q);
+            perturbation[axis] = -epsilon;
+            rotation_vector_quaternion(perturbation, dq);
+            quat_multiply(q, dq, minus_q);
+            check_true(eskf_model_heading(plus_q, &plus_heading, unused_H)
+                           && eskf_model_heading(minus_q, &minus_heading, unused_H),
+                       "perturbed trusted heading remains observable");
+            derivative = wrap_pi(plus_heading - minus_heading) / (2.0 * epsilon);
+            if (fabs(derivative - heading_H[axis]) > maximum_heading_error) {
+                maximum_heading_error = fabs(derivative - heading_H[axis]);
+            }
+        }
+
         {
-            const double error = fabs(wrap_pi(perturbed_heading - heading) / epsilon - 1.0);
-            if (error > maximum_heading_error) maximum_heading_error = error;
+            const double commanded_residual = uniform(-0.5, 0.5);
+            double corrected_q[4];
+            double corrected_heading;
+            double gravity_before[3];
+            double gravity_after[3];
+            rotate_transpose(q, vertical_ned, expected_yaw_axis);
+            for (axis = 0; axis < 3; ++axis) {
+                yaw_error_H[axis] = expected_yaw_axis[axis];
+                perturbation[axis] = yaw_error_H[axis] * commanded_residual;
+            }
+            rotation_vector_quaternion(perturbation, dq);
+            quat_multiply(q, dq, corrected_q);
+            check_true(eskf_model_heading(corrected_q, &corrected_heading, unused_H),
+                       "yaw-error corrected heading remains observable");
+            if (fabs(wrap_pi(corrected_heading - heading - commanded_residual))
+                > maximum_heading_error) {
+                maximum_heading_error = fabs(
+                    wrap_pi(corrected_heading - heading - commanded_residual)
+                );
+            }
+            rotate_transpose(q, vertical_ned, gravity_before);
+            rotate_transpose(corrected_q, vertical_ned, gravity_after);
+            for (axis = 0; axis < 3; ++axis) {
+                const double tilt_error = fabs(gravity_after[axis] - gravity_before[axis]);
+                if (tilt_error > maximum_tilt_invariance_error) {
+                    maximum_tilt_invariance_error = tilt_error;
+                }
+            }
         }
 
         rotate_transpose(q, reference_ned, mag_body);
-        check_true(eskf_model_magnetic_heading(
-                       q, mag_body, reference_ned, &residual, H),
+        check_true(eskf_model_magnetic_yaw_correction(
+                       q, mag_body, reference_ned, &residual, magnetic_H),
                    "random magnetic-heading geometry is observable");
-        for (axis = 0; axis < 3; ++axis) perturbation[axis] = epsilon * H[axis];
+        for (axis = 0; axis < 3; ++axis) {
+            const double axis_error = fabs(magnetic_H[axis] - expected_yaw_axis[axis]);
+            if (axis_error > maximum_yaw_axis_error) maximum_yaw_axis_error = axis_error;
+            perturbation[axis] = epsilon * magnetic_H[axis];
+        }
         rotation_vector_quaternion(perturbation, dq);
-        quat_multiply(q, dq, perturbed_q);
-        check_true(eskf_model_magnetic_heading(
-                       perturbed_q, mag_body, reference_ned,
-                       &perturbed_residual, unused_H),
-                   "perturbed magnetic heading remains observable");
+        quat_multiply(q, dq, plus_q);
+        check_true(eskf_model_magnetic_yaw_correction(
+                       plus_q, mag_body, reference_ned,
+                       &plus_residual, unused_H),
+                   "yaw-axis perturbed magnetic heading remains observable");
         {
-            const double error = fabs(
-                -wrap_pi(perturbed_residual - residual) / epsilon - 1.0
-            );
-            if (error > maximum_magnetic_error) maximum_magnetic_error = error;
+            const double derivative = -wrap_pi(plus_residual - residual) / epsilon;
+            if (fabs(derivative - 1.0) > maximum_magnetic_error) {
+                maximum_magnetic_error = fabs(derivative - 1.0);
+            }
         }
         if (failures != 0) break;
     }
@@ -285,25 +537,57 @@ static void test_randomized_heading_models(void)
                "10,000-point trusted-heading derivative campaign passes");
     check_true(maximum_magnetic_error < 5.0e-6,
                "10,000-point magnetic-heading derivative campaign passes");
+    check_true(maximum_yaw_axis_error < 1.0e-12,
+               "trusted and magnetic yaw-error models use the NED-down correction axis");
+    check_true(maximum_tilt_invariance_error < 1.0e-12,
+               "finite yaw-error corrections preserve the gravity direction exactly");
     printf("heading finite-difference maximum absolute error: %.9g\n",
            maximum_heading_error);
     printf("magnetic-heading finite-difference maximum absolute error: %.9g\n",
            maximum_magnetic_error);
+    printf("yaw-error axis maximum absolute error: %.9g\n", maximum_yaw_axis_error);
+    printf("yaw-error tilt invariance maximum absolute error: %.9g\n",
+           maximum_tilt_invariance_error);
 }
 
-static void test_heading_singularities(void)
+static void test_heading_observability_boundaries(void)
 {
     const double vertical_forward_q[4] = {sqrt(0.5), 0.0, sqrt(0.5), 0.0};
     const double identity_q[4] = {1.0, 0.0, 0.0, 0.0};
     const double vertical_field[3] = {0.0, 0.0, 1.0};
     const double north_reference[3] = {1.0, 0.0, 0.0};
+    static const double factors[3] = {0.99, 1.0, 1.01};
     double value;
     double H[3];
+    int index;
     check_true(!eskf_model_heading(vertical_forward_q, &value, H),
                "trusted heading explicitly reports vertical geometry unobservable");
-    check_true(!eskf_model_magnetic_heading(
+    check_true(!eskf_model_magnetic_yaw_correction(
                    identity_q, vertical_field, north_reference, &value, H),
                "magnetic heading explicitly reports vertical field unobservable");
+    for (index = 0; index < 3; ++index) {
+        const double horizontal = sqrt(factors[index] * 1.0e-4);
+        const double pitch = acos(horizontal);
+        double q[4];
+        const int expected_observable = index == 2;
+        euler_quaternion(0.0, pitch, 0.0, q);
+        check_true(eskf_model_heading(q, &value, H) == expected_observable,
+                   "trusted-heading threshold is fail-closed at and below its boundary");
+    }
+    for (index = 0; index < 3; ++index) {
+        const double horizontal = sqrt(factors[index] * ESKF_EPSILON);
+        const double measured[3] = {horizontal, 0.0, 1.0};
+        const double reference[3] = {horizontal, 0.0, 1.0};
+        const int expected_observable = index == 2;
+        check_true(eskf_model_magnetic_yaw_correction(
+                       identity_q, measured, north_reference, &value, H)
+                       == expected_observable,
+                   "measured magnetic horizontal threshold is fail-closed");
+        check_true(eskf_model_magnetic_yaw_correction(
+                       identity_q, north_reference, reference, &value, H)
+                       == expected_observable,
+                   "reference magnetic horizontal threshold is fail-closed");
+    }
 }
 
 static void test_dimension_aware_nis_limits(void)
@@ -335,8 +619,9 @@ int main(void)
 {
     test_randomized_prediction_transition();
     test_randomized_process_noise_mapping();
+    test_process_noise_continuous_model_oracle();
     test_randomized_heading_models();
-    test_heading_singularities();
+    test_heading_observability_boundaries();
     test_dimension_aware_nis_limits();
     if (failures != 0) {
         fprintf(stderr, "%d ESKF model assertion(s) failed\n", failures);

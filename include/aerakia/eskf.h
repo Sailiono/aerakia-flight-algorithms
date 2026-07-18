@@ -110,12 +110,15 @@ void eskf_update_velocity(ESKF_Handle *h,
 /**
  * @brief Magnetometer Update (Yaw Correction)
  *
- * Corrects attitude estimate using magnetometer.
- * Uses heading-only update to avoid magnetic inclination issues.
+ * Corrects yaw using a tilt-conditioned local NED-yaw pseudo observation.
+ * This deliberately prevents magnetic inclination/model errors from updating
+ * roll and pitch. R_mag is a reviewed yaw-correction tuning variance; the
+ * returned NIS is a pseudo-innovation diagnostic and is not a general
+ * physical-heading consistency statistic at arbitrary tilt.
  *
  * @param h       Pointer to filter handle
  * @param mag_m   Measured magnetic field [x, y, z] (normalized or Gauss)
- * @param R_mag   Magnetometer measurement noise variance
+ * @param R_mag   Local yaw-correction tuning variance (rad²)
  * @param result  Output: Innovation test result (can be NULL if not needed)
  */
 void eskf_update_mag(ESKF_Handle *h,
@@ -126,6 +129,9 @@ void eskf_update_mag(ESKF_Handle *h,
 /**
  * Correct yaw from a trusted navigation-frame heading observation.
  * heading_ned_rad is clockwise from North in the NED convention.
+ * The update uses the complete body-X atan2 heading Jacobian; at large tilt it
+ * can legitimately update correlated attitude components. Reject geometrically
+ * ill-conditioned observations before fusion.
  */
 void eskf_update_heading(ESKF_Handle *h,
                          eskf_float_t heading_ned_rad,

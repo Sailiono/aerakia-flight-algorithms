@@ -27,19 +27,19 @@
     },
     "raw_imu_cold_start_reference_derived_heading": {
       "alignment_time_s": 1.000000,
-      "post_alignment_attitude_rmse_deg": 1.452929,
-      "post_alignment_tilt_rmse_deg": 0.860614,
+      "post_alignment_attitude_rmse_deg": 1.548655,
+      "post_alignment_tilt_rmse_deg": 0.828553,
       "heading_alignment_completed": true,
-      "heading_normal_acceptance_ratio": 0.967949,
+      "heading_normal_acceptance_ratio": 0.997436,
       "heading_fault_rejection_ratio": 1.000000,
-      "heading_observable_yaw_rmse_deg": 1.110553,
-      "heading_dropout_max_abs_yaw_error_deg": 3.950068,
+      "heading_observable_yaw_rmse_deg": 0.919920,
+      "heading_dropout_max_abs_yaw_error_deg": 5.100237,
       "heading_recovery_time_s": 0.995000,
-      "heading_post_recovery_yaw_rmse_deg": 1.190393,
+      "heading_post_recovery_yaw_rmse_deg": 0.890175,
       "heading_geometry_unobservable_samples": 4582,
-      "position_rmse_m": 0.122897,
-      "velocity_rmse_m_s": 0.083966,
-      "navigation_nees_mean": 4.949654
+      "position_rmse_m": 0.123197,
+      "velocity_rmse_m_s": 0.082373,
+      "navigation_nees_mean": 4.978319
     },
     "raw_imu_trusted_attitude_init": {
       "mahony_robust_attitude_rmse_deg": 95.507551,
