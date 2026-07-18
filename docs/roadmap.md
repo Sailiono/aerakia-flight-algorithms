@@ -6,6 +6,8 @@ hardware-independent validation code. FCOne repositories consume a reviewed comm
 adapter; they do not maintain a second algorithm copy.
 
 Public branch, history, and tagging rules are defined in the [release policy](release-policy.md).
+The scoped definition of PX4-class capability, evidence grades, anti-overfitting rules, and G0--G4
+acceptance gates are defined in the [PX4-class validation plan](px4-class-validation-plan.md).
 
 ## Current baseline
 
@@ -30,7 +32,7 @@ Public branch, history, and tagging rules are defined in the [release policy](re
 | Aerial physical position/reference | Exercise physical aircraft IMU and GPS position input against a separately recorded RTK position/velocity path without synthesizing absent receiver fields | Electrical-survey `voo_3` complete: 16,560 replay samples, 2,070 GPS position updates, RTK reference path; physical drone-GPS velocity remains absent |
 | Recorded GNSS degradation | Recorded receiver data and independent navigation truth cover nominal aiding, a real outage, drift, and reacquisition without inventing missing receiver fields | UrbanNav Medium Urban 1 complete: 314,185 IMU samples, 655 valid F9P position epochs, one 131 s outage; physical receiver velocity and aircraft dynamics remain complementary gaps |
 | No-aiding output qualification | Numerical health remains separate from horizontal navigation validity; accepted constraints refresh validity, rejected data do not, and a configurable timeout is enforced | Default five-second timeout implemented and exercised over the recorded 131 s UrbanNav outage; exact FCOne failsafe policy remains private P1 work |
-| Same-input PX4 comparison | A pinned PX4 EKF2 and Aerakia consume identical immutable IMU/aiding data, initial state, masks, delays, and outage windows; validity, drift, recovery, consistency, CPU, and memory are reported | Comparison protocol documented; harness and results pending, so no numerical PX4/Aerakia accuracy ratio is claimed |
+| Same-input PX4 comparison | A pinned PX4 EKF2 and Aerakia consume identical immutable IMU/aiding data, initialization track, masks, delays, and outage windows; validity, drift, recovery, consistency, CPU, and memory are reported | Official `ecl_EKF` M0 architecture and fairness contract reviewed; harness/results pending, so no numerical PX4/Aerakia accuracy ratio is claimed |
 | FCOne-neutral contract tests | A mock publisher verifies timestamp, FRD/NED frames, SI units, validity flags, update freshness, dropout, and stale-aiding behavior without including private FCOne headers | Executable oracle implemented; exact private FCOne v2 adapter remains P1 |
 | Estimator-supervisor contract | Mock modes prove ESKF-primary, Mahony attitude-only degradation, output invalidation, transition logging, hard-vs-soft failure handling, hysteresis, continuity on fallback/recovery, finite fallback duration, and recovery without implementing private flight policy in the public core | Executable host contract implemented; private FCOne policy remains P1 |
 
@@ -53,6 +55,22 @@ This phase deliberately reports empirical P05/P95 ranges across seeds. It covers
 three-axis IMU biases and monotonic timestamp jitter. Transport gaps, reordering, malformed values,
 burst loss, and aiding freshness are now covered by the separate input-integrity campaign; thermal
 drift remains hardware-required evidence.
+
+### Newly audited G0 blockers
+
+Before additional dataset volume is promoted as capability evidence:
+
+1. restore executable F/Q/H finite-difference gates;
+2. make NIS thresholds measurement-dimension-aware;
+3. replace unconditional rejection-count re-anchoring with supervisor-authorized, source-quality-
+   checked, bounded and probationary recovery;
+4. add continuous heading and vertical validity;
+5. separate reproducibility baselines from one-way capability limits;
+6. add warnings-as-errors and sanitizer CI.
+
+These items precede numerical PX4 parity claims. PX4 M0 scaffolding and small independent-truth
+dataset intake may proceed in parallel because they do not require changing the shared estimator
+source.
 
 ## P1 — FCOne v2 integration before hardware arrival
 
@@ -85,6 +103,8 @@ Additional ordinary ULogs are lower priority. The highest-value new evidence is:
 5. Recorded receiver position and Doppler velocity with independent navigation truth, preferably on
    an aerial platform; UrbanNav closes position-outage coverage and the electrical survey adds an
    aerial RTK velocity reference, but neither publishes physical receiver velocity as filter input.
+6. INSANE `indoor_1` and `transition_1` for independent OptiTrack attitude/yaw and indoor-to-outdoor
+   transition coverage, followed by RTK-SLAM for surveyed long GNSS-degradation checkpoints.
 
 No physical dataset should be described as ground truth unless its independent measurement chain,
 frame transform, and synchronization uncertainty are recorded.

@@ -81,6 +81,9 @@ Sensor register access, axis remapping, calibration, and unit conversion stay in
 The complete dependency direction is shown in [Architecture](docs/architecture.md).
 The mathematical and product-level comparison with PX4 EKF2, including the IMU-only boundary and
 the same-input A/B gate, is documented in [PX4 EKF2 comparison](docs/px4-ekf2-comparison.md).
+The scoped meaning of "PX4-class", truth/benchmark separation, anti-overfitting protocol, and
+G0--G4 acceptance gates are defined in the
+[PX4-class validation plan](docs/px4-class-validation-plan.md).
 
 ## Build and test
 

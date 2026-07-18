@@ -835,3 +835,83 @@ NED/FRD proper-rotation round trip.
 Final checkpoint after the new evidence classes and converters: strict Release CTest `6/6`, Python
 tools `39/39`, all deterministic scenario thresholds, the 1,020,000-attempt input-integrity gate,
 Python byte-compilation, and `git diff --check` pass through the one-command host regression.
+
+## 2026-07-18 — scoped PX4-class goal and parallel evidence audit
+
+### Reason
+
+The project goal was clarified as reaching at least PX4-class estimation capability while later
+using stronger FCOne v2 hardware. This required deciding whether to prioritize independent-truth
+datasets or a direct PX4 comparison, and whether repeatedly fitting to truth would be valid.
+
+Three read-only subagent audits ran in parallel with non-overlapping scopes:
+
+1. official pinned PX4 `ecl_EKF` same-input harness design;
+2. primary-source public dataset and truth-independence search;
+3. current capability, evidence-grade, tests, and acceptance-gap audit.
+
+The primary agent verified the high-risk source findings locally and integrated the final plan.
+
+### Decision
+
+Independent truth and PX4 A/B are complementary rather than alternatives. Truth measures absolute
+accuracy/consistency; same-input A/B measures relative non-inferiority inside a declared common
+sensor/task envelope. Both estimators can agree and both be wrong, so PX4 output never becomes
+truth. Parameters are tuned only on whole-flight calibration/development partitions, then frozen
+for validation and locked blind flights.
+
+"PX4-class" is initially scoped to local-NED, GNSS-aided small multirotor/fixed-wing operation with
+physical IMU, magnetometer, barometer, GNSS position/velocity, optional trusted heading, bounded
+aiding outages, and explicit validity/recovery. It does not claim every PX4 vehicle, sensor, or
+deployment-history capability.
+
+### Source-verified G0 blockers
+
+- `src/eskf.c` labels three-dimensional position/velocity gates as 3-sigma but applies the scalar
+  rule `NIS <= gate²`; vector thresholds must instead be tied to measurement degrees of freedom and
+  a declared false-rejection probability.
+- `src/eskf_adapter.c` defaults `navigation_recovery_rejection_limit` to ten and directly resets
+  position or velocity to a repeatedly rejected observation, then refreshes horizontal aiding.
+  This can turn a persistent bad source into a trusted re-anchor. Recovery needs source-quality,
+  consistency, correction-size, supervisor-authorization, and probation gates.
+- Current tests check covariance and process-noise behavior but contain no executable complete
+  F/Q/H finite-difference suite, despite earlier documentation/history referring to one.
+- Startup heading completion is retained, but no continuous heading-aiding-age/validity output
+  exists. Vertical validity is also not independently qualified.
+- `CMakeLists.txt` enables `-Wall -Wextra`, not repository-level `-Werror`; GitHub CI has no
+  sanitizer job. Local strict/sanitized results remain valid checkpoints, but the remote gate is
+  incomplete.
+- Public dataset baselines primarily detect metric change. They must be complemented by one-way
+  capability thresholds so a reproducibly poor result remains a capability failure.
+
+### PX4 M0 design
+
+The official PX4 commit remains
+`de8158101c96ad6b04170dc91f087148104c58eb`. M0 will compile the official host `ecl_EKF` and drive
+`EstimatorInterface` directly. The unversioned full PX4 snapshot under FCOne v1 may help prototype
+an adapter but cannot be a benchmark; `ekf2_integration/src/ekf2_lite.cpp` is still an explicit
+stub with initialization, input, update, and output TODOs.
+
+M0 consumes the same immutable synthetic outage event stream, records source/config/input hashes,
+checks units/frames/event counts, separates zero/recorded/scanned delay, retains PX4 resets and
+fault flags, and scores each output at its own physical timestamp. It must be deterministic and
+generate 5/10/30/60/120 s cuts before any performance ratio is accepted.
+
+### Dataset search outcome
+
+No reviewed public source simultaneously provides physical UAV IMU, physical receiver
+position/Doppler velocity, independent continuous 6DoF/yaw truth, deliberate GNSS outage, and broad
+flight dynamics. The evidence set therefore remains a matrix.
+
+Immediate small downloads are INSANE `indoor_1` and `transition_1` (about 53.6 MB total) to reuse
+the existing converter with independent indoor OptiTrack yaw/full pose and transition behavior.
+RTK-SLAM follows for deliberate long GNSS degradation and surveyed Leica checkpoints, while MILUV
+is retained for selected multi-UAV Vicon/bias experiments rather than a full 173 GB download.
+INSANE outdoor/reference channels and license wording require their existing shared-source and
+usage caveats; no channel is promoted without a fresh frame/time/license audit.
+
+### Recorded plan
+
+The resulting scope, evidence grades, anti-overfitting split, G0--G4 gates, PX4 M0 fairness rules,
+provisional blind-test non-inferiority method, dataset order, FCOne/HIL requirements, and subagent
+ownership are now centralized in `docs/px4-class-validation-plan.md`.
