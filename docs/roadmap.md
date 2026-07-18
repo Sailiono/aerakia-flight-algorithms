@@ -25,7 +25,8 @@ Public branch, history, and tagging rules are defined in the [release policy](re
 | Trusted-heading behavior | Controlled heading covers cold-start yaw, geometry validity, normal updates, dropout, outliers, rejection, and recovery without treating GNSS course as body yaw | Synthetic/Vicon-derived fault gates and INSANE physical dual-RTK input implemented; independent physical yaw truth remains P2 evidence |
 | Bias convergence | Gyroscope and accelerometer bias error, convergence time, and steady-state uncertainty are reported separately; batch reference-bias correction is not counted as online convergence | Multi-axis synthetic gate implemented; thermal and physical characterization remain P2 evidence |
 | Timing and malformed input | Duplicate, stale, out-of-order, delayed, missing, non-finite, and implausible samples have explicit deterministic behavior and tests | Implemented deterministic matrix plus 1,020,000-attempt, 100-seed campaign; retain as a host gate |
-| Public dataset runner | Dataset manifest records source, hash, frame transform, time offset, command, code commit, and output summary; selected datasets reproduce with one command | Implemented for 6 EuRoC plus 3 Blackbird tracks; 84,308 unique external-reference IMU samples and 237,475 replay attempts; keep both reviewed baseline gates passing |
+| Public dataset runner | Dataset manifest records source, hash, frame transform, time offset, command, code commit, and output summary; selected datasets reproduce with one command | Implemented for 6 EuRoC, 3 Blackbird, and 2 UrbanNav tracks; 398,493 unique external-reference IMU samples and 865,845 replay attempts; keep all reviewed baseline gates passing |
+| Recorded GNSS degradation | Recorded receiver data and independent navigation truth cover nominal aiding, a real outage, drift, and reacquisition without inventing missing receiver fields | UrbanNav Medium Urban 1 complete: 314,185 IMU samples, 655 valid F9P position epochs, one 131 s outage; physical receiver velocity and aircraft dynamics remain complementary gaps |
 | FCOne-neutral contract tests | A mock publisher verifies timestamp, FRD/NED frames, SI units, validity flags, update freshness, dropout, and stale-aiding behavior without including private FCOne headers | Executable oracle implemented; exact private FCOne v2 adapter remains P1 |
 | Estimator-supervisor contract | Mock modes prove ESKF-primary, Mahony attitude-only degradation, output invalidation, transition logging, hard-vs-soft failure handling, hysteresis, continuity on fallback/recovery, finite fallback duration, and recovery without implementing private flight policy in the public core | Executable host contract implemented; private FCOne policy remains P1 |
 
@@ -77,6 +78,8 @@ Additional ordinary ULogs are lower priority. The highest-value new evidence is:
 2. Independent yaw truth from motion capture or a rate table with synchronized IMU/magnetometer.
 3. Controlled GNSS interruption and recovery with detailed aiding-source innovations.
 4. Controlled motor-current magnetic-disturbance data at fixed vehicle attitude.
+5. Recorded receiver position and Doppler velocity with independent navigation truth, preferably on
+   an aerial platform; UrbanNav closes position-outage coverage but publishes no receiver velocity.
 
 No physical dataset should be described as ground truth unless its independent measurement chain,
 frame transform, and synchronization uncertainty are recorded.

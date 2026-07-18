@@ -10,7 +10,7 @@ Portable C99 flight-estimation algorithms with a reproducible PC validation plat
 
 - One hardware-neutral measurement contract shared by embedded targets and PC replay
 - A paper-derived standard Mahony baseline and an Aerakia fault-tolerant configuration
-- A 15-dimensional error-state Kalman filter (16-component nominal state) with GPS position/velocity, barometer, heading, magnetometer, and zero-velocity updates
+- A 15-dimensional error-state Kalman filter (16-component nominal state) with paired or independent GNSS position/velocity, barometer, heading, magnetometer, and zero-velocity updates
 - Independent static cold-start tilt and magnetic-heading alignment with an explicit true-North declination reference
 - Deterministic scenario generation, native C replay, metric calculation, plots, and CI regression gates
 - GNSS NIS and independent-truth navigation NEES diagnostics, including outage/reacquisition replay
@@ -58,10 +58,16 @@ AerakiaNavigationEstimate navigation;
 aerakia_eskf_process_imu(&eskf, &sample, &navigation);
 
 /* Lower-rate aiding stays hardware-neutral too. */
-aerakia_eskf_update_gps(&eskf, gps_position_ned, gps_velocity_ned,
-                        gps_position_variance, gps_velocity_variance);
-aerakia_eskf_update_heading(&eskf, trusted_heading_ned_rad,
-                            trusted_heading_variance_rad2);
+AerakiaPositionObservation position = {
+    gps_sample_time_us, gps_position_ned, gps_position_variance
+};
+aerakia_eskf_update_position_observation(&eskf, &position);
+
+/* Publish velocity separately only when the receiver actually provides it. */
+AerakiaVelocityObservation velocity = {
+    gps_sample_time_us, gps_velocity_ned, gps_velocity_variance
+};
+aerakia_eskf_update_velocity_observation(&eskf, &velocity);
 ```
 
 Sensor register access, axis remapping, calibration, and unit conversion stay in the private adapter. Algorithms validate the monotonic sample timestamp and derive `dt` internally. See [Integration guide](docs/integration.md).
@@ -136,9 +142,11 @@ ULog reports keep three yaw views separate: raw agreement with PX4, agreement af
 the logged PX4 reset deltas, and per-reset-segment drift. Direct dual-antenna GNSS heading is
 fused only when PX4 marks it finite; ordinary GNSS course and PX4's GSF yaw remain diagnostics.
 
-The first public external-reference replay uses EuRoC `MH_01_easy`. Its converter, source hashes,
-raw-versus-reference-bias-corrected results, and limitations are documented in
-[Public datasets](docs/public-datasets.md). Raw dataset archives remain outside Git.
+The reviewed public evidence now combines EuRoC and Blackbird motion-capture/reference tracks with
+UrbanNav recorded Xsens IMU, u-blox F9P positions, independent SPAN-CPT postprocessed truth, and a
+131 s recorded GNSS outage. Its converters, source hashes, frame/time audits, results, and explicit
+limitations are documented in [Public datasets](docs/public-datasets.md). Raw archives remain
+outside Git.
 
 After restoring the minimal EuRoC inputs, reproduce all five reviewed tracks with:
 

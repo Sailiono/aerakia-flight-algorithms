@@ -11,7 +11,7 @@ and derived reports belong in version control.
 | P0 | [INSANE](https://www.aau.at/en/smart-systems-technologies/control-of-networked-systems/datasets/insane-dataset/) | Recorded UAV IMU plus physical 1.16 m dual-RTK body-heading observations | Published yaw and direct heading share the RTK baseline; published tilt currently fails gravity consistency | `outdoor_1_sensors` yaw-path intake complete |
 | P0 | [Blackbird](https://github.com/mit-aera/Blackbird-Dataset) | Aggressive UAV dynamics against motion-capture truth | No GNSS or magnetometer; the reviewed redistributed sequence reaches about 3 m/s rather than the full corpus maximum | MathWorks `NYC Subway Winter` sensor/pose package complete |
 | P1 | [RELLIS-3D](https://github.com/unmannedlab/RELLIS-3D) | Recorded VectorNav VN-300 fused attitude and IMU under outdoor off-road motion | Ground vehicle; public topics do not expose raw dual-baseline validity and the reviewed bag lacks a readable index | Retain as a secondary device-output audit, not heading truth |
-| P1 | [UrbanNav](https://github.com/IPNL-POLYU/UrbanNavDataset) | GNSS/IMU behavior in urban canyons and tunnels against SPAN-CPT truth | Ground vehicle rather than aircraft; download IMU, GNSS, and truth separately | Medium-urban and tunnel sensor subsets |
+| P1 | [UrbanNav](https://github.com/IPNL-POLYU/UrbanNavDataset) | GNSS/IMU behavior in urban canyons and tunnels against SPAN-CPT truth | Ground vehicle; selected F9P NMEA contains positions but no receiver velocity or heading | `UrbanNav-HK-Medium-Urban-1` complete; tunnel remains optional diversity |
 | P1 | [GVINS](https://github.com/HKUST-Aerial-Robotics/GVINS) | Raw multi-constellation GNSS, IMU, and intermittent-GNSS comparison | ROS bag and ENU/ECEF conventions need an explicit adapter | Sports-field bag after license and checksum review |
 | P1 | [PX4 Flight Review v2](https://github.com/PX4/flight-review-rs) | Real ULog schema coverage, estimator resets, and unusual sensor combinations | Public PX4 estimates are not independent truth; publication terms and privacy must be checked | Metadata-screened logs only; never bulk-commit raw logs |
 
@@ -32,8 +32,9 @@ Before a sequence is scored:
 ## Scoring policy
 
 - EuRoC and Blackbird support independent-truth RMSE and NEES for the observable state subset.
-- UrbanNav supports navigation RMSE, NIS, outage/reacquisition behavior, and position/velocity NEES
-  after time/frame alignment is independently checked.
+- UrbanNav supports recorded-position RMSE/NIS, outage drift/reacquisition, attitude error, and
+  navigation NEES after time/frame alignment is independently checked. Its selected receiver stream
+  does not support measured-velocity claims.
 - PX4 public ULogs support compatibility and fault discovery, not absolute accuracy claims.
 - Absence of magnetometer or dual-antenna heading must remain explicit; course over ground is never
   relabeled as body heading.
@@ -139,9 +140,9 @@ python validation/run_public_dataset_suite.py \
 ```
 
 The three declared tracks replay 80,985 samples but contain 26,995 unique physical IMU samples.
-Together with the two EuRoC sequences, the one-command external-reference corpus now contains
-84,308 unique recorded IMU samples. INSANE adds 39,174 shared-source physical-heading samples but is
-kept in a separate evidence class.
+Together with EuRoC and the completed UrbanNav intake, the external-reference corpus now contains
+398,493 unique recorded IMU samples and 865,845 replay attempts. INSANE adds 39,174 shared-source
+physical-heading samples but is kept in a separate evidence class.
 
 ## RELLIS-3D audit result
 
@@ -211,13 +212,73 @@ been discretized with `dt²` instead of `dt`. After correcting gyro/acceleromete
 adding integrated velocity-position covariance, EuRoC NEES moved from 14.34/12.60 to 5.29/5.19
 against an expected mean of 6. The deterministic synthetic suite remains within reviewed bounds.
 
-## Next downloads
+## Completed recorded-GNSS intake: UrbanNav HK `Medium-Urban-1`
 
-UrbanNav sensor/truth subsets are the next priority because they add recorded GNSS degradation,
-outage, and recovery. A second Blackbird sequence is useful only if the official sensor-only host
-becomes reliable or another redistribution preserves an auditable sequence identity, license,
-timestamps, and body/IMU extrinsic; the current sequence closes the immediate aggressive
-independent-motion gap.
+The official UrbanNav repository and Dropbox sensor folders supplied a minimal intake containing
+only the selected Xsens IMU log, u-blox F9P NMEA, and SPAN-CPT postprocessed truth. Raw downloads
+remain under ignored `build/` storage. The converter rejects bad NMEA checksums and invalid fixes,
+uses same-epoch GST uncertainty, converts WGS84 coordinates to local NED, and never manufactures a
+receiver velocity from differentiated positions.
+
+| Item | Recorded value |
+| --- | --- |
+| Official tools commit | `075f96b6a6d9252b37486ecb175b4ae690c56f54` |
+| Full IMU ZIP SHA-256 | `0114fb60053fff6cb7ae16a68c09fbd7840cf83557af4ffa127bcbbe8aff4a28` |
+| GNSS ZIP SHA-256 | `b265d9983533b2c038ba2ec46c90a4c078bef5119fef128e6b843af3a1bc5fe2` |
+| SPAN truth SHA-256 | `9d48bb497878aafbd17290789560394c72ecafec20c9e0eaff448418695d92bf` |
+| Selected IMU SHA-256 | `5c329bcafd781e9d00aca41b42d7e5822a8861f3b9d439666ea005f8613e802d` |
+| Selected NMEA SHA-256 | `ff2f53a63ddc13d81bebbeba4808f468bddf07ce6941ec2ed11ec2876c812876` |
+| Replay coverage | 314,185 unique IMU samples, 785.451 s, about 400.33 Hz |
+| Receiver aiding | 655 valid position epochs; 37 bad/non-NMEA fragments rejected |
+| Recorded outage | one 131 s gap, equivalent to about 130 missing nominal 1 Hz epochs |
+| Motion envelope | speed P95/max 10.20/11.50 m/s; gyro norm P95/max 0.225/0.675 rad/s |
+
+The official source body axes are right/forward/up. Conversion to Aerakia FRD uses
+`[[0,1,0],[1,0,0],[0,0,-1]]`; source ENU navigation is converted to NED. Before scoring, the
+converter differentiates SPAN position and compares it with the separately published SPAN body
+velocity. North/east correlations are `0.99992/0.99989` and horizontal velocity RMSE is
+`0.0745 m/s`. This executable audit prevents a plausible but wrong axis or sign mapping from being
+accepted.
+
+Two retained tracks intentionally answer different questions:
+
+| Track | Attitude geodesic / tilt / yaw RMSE | Nominal aided position RMSE | 131 s outage peak | First resumed posterior error |
+| --- | ---: | ---: | ---: | ---: |
+| Reference-attitude initialization | 1.534° / 0.772° / 1.328° | 6.518 m | 1471.5 m | 5.395 m |
+| Independent tilt-only cold start | 36.722° / 2.211° / 36.647° | 6.794 m | 1283.5 m | 5.374 m |
+
+The whole-run position RMSE of about 248 m in the reference-initialized track is not nominal GNSS
+accuracy: it is dominated by the real 131 s unaided interval. The report therefore scores aided,
+unaided, pre-gap, peak, first-resumed, and sustained-recovery intervals separately. Reacquisition
+returns below 10 m on the first accepted position update without a forced navigation reset, while
+the position-only inertial drift during the outage remains intentionally visible.
+
+Raw F9P horizontal error against SPAN is 2.890 m RMSE and 5.036 m P95. Aerakia's 6.518 m aided
+position RMSE is therefore not an accuracy improvement over the receiver on this track. It is a
+stress result for a position-only estimator path with no measured velocity, no magnetometer, no
+delay compensation, and a scalar worst-axis GST variance. Position NIS means `0.011/0.339` are
+strongly conservative, while six-state navigation NEES means `12.91/16.27` are overconfident,
+primarily exposing the unaided velocity subspace. These consistency failures are recorded work,
+not tuned away on the evaluation sequence.
+
+The cold-start result is equally important: tilt completes in about one second, but heading cannot
+complete because this sequence has neither magnetometer nor a physical heading observation. The
+36.65° yaw RMSE must not be cited as general ESKF yaw accuracy; it demonstrates the expected
+unobservability and the need for a valid heading source or a separately validated motion-based yaw
+observer.
+
+```bash
+python validation/run_public_dataset_suite.py \
+  --data-root /path/to/urbannav-minimal-inputs \
+  --manifest validation/public/urbannav_manifest.json \
+  --runner build/aerakia_validation_runner \
+  --out-dir build/urbannav-suite
+```
+
+The next complementary navigation source should contain recorded receiver Doppler velocity and
+independent truth, preferably on an aircraft. A second UrbanNav tunnel sequence increases urban
+environment diversity but repeats the same missing-velocity and ground-vehicle limitations; it is
+therefore useful after, not instead of, that evidence.
 
 ## Completed EuRoC direct-Vicon intake: `V1_03_difficult`
 
@@ -295,7 +356,8 @@ aggregate report. The two sequences contain 57,313 unique recorded IMU samples; 
 produce 156,490 replay attempts. Multiple tracks increase algorithm-path coverage but are not counted
 as additional physical data.
 
-UrbanNav sensor subsets remain the next navigation intake for recorded GNSS degradation and outage
-behavior. A second physical-heading source is still desirable, but it must expose either raw
+UrbanNav now closes recorded GNSS-position degradation and outage behavior. Recorded receiver
+Doppler velocity with independent truth remains the next navigation evidence gap. A second
+physical-heading source is still desirable, but it must expose either raw
 antenna-baseline validity or an independently synchronized yaw reference. None is counted until raw
 topics, timing, frames, license, and hashes pass the same intake checklist.

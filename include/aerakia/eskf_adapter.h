@@ -45,6 +45,18 @@ typedef struct {
 
 typedef struct {
     uint64_t timestamp_us;
+    AerakiaVec3f position_ned_m;
+    float variance_m2;
+} AerakiaPositionObservation;
+
+typedef struct {
+    uint64_t timestamp_us;
+    AerakiaVec3f velocity_ned_m_s;
+    float variance_m2_s2;
+} AerakiaVelocityObservation;
+
+typedef struct {
+    uint64_t timestamp_us;
     float heading_ned_rad;
     float variance_rad2;
 } AerakiaHeadingObservation;
@@ -73,6 +85,8 @@ typedef struct {
     bool navigation_recovered;
     uint32_t navigation_recovery_count;
     uint32_t consecutive_navigation_rejections;
+    uint32_t consecutive_position_rejections;
+    uint32_t consecutive_velocity_rejections;
     bool static_alignment_complete;
     bool static_tilt_alignment_complete;
     bool static_heading_alignment_complete;
@@ -89,6 +103,8 @@ typedef struct {
     AerakiaEskfConfig config;
     uint64_t last_timestamp_us;
     uint64_t last_gps_timestamp_us;
+    uint64_t last_position_timestamp_us;
+    uint64_t last_velocity_timestamp_us;
     uint64_t last_heading_timestamp_us;
     uint64_t last_barometer_timestamp_us;
     uint32_t rejected_samples;
@@ -103,6 +119,8 @@ typedef struct {
     bool navigation_recovered;
     uint32_t navigation_recovery_count;
     uint32_t consecutive_navigation_rejections;
+    uint32_t consecutive_position_rejections;
+    uint32_t consecutive_velocity_rejections;
     double static_acceleration_sum[3];
     double static_angular_rate_sum[3];
     double static_magnetic_sum[3];
@@ -119,6 +137,8 @@ typedef struct {
     bool attitude_seeded;
     bool has_timestamp;
     bool has_gps_timestamp;
+    bool has_position_timestamp;
+    bool has_velocity_timestamp;
     bool has_heading_timestamp;
     bool has_barometer_timestamp;
 } AerakiaEskf;
@@ -169,6 +189,18 @@ void aerakia_eskf_update_gps(
 AerakiaStatus aerakia_eskf_update_gps_observation(
     AerakiaEskf *filter,
     const AerakiaGpsObservation *observation
+);
+
+/** Fuse timestamped position when a receiver does not publish valid velocity. */
+AerakiaStatus aerakia_eskf_update_position_observation(
+    AerakiaEskf *filter,
+    const AerakiaPositionObservation *observation
+);
+
+/** Fuse timestamped velocity independently of position validity. */
+AerakiaStatus aerakia_eskf_update_velocity_observation(
+    AerakiaEskf *filter,
+    const AerakiaVelocityObservation *observation
 );
 
 /** Fuse a trusted yaw/heading source such as dual-GNSS or vision. */

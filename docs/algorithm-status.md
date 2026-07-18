@@ -7,7 +7,9 @@ but it is not yet justified to claim that the complete flight-estimation system 
 The current evidence establishes deterministic host behavior, measurement integrity handling,
 long-run covariance health, synthetic cold start, private PX4-referenced replay tracking, and two
 EuRoC external-reference sequences. Blackbird adds 270.1 s of independent motion-capture truth with
-aggressive angular motion. Vicon-derived heading tests yaw alignment and faults under recorded
+aggressive angular motion. UrbanNav adds 785.5 s of recorded 400 Hz IMU, physical F9P position
+aiding, independent SPAN-CPT postprocessed truth, and a real 131 s GNSS outage. Vicon-derived
+heading tests yaw alignment and faults under recorded
 motion, and INSANE exercises the same production path with 1,378 physical dual-RTK observations.
 Neither derived/shared-source heading track establishes independent absolute heading accuracy or
 flight safety.
@@ -26,6 +28,7 @@ flight safety.
 | Navigation consistency | GNSS position/velocity NIS and posterior 6-state navigation NEES through a five-second outage and reacquisition | 20-seed measurement-noise baseline and constant-bias/timestamp-jitter extension pass with zero numerical/recovery failures; thermal and transport faults pending |
 | EuRoC public replay | 36,381-sample Leica/IMU `MH_01_easy` and 20,932-sample direct-pose `V1_03_difficult`; raw, cold-start, derived-heading, and reference-bias tracks retained | Navigation NIS/NEES consistent; direct Vicon pose passes high-dynamic replay; derived heading is not a recorded heading sensor |
 | Blackbird public replay | 26,995 recorded IMU samples over 270.1 s against independent motion capture; common time base and published body/IMU extrinsic are checked before conversion | ESKF 1.573° geodesic / 1.131° tilt RMSE, 100% health, zero recovery; retained Mahony drift proves fallback must be bounded |
+| UrbanNav public replay | 314,185 recorded IMU samples, 655 checksum/quality-screened F9P positions, SPAN truth, and one 131 s recorded outage | Position-only API and recovery pass with 100% health; 6.52 m nominal aided RMSE and first-update reacquisition are retained alongside severe unaided drift and inconsistent NIS/NEES |
 | Host regression | Strict C99 warnings-as-errors build, public API tests, deterministic synthetic fault suite | Passing reviewed thresholds |
 | Input/transport integrity | Exhaustive required-IMU non-finite checks; timestamp order/gap behavior; optional-mag isolation; timestamped GNSS/heading/barometer freshness and recovery | Passing 100 seeds, 1,020,000 IMU attempts, 2,100 aiding attempts, and burst lengths through 100 with zero invariant/health failures |
 | Estimator supervision | ESKF-primary startup, hard-invalid immediate response, soft observability hysteresis, continuity-gated and time-bounded Mahony attitude-only degradation, navigation invalidation, continuity-gated recovery, and transition evidence | Passing executable public contract; private FCOne policy and actuator interaction remain open |
@@ -44,8 +47,9 @@ flight safety.
 4. Apply the passing neutral adapter oracle to the exact private FCOne message and scheduler when
    its v2 interfaces are available; keep the same timestamp, frame, unit, validity, and stale-data
    checks.
-5. Add UrbanNav or equivalent independent navigation truth with recorded GNSS degradation/outage;
-   Blackbird closes aggressive attitude-motion coverage but its GNSS is synthetic.
+5. Add a complementary physical receiver track with recorded Doppler velocity and independent
+   truth, preferably under aircraft dynamics. UrbanNav closes recorded position/outage coverage but
+   has no receiver velocity, heading, magnetometer, or aircraft motion.
 
 ## P1 work when the new hardware is available
 
@@ -90,6 +94,13 @@ This document is an engineering maturity statement, not an airworthiness claim.
   covariance, and replay determinism—not a physical GNSS receiver.
 - Blackbird position/velocity RMSE is 0.123 m / 0.082 m/s with the same declared synthetic-GNSS
   evidence boundary; navigation NEES is 4.76 for expected mean 6.
+- UrbanNav reference-initialized attitude reaches 1.534° geodesic, 0.772° tilt, and 1.328° yaw
+  RMSE. Nominal position-aided RMSE is 6.518 m. The whole-run 247.99 m value is dominated by a real
+  131 s GNSS outage and is not reported as nominal position accuracy.
+- During that UrbanNav outage, position-only inertial error peaks at 1471.5 m and velocity error at
+  27.40 m/s; the first resumed physical position update returns posterior position error to 5.395 m.
+  Cold-start tilt reaches 2.211° RMSE, while yaw reaches 36.65° because the sequence provides no
+  magnetometer or heading observation. This is a retained observability failure, not a yaw claim.
 
 ### Robustness
 
@@ -106,6 +117,13 @@ This document is an engineering maturity statement, not an airworthiness claim.
 - Estimation consistency is currently reasonable: EuRoC navigation NEES means are 5.19–5.70 for a
   six-dimensional expected mean of 6; position NIS is 3.07–3.08 for expected mean 3. Velocity NIS
   at 2.43–2.58 is mildly conservative rather than overconfident.
+- UrbanNav exposes a different consistency failure that synthetic paired GNSS did not: position
+  NIS means 0.011/0.339 are very conservative while six-state navigation NEES means 12.91/16.27 are
+  overconfident. The position-only stream leaves velocity weakly observed, so this evidence blocks
+  any claim that real-receiver covariance tuning is complete.
+- Recorded-GNSS robustness now covers 314,185 IMU samples, 655 accepted physical position epochs,
+  a 131 s outage, and immediate first-update position reacquisition with 100% finite/healthy output.
+  It does not prove acceptable inertial navigation during long GNSS loss.
 - Physical robustness remains only partly proven. The private ULogs add real fixed-wing/multirotor,
   clipping, magnetic disturbance, and PX4-reset coverage, but they lack independent truth. Thermal
   drift, vibration, installation error, motor current, real GNSS loss, and target timing await
@@ -122,15 +140,16 @@ This document is an engineering maturity statement, not an airworthiness claim.
 
 | Scope | Current judgment | Reason |
 | --- | ---: | --- |
-| Portable algorithm/math implementation | 82–87% | Core equations, covariance handling, cold start, aiding, recovery, and independent aggressive-motion replay are mature; full observability/physical heading truth remains open |
-| Host-side software robustness | 88–92% | High-volume malformed/timing campaign, sanitizers, and 84,308 unique public external-reference IMU samples pass; recorded-GNSS degradation remains open |
+| Portable algorithm/math implementation | 84–88% | Core equations, covariance handling, independent position/velocity aiding, cold start, and recovery are mature; real-receiver covariance consistency and physical heading truth remain open |
+| Host-side software robustness | 90–93% | High-volume malformed/timing campaign, sanitizers, and 398,493 unique public external-reference IMU samples pass, including a recorded 131 s aiding outage |
 | Heading robustness | 68–72% | Real-motion fault/recovery and physical dual-RTK input now pass; independent physical yaw truth and GNSS-velocity GSF fallback remain open |
-| FCOne integration readiness | 72–78% | Neutral adapter and bounded-fallback supervisor contracts are executable; exact private messages, scheduling, target precision, and resource use are unverified |
-| Flight-main-estimator readiness | 48–58% | Suitable for shadow mode and bench/HIL preparation, not justified as the sole flight estimator yet |
+| Navigation robustness | 65–72% | Recorded position outage/reacquisition now passes, but long unaided drift, missing receiver velocity, delay modeling, and NIS/NEES tuning remain open |
+| FCOne integration readiness | 75–80% | Neutral adapter, independent aiding, and bounded-fallback supervisor contracts are executable; exact private messages, scheduling, target precision, and resource use are unverified |
+| Flight-main-estimator readiness | 50–60% | Suitable for shadow mode and bench/HIL preparation, not justified as the sole flight estimator yet |
 
-The highest-value non-hardware work remaining is `UrbanNav` real GNSS degradation, a second
-independently scored physical-heading track, and applying the now-executable neutral contracts to
-the private FCOne v2 interfaces.
+The highest-value non-hardware work remaining is a recorded receiver position-plus-Doppler-velocity
+track with independent truth, a second independently scored physical-heading track, delay/time-
+offset sensitivity, and applying the executable neutral contracts to private FCOne v2 interfaces.
 The highest-value physical evidence remains synchronized independent yaw truth, thermal/vibration
 characterization, motor magnetic disturbance, and target-MCU timing/stack measurements.
 

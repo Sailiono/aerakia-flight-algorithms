@@ -547,3 +547,119 @@ that infrastructure failure is retained, and the ASan+UBSan run is repeated with
 disabled rather than misreported as a code defect. The full sanitized 1,020,000-attempt campaign
 then completes with 790,917 accepted samples, 229,083 intentional rejections, 20,355 forward-gap
 reanchors, zero invariant failures, and zero unhealthy outputs.
+
+## 2026-07-18 — UrbanNav recorded-position outage and independent aiding APIs
+
+### Reason and complementary evidence choice
+
+EuRoC and Blackbird provide external motion references, but their GNSS observations are generated
+from truth. Private PX4 ULogs contain physical GNSS but compare primarily with another onboard
+estimator rather than independent truth. UrbanNav HK `Medium-Urban-1` was selected to bridge those
+evidence classes with recorded Xsens IMU, recorded u-blox F9P positions, SPAN-CPT postprocessed
+truth, and an actual long receiver outage. It remains a ground-vehicle dataset and cannot substitute
+for aircraft dynamics, physical heading, or an independent raw-sensor truth chain.
+
+Only the selected official IMU/GNSS/truth files were retained under ignored `build/` storage. The
+official tools repository was pinned at `075f96b6a6d9252b37486ecb175b4ae690c56f54`. Immutable input
+hashes are recorded in `validation/public/urbannav_manifest.json` and
+`docs/public-datasets.md`; raw archives and generated replay/result CSVs are not committed.
+
+### Interface defect exposed and corrected
+
+The previous timestamped public contract required GNSS position and velocity in one observation.
+The selected F9P NMEA publishes valid positions and GST uncertainty but no receiver velocity or
+course. Differentiating position would create a derived signal and falsely label it physical
+receiver velocity. The public API therefore gained independent timestamped position and velocity
+observations while preserving the paired GPS API. Freshness, duplicate rejection, and component-
+specific recovery are tested separately; position recovery preserves velocity and velocity
+recovery preserves position.
+
+A post-implementation review found that the first independent-API draft still shared one rejection
+counter. Interleaved accepted positions could therefore erase persistent velocity rejection history.
+The counters are now source-specific, the legacy aggregate exposes their maximum for diagnostics,
+and an alternating accepted-position/rejected-velocity test proves velocity recovery still fires.
+
+The replay schema now has independent `gps_position_update` and `gps_velocity_update` flags. The
+analyzer applies NIS masks to the actual update source rather than assuming every position epoch
+also fused velocity.
+
+### Intake audit and coverage
+
+- 314,185 unique IMU samples over 785.451 s, approximately 400.33 Hz;
+- 655 accepted physical F9P position epochs with same-epoch GST uncertainty;
+- 37 corrupt/non-NMEA fragment lines rejected by checksum/format checks;
+- one recorded 131 s position-aiding gap, about 130 missing nominal 1 Hz epochs;
+- speed P95/max `10.20/11.50 m/s` and gyro-norm P95/max `0.225/0.675 rad/s`.
+
+The official source body frame is right/forward/up. The converter maps it to FRD and converts ENU
+navigation to NED. A fail-closed audit differentiates SPAN position and compares it with the
+separately published SPAN body velocity. North/east correlations are `0.99992/0.99989` and
+horizontal velocity RMSE is `0.0745 m/s`; scoring is refused if this audit fails.
+
+Raw F9P horizontal position error against SPAN is `2.890 m` RMSE, `5.036 m` P95, and `6.183 m`
+maximum. No antenna lever arm is applied because the published direction is not sufficiently clear
+for an unchecked assumption. A scalar worst-axis GST variance is used and recorded as a limitation.
+
+### Result and corrected interpretation
+
+With reference attitude initialization, ESKF attitude RMSE is `1.534°` geodesic, `0.772°` tilt,
+and `1.328°` yaw. Nominal position-aided RMSE is `6.518 m`. During the 131 s outage, position error
+peaks at `1471.5 m` and velocity error at `27.40 m/s`; the first resumed physical position update
+returns posterior position error to `5.395 m`, with 100% finite/healthy output and no forced reset.
+
+The first review incorrectly suspected the scalar GST variance was the main explanation for the
+approximately `247.99 m` whole-run position RMSE. Interval decomposition disproved that: the value
+is dominated by the real 131 s unaided segment, while pre-gap and normal aided errors remain around
+the receiver-level single-digit-metre range. The analyzer now reports aided, unaided, pre-gap,
+peak, first-resumed, and sustained-recovery metrics separately so this interpretation cannot recur.
+
+The cold-start track completes tilt alignment in about one second and reaches `2.211°` tilt RMSE,
+but heading alignment correctly remains false and yaw RMSE is `36.65°`. The sequence has neither
+magnetometer nor physical heading, so this is retained evidence of yaw unobservability. Robust
+Mahony likewise never reaches the configured fallback entry-error gates; this exposed an empty-set
+crash in the offline fallback analyzer, which now returns `null` metrics and has a regression test.
+
+Position NIS means `0.011/0.339` are strongly conservative while six-state navigation NEES means
+`12.91/16.27` exceed the expected mean of 6. These are not tuned away on the scored sequence. They
+show that position-only aiding leaves the velocity subspace insufficiently modeled and that
+real-receiver covariance tuning is not complete.
+
+### Reproduction and remaining limitations
+
+```bash
+python validation/run_public_dataset_suite.py \
+  --data-root build/dataset-intake/urbannav-public \
+  --manifest validation/public/urbannav_manifest.json \
+  --runner build/urbannav-dev/aerakia_validation_runner \
+  --out-dir build/public-dataset-suite-urbannav
+```
+
+The reviewed suite passes two tracks and 628,370 replay attempts with hash/baseline checks. Combined
+with EuRoC and Blackbird, the independent/external-reference corpus contains 398,493 unique physical
+IMU samples and 865,845 replay attempts. INSANE remains a separate shared-source physical-heading
+class rather than being mixed into the independent-truth count.
+
+Remaining limitations are explicit: ground vehicle rather than aircraft; no receiver velocity,
+magnetometer, or heading; SPAN is a postprocessed GNSS/INS reference; no antenna lever-arm or aiding
+delay compensation; and scalar rather than per-axis receiver variance. The next complementary
+dataset should provide recorded receiver Doppler velocity plus independent truth, preferably on an
+aerial platform. A second UrbanNav tunnel track adds environmental diversity but repeats the same
+core limitations.
+
+### Validation closure
+
+- strict Release CTest: `6/6`, including the 1,020,000-attempt input-integrity campaign;
+- Python tools: `34/34`, including NMEA integrity, all rotation-to-quaternion branches, frame
+  mapping, gap decomposition, and no-eligible-fallback handling;
+- deterministic accuracy, magnetic, cold-start, outage, heading, bias, NIS, and NEES thresholds:
+  all passed through `run_host_regression.py`;
+- UrbanNav baseline: `2/2` tracks and 628,370 replay attempts;
+- complementary Blackbird baseline: `3/3` tracks and 80,985 replay attempts;
+- complementary EuRoC baseline: `6/6` tracks and 156,490 replay attempts;
+- ASan+UBSan: all six C targets passed; the sanitized 1,020,000-attempt campaign completed in
+  182.69 s after the final source-specific counter correction, with leak detection disabled for the
+  previously documented managed-terminal limitation.
+
+The first Blackbird rerun failed before conversion because system Python lacked SciPy. No score was
+accepted from that attempt. An ignored repository-local virtual environment was created from
+`requirements.txt`; the complete Blackbird and EuRoC suites then passed under that isolated runtime.

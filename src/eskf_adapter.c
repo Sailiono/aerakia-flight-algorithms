@@ -443,8 +443,12 @@ void aerakia_eskf_update_gps(
 
     if (filter->position_accepted || filter->velocity_accepted) {
         filter->consecutive_navigation_rejections = 0U;
+        filter->consecutive_position_rejections = 0U;
+        filter->consecutive_velocity_rejections = 0U;
     } else {
         filter->consecutive_navigation_rejections++;
+        filter->consecutive_position_rejections++;
+        filter->consecutive_velocity_rejections++;
         if (filter->config.navigation_recovery_rejection_limit > 0U
             && filter->consecutive_navigation_rejections
                 >= filter->config.navigation_recovery_rejection_limit) {
@@ -461,6 +465,8 @@ void aerakia_eskf_update_gps(
             filter->navigation_recovered = true;
             filter->navigation_recovery_count++;
             filter->consecutive_navigation_rejections = 0U;
+            filter->consecutive_position_rejections = 0U;
+            filter->consecutive_velocity_rejections = 0U;
         }
     }
 }
@@ -470,7 +476,8 @@ AerakiaStatus aerakia_eskf_update_gps_observation(
     const AerakiaGpsObservation *observation
 )
 {
-    AerakiaStatus status;
+    AerakiaStatus position_status;
+    AerakiaStatus velocity_status;
     if (filter == NULL || observation == NULL) return AERAKIA_STATUS_INVALID_ARGUMENT;
     if (!vector_is_finite(observation->position_ned_m)
         || !vector_is_finite(observation->velocity_ned_m_s)
@@ -480,17 +487,135 @@ AerakiaStatus aerakia_eskf_update_gps_observation(
         || observation->velocity_variance_m2_s2 <= 0.0f) {
         return AERAKIA_STATUS_MISSING_MEASUREMENT;
     }
-    status = validate_aiding_timestamp(
-        filter, observation->timestamp_us, filter->last_gps_timestamp_us,
-        filter->has_gps_timestamp
+    position_status = validate_aiding_timestamp(
+        filter, observation->timestamp_us, filter->last_position_timestamp_us,
+        filter->has_position_timestamp
     );
-    if (status != AERAKIA_STATUS_OK) return status;
+    if (position_status != AERAKIA_STATUS_OK) return position_status;
+    velocity_status = validate_aiding_timestamp(
+        filter, observation->timestamp_us, filter->last_velocity_timestamp_us,
+        filter->has_velocity_timestamp
+    );
+    if (velocity_status != AERAKIA_STATUS_OK) return velocity_status;
     aerakia_eskf_update_gps(
         filter, observation->position_ned_m, observation->velocity_ned_m_s,
         observation->position_variance_m2, observation->velocity_variance_m2_s2
     );
     filter->last_gps_timestamp_us = observation->timestamp_us;
+    filter->last_position_timestamp_us = observation->timestamp_us;
+    filter->last_velocity_timestamp_us = observation->timestamp_us;
     filter->has_gps_timestamp = true;
+    filter->has_position_timestamp = true;
+    filter->has_velocity_timestamp = true;
+    return AERAKIA_STATUS_OK;
+}
+
+AerakiaStatus aerakia_eskf_update_position_observation(
+    AerakiaEskf *filter,
+    const AerakiaPositionObservation *observation
+)
+{
+    AerakiaStatus status;
+    if (filter == NULL || observation == NULL) return AERAKIA_STATUS_INVALID_ARGUMENT;
+    if (!vector_is_finite(observation->position_ned_m)
+        || !isfinite(observation->variance_m2) || observation->variance_m2 <= 0.0f) {
+        return AERAKIA_STATUS_MISSING_MEASUREMENT;
+    }
+    status = validate_aiding_timestamp(
+        filter, observation->timestamp_us, filter->last_position_timestamp_us,
+        filter->has_position_timestamp
+    );
+    if (status != AERAKIA_STATUS_OK) return status;
+
+    filter->navigation_recovered = false;
+    aerakia_eskf_update_position(
+        filter, observation->position_ned_m, observation->variance_m2
+    );
+    if (filter->position_accepted) {
+        filter->consecutive_position_rejections = 0U;
+    } else {
+        filter->consecutive_position_rejections++;
+        if (filter->config.navigation_recovery_rejection_limit > 0U
+            && filter->consecutive_position_rejections
+                >= filter->config.navigation_recovery_rejection_limit) {
+            const eskf_float_t position[3] = {
+                observation->position_ned_m.x,
+                observation->position_ned_m.y,
+                observation->position_ned_m.z,
+            };
+            eskf_reset_position(
+                &filter->core, position,
+                fmaxf(
+                    observation->variance_m2,
+                    filter->config.recovery_position_variance_floor_m2
+                )
+            );
+            filter->navigation_recovered = true;
+            filter->navigation_recovery_count++;
+            filter->consecutive_position_rejections = 0U;
+        }
+    }
+    filter->consecutive_navigation_rejections =
+        filter->consecutive_position_rejections > filter->consecutive_velocity_rejections
+            ? filter->consecutive_position_rejections
+            : filter->consecutive_velocity_rejections;
+    filter->last_position_timestamp_us = observation->timestamp_us;
+    filter->has_position_timestamp = true;
+    return AERAKIA_STATUS_OK;
+}
+
+AerakiaStatus aerakia_eskf_update_velocity_observation(
+    AerakiaEskf *filter,
+    const AerakiaVelocityObservation *observation
+)
+{
+    AerakiaStatus status;
+    if (filter == NULL || observation == NULL) return AERAKIA_STATUS_INVALID_ARGUMENT;
+    if (!vector_is_finite(observation->velocity_ned_m_s)
+        || !isfinite(observation->variance_m2_s2)
+        || observation->variance_m2_s2 <= 0.0f) {
+        return AERAKIA_STATUS_MISSING_MEASUREMENT;
+    }
+    status = validate_aiding_timestamp(
+        filter, observation->timestamp_us, filter->last_velocity_timestamp_us,
+        filter->has_velocity_timestamp
+    );
+    if (status != AERAKIA_STATUS_OK) return status;
+
+    filter->navigation_recovered = false;
+    aerakia_eskf_update_velocity(
+        filter, observation->velocity_ned_m_s, observation->variance_m2_s2
+    );
+    if (filter->velocity_accepted) {
+        filter->consecutive_velocity_rejections = 0U;
+    } else {
+        filter->consecutive_velocity_rejections++;
+        if (filter->config.navigation_recovery_rejection_limit > 0U
+            && filter->consecutive_velocity_rejections
+                >= filter->config.navigation_recovery_rejection_limit) {
+            const eskf_float_t velocity[3] = {
+                observation->velocity_ned_m_s.x,
+                observation->velocity_ned_m_s.y,
+                observation->velocity_ned_m_s.z,
+            };
+            eskf_reset_velocity(
+                &filter->core, velocity,
+                fmaxf(
+                    observation->variance_m2_s2,
+                    filter->config.recovery_velocity_variance_floor_m2_s2
+                )
+            );
+            filter->navigation_recovered = true;
+            filter->navigation_recovery_count++;
+            filter->consecutive_velocity_rejections = 0U;
+        }
+    }
+    filter->consecutive_navigation_rejections =
+        filter->consecutive_position_rejections > filter->consecutive_velocity_rejections
+            ? filter->consecutive_position_rejections
+            : filter->consecutive_velocity_rejections;
+    filter->last_velocity_timestamp_us = observation->timestamp_us;
+    filter->has_velocity_timestamp = true;
     return AERAKIA_STATUS_OK;
 }
 
@@ -630,6 +755,8 @@ void aerakia_eskf_get_estimate(
     estimate->navigation_recovered = filter->navigation_recovered;
     estimate->navigation_recovery_count = filter->navigation_recovery_count;
     estimate->consecutive_navigation_rejections = filter->consecutive_navigation_rejections;
+    estimate->consecutive_position_rejections = filter->consecutive_position_rejections;
+    estimate->consecutive_velocity_rejections = filter->consecutive_velocity_rejections;
     estimate->static_alignment_complete = filter->static_alignment_complete;
     estimate->static_tilt_alignment_complete = filter->static_tilt_alignment_complete;
     estimate->static_heading_alignment_complete = filter->static_heading_alignment_complete;

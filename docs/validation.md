@@ -75,6 +75,17 @@ reports posterior six-state `[velocity, position]` normalized estimation error s
 single-sample chi-square coverage as a diagnostic; consecutive replay samples are correlated, so
 coverage is not treated as an independent-sample hypothesis test.
 
+Position and velocity are distinct measurement sources in the replay and public API. A receiver
+that publishes only position must use the timestamped position observation; validation must not
+differentiate positions and relabel the result as measured receiver velocity. The legacy paired API
+remains available when both measurements are physically present. Duplicate/freshness accounting
+and recovery timestamps are source-specific.
+
+Recorded aiding gaps are scored separately from nominal aided operation. Reports identify the
+longest gap, missing nominal epochs, error immediately before the gap, peak position/velocity drift,
+the first resumed posterior error, resume NIS, and sustained recovery time. A whole-run RMSE that
+mixes a long outage with nominal aiding is retained but is never presented as receiver accuracy.
+
 `run_monte_carlo.py` formalizes the first reviewed multi-seed navigation gate. It retains every
 seed result, reports failure seeds, and aggregates empirical P05/P95 ranges for accuracy and
 consistency metrics. The current phase randomizes measurement noise and includes the fixed
@@ -107,6 +118,12 @@ Blackbird `NYC Subway Winter` adds a 270.1 s independent motion-capture track wi
 converter keeps one absolute time base across IMU and truth, applies the published body/IMU
 extrinsic, and fails closed unless angular-rate correlation and gravity/frame residual checks pass.
 Its optional synthetic GNSS remains a navigation-math diagnostic, not receiver evidence.
+
+UrbanNav `Medium-Urban-1` adds 785.5 s of recorded 400 Hz ground-vehicle IMU, 655 valid F9P
+position epochs, independent SPAN-CPT postprocessed navigation truth, and a real 131 s receiver
+position gap. It tests independent position-only aiding and reacquisition. It does not test receiver
+velocity, physical body heading, aircraft dynamics, or fully independent truth because SPAN is a
+postprocessed GNSS/INS system.
 
 For independent-truth tracks, `analyze_results.py` also reports an offline Mahony fallback envelope:
 for declared entry-error gates it computes the first threshold crossing and worst/P95 truth error

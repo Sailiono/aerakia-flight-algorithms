@@ -444,6 +444,100 @@ static void test_eskf_timestamped_aiding_integrity(void)
                "barometer recovers after rejected aiding faults");
 }
 
+static void test_eskf_independent_navigation_observations(void)
+{
+    AerakiaEskf filter;
+    AerakiaEskf before;
+    AerakiaEskfConfig config;
+    AerakiaNavigationEstimate estimate;
+    AerakiaImuSample sample = level_sample(1000000U);
+    AerakiaPositionObservation position = {
+        1010000U, {1000.0f, 1000.0f, 1000.0f}, 1.0f
+    };
+    AerakiaVelocityObservation velocity = {
+        1010000U, {100.0f, 100.0f, 100.0f}, 1.0f
+    };
+    AerakiaGpsObservation paired = {
+        1020000U, {1.0f, 2.0f, 3.0f}, {0.1f, 0.2f, 0.3f}, 1.0f, 1.0f
+    };
+
+    aerakia_eskf_default_config(&config);
+    config.enable_static_alignment = false;
+    config.navigation_recovery_rejection_limit = 1U;
+    aerakia_eskf_init(&filter, &config, NULL, NULL);
+    (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
+    sample.timestamp_us = 1010000U;
+    (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
+
+    check_true(aerakia_eskf_update_position_observation(&filter, &position)
+                   == AERAKIA_STATUS_OK,
+               "position-only observation is accepted without receiver velocity");
+    aerakia_eskf_get_estimate(&filter, &estimate);
+    check_true(estimate.navigation_recovered, "rejected position-only aid reanchors position");
+    check_true(near(estimate.position_ned_m.x, 1000.0f, 1.0e-4f),
+               "position-only recovery changes position");
+    check_true(near(estimate.velocity_ned_m_s.x, 0.0f, 1.0e-4f),
+               "position-only recovery preserves velocity");
+
+    check_true(aerakia_eskf_update_velocity_observation(&filter, &velocity)
+                   == AERAKIA_STATUS_OK,
+               "velocity-only observation may share an epoch with position-only aid");
+    aerakia_eskf_get_estimate(&filter, &estimate);
+    check_true(estimate.navigation_recovered, "rejected velocity-only aid reanchors velocity");
+    check_true(near(estimate.position_ned_m.x, 1000.0f, 1.0e-4f),
+               "velocity-only recovery preserves position");
+    check_true(near(estimate.velocity_ned_m_s.x, 100.0f, 1.0e-4f),
+               "velocity-only recovery changes velocity");
+
+    before = filter;
+    check_true(aerakia_eskf_update_position_observation(&filter, &position)
+                   == AERAKIA_STATUS_TIMESTAMP_ERROR,
+               "duplicate position-only observation is rejected");
+    check_true(aerakia_eskf_update_velocity_observation(&filter, &velocity)
+                   == AERAKIA_STATUS_TIMESTAMP_ERROR,
+               "duplicate velocity-only observation is rejected");
+    check_true(eskf_core_unchanged(&filter, &before),
+               "duplicate independent navigation aid leaves the filter unchanged");
+
+    sample.timestamp_us = 1020000U;
+    (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
+    check_true(aerakia_eskf_update_gps_observation(&filter, &paired) == AERAKIA_STATUS_OK,
+               "paired GNSS remains compatible after independent observations");
+    check_true(filter.last_position_timestamp_us == paired.timestamp_us
+                   && filter.last_velocity_timestamp_us == paired.timestamp_us,
+               "paired GNSS advances both source-specific timestamps");
+
+    config.navigation_recovery_rejection_limit = 2U;
+    aerakia_eskf_init(&filter, &config, NULL, NULL);
+    sample.timestamp_us = 2000000U;
+    (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
+    sample.timestamp_us = 2010000U;
+    (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
+
+    position.timestamp_us = 2010000U;
+    position.position_ned_m = (AerakiaVec3f){0.0f, 0.0f, 0.0f};
+    velocity.timestamp_us = 2010000U;
+    velocity.velocity_ned_m_s = (AerakiaVec3f){100.0f, 100.0f, 100.0f};
+    (void)aerakia_eskf_update_velocity_observation(&filter, &velocity);
+    (void)aerakia_eskf_update_position_observation(&filter, &position);
+    aerakia_eskf_get_estimate(&filter, &estimate);
+    check_true(!estimate.navigation_recovered
+                   && estimate.consecutive_velocity_rejections == 1U
+                   && estimate.consecutive_position_rejections == 0U,
+               "accepted position does not clear independent velocity rejection history");
+
+    sample.timestamp_us = 2020000U;
+    (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
+    position.timestamp_us = 2020000U;
+    velocity.timestamp_us = 2020000U;
+    (void)aerakia_eskf_update_position_observation(&filter, &position);
+    (void)aerakia_eskf_update_velocity_observation(&filter, &velocity);
+    aerakia_eskf_get_estimate(&filter, &estimate);
+    check_true(estimate.navigation_recovered
+                   && estimate.consecutive_velocity_rejections == 0U,
+               "velocity recovery triggers despite interleaved accepted positions");
+}
+
 static void test_eskf_aiding_numeric_exhaustive(void)
 {
     AerakiaEskf filter;
@@ -706,6 +800,7 @@ int main(void)
     test_mahony_input_integrity();
     test_eskf_input_integrity();
     test_eskf_timestamped_aiding_integrity();
+    test_eskf_independent_navigation_observations();
     test_eskf_aiding_numeric_exhaustive();
     test_eskf_adapter_stationary();
     test_eskf_health_covers_state_and_covariance();

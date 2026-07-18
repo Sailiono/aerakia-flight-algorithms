@@ -193,6 +193,12 @@ def fallback_envelope_metrics(columns: dict[str, np.ndarray]) -> dict[str, objec
         eligible = np.flatnonzero(error_deg <= gate_deg)
         gate_result: dict[str, object] = {"eligible_start_samples": int(len(eligible))}
         for horizon_s in (0.5, 1.0, 2.0, 5.0):
+            if len(eligible) == 0:
+                gate_result[f"{horizon_s:g}_s"] = {
+                    "p95_peak_error_deg": None,
+                    "maximum_peak_error_deg": None,
+                }
+                continue
             peaks = np.asarray(
                 [
                     np.max(error_deg[index : np.searchsorted(
@@ -623,24 +629,131 @@ def navigation_metrics(columns: dict[str, np.ndarray]) -> dict[str, object] | No
     )
     position_error = estimate_p[valid] - reference_p[valid]
     velocity_error = estimate_v[valid] - reference_v[valid]
-    gps_updates = columns.get("input_position_update", np.zeros(len(valid))) > 0.5
+    position_updates = columns.get("input_position_update", np.zeros(len(valid))) > 0.5
+    velocity_updates = columns.get("input_velocity_update", position_updates) > 0.5
     return {
         "reference_samples": int(np.count_nonzero(valid)),
         "position_rmse_m": float(np.sqrt(np.mean(np.sum(position_error * position_error, axis=1)))),
         "position_p95_m": float(np.percentile(np.linalg.norm(position_error, axis=1), 95)),
         "velocity_rmse_m_s": float(np.sqrt(np.mean(np.sum(velocity_error * velocity_error, axis=1)))),
-        "gps_updates": int(np.count_nonzero(gps_updates)),
+        "gps_updates": int(np.count_nonzero(position_updates | velocity_updates)),
+        "position_updates": int(np.count_nonzero(position_updates)),
+        "velocity_updates": int(np.count_nonzero(velocity_updates)),
         "position_acceptance_ratio": (
-            float(np.count_nonzero((columns.get("eskf_position_accepted", 0) > 0.5) & gps_updates))
-            / np.count_nonzero(gps_updates)
-            if np.any(gps_updates) else None
+            float(np.count_nonzero(
+                (columns.get("eskf_position_accepted", 0) > 0.5) & position_updates
+            )) / np.count_nonzero(position_updates)
+            if np.any(position_updates) else None
         ),
         "velocity_acceptance_ratio": (
-            float(np.count_nonzero((columns.get("eskf_velocity_accepted", 0) > 0.5) & gps_updates))
-            / np.count_nonzero(gps_updates)
-            if np.any(gps_updates) else None
+            float(np.count_nonzero(
+                (columns.get("eskf_velocity_accepted", 0) > 0.5) & velocity_updates
+            )) / np.count_nonzero(velocity_updates)
+            if np.any(velocity_updates) else None
         ),
     }
+
+
+def navigation_aiding_gap_metrics(
+    columns: dict[str, np.ndarray], minimum_gap_s: float = 5.0,
+    recovery_threshold_m: float = 10.0, recovery_hold_s: float = 5.0,
+) -> dict[str, object] | None:
+    """Measure drift and reacquisition separately from ordinary aided accuracy.
+
+    Overall trajectory RMSE can hide whether error comes from normal GNSS operation or one long
+    recorded outage. This diagnostic uses only the recorded update-validity timeline and the
+    independent reference; it does not synthesize an outage or assume that a rejected fix existed.
+    """
+    required = [
+        "position_ref_valid", "input_position_update",
+        *[f"eskf_position_{axis}_m" for axis in ("n", "e", "d")],
+        *[f"ref_position_{axis}_m" for axis in ("n", "e", "d")],
+        *[f"eskf_velocity_{axis}_m_s" for axis in ("n", "e", "d")],
+        *[f"ref_velocity_{axis}_m_s" for axis in ("n", "e", "d")],
+    ]
+    if not all(name in columns for name in required):
+        return None
+    valid = columns["position_ref_valid"] > 0.5
+    updates = (columns["input_position_update"] > 0.5) & valid
+    update_indices = np.flatnonzero(updates)
+    if len(update_indices) < 2:
+        return None
+    time_s = (columns["ts_us"] - columns["ts_us"][0]) * 1.0e-6
+    position_error = np.linalg.norm(
+        np.column_stack([columns[f"eskf_position_{axis}_m"] for axis in ("n", "e", "d")])
+        - np.column_stack([columns[f"ref_position_{axis}_m"] for axis in ("n", "e", "d")]),
+        axis=1,
+    )
+    velocity_error = np.linalg.norm(
+        np.column_stack([columns[f"eskf_velocity_{axis}_m_s"] for axis in ("n", "e", "d")])
+        - np.column_stack([columns[f"ref_velocity_{axis}_m_s"] for axis in ("n", "e", "d")]),
+        axis=1,
+    )
+    nominal_interval_s = float(np.median(np.diff(time_s[update_indices])))
+    last_update_time = np.full(len(time_s), -np.inf, dtype=np.float64)
+    last_update_time[update_indices] = time_s[update_indices]
+    last_update_time = np.maximum.accumulate(last_update_time)
+    aiding_available = valid & ((time_s - last_update_time) <= 1.5 * nominal_interval_s)
+
+    details: list[dict[str, object]] = []
+    for start, resume in zip(update_indices[:-1], update_indices[1:]):
+        gap_s = float(time_s[resume] - time_s[start])
+        if gap_s < minimum_gap_s:
+            continue
+        segment = slice(int(start), int(resume) + 1)
+        peak_offset = int(np.argmax(position_error[segment]))
+        peak_index = int(start) + peak_offset
+        recovery_time_s: float | None = None
+        for candidate in np.flatnonzero(
+            (np.arange(len(time_s)) >= resume) & valid
+            & (position_error <= recovery_threshold_m)
+        ):
+            hold_end = int(np.searchsorted(
+                time_s, time_s[candidate] + recovery_hold_s, side="left"
+            ))
+            if hold_end >= len(time_s):
+                break
+            if np.all(position_error[candidate : hold_end + 1] <= recovery_threshold_m):
+                recovery_time_s = float(time_s[candidate] - time_s[resume])
+                break
+        details.append(
+            {
+                "last_update_time_s": float(time_s[start]),
+                "resume_update_time_s": float(time_s[resume]),
+                "update_interval_s": gap_s,
+                "missing_nominal_epochs": max(0, int(round(gap_s / nominal_interval_s)) - 1),
+                "position_error_before_gap_m": float(position_error[start]),
+                "peak_position_error_m": float(position_error[peak_index]),
+                "peak_position_error_time_s": float(time_s[peak_index]),
+                "peak_velocity_error_m_s": float(np.max(velocity_error[segment])),
+                "position_error_after_first_resume_update_m": float(position_error[resume]),
+                "resume_position_nis": (
+                    float(columns["eskf_position_nis"][resume])
+                    if "eskf_position_nis" in columns else None
+                ),
+                "sustained_recovery_threshold_m": recovery_threshold_m,
+                "sustained_recovery_hold_s": recovery_hold_s,
+                "sustained_recovery_time_s": recovery_time_s,
+            }
+        )
+    if not details:
+        return None
+    details.sort(key=lambda item: float(item["update_interval_s"]), reverse=True)
+    result: dict[str, object] = {
+        "interpretation": (
+            "Recorded position-update gaps are scored separately from nominal aided operation; "
+            "the first resumed row contains the posterior after that update."
+        ),
+        "nominal_update_interval_s": nominal_interval_s,
+        "minimum_reported_gap_s": minimum_gap_s,
+        "reported_gaps": len(details),
+        "aiding_available_ratio": float(np.mean(aiding_available[valid])),
+        "aided_position_rmse_m": float(np.sqrt(np.mean(position_error[aiding_available] ** 2))),
+        "unaided_position_rmse_m": float(np.sqrt(np.mean(position_error[valid & ~aiding_available] ** 2))),
+        "longest_gap": details[0],
+        "gaps": details,
+    }
+    return result
 
 
 def _consistency_summary(values: np.ndarray, degrees_of_freedom: int) -> dict[str, float | int]:
@@ -670,20 +783,27 @@ def consistency_metrics(
 ) -> dict[str, object] | None:
     if "eskf_position_nis" not in columns or "eskf_velocity_nis" not in columns:
         return None
-    gps_updates = columns.get("input_position_update", np.zeros(len(columns["ts_us"]))) > 0.5
-    if not np.any(gps_updates):
+    position_updates = columns.get(
+        "input_position_update", np.zeros(len(columns["ts_us"]))
+    ) > 0.5
+    velocity_updates = columns.get("input_velocity_update", position_updates) > 0.5
+    if not np.any(position_updates | velocity_updates):
         return None
     result: dict[str, object] = {
         "interpretation": (
             "NIS uses each pre-update GNSS innovation. Single-sample chi-square coverage is "
             "diagnostic because consecutive samples are time-correlated."
         ),
-        "position_nis": _consistency_summary(columns["eskf_position_nis"][gps_updates], 3),
-        "velocity_nis": _consistency_summary(columns["eskf_velocity_nis"][gps_updates], 3),
+        "position_nis": _consistency_summary(
+            columns["eskf_position_nis"][position_updates], 3
+        ),
+        "velocity_nis": _consistency_summary(
+            columns["eskf_velocity_nis"][velocity_updates], 3
+        ),
     }
     if reference_kind in ("synthetic", "independent_truth") and "eskf_navigation_nees" in columns:
         result["navigation_nees"] = _consistency_summary(
-            columns["eskf_navigation_nees"][gps_updates], 6
+            columns["eskf_navigation_nees"][position_updates | velocity_updates], 6
         )
         result["navigation_nees_scope"] = (
             "Posterior [velocity, position] 6-state error against the declared truth source."
@@ -767,9 +887,46 @@ def create_yaw_diagnostic_plot(columns: dict[str, np.ndarray], output_path: Path
     plt.close(figure)
 
 
+def create_navigation_diagnostic_plot(
+    columns: dict[str, np.ndarray], output_path: Path, title: str
+) -> None:
+    time_s = (columns["ts_us"] - columns["ts_us"][0]) * 1.0e-6
+    position_error = np.linalg.norm(
+        np.column_stack([columns[f"eskf_position_{axis}_m"] for axis in ("n", "e", "d")])
+        - np.column_stack([columns[f"ref_position_{axis}_m"] for axis in ("n", "e", "d")]),
+        axis=1,
+    )
+    velocity_error = np.linalg.norm(
+        np.column_stack([columns[f"eskf_velocity_{axis}_m_s"] for axis in ("n", "e", "d")])
+        - np.column_stack([columns[f"ref_velocity_{axis}_m_s"] for axis in ("n", "e", "d")]),
+        axis=1,
+    )
+    updates = columns.get("input_position_update", np.zeros(len(time_s))) > 0.5
+    update_indices = np.flatnonzero(updates)
+    figure, axes = plt.subplots(2, 1, figsize=(14, 7), sharex=True)
+    axes[0].semilogy(time_s, np.maximum(position_error, 1.0e-3), color="#d55e00")
+    axes[1].semilogy(time_s, np.maximum(velocity_error, 1.0e-4), color="#0072b2")
+    if len(update_indices) >= 2:
+        intervals = np.diff(time_s[update_indices])
+        for gap_index in np.flatnonzero(intervals >= 5.0):
+            start = time_s[update_indices[gap_index]]
+            stop = time_s[update_indices[gap_index + 1]]
+            for axis in axes:
+                axis.axvspan(start, stop, color="#cc79a7", alpha=0.18, label="recorded aid gap")
+    axes[0].set_ylabel("3D position error (m)")
+    axes[1].set_ylabel("3D velocity error (m/s)")
+    axes[1].set_xlabel("time (s)")
+    for axis in axes:
+        axis.grid(alpha=0.25, which="both")
+    if any(patch.get_label() == "recorded aid gap" for patch in axes[0].patches):
+        axes[0].legend(fontsize=8)
+    figure.suptitle(title); figure.tight_layout(); figure.savefig(output_path, dpi=150)
+    plt.close(figure)
+
+
 def write_markdown(
     path: Path, scenario: str, metrics: dict[str, object], plot_name: str,
-    yaw_plot_name: str | None = None,
+    yaw_plot_name: str | None = None, navigation_plot_name: str | None = None,
 ) -> None:
     algorithms = metrics["algorithms"]
     assert isinstance(algorithms, dict)
@@ -822,6 +979,29 @@ def write_markdown(
         lines.append(
             f"- Position RMSE against the declared navigation reference: "
             f"{navigation['position_rmse_m']:.3f} m."
+        )
+    aiding_gaps = metrics.get("navigation_aiding_gaps")
+    if aiding_gaps:
+        longest = aiding_gaps["longest_gap"]
+        recovery = longest.get("sustained_recovery_time_s")
+        recovery_text = "not reached" if recovery is None else f"{recovery:.3f} s"
+        lines.extend(
+            [
+                "", "## Recorded navigation-aiding gaps", "",
+                f"- Longest recorded position-update interval: "
+                f"{longest['update_interval_s']:.3f} s; estimated missing nominal epochs: "
+                f"{longest['missing_nominal_epochs']}.",
+                f"- Position error before gap / peak / after first resumed update: "
+                f"{longest['position_error_before_gap_m']:.3f} / "
+                f"{longest['peak_position_error_m']:.3f} / "
+                f"{longest['position_error_after_first_resume_update_m']:.3f} m.",
+                f"- Sustained recovery below "
+                f"{longest['sustained_recovery_threshold_m']:.1f} m for "
+                f"{longest['sustained_recovery_hold_s']:.1f} s: {recovery_text}.",
+                f"- Aided / unaided position RMSE: "
+                f"{aiding_gaps['aided_position_rmse_m']:.3f} / "
+                f"{aiding_gaps['unaided_position_rmse_m']:.3f} m.",
+            ]
         )
     trusted_heading = metrics.get("trusted_heading")
     if trusted_heading:
@@ -914,6 +1094,8 @@ def write_markdown(
     )
     if yaw_plot_name is not None:
         lines.extend([f"![Yaw reset and source diagnostics]({yaw_plot_name})", ""])
+    if navigation_plot_name is not None:
+        lines.extend([f"![Navigation error and recorded aiding gaps]({navigation_plot_name})", ""])
     reference_kind = metrics["reference_kind"]
     if reference_kind == "px4_estimate":
         lines.extend(
@@ -959,6 +1141,7 @@ def main() -> None:
         },
         "eskf_integrity": eskf_integrity_metrics(columns),
         "navigation": navigation_metrics(columns),
+        "navigation_aiding_gaps": navigation_aiding_gap_metrics(columns),
         "eskf_consistency": consistency_metrics(columns, args.reference_kind),
         "reference_resets": reset_summary(columns),
         "trusted_heading": trusted_heading_metrics(columns),
@@ -979,12 +1162,19 @@ def main() -> None:
     if args.reference_kind == "px4_estimate":
         yaw_plot_path = args.out_dir / "yaw_diagnostics.png"
         create_yaw_diagnostic_plot(columns, yaw_plot_path, f"Yaw diagnostics — {args.scenario}")
+    navigation_plot_path: Path | None = None
+    if metrics["navigation"] is not None:
+        navigation_plot_path = args.out_dir / "navigation_diagnostics.png"
+        create_navigation_diagnostic_plot(
+            columns, navigation_plot_path, f"Navigation diagnostics — {args.scenario}"
+        )
     (args.out_dir / "metrics.json").write_text(
         json.dumps(metrics, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     write_markdown(
         args.out_dir / "report.md", args.scenario, metrics, plot_path.name,
         yaw_plot_path.name if yaw_plot_path is not None else None,
+        navigation_plot_path.name if navigation_plot_path is not None else None,
     )
     print(json.dumps(metrics, indent=2, sort_keys=True))
 

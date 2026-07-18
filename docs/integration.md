@@ -85,12 +85,35 @@ heading_status = aerakia_eskf_update_heading_observation(&navigation_filter, &he
 barometer_status = aerakia_eskf_update_barometer_observation(&navigation_filter, &barometer);
 ```
 
+If the receiver publishes position and velocity independently, use the source-specific contracts:
+
+```c
+AerakiaPositionObservation position = {
+    gps_position_time_us, gps_position_ned_m, gps_position_variance_m2
+};
+AerakiaVelocityObservation velocity = {
+    gps_velocity_time_us, gps_velocity_ned_m_s, gps_velocity_variance_m2_s2
+};
+
+aerakia_eskf_update_position_observation(&navigation_filter, &position);
+aerakia_eskf_update_velocity_observation(&navigation_filter, &velocity);
+```
+
+Do not differentiate receiver positions inside the adapter and mark the result as measured Doppler
+velocity. If only one source is valid, publish only that observation. The paired API remains the
+preferred path when a receiver truly provides synchronized position and velocity.
+
 Use the physical measurement time, not message-delivery or task-wakeup time. The timestamped APIs
 reject observations before the first IMU, from the future, duplicate/reordered per source, or older
 than `maximum_aiding_age_s`. The older untimestamped update functions remain source-compatible for
 existing host applications, but cannot enforce freshness and must not be used by the FCOne adapter.
 
-The paired GPS API gates position and velocity separately. If both are rejected for the configured consecutive limit, it re-anchors only position/velocity with covariance floors; attitude and learned IMU biases are preserved. A syntactically and temporally valid observation consumes its source timestamp even if its innovation is rejected, preventing the same physical sample from being retried as if it were new.
+The paired GPS API gates position and velocity separately. Independent APIs also maintain separate
+freshness timestamps and can re-anchor only their own state component after persistent rejection.
+Position recovery preserves velocity; velocity recovery preserves position; both preserve attitude
+and learned IMU biases. A syntactically and temporally valid observation consumes its source
+timestamp even if its innovation is rejected, preventing the same physical sample from being
+retried as if it were new.
 
 Trusted heading is independent of magnetometer fusion. It can come from dual-antenna GNSS, vision, motion capture, or another upstream estimator, provided the application converts it to clockwise-from-North NED radians and supplies a defensible variance.
 

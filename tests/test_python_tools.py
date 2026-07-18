@@ -17,6 +17,7 @@ import convert_capture_to_golden as converter  # noqa: E402
 import convert_blackbird_to_replay as blackbird_converter  # noqa: E402
 import convert_euroc_to_replay as euroc_converter  # noqa: E402
 import convert_insane_to_replay as insane_converter  # noqa: E402
+import convert_urbannav_to_replay as urbannav_converter  # noqa: E402
 import convert_ulog_to_replay as ulog_converter  # noqa: E402
 import analyze_results as analyzer  # noqa: E402
 import generate_synthetic_imu as synthetic_generator  # noqa: E402
@@ -462,6 +463,79 @@ class InsaneConverterTests(unittest.TestCase):
         np.testing.assert_array_equal(second_index, np.asarray([0]))
 
 
+class UrbanNavConverterTests(unittest.TestCase):
+    @staticmethod
+    def _sentence(payload: str) -> str:
+        checksum = 0
+        for character in payload:
+            checksum ^= ord(character)
+        return f"${payload}*{checksum:02X}\n"
+
+    def test_nmea_intake_requires_checksum_fix_and_gst_uncertainty(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_directory:
+            path = Path(temp_directory) / "receiver.nmea"
+            content = "".join(
+                [
+                    self._sentence("GNRMC,023255.00,A,2218.00000,N,11410.00000,E,0.0,,170521,,,D,V"),
+                    self._sentence("GNGGA,023255.00,2218.00000,N,11410.00000,E,2,12,0.6,9.0,M,-1.6,M,,0000"),
+                    self._sentence("GNGST,023255.00,1,2,1,0,0.5,0.6,1.5"),
+                    "$GNGGA,broken*00\n",
+                    self._sentence("GNRMC,023256.00,A,2218.00010,N,11410.00010,E,0.0,,170521,,,D,V"),
+                    self._sentence("GNGGA,023256.00,2218.00010,N,11410.00010,E,1,10,0.8,9.1,M,-1.6,M,,0000"),
+                    self._sentence("GNGST,023256.00,1,2,1,0,0.7,0.8,1.2"),
+                ]
+            )
+            path.write_bytes(content.encode("latin-1"))
+            document = urbannav_converter._parse_nmea(path)
+            data = document["data"]
+            self.assertEqual(len(data), 2)
+            self.assertEqual(int(document["invalid_checksums"][0]), 1)
+            self.assertEqual(int(document["missing_uncertainty"][0]), 0)
+            self.assertAlmostEqual(float(data[0, 3]), 7.4)
+            self.assertAlmostEqual(float(data[0, 4]), 1.5**2)
+            self.assertAlmostEqual(float(data[1, 0] - data[0, 0]), 1.0)
+
+    def test_published_rfu_body_and_enu_navigation_map_to_frd_ned(self) -> None:
+        import numpy as np
+
+        rotation_enu_source = urbannav_converter._rotation_enu_source(
+            np.asarray([0.0]), np.asarray([0.0]), np.radians(np.asarray([90.0]))
+        )[0]
+        source_forward = np.asarray([0.0, 1.0, 0.0])
+        np.testing.assert_allclose(
+            rotation_enu_source @ source_forward, np.asarray([1.0, 0.0, 0.0]),
+            atol=1.0e-12,
+        )
+        rotation_ned_frd = (
+            urbannav_converter.ENU_TO_NED
+            @ rotation_enu_source
+            @ urbannav_converter.SOURCE_TO_FRD
+        )
+        np.testing.assert_allclose(
+            rotation_ned_frd @ np.asarray([1.0, 0.0, 0.0]),
+            np.asarray([0.0, 1.0, 0.0]), atol=1.0e-12,
+        )
+        self.assertAlmostEqual(float(np.linalg.det(rotation_ned_frd)), 1.0)
+
+    def test_rotation_to_quaternion_covers_every_trace_branch(self) -> None:
+        import numpy as np
+
+        rotations = np.asarray(
+            [
+                np.eye(3),
+                np.diag([1.0, -1.0, -1.0]),
+                np.diag([-1.0, 1.0, -1.0]),
+                np.diag([-1.0, -1.0, 1.0]),
+            ]
+        )
+        quaternions = urbannav_converter._quaternion_from_rotation(rotations)
+        reconstructed = insane_converter._rotation_from_quaternion(quaternions)
+        np.testing.assert_allclose(reconstructed, rotations, atol=1.0e-12)
+        np.testing.assert_allclose(
+            np.linalg.norm(quaternions, axis=1), np.ones(4), atol=1.0e-12
+        )
+
+
 class ValidationAnalyzerTests(unittest.TestCase):
     def test_fallback_envelope_reports_continuity_gate_and_time_budget(self) -> None:
         import numpy as np
@@ -483,6 +557,25 @@ class ValidationAnalyzerTests(unittest.TestCase):
         self.assertAlmostEqual(
             result["entry_envelopes"]["10_deg"]["1_s"]["maximum_peak_error_deg"],
             12.0,
+        )
+
+    def test_fallback_envelope_reports_no_qualified_entry_without_crashing(self) -> None:
+        import numpy as np
+
+        half = np.radians(np.full(3, 30.0)) * 0.5
+        columns = {"ts_us": np.arange(3, dtype=float) * 1_000_000.0}
+        for prefix in ("truth", "mahony_robust"):
+            columns[f"{prefix}_q_w"] = np.ones(3)
+            columns[f"{prefix}_q_x"] = np.zeros(3)
+            columns[f"{prefix}_q_y"] = np.zeros(3)
+            columns[f"{prefix}_q_z"] = np.zeros(3)
+        columns["mahony_robust_q_w"] = np.cos(half)
+        columns["mahony_robust_q_z"] = np.sin(half)
+        result = analyzer.fallback_envelope_metrics(columns)
+        assert result is not None
+        self.assertEqual(result["entry_envelopes"]["15_deg"]["eligible_start_samples"], 0)
+        self.assertIsNone(
+            result["entry_envelopes"]["15_deg"]["1_s"]["maximum_peak_error_deg"]
         )
 
     def test_trusted_heading_metrics_separate_faults_and_dropout(self) -> None:
@@ -636,6 +729,38 @@ class ValidationAnalyzerTests(unittest.TestCase):
         real_metrics = analyzer.consistency_metrics(columns, "px4_estimate")
         assert real_metrics is not None
         self.assertNotIn("navigation_nees", real_metrics)
+
+    def test_navigation_gap_metrics_separate_outage_drift_and_recovery(self) -> None:
+        import numpy as np
+
+        samples = 21
+        time_s = np.arange(samples, dtype=np.float64)
+        update = np.zeros(samples)
+        update[[0, 1, 2, 15, 16, 17, 18, 19, 20]] = 1.0
+        error = np.ones(samples)
+        error[3:15] = np.linspace(2.0, 30.0, 12)
+        error[15:] = np.asarray([8.0, 5.0, 4.0, 3.0, 2.0, 2.0])
+        columns = {
+            "ts_us": time_s * 1.0e6,
+            "position_ref_valid": np.ones(samples),
+            "input_position_update": update,
+            "eskf_position_nis": np.where(update > 0.5, 3.0, np.nan),
+        }
+        for axis in ("n", "e", "d"):
+            columns[f"ref_position_{axis}_m"] = np.zeros(samples)
+            columns[f"ref_velocity_{axis}_m_s"] = np.zeros(samples)
+            columns[f"eskf_position_{axis}_m"] = error if axis == "n" else np.zeros(samples)
+            columns[f"eskf_velocity_{axis}_m_s"] = np.zeros(samples)
+        metrics = analyzer.navigation_aiding_gap_metrics(
+            columns, minimum_gap_s=5.0, recovery_threshold_m=10.0, recovery_hold_s=2.0
+        )
+        assert metrics is not None
+        longest = metrics["longest_gap"]
+        self.assertAlmostEqual(longest["update_interval_s"], 13.0)
+        self.assertEqual(longest["missing_nominal_epochs"], 12)
+        self.assertAlmostEqual(longest["peak_position_error_m"], 30.0)
+        self.assertAlmostEqual(longest["position_error_after_first_resume_update_m"], 8.0)
+        self.assertAlmostEqual(longest["sustained_recovery_time_s"], 0.0)
 
 
 class PublicDatasetSuiteTests(unittest.TestCase):

@@ -24,7 +24,8 @@ typedef struct {
     int ref_q_w, ref_q_x, ref_q_y, ref_q_z;
     int position_ref_valid, ref_position_n, ref_position_e, ref_position_d;
     int ref_velocity_n, ref_velocity_e, ref_velocity_d;
-    int position_update, gps_position_n, gps_position_e, gps_position_d;
+    int position_update, gps_position_update, gps_velocity_update;
+    int gps_position_n, gps_position_e, gps_position_d;
     int gps_velocity_n, gps_velocity_e, gps_velocity_d;
     int gps_position_variance, gps_velocity_variance;
     int heading_valid, heading_update, heading, heading_variance, heading_fault;
@@ -83,6 +84,8 @@ static int load_column_map(char *header, ColumnMap *map)
     MAP(ref_velocity_n, "ref_velocity_n_m_s"); MAP(ref_velocity_e, "ref_velocity_e_m_s");
     MAP(ref_velocity_d, "ref_velocity_d_m_s");
     MAP(position_update, "position_update");
+    MAP(gps_position_update, "gps_position_update");
+    MAP(gps_velocity_update, "gps_velocity_update");
     MAP(gps_position_n, "gps_position_n_m"); MAP(gps_position_e, "gps_position_e_m");
     MAP(gps_position_d, "gps_position_d_m");
     MAP(gps_velocity_n, "gps_velocity_n_m_s"); MAP(gps_velocity_e, "gps_velocity_e_m_s");
@@ -372,7 +375,7 @@ int main(int argc, char *argv[])
         "eskf_navigation_recovery_count,eskf_healthy,eskf_static_aligned,"
         "eskf_static_tilt_aligned,eskf_static_heading_aligned,"
         "eskf_stationary_detected,eskf_zupt_applied,eskf_zupt_count,"
-        "input_mag_update,input_position_update,position_ref_valid,"
+        "input_mag_update,input_position_update,input_velocity_update,position_ref_valid,"
         "ref_attitude_reset_counter,ref_attitude_reset_event,"
         "ref_delta_q_reset_w,ref_delta_q_reset_x,ref_delta_q_reset_y,ref_delta_q_reset_z,"
         "input_heading_update,eskf_heading_accepted,eskf_heading_innovation_rad,"
@@ -420,7 +423,15 @@ int main(int argc, char *argv[])
         const double magnetic_declination_rad = parse_double(
             columns, count, map.magnetic_declination, 0.0, &ok
         );
-        const int position_update = (int)parse_double(columns, count, map.position_update, 0.0, &ok) != 0;
+        const int paired_navigation_update = (int)parse_double(
+            columns, count, map.position_update, 0.0, &ok
+        ) != 0;
+        const int position_update = paired_navigation_update || ((int)parse_double(
+            columns, count, map.gps_position_update, 0.0, &ok
+        ) != 0);
+        const int velocity_update = paired_navigation_update || ((int)parse_double(
+            columns, count, map.gps_velocity_update, 0.0, &ok
+        ) != 0);
         const int heading_valid = (int)parse_double(
             columns, count, map.heading_valid, 0.0, &ok
         ) != 0;
@@ -525,7 +536,7 @@ int main(int argc, char *argv[])
         (void)aerakia_mahony_update(&robust, &sample, &robust_estimate);
         (void)aerakia_eskf_process_imu(&eskf, &sample, &eskf_estimate);
 
-        if (position_update) {
+        if (position_update && velocity_update) {
             AerakiaGpsObservation observation;
             observation.timestamp_us = sample.timestamp_us;
             observation.position_ned_m = parse_vector(
@@ -541,6 +552,34 @@ int main(int argc, char *argv[])
                 columns, count, map.gps_velocity_variance, 1.0, &ok
             );
             if (ok && aerakia_eskf_update_gps_observation(&eskf, &observation)
+                    == AERAKIA_STATUS_OK) {
+                gps_updates++;
+            }
+        } else if (position_update) {
+            AerakiaPositionObservation observation;
+            observation.timestamp_us = sample.timestamp_us;
+            observation.position_ned_m = parse_vector(
+                columns, count, map.gps_position_n, map.gps_position_e,
+                map.gps_position_d, 1.0, &ok
+            );
+            observation.variance_m2 = (float)parse_double(
+                columns, count, map.gps_position_variance, 1.0, &ok
+            );
+            if (ok && aerakia_eskf_update_position_observation(&eskf, &observation)
+                    == AERAKIA_STATUS_OK) {
+                gps_updates++;
+            }
+        } else if (velocity_update) {
+            AerakiaVelocityObservation observation;
+            observation.timestamp_us = sample.timestamp_us;
+            observation.velocity_ned_m_s = parse_vector(
+                columns, count, map.gps_velocity_n, map.gps_velocity_e,
+                map.gps_velocity_d, 1.0, &ok
+            );
+            observation.variance_m2_s2 = (float)parse_double(
+                columns, count, map.gps_velocity_variance, 1.0, &ok
+            );
+            if (ok && aerakia_eskf_update_velocity_observation(&eskf, &observation)
                     == AERAKIA_STATUS_OK) {
                 gps_updates++;
             }
@@ -574,7 +613,7 @@ int main(int argc, char *argv[])
             "%ld,%llu,%.9f,%.9f,%.9f,"
             "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,"
             "%.6f,%.6f,%.6f,%d,%.9f,%.9f,%d,%d,%d,%u,%d,%d,%d,%d,%d,%d,%u,"
-            "%d,%d,%d,%.0f,%.0f,%.9f,%.9f,%.9f,%.9f,"
+            "%d,%d,%d,%d,%.0f,%.0f,%.9f,%.9f,%.9f,%.9f,"
             "%d,%d,%.9f,%d,%.9f,%.9f,%d,%d,%d,%.9f,%.9f,%.9f,%d,%d,%.9f,%.9f,"
             "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,"
             "%.9f,%.9f,%.9f,"
@@ -603,7 +642,7 @@ int main(int argc, char *argv[])
             eskf_estimate.stationary_detected ? 1 : 0,
             eskf_estimate.zero_velocity_update_applied ? 1 : 0,
             eskf_estimate.zero_velocity_update_count,
-            mag_valid && mag_update, position_update, position_ref_valid,
+            mag_valid && mag_update, position_update, velocity_update, position_ref_valid,
             parse_double(columns, count, map.reset_counter, 0.0, &ok),
             parse_double(columns, count, map.reset_event, 0.0, &ok),
             parse_double(columns, count, map.reset_q_w, 1.0, &ok),
@@ -623,8 +662,8 @@ int main(int argc, char *argv[])
             eskf_estimate.position_ned_m.z, eskf_estimate.velocity_ned_m_s.x,
             eskf_estimate.velocity_ned_m_s.y, eskf_estimate.velocity_ned_m_s.z,
             position_update ? eskf_estimate.last_position_innovation.nis : NAN,
-            position_update ? eskf_estimate.last_velocity_innovation.nis : NAN,
-            position_update && position_ref_valid
+            velocity_update ? eskf_estimate.last_velocity_innovation.nis : NAN,
+            (position_update || velocity_update) && position_ref_valid
                 ? navigation_nees(&eskf, reference_position, reference_velocity) : NAN,
             reference_q[0], reference_q[1], reference_q[2], reference_q[3],
             standard_estimate.quaternion_wxyz[0], standard_estimate.quaternion_wxyz[1],

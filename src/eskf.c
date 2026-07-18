@@ -872,6 +872,45 @@ void eskf_reset_navigation(ESKF_Handle *h,
     }
 }
 
+void eskf_reset_position(ESKF_Handle *h,
+                         const eskf_float_t position_ned_m[3],
+                         eskf_float_t position_variance_m2) {
+    int i;
+    int j;
+    if (!h || !h->initialized || !position_ned_m || position_variance_m2 <= 0.0) return;
+
+    eskf_vec3_copy(position_ned_m, h->state.p);
+    for (i = ESKF_IDX_DP; i < ESKF_IDX_DP + 3; ++i) {
+        for (j = 0; j < ESKF_ERROR_STATE_DIM; ++j) {
+            h->P[i][j] = 0.0;
+            h->P[j][i] = 0.0;
+        }
+    }
+    for (i = 0; i < 3; ++i) {
+        h->P[ESKF_IDX_DP + i][ESKF_IDX_DP + i] = position_variance_m2;
+    }
+}
+
+void eskf_reset_velocity(ESKF_Handle *h,
+                         const eskf_float_t velocity_ned_m_s[3],
+                         eskf_float_t velocity_variance_m2_s2) {
+    int i;
+    int j;
+    if (!h || !h->initialized || !velocity_ned_m_s
+        || velocity_variance_m2_s2 <= 0.0) return;
+
+    eskf_vec3_copy(velocity_ned_m_s, h->state.v);
+    for (i = ESKF_IDX_DV; i < ESKF_IDX_DV + 3; ++i) {
+        for (j = 0; j < ESKF_ERROR_STATE_DIM; ++j) {
+            h->P[i][j] = 0.0;
+            h->P[j][i] = 0.0;
+        }
+    }
+    for (i = 0; i < 3; ++i) {
+        h->P[ESKF_IDX_DV + i][ESKF_IDX_DV + i] = velocity_variance_m2_s2;
+    }
+}
+
 /* ============================================================================
  * Calibration / Alignment
  * ============================================================================ */

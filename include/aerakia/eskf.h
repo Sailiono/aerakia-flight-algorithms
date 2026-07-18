@@ -169,6 +169,16 @@ void eskf_reset_navigation(ESKF_Handle *h,
                            eskf_float_t position_variance_m2,
                            eskf_float_t velocity_variance_m2_s2);
 
+/** Re-anchor position without changing velocity, attitude, or learned IMU biases. */
+void eskf_reset_position(ESKF_Handle *h,
+                         const eskf_float_t position_ned_m[3],
+                         eskf_float_t position_variance_m2);
+
+/** Re-anchor velocity without changing position, attitude, or learned IMU biases. */
+void eskf_reset_velocity(ESKF_Handle *h,
+                         const eskf_float_t velocity_ned_m_s[3],
+                         eskf_float_t velocity_variance_m2_s2);
+
 /* ============================================================================
  * Calibration / Alignment
  * ============================================================================ */
