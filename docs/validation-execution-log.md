@@ -417,7 +417,8 @@ headers or moving product policy into the public algorithm core:
 The supervisor contract covers five-sample startup qualification, three-sample soft-observability
 confirmation, Mahony attitude-only degradation, position/velocity invalidation, 15-degree handover
 continuity, five-sample recovery dwell, both-estimators-invalid behavior, transition reason/count,
-and transition timestamp.
+and transition timestamp. The later Blackbird milestone below supersedes the entry gate with 10°
+and adds continuity on fallback entry plus a finite degraded-mode budget.
 
 The first design applied hysteresis to every ESKF health loss. Review found that this would allow a
 numerically invalid ESKF state to remain selected during the confirmation window. The contract now
@@ -465,3 +466,84 @@ All five non-campaign C targets passed under ASan+UBSan. The full 1,020,000-atte
 run directly with the same sanitizers and also completed with zero invariant failures, zero unhealthy
 outputs, 790,917 accepted samples, 139,059 missing-measurement rejections, 90,024 timestamp
 rejections, 20,355 forward-gap reanchors, and every declared aiding fault class exercised.
+
+## 2026-07-18 — Blackbird independent-motion intake and bounded fallback
+
+### Reason
+
+The existing public corpus covered two EuRoC sequences but did not independently score a longer
+aggressive UAV trajectory. It also documented robust Mahony as an attitude fallback without a
+data-derived bound on how long a parallel, unaided Mahony state could remain control-qualified.
+
+The official Blackbird sensor host returned TLS EOF/empty HTTP responses. The intake therefore used
+MathWorks' MIT-licensed `BlackbirdVIOData.tar` redistribution of `NYC Subway Winter`, retained the
+raw TAR/MAT outside Git, and committed only the converter, input hash, manifest, and metric summary.
+
+### Retained frame/time failure and correction
+
+The first audit independently subtracted the first IMU and first motion-capture timestamps. This
+silently discarded a `-1.762237184 s` stream-start offset; x/y truth-vs-IMU angular-rate correlation
+then appeared near zero. No algorithm score from that attempt was accepted.
+
+Using a common absolute time origin and the official Blackbird body-to-IMU quaternion produced
+axis correlations `0.99345 / 0.98947 / 0.99984`, total angular-rate RMSE `0.03627 rad/s`, and total
+specific-force RMSE `0.36386 m/s²`. These checks are executable preconditions in
+`convert_blackbird_to_replay.py`; ambiguous time/frame data now fail closed.
+
+### Coverage and result
+
+- 26,995 unique recorded IMU samples, 270.076 s, 99.978 Hz;
+- independent 19.9999 Hz motion-capture pose;
+- speed P95/max `2.80/3.03 m/s`;
+- gyro norm P95/max `1.95/4.22 rad/s`;
+- acceleration norm P99/max `11.43/59.78 m/s²`;
+- three retained tracks and 80,985 replay attempts.
+
+Raw ESKF tracking reaches `1.573°` geodesic attitude, `1.131°` tilt, and `1.069°` Euler-yaw RMSE.
+It remains healthy for every sample with zero navigation recovery. Tilt-only cold start completes in
+`1.009 s` and reaches `1.131°` post-alignment tilt RMSE; heading alignment correctly remains false.
+Synthetic GNSS produces `0.123 m / 0.082 m/s` position/velocity RMSE and navigation NEES `4.76`, but
+is explicitly not recorded-receiver evidence.
+
+Raw robust Mahony reaches `51.478°` geodesic and `7.814°` tilt RMSE with no magnetometer/heading.
+Static reference-bias subtraction improves full attitude only to `10.129°`, leaving the aggressive
+acceleration limitation visible. The offline truth envelope shows first 10° error at `14.588 s`;
+an entry at or below 10° can reach `14.959°` within one second, while the older 15°/five-second
+example can reach `20.307°`.
+
+### Supervisor correction
+
+The earlier oracle checked continuity only when returning from Mahony to ESKF. It could therefore
+select a parallel Mahony instance that had already drifted before the ESKF fault. The executable
+contract now:
+
+- compares Mahony with the last qualified output before fallback entry;
+- rejects a discontinuous fallback instead of publishing an attitude step;
+- invalidates position, velocity, and navigation throughout Mahony-only operation;
+- expires Mahony-only operation after a finite budget with an explicit transition reason;
+- uses a conservative 10°/one-second host-test gate derived from the Blackbird envelope.
+
+The numerical values are test-oracle defaults, not flight-qualified FCOne policy. Final limits must
+be chosen with vehicle dynamics, controller tolerance, failsafe timing, HIL, and hardware evidence.
+
+### Reproduction
+
+```bash
+python validation/run_public_dataset_suite.py \
+  --data-root /path/to/blackbird-mathworks \
+  --manifest validation/public/blackbird_manifest.json \
+  --runner build/aerakia_validation_runner \
+  --out-dir build/blackbird-suite
+```
+
+The suite verifies the MAT SHA-256 before conversion, runs and logs all nine subprocesses, checks
+selected metrics against the committed baseline, and records the host environment and Git state.
+
+The complete Release host gate passes CTest `6/6`, Python `29/29`, all deterministic
+accuracy/recovery/NIS/NEES/bias/magnetic thresholds, and the 1,020,000-attempt input-integrity
+campaign with zero invariant or unhealthy-output failures. The five non-campaign C targets also
+pass ASan+UBSan. LeakSanitizer itself cannot run inside the desktop sandbox's ptrace environment;
+that infrastructure failure is retained, and the ASan+UBSan run is repeated with leak detection
+disabled rather than misreported as a code defect. The full sanitized 1,020,000-attempt campaign
+then completes with 790,917 accepted samples, 229,083 intentional rejections, 20,355 forward-gap
+reanchors, zero invariant failures, and zero unhealthy outputs.

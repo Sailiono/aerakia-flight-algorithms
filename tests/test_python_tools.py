@@ -14,6 +14,7 @@ VALIDATION = Path(__file__).resolve().parents[1] / "validation"
 sys.path.insert(0, str(VALIDATION))
 
 import convert_capture_to_golden as converter  # noqa: E402
+import convert_blackbird_to_replay as blackbird_converter  # noqa: E402
 import convert_euroc_to_replay as euroc_converter  # noqa: E402
 import convert_insane_to_replay as insane_converter  # noqa: E402
 import convert_ulog_to_replay as ulog_converter  # noqa: E402
@@ -388,6 +389,47 @@ class EurocConverterTests(unittest.TestCase):
             )
 
 
+class BlackbirdConverterTests(unittest.TestCase):
+    def test_published_sensor_extrinsic_maps_imu_axes_into_body_frd(self) -> None:
+        import numpy as np
+
+        rotation_body_imu = blackbird_converter._rotation_from_quaternion(
+            blackbird_converter.BODY_TO_IMU_QUATERNION_WXYZ
+        )[0]
+        sensor_x = np.asarray([[1.0, 0.0, 0.0]])
+        body = sensor_x @ rotation_body_imu.T
+        self.assertAlmostEqual(float(np.linalg.det(rotation_body_imu)), 1.0, places=12)
+        np.testing.assert_allclose(
+            rotation_body_imu.T @ rotation_body_imu, np.eye(3), atol=1.0e-12
+        )
+        self.assertGreater(float(body[0, 1]), 0.99)
+
+    def test_truth_relative_rate_preserves_body_yaw_sign_and_common_time(self) -> None:
+        import numpy as np
+
+        timestamp_ns = np.asarray([1_000_000_000, 1_100_000_000], dtype=np.int64)
+        half_angle = 0.05
+        quaternion = np.asarray(
+            [[1.0, 0.0, 0.0, 0.0], [math.cos(half_angle), 0.0, 0.0, math.sin(half_angle)]]
+        )
+        midpoint_ns, angular_rate = blackbird_converter._relative_angular_rate(
+            timestamp_ns, quaternion
+        )
+        self.assertEqual(int(midpoint_ns[0]), 1_050_000_000)
+        np.testing.assert_allclose(angular_rate[0], [0.0, 0.0, 1.0], atol=1.0e-12)
+
+    def test_interpolation_does_not_independently_zero_stream_origins(self) -> None:
+        import numpy as np
+
+        source_timestamp_ns = np.asarray([0, 1_000_000_000, 2_000_000_000], dtype=np.int64)
+        query_timestamp_ns = np.asarray([1_500_000_000], dtype=np.int64)
+        values = np.column_stack((np.arange(3, dtype=float), np.zeros((3, 2))))
+        interpolated = blackbird_converter._interpolate_vectors(
+            source_timestamp_ns, values, query_timestamp_ns
+        )
+        self.assertAlmostEqual(float(interpolated[0, 0]), 1.5)
+
+
 class InsaneConverterTests(unittest.TestCase):
     def test_frame_transform_serializes_matching_euler_angles(self) -> None:
         import numpy as np
@@ -421,6 +463,28 @@ class InsaneConverterTests(unittest.TestCase):
 
 
 class ValidationAnalyzerTests(unittest.TestCase):
+    def test_fallback_envelope_reports_continuity_gate_and_time_budget(self) -> None:
+        import numpy as np
+
+        angle_deg = np.asarray([0.0, 4.0, 8.0, 12.0, 16.0])
+        half = np.radians(angle_deg) * 0.5
+        columns = {"ts_us": np.arange(5, dtype=float) * 1_000_000.0}
+        for prefix in ("truth", "mahony_robust"):
+            columns[f"{prefix}_q_w"] = np.ones(5)
+            columns[f"{prefix}_q_x"] = np.zeros(5)
+            columns[f"{prefix}_q_y"] = np.zeros(5)
+            columns[f"{prefix}_q_z"] = np.zeros(5)
+        columns["mahony_robust_q_w"] = np.cos(half)
+        columns["mahony_robust_q_z"] = np.sin(half)
+        result = analyzer.fallback_envelope_metrics(columns)
+        assert result is not None
+        self.assertAlmostEqual(result["first_exceedance_s"]["10_deg"], 3.0)
+        self.assertEqual(result["entry_envelopes"]["10_deg"]["eligible_start_samples"], 3)
+        self.assertAlmostEqual(
+            result["entry_envelopes"]["10_deg"]["1_s"]["maximum_peak_error_deg"],
+            12.0,
+        )
+
     def test_trusted_heading_metrics_separate_faults_and_dropout(self) -> None:
         import numpy as np
 
@@ -575,6 +639,24 @@ class ValidationAnalyzerTests(unittest.TestCase):
 
 
 class PublicDatasetSuiteTests(unittest.TestCase):
+    def test_report_uses_manifest_specific_evidence_boundaries(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_directory:
+            output = Path(temp_directory) / "report.md"
+            public_dataset_suite.write_report(
+                output,
+                {
+                    "status": "passed",
+                    "dataset": "example",
+                    "git_commit": "abc",
+                    "unique_input_samples": 1,
+                    "total_replayed_samples": 1,
+                    "tracks": [],
+                    "interpretation": ["Recorded heading is absent."],
+                },
+            )
+            report = output.read_text(encoding="utf-8")
+            self.assertIn("- Recorded heading is absent.", report)
+
     def test_nested_metric_lookup(self) -> None:
         document = {"navigation": {"position_rmse_m": 0.25}}
         self.assertEqual(

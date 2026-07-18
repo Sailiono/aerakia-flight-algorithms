@@ -1,0 +1,74 @@
+{
+  "dataset": "Blackbird UAV",
+  "paper": "arXiv:1810.01987",
+  "license": "MIT (license included with MathWorks redistributed package)",
+  "sequence": "NYC Subway Winter",
+  "samples": 26995,
+  "duration_s": 270.076474,
+  "motion_capture_rate_hz": 19.999949,
+  "imu_rate_hz": 99.978245,
+  "motion_coverage": {
+    "speed_p95_m_s": 2.800353,
+    "speed_max_m_s": 3.027441,
+    "gyro_norm_p95_rad_s": 1.945443,
+    "gyro_norm_max_rad_s": 4.222072,
+    "accel_norm_p99_m_s2": 11.426846,
+    "accel_norm_max_m_s2": 59.783187
+  },
+  "frame_validation": {
+    "angular_rate_total_rmse_rad_s": 0.036270,
+    "specific_force_total_rmse_m_s2": 0.363858,
+    "angular_rate_axis_correlation": [0.993454, 0.989469, 0.999840]
+  },
+  "mahony_fallback_envelope": {
+    "first_exceeds_10_deg_s": 14.588464,
+    "first_exceeds_15_deg_s": 29.617647,
+    "maximum_error_with_10_deg_entry_and_1_s_budget_deg": 14.959175,
+    "maximum_error_with_15_deg_entry_and_5_s_budget_deg": 20.307151,
+    "evidence_boundary": "offline truth diagnostic; truth error is not available to the flight supervisor"
+  },
+  "tracks": {
+    "raw_imu_cold_start_tilt_only": {
+      "tilt_alignment_time_s": 1.009054,
+      "post_tilt_alignment_tilt_rmse_deg": 1.131405,
+      "heading_alignment_completed": false,
+      "position_rmse_m": 0.123423,
+      "velocity_rmse_m_s": 0.081854,
+      "navigation_nees_mean": 4.761565,
+      "healthy_ratio": 1.0,
+      "navigation_recoveries": 0
+    },
+    "raw_imu_trusted_attitude_init": {
+      "mahony_robust_attitude_rmse_deg": 51.477539,
+      "mahony_robust_tilt_rmse_deg": 7.814110,
+      "eskf_attitude_rmse_deg": 1.573371,
+      "eskf_tilt_rmse_deg": 1.131209,
+      "eskf_yaw_rmse_deg": 1.069186,
+      "position_rmse_m": 0.123434,
+      "velocity_rmse_m_s": 0.081903,
+      "position_nis_mean": 3.057070,
+      "velocity_nis_mean": 2.568091,
+      "navigation_nees_mean": 4.762812,
+      "healthy_ratio": 1.0,
+      "navigation_recoveries": 0,
+      "fallback_first_exceeds_10_deg_s": 14.588464,
+      "fallback_10_deg_entry_1_s_max_deg": 14.959175
+    },
+    "static_reference_bias_corrected_trusted_attitude_init": {
+      "mahony_robust_attitude_rmse_deg": 10.129070,
+      "mahony_robust_tilt_rmse_deg": 7.743683,
+      "eskf_attitude_rmse_deg": 1.573132,
+      "eskf_tilt_rmse_deg": 1.131277,
+      "eskf_yaw_rmse_deg": 1.068789,
+      "position_rmse_m": 0.123436,
+      "velocity_rmse_m_s": 0.081905,
+      "navigation_nees_mean": 4.762959
+    }
+  },
+  "limitations": [
+    "No recorded magnetometer, GNSS, or trusted-heading observation is present.",
+    "Synthetic GNSS is generated from motion-capture truth and is not receiver evidence.",
+    "The motion-capture sequence is independent attitude/position truth, but differentiated velocity is smoothed over 1.0 s.",
+    "The redistributed sequence is aggressive in angular rate and includes an IMU spike, but reaches about 3.03 m/s rather than the full corpus maximum."
+  ]
+}

@@ -9,7 +9,7 @@ FCOne application code.
 | Estimator | Product role | Valid outputs | Explicit limitations |
 | --- | --- | --- | --- |
 | 15-error-state ESKF | Primary navigation estimator | attitude, velocity, local position, IMU biases, covariance, aiding and recovery status | Requires completed initialization and sufficient healthy aiding for the requested navigation mode |
-| Robust Mahony | Independent degraded-attitude fallback and cross-monitor | attitude and attitude-filter health | No position, velocity, navigation covariance, GNSS/barometer fusion, or full navigation integrity |
+| Robust Mahony | Independent short-duration degraded-attitude fallback and cross-monitor | attitude and attitude-filter health | No position, velocity, navigation covariance, GNSS/barometer fusion, full navigation integrity, or indefinite unaided-yaw guarantee |
 | Standard Mahony | Reproducible comparison baseline | attitude metrics in validation | Not the planned deployed fallback |
 
 The two deployed candidates consume the same calibrated physical IMU publication, but maintain
@@ -21,7 +21,9 @@ separate contexts and state. A defect or reset in one estimator must not overwri
 2. `PRIMARY_ESKF`: use ESKF outputs with per-field validity and freshness.
 3. `DEGRADED_ATTITUDE_MAHONY`: expose Mahony attitude only; mark ESKF position, velocity, and
    navigation-dependent outputs invalid or stale. The controller must enter an explicitly reviewed
-   limited mode rather than assuming full navigation remains available.
+   limited mode rather than assuming full navigation remains available. Entry is allowed only when
+   Mahony is continuous with the last qualified control attitude, and the mode has a finite time
+   budget.
 4. `ESTIMATE_INVALID`: neither estimator provides a qualified attitude; execute the FCOne safety
    response appropriate to vehicle state.
 
@@ -62,6 +64,10 @@ wrong. The supervisor needs aiding health and vehicle context before assigning f
 - Do not feed Mahony attitude into the ESKF as an unannounced correction.
 - Do not switch the controller's attitude reference without an explicit continuity policy.
 - Record transition time, reason, source health snapshot, attitude delta, and output-validity mask.
+- Compare a candidate Mahony fallback against the last qualified output before selecting it; a
+  parallel filter that has already drifted outside the continuity gate is not a valid fallback.
+- Give Mahony-only degradation a finite, vehicle-state-specific time budget. Expiry must enter an
+  explicit invalid/failsafe state rather than silently extending attitude validity.
 - Apply hysteresis and minimum healthy dwell time before returning to the ESKF.
 - Never continue publishing old ESKF position or velocity as valid during Mahony-only operation.
 - Validate every transition first in host replay and FCOne shadow mode; physical takeover requires
@@ -72,6 +78,9 @@ wrong. The supervisor needs aiding health and vehicle context before assigning f
 This repository validates estimator behavior and the public health evidence needed by a supervisor.
 `validation/estimator_supervisor_contract.c` is an executable host oracle for initialization,
 hard-invalid handling, soft-degradation hysteresis, attitude-only output invalidation, handover
-continuity, recovery dwell, and transition logging. It is not a flight-qualified automatic failover
-implementation. Target timing, actuator interaction, and in-flight abort behavior require the
-private FCOne supervisor plus FCOne v2 hardware and HIL/flight evidence.
+continuity on both fallback entry and recovery, a finite Mahony-only time budget, recovery dwell,
+and transition logging. Its ten-degree entry gate and one-second degraded budget are conservative
+test-oracle values derived from the retained Blackbird envelope, not product
+constant. It is not a flight-qualified automatic failover implementation. Target timing, actuator
+interaction, and in-flight abort behavior require the private FCOne supervisor plus FCOne v2
+hardware and HIL/flight evidence.

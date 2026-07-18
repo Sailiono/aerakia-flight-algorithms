@@ -28,14 +28,15 @@ typedef enum {
     TRANSITION_ESKF_UNHEALTHY,
     TRANSITION_ESKF_UNOBSERVABLE,
     TRANSITION_ALL_ATTITUDE_INVALID,
-    TRANSITION_ESKF_RECOVERED
+    TRANSITION_ESKF_RECOVERED,
+    TRANSITION_FALLBACK_TIMEOUT
 } TransitionReason;
 
 typedef struct {
     uint32_t eskf_failure_confirmation_samples;
     uint32_t eskf_recovery_confirmation_samples;
-    uint32_t all_invalid_confirmation_samples;
     float maximum_handover_angle_rad;
+    uint64_t maximum_degraded_duration_us;
 } SupervisorConfig;
 
 typedef struct {
@@ -50,10 +51,12 @@ typedef struct {
     SupervisorConfig config;
     uint32_t eskf_failure_count;
     uint32_t eskf_recovery_count;
-    uint32_t all_invalid_count;
     uint32_t transition_count;
     uint64_t last_transition_timestamp_us;
+    uint64_t degraded_started_timestamp_us;
     TransitionReason last_transition_reason;
+    AerakiaAttitudeEstimate last_qualified_attitude;
+    bool has_last_qualified_attitude;
 } Supervisor;
 
 typedef struct {
@@ -93,16 +96,38 @@ static bool eskf_qualified(const SupervisorEvidence *evidence)
         && evidence->eskf_navigation_observable;
 }
 
-static bool handover_continuous(
+static bool attitudes_continuous(
+    const Supervisor *supervisor,
+    const AerakiaAttitudeEstimate *candidate,
+    const AerakiaAttitudeEstimate *reference
+)
+{
+    return candidate->healthy && reference->healthy
+        && quaternion_separation_rad(candidate->quaternion_wxyz, reference->quaternion_wxyz)
+            <= supervisor->config.maximum_handover_angle_rad;
+}
+
+static bool fallback_continuous(
     const Supervisor *supervisor,
     const SupervisorEvidence *evidence
 )
 {
-    return evidence->mahony.healthy
-        && quaternion_separation_rad(
-            evidence->eskf.attitude.quaternion_wxyz,
-            evidence->mahony.quaternion_wxyz
-        ) <= supervisor->config.maximum_handover_angle_rad;
+    return supervisor->has_last_qualified_attitude
+        && attitudes_continuous(
+            supervisor, &evidence->mahony, &supervisor->last_qualified_attitude
+        );
+}
+
+static bool eskf_recovery_continuous(
+    const Supervisor *supervisor,
+    const SupervisorEvidence *evidence
+)
+{
+    const AerakiaAttitudeEstimate *reference = supervisor->mode
+        == SUPERVISOR_DEGRADED_ATTITUDE_MAHONY
+        ? &evidence->mahony : &supervisor->last_qualified_attitude;
+    return supervisor->has_last_qualified_attitude
+        && attitudes_continuous(supervisor, &evidence->eskf.attitude, reference);
 }
 
 static void transition(
@@ -117,9 +142,10 @@ static void transition(
     supervisor->transition_count += 1U;
     supervisor->last_transition_timestamp_us = timestamp_us;
     supervisor->last_transition_reason = reason;
+    supervisor->degraded_started_timestamp_us = mode == SUPERVISOR_DEGRADED_ATTITUDE_MAHONY
+        ? timestamp_us : 0U;
     supervisor->eskf_failure_count = 0U;
     supervisor->eskf_recovery_count = 0U;
-    supervisor->all_invalid_count = 0U;
 }
 
 static void supervisor_init(Supervisor *supervisor)
@@ -128,8 +154,8 @@ static void supervisor_init(Supervisor *supervisor)
     supervisor->mode = SUPERVISOR_INITIALIZING;
     supervisor->config.eskf_failure_confirmation_samples = 3U;
     supervisor->config.eskf_recovery_confirmation_samples = 5U;
-    supervisor->config.all_invalid_confirmation_samples = 2U;
-    supervisor->config.maximum_handover_angle_rad = 15.0f * AERAKIA_PI_F / 180.0f;
+    supervisor->config.maximum_handover_angle_rad = 10.0f * AERAKIA_PI_F / 180.0f;
+    supervisor->config.maximum_degraded_duration_us = 1000000U;
 }
 
 static QualifiedEstimate supervisor_update(
@@ -140,7 +166,9 @@ static QualifiedEstimate supervisor_update(
     QualifiedEstimate output;
     const bool eskf_ok = eskf_qualified(evidence);
     const bool mahony_ok = evidence->mahony.healthy;
-    const bool continuous = eskf_ok && handover_continuous(supervisor, evidence);
+    const bool mahony_selectable = mahony_ok && fallback_continuous(supervisor, evidence);
+    const bool recovery_continuous = eskf_ok
+        && eskf_recovery_continuous(supervisor, evidence);
     memset(&output, 0, sizeof(output));
 
     if (supervisor->mode == SUPERVISOR_INITIALIZING) {
@@ -157,9 +185,10 @@ static QualifiedEstimate supervisor_update(
         if (!evidence->eskf.healthy) {
             transition(
                 supervisor,
-                mahony_ok ? SUPERVISOR_DEGRADED_ATTITUDE_MAHONY
-                          : SUPERVISOR_ESTIMATE_INVALID,
-                mahony_ok ? TRANSITION_ESKF_UNHEALTHY : TRANSITION_ALL_ATTITUDE_INVALID,
+                mahony_selectable ? SUPERVISOR_DEGRADED_ATTITUDE_MAHONY
+                                  : SUPERVISOR_ESTIMATE_INVALID,
+                mahony_selectable ? TRANSITION_ESKF_UNHEALTHY
+                                  : TRANSITION_ALL_ATTITUDE_INVALID,
                 evidence->timestamp_us
             );
         } else {
@@ -171,20 +200,28 @@ static QualifiedEstimate supervisor_update(
             >= supervisor->config.eskf_failure_confirmation_samples) {
             transition(
                 supervisor,
-                mahony_ok ? SUPERVISOR_DEGRADED_ATTITUDE_MAHONY
-                          : SUPERVISOR_ESTIMATE_INVALID,
-                mahony_ok ? TRANSITION_ESKF_UNOBSERVABLE : TRANSITION_ALL_ATTITUDE_INVALID,
+                mahony_selectable ? SUPERVISOR_DEGRADED_ATTITUDE_MAHONY
+                                  : SUPERVISOR_ESTIMATE_INVALID,
+                mahony_selectable ? TRANSITION_ESKF_UNOBSERVABLE
+                                  : TRANSITION_ALL_ATTITUDE_INVALID,
                 evidence->timestamp_us
             );
         }
     } else if (supervisor->mode == SUPERVISOR_DEGRADED_ATTITUDE_MAHONY) {
-        supervisor->all_invalid_count = mahony_ok ? 0U : supervisor->all_invalid_count + 1U;
-        supervisor->eskf_recovery_count = continuous
+        const bool fallback_timed_out = evidence->timestamp_us
+                >= supervisor->degraded_started_timestamp_us
+            && evidence->timestamp_us - supervisor->degraded_started_timestamp_us
+                >= supervisor->config.maximum_degraded_duration_us;
+        supervisor->eskf_recovery_count = recovery_continuous
             ? supervisor->eskf_recovery_count + 1U : 0U;
-        if (supervisor->all_invalid_count
-            >= supervisor->config.all_invalid_confirmation_samples) {
+        if (!mahony_selectable) {
             transition(
                 supervisor, SUPERVISOR_ESTIMATE_INVALID, TRANSITION_ALL_ATTITUDE_INVALID,
+                evidence->timestamp_us
+            );
+        } else if (fallback_timed_out) {
+            transition(
+                supervisor, SUPERVISOR_ESTIMATE_INVALID, TRANSITION_FALLBACK_TIMEOUT,
                 evidence->timestamp_us
             );
         } else if (supervisor->eskf_recovery_count
@@ -195,7 +232,7 @@ static QualifiedEstimate supervisor_update(
             );
         }
     } else {
-        supervisor->eskf_recovery_count = continuous
+        supervisor->eskf_recovery_count = recovery_continuous
             ? supervisor->eskf_recovery_count + 1U : 0U;
         if (supervisor->eskf_recovery_count
             >= supervisor->config.eskf_recovery_confirmation_samples) {
@@ -218,6 +255,10 @@ static QualifiedEstimate supervisor_update(
     } else if (supervisor->mode == SUPERVISOR_DEGRADED_ATTITUDE_MAHONY) {
         output.attitude = evidence->mahony;
         output.attitude_valid = true;
+    }
+    if (output.attitude_valid) {
+        supervisor->last_qualified_attitude = output.attitude;
+        supervisor->has_last_qualified_attitude = true;
     }
     return output;
 }
@@ -325,10 +366,88 @@ static void test_both_estimators_invalid_contract(void)
                "invalid transition timestamp is retained");
 }
 
+static void test_discontinuous_fallback_is_rejected(void)
+{
+    Supervisor supervisor;
+    SupervisorEvidence evidence = healthy_evidence(0U);
+    QualifiedEstimate output;
+    uint32_t index;
+    supervisor_init(&supervisor);
+    for (index = 0U; index < 5U; ++index) {
+        evidence.timestamp_us += 10000U;
+        (void)supervisor_update(&supervisor, &evidence);
+    }
+    evidence.mahony.quaternion_wxyz[0] = cosf(20.0f * AERAKIA_PI_F / 360.0f);
+    evidence.mahony.quaternion_wxyz[3] = sinf(20.0f * AERAKIA_PI_F / 360.0f);
+    evidence.eskf.healthy = false;
+    evidence.eskf.attitude.healthy = false;
+    evidence.timestamp_us += 10000U;
+    output = supervisor_update(&supervisor, &evidence);
+    check_true(output.mode == SUPERVISOR_ESTIMATE_INVALID,
+               "a discontinuous parallel Mahony state is never selected as fallback");
+    check_true(!output.attitude_valid,
+               "rejected fallback does not expose a discontinuous attitude");
+}
+
+static void test_fallback_has_a_finite_time_budget(void)
+{
+    Supervisor supervisor;
+    SupervisorEvidence evidence = healthy_evidence(0U);
+    QualifiedEstimate output;
+    uint32_t index;
+    supervisor_init(&supervisor);
+    for (index = 0U; index < 5U; ++index) {
+        evidence.timestamp_us += 10000U;
+        (void)supervisor_update(&supervisor, &evidence);
+    }
+    evidence.eskf.healthy = false;
+    evidence.eskf.attitude.healthy = false;
+    evidence.timestamp_us += 10000U;
+    output = supervisor_update(&supervisor, &evidence);
+    check_true(output.mode == SUPERVISOR_DEGRADED_ATTITUDE_MAHONY,
+               "a continuous healthy Mahony state may enter bounded degraded mode");
+    evidence.timestamp_us += supervisor.config.maximum_degraded_duration_us;
+    output = supervisor_update(&supervisor, &evidence);
+    check_true(output.mode == SUPERVISOR_ESTIMATE_INVALID,
+               "Mahony-only degraded operation expires at its configured time budget");
+    check_true(supervisor.last_transition_reason == TRANSITION_FALLBACK_TIMEOUT,
+               "fallback timeout is retained as explicit transition evidence");
+}
+
+static void test_active_fallback_jump_is_immediately_invalid(void)
+{
+    Supervisor supervisor;
+    SupervisorEvidence evidence = healthy_evidence(0U);
+    QualifiedEstimate output;
+    uint32_t index;
+    supervisor_init(&supervisor);
+    for (index = 0U; index < 5U; ++index) {
+        evidence.timestamp_us += 10000U;
+        (void)supervisor_update(&supervisor, &evidence);
+    }
+    evidence.eskf.healthy = false;
+    evidence.eskf.attitude.healthy = false;
+    evidence.timestamp_us += 10000U;
+    output = supervisor_update(&supervisor, &evidence);
+    check_true(output.mode == SUPERVISOR_DEGRADED_ATTITUDE_MAHONY,
+               "continuous fallback enters degraded mode before jump test");
+    evidence.mahony.quaternion_wxyz[0] = cosf(20.0f * AERAKIA_PI_F / 360.0f);
+    evidence.mahony.quaternion_wxyz[3] = sinf(20.0f * AERAKIA_PI_F / 360.0f);
+    evidence.timestamp_us += 10000U;
+    output = supervisor_update(&supervisor, &evidence);
+    check_true(output.mode == SUPERVISOR_ESTIMATE_INVALID,
+               "an active fallback continuity breach invalidates immediately");
+    check_true(!output.attitude_valid,
+               "a discontinuous active fallback is never published for one extra sample");
+}
+
 int main(void)
 {
     test_primary_degraded_recovery_contract();
     test_both_estimators_invalid_contract();
+    test_discontinuous_fallback_is_rejected();
+    test_fallback_has_a_finite_time_budget();
+    test_active_fallback_jump_is_immediately_invalid();
     if (failures != 0) {
         fprintf(stderr, "%d estimator-supervisor contract checks failed\n", failures);
         return 1;

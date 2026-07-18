@@ -9,7 +9,7 @@ and derived reports belong in version control.
 | --- | --- | --- | --- | --- |
 | P0 | [EuRoC MAV](https://www.research-collection.ethz.ch/entities/researchdata/bcaf173e-5dac-484b-bc37-faf97a594f1f) | IMU propagation and attitude/position accuracy against Vicon or Leica truth | No GNSS or magnetometer; Machine Hall orientation is IMU-aided | `MH_01_easy` and direct-pose `V1_03_difficult` complete |
 | P0 | [INSANE](https://www.aau.at/en/smart-systems-technologies/control-of-networked-systems/datasets/insane-dataset/) | Recorded UAV IMU plus physical 1.16 m dual-RTK body-heading observations | Published yaw and direct heading share the RTK baseline; published tilt currently fails gravity consistency | `outdoor_1_sensors` yaw-path intake complete |
-| P0 | [Blackbird](https://github.com/mit-aera/Blackbird-Dataset) | Aggressive UAV dynamics against high-rate motion-capture truth | No GNSS or magnetometer; the full image dataset is multi-terabyte | Two sensor-only flight chunks at moderate and high speed |
+| P0 | [Blackbird](https://github.com/mit-aera/Blackbird-Dataset) | Aggressive UAV dynamics against motion-capture truth | No GNSS or magnetometer; the reviewed redistributed sequence reaches about 3 m/s rather than the full corpus maximum | MathWorks `NYC Subway Winter` sensor/pose package complete |
 | P1 | [RELLIS-3D](https://github.com/unmannedlab/RELLIS-3D) | Recorded VectorNav VN-300 fused attitude and IMU under outdoor off-road motion | Ground vehicle; public topics do not expose raw dual-baseline validity and the reviewed bag lacks a readable index | Retain as a secondary device-output audit, not heading truth |
 | P1 | [UrbanNav](https://github.com/IPNL-POLYU/UrbanNavDataset) | GNSS/IMU behavior in urban canyons and tunnels against SPAN-CPT truth | Ground vehicle rather than aircraft; download IMU, GNSS, and truth separately | Medium-urban and tunnel sensor subsets |
 | P1 | [GVINS](https://github.com/HKUST-Aerial-Robotics/GVINS) | Raw multi-constellation GNSS, IMU, and intermittent-GNSS comparison | ROS bag and ENU/ECEF conventions need an explicit adapter | Sports-field bag after license and checksum review |
@@ -77,6 +77,71 @@ magnetometer. Direct baseline heading and scored yaw therefore share a physical 
 the published initial roll/pitch disagrees with the measured gravity direction by roughly 18–20
 degrees under replay. Until that frame/export discrepancy is resolved, only the yaw input path is
 accepted from this sequence; full-attitude metrics are deliberately excluded from capability claims.
+
+## Completed independent-motion intake: Blackbird `NYC Subway Winter`
+
+The official Blackbird download host did not complete either HTTPS or HTTP sensor-file requests on
+2026-07-18. Rather than bypassing source validation, the intake uses MathWorks' documented
+`BlackbirdVIOData.tar` redistribution of the Blackbird `NYC Subway Winter` sequence. The package is
+MIT licensed and contains recorded IMU, motion-capture pose, image timestamps, and images in one
+MAT file; only IMU, timestamps, and pose are read. The raw TAR and MAT stay outside Git.
+
+| Item | Recorded value |
+| --- | --- |
+| MathWorks TAR SHA-256 | `5a225275874bf4d129a7c9649524e9baf43d401bb2ad452f85709f514a39c0ec` |
+| `data.mat` SHA-256 | `58b852a823d13afa0bcc5064c28b9de599a4adc5e191e4979bd10fef66b154b9` |
+| Included license SHA-256 | `c9fe8f7fb586becf1335fa515f173bfda1803db4a49826f03aba09f5443208cf` |
+| Official Blackbird tools commit | `8f02a207a85bea415e32375b67b56bf8b0e1c02d` |
+| Retained overlap | 26,995 recorded IMU samples, 270.076 s, 99.978 Hz |
+| Independent truth | 19.9999 Hz motion-capture body pose |
+| Motion | speed P95/max 2.80/3.03 m/s; gyro norm P95/max 1.95/4.22 rad/s; acceleration norm P99/max 11.43/59.78 m/s² |
+| Aiding | deterministic synthetic 10 Hz GNSS from motion-capture position and differentiated velocity |
+
+The first frame audit incorrectly zeroed the IMU and motion-capture timestamps independently. That
+discarded the real `-1.762237184 s` motion-capture-start offset and made x/y angular rates appear
+uncorrelated. The converter now retains one common absolute time base and applies the published
+body-to-IMU quaternion
+`[0.70747936, 0.00202983, -0.00774523, 0.70668865]` (wxyz). It refuses conversion unless the
+motion-capture-derived and recorded angular rates correlate by at least 0.95 on all axes and the
+frame/gravity residual stays bounded. The accepted axis correlations are
+`0.99345 / 0.98947 / 0.99984`; total angular-rate RMSE is `0.03627 rad/s` and total specific-force
+RMSE is `0.36386 m/s²`.
+
+| Track | Mahony robust geodesic / tilt RMSE | ESKF geodesic / tilt / yaw RMSE | Position / velocity RMSE | Position / velocity NIS mean | 6D nav NEES mean |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Raw IMU, reference attitude init | 51.478° / 7.814° | 1.573° / 1.131° / 1.069° | 0.123 m / 0.082 m/s | 3.057 / 2.568 | 4.763 |
+| Static-reference bias diagnostic | 10.129° / 7.744° | 1.573° / 1.131° / 1.069° | 0.123 m / 0.082 m/s | 3.057 / 2.568 | 4.763 |
+| Raw IMU, independent tilt cold start | not scored as product fallback | post-alignment tilt 1.131° | 0.123 m / 0.082 m/s | 3.057 / 2.568 | 4.762 |
+
+The cold start completes tilt alignment in `1.009 s` and correctly leaves heading alignment false
+because there is no magnetometer or trusted-heading observation. ESKF remains healthy for 100% of
+the replay with zero navigation recoveries. Synthetic GNSS means the navigation result validates
+fusion and covariance consistency, not a physical receiver.
+
+The retained Mahony failure is operationally important. With no magnetic/heading reference it is
+not an indefinite backup: raw yaw drifts severely and aggressive translational acceleration also
+degrades tilt. The public supervisor oracle now requires Mahony to be continuous with the last
+qualified output before fallback, invalidates all navigation fields, and applies a finite degraded
+time budget. With a 10° admissible entry error, the worst one-second Blackbird truth envelope reaches
+14.959°; the older 15°/five-second example reached 20.307°. The oracle therefore uses a conservative
+10°/one-second host-test policy. It is not a flight-qualified FCOne constant.
+
+```bash
+python simulation/tools/convert_blackbird_to_replay.py BlackbirdVIOData \
+  --out replay.csv --metadata source.json \
+  --synthetic-gnss-rate-hz 10 --seed 7 --static-hint-duration-s 5
+
+python validation/run_public_dataset_suite.py \
+  --data-root /path/to/blackbird-mathworks \
+  --manifest validation/public/blackbird_manifest.json \
+  --runner build/aerakia_validation_runner \
+  --out-dir build/blackbird-suite
+```
+
+The three declared tracks replay 80,985 samples but contain 26,995 unique physical IMU samples.
+Together with the two EuRoC sequences, the one-command external-reference corpus now contains
+84,308 unique recorded IMU samples. INSANE adds 39,174 shared-source physical-heading samples but is
+kept in a separate evidence class.
 
 ## RELLIS-3D audit result
 
@@ -147,6 +212,12 @@ adding integrated velocity-position covariance, EuRoC NEES moved from 14.34/12.6
 against an expected mean of 6. The deterministic synthetic suite remains within reviewed bounds.
 
 ## Next downloads
+
+UrbanNav sensor/truth subsets are the next priority because they add recorded GNSS degradation,
+outage, and recovery. A second Blackbird sequence is useful only if the official sensor-only host
+becomes reliable or another redistribution preserves an auditable sequence identity, license,
+timestamps, and body/IMU extrinsic; the current sequence closes the immediate aggressive
+independent-motion gap.
 
 ## Completed EuRoC direct-Vicon intake: `V1_03_difficult`
 
@@ -224,8 +295,7 @@ aggregate report. The two sequences contain 57,313 unique recorded IMU samples; 
 produce 156,490 replay attempts. Multiple tracks increase algorithm-path coverage but are not counted
 as additional physical data.
 
-Blackbird sensor-only chunks remain desirable for aggressive aerial motion, and UrbanNav sensor
-subsets remain the next navigation intake for recorded GNSS degradation and outage behavior. A
-second physical-heading source is still desirable, but it must expose either raw antenna-baseline
-validity or an independently synchronized yaw reference. None is counted until raw topics, timing,
-frames, license, and hashes pass the same intake checklist.
+UrbanNav sensor subsets remain the next navigation intake for recorded GNSS degradation and outage
+behavior. A second physical-heading source is still desirable, but it must expose either raw
+antenna-baseline validity or an independently synchronized yaw reference. None is counted until raw
+topics, timing, frames, license, and hashes pass the same intake checklist.

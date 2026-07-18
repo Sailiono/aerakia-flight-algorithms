@@ -166,6 +166,50 @@ def metrics_for(
     return result
 
 
+def fallback_envelope_metrics(columns: dict[str, np.ndarray]) -> dict[str, object] | None:
+    """Bound robust-Mahony truth error after a continuity-qualified fallback entry.
+
+    This is an offline truth diagnostic, not a signal available to the flight supervisor. It helps
+    select conservative entry gates and degraded-mode time budgets from recorded motion.
+    """
+    truth = _normalized_quaternion_columns(columns, "truth")
+    fallback = _normalized_quaternion_columns(columns, "mahony_robust")
+    if truth is None or fallback is None:
+        return None
+    error_deg, _ = quaternion_attitude_errors_deg(fallback, truth)
+    time_s = (columns["ts_us"] - columns["ts_us"][0]) * 1.0e-6
+    result: dict[str, object] = {
+        "interpretation": (
+            "Offline independent-truth envelope; the flight supervisor cannot observe truth error."
+        ),
+        "first_exceedance_s": {},
+        "entry_envelopes": {},
+    }
+    for gate_deg in (5.0, 10.0, 15.0):
+        crossing = np.flatnonzero(error_deg > gate_deg)
+        result["first_exceedance_s"][f"{gate_deg:g}_deg"] = (
+            float(time_s[crossing[0]]) if len(crossing) else None
+        )
+        eligible = np.flatnonzero(error_deg <= gate_deg)
+        gate_result: dict[str, object] = {"eligible_start_samples": int(len(eligible))}
+        for horizon_s in (0.5, 1.0, 2.0, 5.0):
+            peaks = np.asarray(
+                [
+                    np.max(error_deg[index : np.searchsorted(
+                        time_s, time_s[index] + horizon_s, side="right"
+                    )])
+                    for index in eligible
+                ],
+                dtype=np.float64,
+            )
+            gate_result[f"{horizon_s:g}_s"] = {
+                "p95_peak_error_deg": float(np.percentile(peaks, 95.0)),
+                "maximum_peak_error_deg": float(np.max(peaks)),
+            }
+        result["entry_envelopes"][f"{gate_deg:g}_deg"] = gate_result
+    return result
+
+
 def cold_start_alignment_metrics(columns: dict[str, np.ndarray]) -> dict[str, object] | None:
     if "eskf_static_tilt_aligned" not in columns:
         return None
@@ -920,6 +964,8 @@ def main() -> None:
         "trusted_heading": trusted_heading_metrics(columns),
         "bias_estimation": bias_metrics(columns),
     }
+    if args.reference_kind == "independent_truth":
+        metrics["mahony_fallback_envelope"] = fallback_envelope_metrics(columns)
     cold_start = cold_start_alignment_metrics(columns)
     if cold_start is not None:
         metrics["cold_start_alignment"] = cold_start

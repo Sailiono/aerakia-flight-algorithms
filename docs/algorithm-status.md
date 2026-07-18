@@ -6,10 +6,11 @@ The portable estimator core is suitable for FCOne integration work and further b
 but it is not yet justified to claim that the complete flight-estimation system is verified.
 The current evidence establishes deterministic host behavior, measurement integrity handling,
 long-run covariance health, synthetic cold start, private PX4-referenced replay tracking, and two
-EuRoC external-reference sequences. Vicon-derived heading tests yaw alignment and faults under
-recorded aggressive motion, and INSANE now exercises the same production path with 1,378 physical
-dual-RTK observations. Neither shared-source track establishes independent absolute heading
-accuracy or flight safety.
+EuRoC external-reference sequences. Blackbird adds 270.1 s of independent motion-capture truth with
+aggressive angular motion. Vicon-derived heading tests yaw alignment and faults under recorded
+motion, and INSANE exercises the same production path with 1,378 physical dual-RTK observations.
+Neither derived/shared-source heading track establishes independent absolute heading accuracy or
+flight safety.
 
 ## Evidence completed
 
@@ -24,9 +25,10 @@ accuracy or flight safety.
 | Cold-start alignment | Static accelerometer tilt, magnetic heading with explicit declination, IMU-bias initialization, and covariance reset at the new linearization point; no PX4 attitude seed | Passing unit/noisy synthetic checks and direct-Vicon tilt (0.862° post-alignment RMSE); external yaw truth still pending |
 | Navigation consistency | GNSS position/velocity NIS and posterior 6-state navigation NEES through a five-second outage and reacquisition | 20-seed measurement-noise baseline and constant-bias/timestamp-jitter extension pass with zero numerical/recovery failures; thermal and transport faults pending |
 | EuRoC public replay | 36,381-sample Leica/IMU `MH_01_easy` and 20,932-sample direct-pose `V1_03_difficult`; raw, cold-start, derived-heading, and reference-bias tracks retained | Navigation NIS/NEES consistent; direct Vicon pose passes high-dynamic replay; derived heading is not a recorded heading sensor |
+| Blackbird public replay | 26,995 recorded IMU samples over 270.1 s against independent motion capture; common time base and published body/IMU extrinsic are checked before conversion | ESKF 1.573° geodesic / 1.131° tilt RMSE, 100% health, zero recovery; retained Mahony drift proves fallback must be bounded |
 | Host regression | Strict C99 warnings-as-errors build, public API tests, deterministic synthetic fault suite | Passing reviewed thresholds |
 | Input/transport integrity | Exhaustive required-IMU non-finite checks; timestamp order/gap behavior; optional-mag isolation; timestamped GNSS/heading/barometer freshness and recovery | Passing 100 seeds, 1,020,000 IMU attempts, 2,100 aiding attempts, and burst lengths through 100 with zero invariant/health failures |
-| Estimator supervision | ESKF-primary startup, hard-invalid immediate response, soft observability hysteresis, Mahony attitude-only degradation, navigation invalidation, continuity-gated recovery, and transition evidence | Passing executable public contract; private FCOne policy and actuator interaction remain open |
+| Estimator supervision | ESKF-primary startup, hard-invalid immediate response, soft observability hysteresis, continuity-gated and time-bounded Mahony attitude-only degradation, navigation invalidation, continuity-gated recovery, and transition evidence | Passing executable public contract; private FCOne policy and actuator interaction remain open |
 | FCOne-neutral adapter | Physical timestamp preservation, FRD sentinel axes, g/deg/s/gauss conversion, independent validity bits, missing data, duplicate/gap recovery, and future/stale aiding | Passing executable mock-publication contract; exact v2 message and scheduler remain open |
 | Private replay | Sanitized relative GNSS, reset events, GSF diagnostics, and native C replay across the selected ULog suite | Operational; PX4 remains an engineering reference |
 
@@ -42,6 +44,8 @@ accuracy or flight safety.
 4. Apply the passing neutral adapter oracle to the exact private FCOne message and scheduler when
    its v2 interfaces are available; keep the same timestamp, frame, unit, validity, and stale-data
    checks.
+5. Add UrbanNav or equivalent independent navigation truth with recorded GNSS degradation/outage;
+   Blackbird closes aggressive attitude-motion coverage but its GNSS is synthetic.
 
 ## P1 work when the new hardware is available
 
@@ -71,6 +75,11 @@ This document is an engineering maturity statement, not an airworthiness claim.
   The scored yaw shares the RTK baseline, so this validates integration behavior rather than
   independent absolute accuracy. Full-attitude scores are excluded because the published tilt and
   measured gravity direction are inconsistent.
+- On Blackbird `NYC Subway Winter`, 26,995 recorded IMU samples over 270.1 s reach 4.22 rad/s and an
+  isolated 59.78 m/s² acceleration spike. Against independent motion capture, raw ESKF geodesic
+  attitude RMSE is 1.573°, tilt RMSE 1.131°, and Euler-yaw RMSE 1.069°. Tilt-only cold start
+  completes in 1.009 s with 1.131° post-alignment tilt RMSE. No heading alignment is claimed because
+  the package has no magnetometer or trusted-heading observation.
 - EuRoC full-attitude raw-IMU RMSE is 8.804° and 4.102°. This is dominated by yaw drift from the
   recorded approximately 0.08 rad/s z-gyro bias with no magnetometer or trusted heading; it is an
   observed limitation, not an acceptable heading-accuracy claim.
@@ -79,6 +88,8 @@ This document is an engineering maturity statement, not an airworthiness claim.
 - EuRoC position RMSE is 0.131–0.137 m and velocity RMSE 0.082–0.091 m/s with deterministic
   synthetic 10 Hz GNSS generated from external reference truth. These values validate fusion math,
   covariance, and replay determinism—not a physical GNSS receiver.
+- Blackbird position/velocity RMSE is 0.123 m / 0.082 m/s with the same declared synthetic-GNSS
+  evidence boundary; navigation NEES is 4.76 for expected mean 6.
 
 ### Robustness
 
@@ -87,6 +98,11 @@ This document is an engineering maturity statement, not an airworthiness claim.
   non-finite axes, and zero state/covariance invariant or health failures.
 - Numerical robustness is strong on the host: strict C build, long covariance checks, Joseph-form
   updates, finite-difference Jacobians, and the full million-attempt campaign under ASan+UBSan.
+- Aggressive-motion robustness now includes Blackbird's independent motion capture: ESKF remains
+  healthy for all 26,995 samples with zero navigation recovery. The same run retains a 51.48° raw
+  Mahony full-attitude RMSE without magnetometer/heading; even static reference-bias subtraction
+  leaves 10.13°. Therefore Mahony is classified as continuity-gated, finite-duration degraded
+  attitude—not a second long-duration navigation solution.
 - Estimation consistency is currently reasonable: EuRoC navigation NEES means are 5.19–5.70 for a
   six-dimensional expected mean of 6; position NIS is 3.07–3.08 for expected mean 3. Velocity NIS
   at 2.43–2.58 is mildly conservative rather than overconfident.
@@ -106,15 +122,15 @@ This document is an engineering maturity statement, not an airworthiness claim.
 
 | Scope | Current judgment | Reason |
 | --- | ---: | --- |
-| Portable algorithm/math implementation | 80–85% | Core equations, covariance handling, cold start, aiding, recovery, and host gates are mature; full observability/physical truth remains open |
-| Host-side software robustness | 85–90% | High-volume malformed/timing campaign and sanitizer run pass; external dataset breadth is still only two unique EuRoC sequences |
+| Portable algorithm/math implementation | 82–87% | Core equations, covariance handling, cold start, aiding, recovery, and independent aggressive-motion replay are mature; full observability/physical heading truth remains open |
+| Host-side software robustness | 88–92% | High-volume malformed/timing campaign, sanitizers, and 84,308 unique public external-reference IMU samples pass; recorded-GNSS degradation remains open |
 | Heading robustness | 68–72% | Real-motion fault/recovery and physical dual-RTK input now pass; independent physical yaw truth and GNSS-velocity GSF fallback remain open |
-| FCOne integration readiness | 70–75% | Neutral adapter and supervisor contracts are executable; exact private messages, scheduling, target precision, and resource use are unverified |
-| Flight-main-estimator readiness | 45–55% | Suitable for shadow mode and bench/HIL preparation, not justified as the sole flight estimator yet |
+| FCOne integration readiness | 72–78% | Neutral adapter and bounded-fallback supervisor contracts are executable; exact private messages, scheduling, target precision, and resource use are unverified |
+| Flight-main-estimator readiness | 48–58% | Suitable for shadow mode and bench/HIL preparation, not justified as the sole flight estimator yet |
 
-The highest-value non-hardware work remaining is broader independent data (`Blackbird` aggressive
-motion and `UrbanNav` real GNSS degradation), a second independently scored physical-heading track,
-and applying the now-executable neutral contracts to the private FCOne v2 interfaces.
+The highest-value non-hardware work remaining is `UrbanNav` real GNSS degradation, a second
+independently scored physical-heading track, and applying the now-executable neutral contracts to
+the private FCOne v2 interfaces.
 The highest-value physical evidence remains synchronized independent yaw truth, thermal/vibration
 characterization, motor magnetic disturbance, and target-MCU timing/stack measurements.
 

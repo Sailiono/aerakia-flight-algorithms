@@ -5,6 +5,11 @@
   "source_license": "In Copyright - Non-Commercial Use Permitted",
   "default_absolute_tolerance": 0.0001,
   "default_relative_tolerance": 0.00001,
+  "interpretation": [
+    "Repeated tracks use the same immutable recorded samples with different declared initialization or reference-bias handling; they increase algorithm-path coverage, not the amount of unique physical data.",
+    "Synthetic GNSS is generated deterministically from external reference position and velocity. Navigation metrics validate fusion and covariance behavior, not a recorded GNSS receiver.",
+    "EuRoC has no magnetometer or recorded trusted-heading sensor. The Vicon-derived heading track exercises cold-start, geometry validity, faults, dropout, and recovery under physical motion, but it is not dual-antenna or vision-sensor evidence."
+  ],
   "sequences": [
     {
       "id": "MH_01_easy",

@@ -110,18 +110,16 @@ def write_report(path: Path, manifest: dict[str, Any]) -> None:
             f"| {track['duration_s']:.3f} s | {passed}/{len(comparisons)} "
             f"| {'PASS' if track['all_metrics_passed'] else 'FAIL'} |"
         )
-    lines.extend([
-        "", "## Interpretation", "",
-        "- Repeated tracks use the same immutable recorded samples with different declared "
+    lines.extend(["", "## Interpretation", ""])
+    interpretation = manifest.get("interpretation") or [
+        "Repeated tracks use the same immutable recorded samples with different declared "
         "initialization or reference-bias handling; they increase algorithm-path coverage, not "
         "the amount of unique physical data.",
-        "- Synthetic GNSS is generated deterministically from external reference position and "
+        "Synthetic GNSS is generated deterministically from external reference position and "
         "velocity. Navigation metrics validate fusion and covariance behavior, not a recorded "
         "GNSS receiver.",
-        "- EuRoC has no magnetometer or recorded trusted-heading sensor. A Vicon-derived "
-        "heading track exercises cold-start, geometry validity, faults, dropout, and recovery "
-        "under physical motion, but it is not dual-antenna/vision sensor evidence.",
-    ])
+    ]
+    lines.extend(f"- {item}" for item in interpretation)
     if manifest.get("failure"):
         lines.extend(["", "## Failure", "", f"```text\n{manifest['failure']}\n```"])
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -143,9 +141,12 @@ def main() -> None:
     runner = args.runner.resolve()
     out_dir = args.out_dir if args.out_dir.is_absolute() else root / args.out_dir
     out_dir = out_dir.resolve()
-    converter = root / "simulation" / "tools" / "convert_euroc_to_replay.py"
-    analyzer = root / "validation" / "analyze_results.py"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    converter = root / manifest.get(
+        "converter", "simulation/tools/convert_euroc_to_replay.py"
+    )
+    reference_kind = manifest.get("reference_kind", "independent_truth")
+    analyzer = root / "validation" / "analyze_results.py"
     absolute_tolerance = float(manifest["default_absolute_tolerance"])
     relative_tolerance = float(manifest["default_relative_tolerance"])
     environment = os.environ.copy()
@@ -159,6 +160,9 @@ def main() -> None:
         "dataset": manifest["dataset"],
         "source_doi": manifest["source_doi"],
         "source_license": manifest["source_license"],
+        "interpretation": manifest.get("interpretation"),
+        "converter": str(converter),
+        "reference_kind": reference_kind,
         "started_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "git_commit": capture(["git", "rev-parse", "HEAD"], root),
         "git_status": capture(["git", "status", "--short"], root),
@@ -217,7 +221,7 @@ def main() -> None:
                      "--metadata", str(source_path), *track["converter_args"]],
                     [str(runner), *track["runner_args"], str(replay_path), str(results_path)],
                     [sys.executable, str(analyzer), str(results_path), "--out-dir", str(report_dir),
-                     "--scenario", track_name, "--reference-kind", "independent_truth"],
+                     "--scenario", track_name, "--reference-kind", reference_kind],
                 ]
                 for index, command in enumerate(commands, start=1):
                     run_manifest["commands"].append(run_recorded(

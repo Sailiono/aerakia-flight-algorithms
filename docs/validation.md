@@ -102,6 +102,18 @@ measured uncalibrated bias. Tilt completion and post-tilt gravity-direction RMSE
 heading alignment cannot complete. Full-attitude cold-start scoring still requires an accepted
 heading source.
 
+Blackbird `NYC Subway Winter` adds a 270.1 s independent motion-capture track with recorded
+100 Hz IMU, aggressive angular motion, and an externally verified five-second static prefix. The
+converter keeps one absolute time base across IMU and truth, applies the published body/IMU
+extrinsic, and fails closed unless angular-rate correlation and gravity/frame residual checks pass.
+Its optional synthetic GNSS remains a navigation-math diagnostic, not receiver evidence.
+
+For independent-truth tracks, `analyze_results.py` also reports an offline Mahony fallback envelope:
+for declared entry-error gates it computes the first threshold crossing and worst/P95 truth error
+over 0.5, 1, 2, and 5 second windows. This metric is used to challenge supervisor policy, not as an
+online health signal—the flight supervisor cannot observe ground-truth error. Blackbird motivated a
+continuity check on fallback entry and a finite Mahony-only time budget.
+
 ## Private ULog track
 
 `convert_ulog_to_replay.py` extracts calibrated IMU, sparse magnetometer updates, the configured

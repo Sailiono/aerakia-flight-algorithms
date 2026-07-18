@@ -21,13 +21,14 @@ Portable C99 flight-estimation algorithms with a reproducible PC validation plat
 | Algorithm | Role | Notable behavior |
 | --- | --- | --- |
 | Mahony standard | Reference baseline | Full accelerometer and magnetometer correction |
-| Mahony robust | Attitude fallback / cross-monitor | Adaptive accelerometer trust, yaw-only magnetic correction, magnitude anomaly gate |
+| Mahony robust | Short-duration degraded-attitude fallback / cross-monitor | Adaptive accelerometer trust, yaw-only magnetic correction, magnitude anomaly gate |
 | 15-error-state ESKF | Aerakia navigation estimator | IMU propagation, bias states, covariance reset Jacobian, aiding gates, navigation recovery |
 
 The Mahony implementation was written against the published nonlinear complementary-filter formulation rather than copied from the previous hardware project. The ESKF follows the quaternion/error-state conventions documented by Joan Solà. See [References](docs/references.md).
 
 In the intended FCOne architecture, the ESKF is the primary navigation estimator and robust
-Mahony is an independent attitude-only fallback/cross-monitor. Mahony does not replace ESKF
+Mahony is an independent, continuity-gated, time-bounded attitude-only fallback/cross-monitor.
+Mahony does not replace ESKF
 position, velocity, covariance, or aiding integrity. Standard Mahony remains a validation baseline.
 The application-level transition contract is documented in
 [Estimator supervision](docs/estimator-supervision.md).
