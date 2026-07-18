@@ -51,6 +51,22 @@ def compare_value(
     return actual == expected, None
 
 
+def evaluate_capability_gate(actual: Any, gate: dict[str, Any]) -> bool:
+    """Evaluate a one-way capability gate independently of baseline reproducibility."""
+    if "equals" in gate:
+        return actual == gate["equals"]
+    if not isinstance(actual, (int, float)) or isinstance(actual, bool):
+        raise TypeError(f"numeric capability gate received {actual!r}")
+    value = float(actual)
+    if "minimum" in gate and value < float(gate["minimum"]):
+        return False
+    if "maximum" in gate and value > float(gate["maximum"]):
+        return False
+    if "minimum" not in gate and "maximum" not in gate:
+        raise ValueError(f"capability gate has no bound: {gate!r}")
+    return True
+
+
 def run_recorded(
     command: list[str], *, cwd: Path, log_path: Path, environment: dict[str, str]
 ) -> dict[str, Any]:
@@ -105,10 +121,16 @@ def write_report(path: Path, manifest: dict[str, Any]) -> None:
     for track in manifest.get("tracks", []):
         comparisons = track["comparisons"]
         passed = sum(1 for item in comparisons if item["passed"])
+        capability = track.get("capability", [])
+        capability_passed = sum(1 for item in capability if item["passed"])
+        capability_text = (
+            f"; capability {capability_passed}/{len(capability)}"
+            if capability else "; capability not assessed"
+        )
         lines.append(
             f"| `{track['sequence']}` | `{track['track']}` | {track['samples']:,} "
             f"| {track['duration_s']:.3f} s | {passed}/{len(comparisons)} "
-            f"| {'PASS' if track['all_metrics_passed'] else 'FAIL'} |"
+            f"| {'PASS' if track['all_metrics_passed'] else 'FAIL'}{capability_text} |"
         )
     lines.extend(["", "## Interpretation", ""])
     interpretation = manifest.get("interpretation") or [
@@ -255,6 +277,24 @@ def main() -> None:
                         failures.append(
                             f"{track_name}/{baseline_key}: actual={actual!r} expected={expected!r}"
                         )
+                capability: list[dict[str, Any]] = []
+                for gate in track.get("capability_gates", []):
+                    actual = nested_value(metrics, gate["metric_path"])
+                    passed = evaluate_capability_gate(actual, gate)
+                    result = {
+                        "name": gate["name"],
+                        "metric_path": gate["metric_path"],
+                        "actual": actual,
+                        "minimum": gate.get("minimum"),
+                        "maximum": gate.get("maximum"),
+                        "equals": gate.get("equals"),
+                        "passed": passed,
+                    }
+                    capability.append(result)
+                    if track.get("capability_required", False) and not passed:
+                        failures.append(
+                            f"{track_name}/capability/{gate['name']}: actual={actual!r}"
+                        )
                 total_samples += int(source["samples"])
                 run_manifest["tracks"].append({
                     "sequence": sequence["id"],
@@ -264,6 +304,10 @@ def main() -> None:
                     "input_sha256": source["input_sha256"],
                     "comparisons": comparisons,
                     "all_metrics_passed": all(item["passed"] for item in comparisons),
+                    "capability": capability,
+                    "capability_required": bool(track.get("capability_required", False)),
+                    "all_capability_gates_passed":
+                        bool(capability) and all(item["passed"] for item in capability),
                     "metrics_path": str(report_dir / "metrics.json"),
                 })
         if failures:

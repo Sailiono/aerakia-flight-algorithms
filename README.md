@@ -84,6 +84,8 @@ the same-input A/B gate, is documented in [PX4 EKF2 comparison](docs/px4-ekf2-co
 The scoped meaning of "PX4-class", truth/benchmark separation, anti-overfitting protocol, and
 G0--G4 acceptance gates are defined in the
 [PX4-class validation plan](docs/px4-class-validation-plan.md).
+The eVTOL hover/transition/fixed-wing profiles and the public-algorithm/private-product source flow
+are defined in [FCOne/eVTOL target profiles](docs/vehicle-target-and-repository-flow.md).
 
 ## Build and test
 
@@ -113,17 +115,17 @@ Example results from the deterministic 20 s / 100 Hz / seed 7 suite:
 
 | Scenario | Mahony standard | Mahony robust | ESKF |
 | --- | ---: | ---: | ---: |
-| Clean motion | 0.1476° | 0.1547° | 0.3515° |
-| Magnetic spike | 0.2612° | 0.1540° | 0.3741° |
+| Clean motion | 0.1483° | 0.1508° | 0.3115° |
+| Magnetic spike | 0.2662° | 0.1494° | 0.3305° |
 | Persistent magnetic bias | 27.1650° | 0.2854° | 0.3271° |
 | Tilted cold start (post-alignment) | — | — | 0.0369° |
-| GNSS outage/reacquisition (post-alignment) | — | — | 0.6821° |
-| Trusted heading dropout/recovery (post-alignment) | — | — | 0.2755° |
-| Multi-axis bias convergence (post-alignment) | — | — | 0.8863° |
+| GNSS outage/reacquisition (post-alignment) | — | — | 0.6863° |
+| Trusted heading dropout/recovery (post-alignment) | — | — | 0.2779° |
+| Multi-axis bias convergence (post-alignment) | — | — | 0.8454° |
 
 Attitude values use quaternion geodesic RMSE, which is singularity-free and is not numerically
-comparable to the older RMS of three Euler components. In the outage scenario, position RMSE is 0.497 m and velocity
-RMSE is 0.226 m/s; NIS and NEES are checked against reviewed deterministic bounds. These synthetic
+comparable to the older RMS of three Euler components. In the outage scenario, position RMSE is 0.507 m and velocity
+RMSE is 0.231 m/s; NIS and NEES are checked against reviewed deterministic bounds. These synthetic
 results demonstrate repeatability and fault response, not flight safety or airworthiness. The
 [algorithm status](docs/algorithm-status.md) records the current maturity and P0 blockers, while the
 [validation methodology](docs/validation.md) defines the evidence still required from public

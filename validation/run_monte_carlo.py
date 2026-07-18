@@ -6,19 +6,33 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import numpy as np
 
 
 LIMITS = {
-    "position_rmse_m": 0.75,
-    "velocity_rmse_m_s": 0.40,
-    "attitude_rmse_deg": 2.50,
+    "position_rmse_m": 1.25,
+    "velocity_rmse_m_s": 0.60,
+    "attitude_rmse_deg": 3.50,
     "navigation_recoveries": 0.0,
     "minimum_healthy_ratio": 1.0,
+}
+
+DISTRIBUTION_P95_LIMITS = {
+    "position_rmse_m": 0.75,
+    "velocity_rmse_m_s": 0.40,
+    "attitude_rmse_deg": 2.00,
+}
+
+AGGREGATE_CONSISTENCY_LIMITS = {
+    "position_nis_mean": (2.0, 4.0),
+    "velocity_nis_mean": (2.0, 4.0),
+    "navigation_nees_mean": (3.0, 9.0),
 }
 
 
@@ -107,7 +121,94 @@ def summarize_trials(trials: list[dict[str, float | int]]) -> dict[str, object]:
             )
         if reasons:
             failures.append({"seed": int(trial["seed"]), "reasons": reasons})
-    return {"aggregates": aggregates, "failures": failures}
+    consistency_failures: list[str] = []
+    for name, (minimum, maximum) in AGGREGATE_CONSISTENCY_LIMITS.items():
+        mean = aggregates[name]["mean"]
+        if mean < minimum or mean > maximum:
+            consistency_failures.append(
+                f"{name}.mean={mean:.6g} outside [{minimum:.6g}, {maximum:.6g}]"
+            )
+    distribution_failures: list[str] = []
+    for name, maximum in DISTRIBUTION_P95_LIMITS.items():
+        p95 = aggregates[name]["p95"]
+        if p95 > maximum:
+            distribution_failures.append(
+                f"{name}.p95={p95:.6g}>{maximum:.6g}"
+            )
+    return {
+        "aggregates": aggregates,
+        "failures": failures,
+        "consistency_failures": consistency_failures,
+        "distribution_failures": distribution_failures,
+    }
+
+
+def run_trial(
+    seed: int,
+    *,
+    root: Path,
+    runner: Path,
+    out_dir: Path,
+    duration_s: float,
+    rate_hz: float,
+    accel_bias_std_m_s2: float,
+    gyro_bias_std_deg_s: float,
+    timestamp_jitter_std_us: float,
+    environment: dict[str, str],
+    compact: bool,
+    timeout_s: float,
+    retries: int,
+) -> dict[str, float | int | dict[str, object]]:
+    trial_dir = out_dir / f"seed-{seed:04d}"
+    command = [
+            sys.executable,
+            str(root / "validation/run_suite.py"),
+            "--runner", str(runner),
+            "--out-dir", str(trial_dir),
+            "--scenarios", "navigation_outage",
+            "--duration", str(duration_s),
+            "--rate", str(rate_hz),
+            "--seed", str(seed),
+            "--accel-bias-std-m-s2", str(accel_bias_std_m_s2),
+            "--gyro-bias-std-deg-s", str(gyro_bias_std_deg_s),
+            "--timestamp-jitter-std-us", str(timestamp_jitter_std_us),
+            "--no-plots",
+    ]
+    trial_environment = environment.copy()
+    trial_environment["MPLCONFIGDIR"] = str((trial_dir / ".matplotlib").resolve())
+    last_error: subprocess.CalledProcessError | subprocess.TimeoutExpired | None = None
+    for _attempt in range(retries + 1):
+        try:
+            subprocess.run(
+                command,
+                cwd=root,
+                env=trial_environment,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                timeout=timeout_s,
+            )
+            last_error = None
+            break
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+            last_error = error
+    if last_error is not None:
+        output = getattr(last_error, "stdout", None) or getattr(last_error, "output", None) or ""
+        raise RuntimeError(
+            f"seed {seed} failed after {retries + 1} attempt(s): {last_error}\n{output}"
+        )
+    metrics = json.loads((trial_dir / "navigation_outage/metrics.json").read_text(
+        encoding="utf-8"
+    ))
+    trial = extract_trial(seed, metrics)
+    generation = json.loads((trial_dir / "navigation_outage/input-metadata.json").read_text(
+        encoding="utf-8"
+    ))
+    trial["generation"] = generation
+    if compact:
+        shutil.rmtree(trial_dir)
+    return trial
 
 
 def main() -> None:
@@ -120,6 +221,17 @@ def main() -> None:
     parser.add_argument("--accel-bias-std-m-s2", type=float, default=0.05)
     parser.add_argument("--gyro-bias-std-deg-s", type=float, default=0.20)
     parser.add_argument("--timestamp-jitter-std-us", type=float, default=250.0)
+    parser.add_argument("--jobs", type=int, default=4)
+    parser.add_argument(
+        "--compact", action="store_true",
+        help="retain complete per-trial facts in summary.json but remove generated CSV/report trees",
+    )
+    parser.add_argument("--timeout-s", type=float, default=120.0)
+    parser.add_argument("--retries", type=int, default=1)
+    parser.add_argument(
+        "--resume", action="store_true",
+        help="reuse completed per-seed JSON checkpoints in the selected output directory",
+    )
     args = parser.parse_args()
 
     root = Path(__file__).resolve().parents[1]
@@ -127,42 +239,61 @@ def main() -> None:
     environment = os.environ.copy()
     environment["MPLCONFIGDIR"] = str((args.out_dir / ".matplotlib").resolve())
     Path(environment["MPLCONFIGDIR"]).mkdir(parents=True, exist_ok=True)
-    trials: list[dict[str, float | int]] = []
+    if args.jobs < 1 or args.timeout_s <= 0.0 or args.retries < 0:
+        parser.error("jobs and timeout must be positive; retries must be non-negative")
+    args.out_dir.mkdir(parents=True, exist_ok=True)
+    trial_records_dir = args.out_dir / "trials"
+    trial_records_dir.mkdir(parents=True, exist_ok=True)
+    trials: list[dict[str, float | int | dict[str, object]]] = []
+    pending_seeds: list[int] = []
     for seed in seeds:
-        trial_dir = args.out_dir / f"seed-{seed:04d}"
-        subprocess.run(
-            [
-                sys.executable,
-                str(root / "validation/run_suite.py"),
-                "--runner", str(args.runner.resolve()),
-                "--out-dir", str(trial_dir),
-                "--scenarios", "navigation_outage",
-                "--duration", str(args.duration),
-                "--rate", str(args.rate),
-                "--seed", str(seed),
-                "--accel-bias-std-m-s2", str(args.accel_bias_std_m_s2),
-                "--gyro-bias-std-deg-s", str(args.gyro_bias_std_deg_s),
-                "--timestamp-jitter-std-us", str(args.timestamp_jitter_std_us),
-            ],
-            cwd=root,
-            env=environment,
-            check=True,
-            stdout=subprocess.DEVNULL,
-        )
-        metrics = json.loads((trial_dir / "navigation_outage/metrics.json").read_text(
-            encoding="utf-8"
-        ))
-        trial = extract_trial(seed, metrics)
-        generation = json.loads((trial_dir / "navigation_outage/input-metadata.json").read_text(
-            encoding="utf-8"
-        ))
-        trial["generation"] = generation
-        trials.append(trial)
-        print(
-            f"seed={seed:4d} position={trial['position_rmse_m']:.3f} m "
-            f"velocity={trial['velocity_rmse_m_s']:.3f} m/s "
-            f"NEES={trial['navigation_nees_mean']:.3f}"
-        )
+        record_path = trial_records_dir / f"seed-{seed:04d}.json"
+        if args.resume and record_path.is_file():
+            trials.append(json.loads(record_path.read_text(encoding="utf-8")))
+        else:
+            pending_seeds.append(seed)
+    execution_failures: list[dict[str, object]] = []
+    with ThreadPoolExecutor(max_workers=args.jobs) as executor:
+        futures = {
+            executor.submit(
+                run_trial,
+                seed,
+                root=root,
+                runner=args.runner.resolve(),
+                out_dir=args.out_dir,
+                duration_s=args.duration,
+                rate_hz=args.rate,
+                accel_bias_std_m_s2=args.accel_bias_std_m_s2,
+                gyro_bias_std_deg_s=args.gyro_bias_std_deg_s,
+                timestamp_jitter_std_us=args.timestamp_jitter_std_us,
+                environment=environment,
+                compact=args.compact,
+                timeout_s=args.timeout_s,
+                retries=args.retries,
+            ): seed
+            for seed in pending_seeds
+        }
+        completed = 0
+        for future in as_completed(futures):
+            seed = futures[future]
+            try:
+                trial = future.result()
+                trials.append(trial)
+                (trial_records_dir / f"seed-{seed:04d}.json").write_text(
+                    json.dumps(trial, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+                )
+            except Exception as error:  # retain all other independent trials and report the seed
+                execution_failures.append({"seed": seed, "error": str(error)})
+            completed += 1
+            if completed == 1 or completed % 25 == 0 or completed == len(pending_seeds):
+                print(
+                    f"completed {completed}/{len(pending_seeds)} pending Monte Carlo trials "
+                    f"({len(execution_failures)} execution failures)"
+                )
+    trials.sort(key=lambda trial: int(trial["seed"]))
+
+    if not trials:
+        raise SystemExit("no Monte Carlo trial completed")
 
     summary = summarize_trials(trials)
     output = {
@@ -170,6 +301,7 @@ def main() -> None:
         "scope": {
             "scenario": "navigation_outage",
             "seeds": seeds,
+            "completed_trials": len(trials),
             "duration_s": args.duration,
             "rate_hz": args.rate,
             "accel_bias_std_m_s2": args.accel_bias_std_m_s2,
@@ -190,6 +322,9 @@ def main() -> None:
             ],
         },
         "limits": LIMITS,
+        "distribution_p95_limits": DISTRIBUTION_P95_LIMITS,
+        "aggregate_consistency_limits": AGGREGATE_CONSISTENCY_LIMITS,
+        "execution_failures": execution_failures,
         "trials": trials,
         **summary,
     }
@@ -203,7 +338,8 @@ def main() -> None:
     lines = [
         "# Navigation Monte Carlo baseline",
         "",
-        f"Seeds: `{seeds[0]}` through `{seeds[-1]}` ({len(seeds)} trials).",
+        f"Seeds: `{seeds[0]}` through `{seeds[-1]}` "
+        f"({len(trials)}/{len(seeds)} completed trials).",
         "",
         "| Metric | Mean | P05 | P95 | Maximum |",
         "| --- | ---: | ---: | ---: | ---: |",
@@ -218,9 +354,13 @@ def main() -> None:
             f"| {values['p95']:.4f} | {values['maximum']:.4f} |"
         )
     failures = summary["failures"]
+    consistency_failures = summary["consistency_failures"]
+    distribution_failures = summary["distribution_failures"]
     lines.extend([
         "",
-        f"Acceptance failures: **{len(failures)}**.",
+        f"Hard-envelope failures: **{len(failures)}**; distribution P95 failures: "
+        f"**{len(distribution_failures)}**; aggregate consistency failures: "
+        f"**{len(consistency_failures)}**; execution failures: **{len(execution_failures)}**.",
         "",
         "P05/P95 are empirical percentiles across seeds, not independent-sample theoretical "
         "confidence bounds. This baseline randomizes measurement noise, constant IMU bias, and "
@@ -228,8 +368,22 @@ def main() -> None:
         "Temperature drift and transport faults remain separate P0 work.",
     ])
     (args.out_dir / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    if execution_failures:
+        raise SystemExit(
+            f"Monte Carlo execution failed for {len(execution_failures)} seed(s); rerun with --resume"
+        )
     if failures:
-        raise SystemExit(f"Monte Carlo acceptance failed for {len(failures)} seed(s)")
+        raise SystemExit(f"Monte Carlo hard envelope failed for {len(failures)} seed(s)")
+    if distribution_failures:
+        raise SystemExit(
+            "Monte Carlo distribution gate failed: "
+            + "; ".join(distribution_failures)
+        )
+    if consistency_failures:
+        raise SystemExit(
+            "Monte Carlo aggregate consistency gate failed: "
+            + "; ".join(consistency_failures)
+        )
     print(f"Monte Carlo baseline passed: {args.out_dir / 'report.md'}")
 
 

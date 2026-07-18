@@ -108,12 +108,20 @@ reject observations before the first IMU, from the future, duplicate/reordered p
 than `maximum_aiding_age_s`. The older untimestamped update functions remain source-compatible for
 existing host applications, but cannot enforce freshness and must not be used by the FCOne adapter.
 
-The paired GPS API gates position and velocity separately. Independent APIs also maintain separate
-freshness timestamps and can re-anchor only their own state component after persistent rejection.
-Position recovery preserves velocity; velocity recovery preserves position; both preserve attitude
-and learned IMU biases. A syntactically and temporally valid observation consumes its source
-timestamp even if its innovation is rejected, preventing the same physical sample from being
-retried as if it were new.
+The paired GPS API gates position and velocity separately. Independent APIs maintain separate
+freshness timestamps, but neither is allowed to re-anchor state after repeated rejection. A
+syntactically and temporally valid observation consumes its source timestamp even if its innovation
+is rejected, preventing the same physical sample from being retried as if it were new.
+
+Repeated rejection can only create a recovery candidate from synchronized paired GNSS
+position/velocity observations that pass configured variance bounds and multi-sample kinematic
+consistency. It cannot reset the filter by itself. The private estimator supervisor must explicitly
+authorize the exact candidate timestamp using `aerakia_eskf_authorize_navigation_recovery`, declare
+that upstream source quality was independently verified, and provide application-level correction
+bounds. A successful re-anchor preserves attitude and learned IMU biases, enters probation, and
+keeps navigation invalid until the configured number of subsequent paired updates are accepted.
+Rejected authorization, stale candidates, excessive corrections, and standalone observations leave
+the nominal state unchanged.
 
 An accepted position or velocity constraint also refreshes the estimate's horizontal-aiding age.
 By default, `maximum_horizontal_dead_reckoning_s` is 5 seconds. After that time without an accepted
@@ -127,7 +135,14 @@ The FCOne adapter must propagate these validity fields to the private estimator 
 vehicle-specific policy may choose a shorter limit, but must not silently extend it without physical
 evidence and a matching failsafe review.
 
-Trusted heading is independent of magnetometer fusion. It can come from dual-antenna GNSS, vision, motion capture, or another upstream estimator, provided the application converts it to clockwise-from-North NED radians and supplies a defensible variance.
+Heading, vertical-position, and vertical-velocity aiding have independent ages and validity fields.
+Startup alignment completion is historical state, not proof of continued observability. The
+supervisor must consume current validity and must not keep yaw or altitude qualified solely because
+alignment once succeeded.
+
+Trusted heading is independent of magnetometer fusion. It can come from dual-antenna GNSS, vision,
+motion capture, or another upstream estimator, provided the application converts it to
+clockwise-from-North NED radians and supplies a defensible variance.
 
 ## Application-declared stationary alignment
 

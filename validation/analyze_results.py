@@ -937,7 +937,7 @@ def create_navigation_diagnostic_plot(
 
 
 def write_markdown(
-    path: Path, scenario: str, metrics: dict[str, object], plot_name: str,
+    path: Path, scenario: str, metrics: dict[str, object], plot_name: str | None,
     yaw_plot_name: str | None = None, navigation_plot_name: str | None = None,
 ) -> None:
     algorithms = metrics["algorithms"]
@@ -1106,9 +1106,10 @@ def write_markdown(
             f"- PX4 GSF diagnostic updates (never fused into Aerakia during comparison): "
             f"{yaw_sources.get('px4_gsf_updates', 0)}; confident moving updates: "
             f"{yaw_sources.get('px4_gsf_confident_updates', 0)}.",
-            "", f"![Attitude estimates and wrapped errors]({plot_name})", "",
         ]
     )
+    if plot_name is not None:
+        lines.extend(["", f"![Attitude estimates and wrapped errors]({plot_name})", ""])
     if yaw_plot_name is not None:
         lines.extend([f"![Yaw reset and source diagnostics]({yaw_plot_name})", ""])
     if navigation_plot_name is not None:
@@ -1143,6 +1144,10 @@ def main() -> None:
     parser.add_argument("results_csv", type=Path)
     parser.add_argument("--out-dir", type=Path, required=True)
     parser.add_argument("--scenario", default="validation")
+    parser.add_argument(
+        "--no-plots", action="store_true",
+        help="write metrics and Markdown without generating PNGs",
+    )
     parser.add_argument(
         "--reference-kind",
         choices=(
@@ -1183,14 +1188,16 @@ def main() -> None:
         metrics["eskf_reset_compensated_yaw"] = reset_compensated_yaw_metrics(columns)
         metrics["eskf_segment_aligned_yaw"] = segment_aligned_yaw_metrics(columns)
         metrics["yaw_sources"] = yaw_source_diagnostics(columns)
-    plot_path = args.out_dir / "attitude_comparison.png"
-    create_plot(columns, plot_path, f"Aerakia validation — {args.scenario}")
+    plot_path: Path | None = None
+    if not args.no_plots:
+        plot_path = args.out_dir / "attitude_comparison.png"
+        create_plot(columns, plot_path, f"Aerakia validation — {args.scenario}")
     yaw_plot_path: Path | None = None
-    if args.reference_kind == "px4_estimate":
+    if args.reference_kind == "px4_estimate" and not args.no_plots:
         yaw_plot_path = args.out_dir / "yaw_diagnostics.png"
         create_yaw_diagnostic_plot(columns, yaw_plot_path, f"Yaw diagnostics — {args.scenario}")
     navigation_plot_path: Path | None = None
-    if metrics["navigation"] is not None:
+    if metrics["navigation"] is not None and not args.no_plots:
         navigation_plot_path = args.out_dir / "navigation_diagnostics.png"
         create_navigation_diagnostic_plot(
             columns, navigation_plot_path, f"Navigation diagnostics — {args.scenario}"
@@ -1199,7 +1206,8 @@ def main() -> None:
         json.dumps(metrics, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     write_markdown(
-        args.out_dir / "report.md", args.scenario, metrics, plot_path.name,
+        args.out_dir / "report.md", args.scenario, metrics,
+        plot_path.name if plot_path is not None else None,
         yaw_plot_path.name if yaw_plot_path is not None else None,
         navigation_plot_path.name if navigation_plot_path is not None else None,
     )

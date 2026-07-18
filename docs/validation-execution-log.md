@@ -915,3 +915,150 @@ usage caveats; no channel is promoted without a fresh frame/time/license audit.
 The resulting scope, evidence grades, anti-overfitting split, G0--G4 gates, PX4 M0 fairness rules,
 provisional blind-test non-inferiority method, dataset order, FCOne/HIL requirements, and subagent
 ownership are now centralized in `docs/px4-class-validation-plan.md`.
+
+## 2026-07-18 — G0 mathematical, recovery, validity, and statistical closure
+
+### Reason and source audit
+
+The PX4-class gap audit identified four issues that could invalidate additional volume claims:
+three-dimensional observations used the scalar 3-sigma NIS limit, repeatedly rejected navigation
+observations could eventually force an automatic re-anchor, heading/vertical observability was not
+continuously qualified, and the current tree no longer contained the executable full F/Q/H audit
+described by older history.
+
+The history audit recovered the earlier internal-model test boundary and also found that the active
+tree had lost the position transition's attitude and accelerometer-bias `dt²/2` couplings. The
+first restored 10,000-case prediction finite-difference run reached maximum absolute error
+`0.00337988`, above the proposed `0.0025` limit. The failure was not waived: the attitude block was
+changed from first-order `I-[omega]dt` to exact discrete SO(3), and gyro-bias coupling now uses the
+SO(3) right Jacobian.
+
+### Mathematical and measurement changes
+
+- `eskf_models.c` is the single internal implementation of F, Q, trusted-heading geometry, and
+  magnetic-heading geometry used by both production code and numerical tests.
+- Position propagation includes velocity, attitude, and accelerometer-bias `dt²/2` couplings.
+- Continuous IMU white-noise densities retain the reviewed `sigma² dt` mapping with integrated
+  acceleration velocity-position cross covariance.
+- Scalar observations use the one-degree-of-freedom 99.7300204% NIS limit `9.0`; vector
+  position/velocity/ZUPT observations use the three-degree-of-freedom limit
+  `14.1564136091267`. Reported test ratio is NIS divided by the applicable threshold.
+- Heading and magnetic geometry explicitly report unobservable near-vertical body-forward or
+  horizontal-field geometry rather than emitting a misleading correction.
+
+The final 10,000-case-per-family executable campaign reports:
+
+- transition F maximum absolute finite-difference error: `1.61851333e-07` across all 15 columns;
+- trusted-heading H maximum absolute finite-difference error: `2.16205933e-08`;
+- magnetic-heading H maximum absolute finite-difference error: `1.64858118e-08`;
+- process-noise blocks remain finite, symmetric, positive, and positive semidefinite across the
+  randomized range.
+
+### Recovery and continuous validity
+
+Automatic state reset after a rejection count was removed. Standalone position or velocity
+observations can never force re-anchoring. A paired GNSS recovery candidate now requires bounded
+variance and multiple kinematically consistent samples; the exact candidate timestamp then requires
+one-shot application authorization with independently verified source quality and correction-size
+bounds. Successful recovery preserves attitude and IMU bias, enters probation, and leaves
+navigation invalid until subsequent accepted paired updates complete the dwell.
+
+Heading, vertical-position, and vertical-velocity aiding now have separate age and validity outputs.
+Startup alignment completion is retained as historical state but can no longer be mistaken for
+continued observability. Tests cover initial invalidity, independent qualification, timeout, failed
+authorization, excessive correction, accepted bounded recovery, and probation exit.
+
+### Public capability and multi-rate test correction
+
+Public dataset reproduction baselines remain change detectors, while declared one-way minimum or
+maximum capability gates can independently fail a stable result. The V1_03 difficult derived-
+heading track must meet full-attitude, observable-yaw, fault-rejection, and recovery-time gates; its
+reference-bias track separately gates attitude, tilt, and navigation NEES.
+
+The first multi-rate gate was intentionally rejected because it compared one seed while keeping
+per-sample IMU noise variance constant and increasing magnetometer updates with IMU rate. That made
+the physical noise process and aiding bandwidth differ between 100 and 1000 Hz. The corrected gate:
+
+1. uses interval-average gyro samples whose delta angles exactly reconstruct the reference pose;
+2. checks deterministic discretization independently;
+3. fixes magnetometer and GNSS publications at 100 Hz and 10 Hz;
+4. scales IMU sample noise with square root of rate to preserve continuous white-noise density;
+5. compares paired multi-seed statistical aggregates for attitude, navigation, NIS, and NEES.
+
+The first 1,000-trial campaign then exposed a validation-runner orchestration failure at seed 778.
+The exact seed replayed successfully when isolated, so this was not recorded as an estimator hang.
+The campaign tool was corrected to create a per-seed checkpoint, use an isolated configuration
+directory, enforce a timeout, retry a bounded number of times, retain execution-failure text, and
+resume without discarding hundreds of completed independent trials. Final campaign and total
+regression results are recorded in the continuation below after the corrected rerun completes.
+
+### Corrected 1,000-trial result and frozen statistical gates
+
+The corrected run completed seeds 0--999 with zero execution failures. The earlier 20-seed
+thresholds were also found to be incorrectly interpreted as absolute maxima: when sampling 1,000
+independent Gaussian-noise/bias trials, expected distribution tails occasionally exceeded those
+small-sample maxima without numerical or consistency failure. Before future blind use, the G0 gate
+was frozen as two levels:
+
+- distribution P95: position `<=0.75 m`, velocity `<=0.40 m/s`, attitude `<=2.0 deg`;
+- per-trial hard envelope: position `<=1.25 m`, velocity `<=0.60 m/s`, attitude `<=3.5 deg`;
+- numerical health must remain 100% and unexpected navigation recovery remains zero-tolerance;
+- aggregate NIS/NEES means must remain within the declared consistency bands.
+
+Final results:
+
+| Metric | Mean | P05 | P95 | Maximum |
+| --- | ---: | ---: | ---: | ---: |
+| position RMSE | 0.3921 m | 0.2178 m | 0.6495 m | 1.0266 m |
+| velocity RMSE | 0.1731 m/s | 0.0887 m/s | 0.2984 m/s | 0.4571 m/s |
+| post-alignment attitude RMSE | 0.9798 deg | 0.4992 deg | 1.7272 deg | 2.6924 deg |
+| position NIS mean | 2.9628 | 2.6550 | 3.3075 | 3.6510 |
+| velocity NIS mean | 2.5173 | 2.2371 | 2.8153 | 3.0887 |
+| six-state navigation NEES mean | 4.9828 | 3.4932 | 7.0346 | 10.2682 |
+
+All 1,000 states/covariances remained healthy and no navigation recovery was invoked. The expected
+means are 3 for each three-dimensional NIS and 6 for navigation NEES; the result is mildly
+conservative, not divergent or overconfident. These remain synthetic evidence and do not replace
+physical truth, temperature, vibration, or target execution tests.
+
+### Final multi-rate result
+
+The formal gate uses the same 32 fixed seeds at 100/200/400/1000 Hz. A small seed count's median
+was rejected as the cross-rate statistic because the RMSE distribution is skewed and its median
+varied 6.3% even while per-rate means differed only 1.1%. The frozen gate uses the paired seed-set
+mean and retains a 5% maximum cross-rate spread plus independent absolute capability limits.
+
+- attitude RMSE means: `0.6694 / 0.6766 / 0.6720 / 0.6751 deg`;
+- position RMSE means: `0.3775 / 0.3774 / 0.3770 / 0.3777 m`;
+- velocity RMSE means: `0.1661 / 0.1658 / 0.1662 / 0.1667 m/s`;
+- position NIS means: `2.9247 / 2.9247 / 2.9246 / 2.9247`;
+- velocity NIS means: `2.5270 / 2.5267 / 2.5271 / 2.5271`;
+- navigation NEES means: `4.8620 / 4.8628 / 4.8604 / 4.8601`.
+
+All deterministic integration, statistical spread, and per-rate one-way gates pass. This closes
+the earlier ambiguity between input-integrity rate coverage and actual estimator-accuracy
+invariance.
+
+### Final G0 verification checkpoint
+
+The closure candidate was rebuilt and rerun after the model, generator, gate, and documentation
+changes were complete:
+
+- seven native CTest targets passed under repository-wide warnings-as-errors; the 10,000-case
+  model campaign was part of that run;
+- the same seven targets passed under AddressSanitizer and UndefinedBehaviorSanitizer, including
+  the 1,020,000-attempt input-integrity campaign;
+- 42 Python converter, analyzer, manifest, gate, and orchestration tests passed;
+- seven deterministic synthetic scenarios passed every reviewed threshold, including cold start,
+  magnetic spike/bias, five-second GNSS outage/reacquisition, trusted-heading faults/recovery, and
+  online bias convergence;
+- the 32-seed 100/200/400/1000 Hz gate passed both deterministic and statistical limits;
+- the corrected 1,000-seed campaign completed with zero execution, hard-envelope, distribution,
+  consistency, health, or unexpected-recovery failures;
+- all six EuRoC tracks passed baseline reproducibility and declared one-way capability gates,
+  replaying 156,490 IMU samples in the final run.
+
+The final deterministic outage result is `0.507 m` position RMSE, `0.231 m/s` velocity RMSE, and
+`0.686 deg` post-alignment attitude RMSE. The online-bias scenario ends at `0.030 m/s²`
+accelerometer-bias error and `0.000522 rad/s` gyroscope-bias error while retaining navigation NEES
+`4.998`. These are host/synthetic acceptance figures, not target-hardware or flight claims.

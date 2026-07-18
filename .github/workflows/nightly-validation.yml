@@ -1,0 +1,32 @@
+name: Nightly validation
+
+on:
+  schedule:
+    - cron: "23 18 * * 1"
+  workflow_dispatch:
+
+jobs:
+  monte-carlo-1000:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install -r requirements.txt
+      - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build build --parallel --target aerakia_validation_runner
+      - name: Run 1,000-trial navigation consistency campaign
+        run: >-
+          python validation/run_monte_carlo.py
+          --runner build/aerakia_validation_runner
+          --out-dir build/monte-carlo-1000
+          --seeds 0:1000 --jobs 2 --compact
+      - uses: actions/upload-artifact@v4
+        with:
+          name: monte-carlo-1000
+          path: |
+            build/monte-carlo-1000/report.md
+            build/monte-carlo-1000/summary.json

@@ -100,6 +100,62 @@ def body_to_ned_matrix(roll_rad: float, pitch_rad: float, yaw_rad: float) -> np.
     )
 
 
+def euler_to_quaternion(
+    roll_rad: np.ndarray, pitch_rad: np.ndarray, yaw_rad: np.ndarray
+) -> np.ndarray:
+    """Return scalar-first body-to-NED quaternions for the requested samples."""
+    half_roll = 0.5 * roll_rad
+    half_pitch = 0.5 * pitch_rad
+    half_yaw = 0.5 * yaw_rad
+    cr, sr = np.cos(half_roll), np.sin(half_roll)
+    cp, sp = np.cos(half_pitch), np.sin(half_pitch)
+    cy, sy = np.cos(half_yaw), np.sin(half_yaw)
+    return np.column_stack((
+        cr * cp * cy + sr * sp * sy,
+        sr * cp * cy - cr * sp * sy,
+        cr * sp * cy + sr * cp * sy,
+        cr * cp * sy - sr * sp * cy,
+    ))
+
+
+def quaternion_multiply(left: np.ndarray, right: np.ndarray) -> np.ndarray:
+    lw, lx, ly, lz = left
+    rw, rx, ry, rz = right
+    return np.array((
+        lw * rw - lx * rx - ly * ry - lz * rz,
+        lw * rx + lx * rw + ly * rz - lz * ry,
+        lw * ry - lx * rz + ly * rw + lz * rx,
+        lw * rz + lx * ry - ly * rx + lz * rw,
+    ))
+
+
+def interval_average_body_rate(
+    time_s: np.ndarray, roll_rad: np.ndarray, pitch_rad: np.ndarray, yaw_rad: np.ndarray
+) -> np.ndarray:
+    """Generate rate samples whose delta angles exactly match the reference poses.
+
+    Row zero carries no preceding interval and is therefore zero. Each later row
+    is the constant body rate over `(t[i-1], t[i]]`, matching the timestamped IMU
+    sample contract consumed by the native runner.
+    """
+    quaternions = euler_to_quaternion(roll_rad, pitch_rad, yaw_rad)
+    rates = np.zeros((len(time_s), 3), dtype=np.float64)
+    for index in range(1, len(time_s)):
+        previous_conjugate = quaternions[index - 1].copy()
+        previous_conjugate[1:] *= -1.0
+        delta = quaternion_multiply(previous_conjugate, quaternions[index])
+        if delta[0] < 0.0:
+            delta *= -1.0
+        vector_norm = float(np.linalg.norm(delta[1:]))
+        if vector_norm <= 1.0e-15:
+            continue
+        angle = 2.0 * math.atan2(vector_norm, float(delta[0]))
+        rates[index] = delta[1:] * (angle / vector_norm) / (
+            time_s[index] - time_s[index - 1]
+        )
+    return rates
+
+
 def synthesize_measurements(
     time_s: np.ndarray,
     roll_deg: np.ndarray,
@@ -115,18 +171,8 @@ def synthesize_measurements(
     pitch_rad = np.radians(pitch_deg)
     yaw_rad = np.radians(yaw_deg)
 
-    roll_rate = np.gradient(roll_rad, time_s)
-    pitch_rate = np.gradient(pitch_rad, time_s)
-    yaw_rate = np.gradient(yaw_rad, time_s)
-
-    gyro_rad_s = np.column_stack(
-        (
-            roll_rate - np.sin(pitch_rad) * yaw_rate,
-            np.cos(roll_rad) * pitch_rate
-            + np.sin(roll_rad) * np.cos(pitch_rad) * yaw_rate,
-            -np.sin(roll_rad) * pitch_rate
-            + np.cos(roll_rad) * np.cos(pitch_rad) * yaw_rate,
-        )
+    gyro_rad_s = interval_average_body_rate(
+        time_s, roll_rad, pitch_rad, yaw_rad
     )
 
     if acceleration_ned_m_s2 is None:
@@ -355,6 +401,37 @@ def main() -> None:
         "--timestamp-jitter-std-us", type=float, default=0.0,
         help="standard deviation of per-interval timestamp jitter; intervals remain monotonic",
     )
+    parser.add_argument(
+        "--accel-noise-m-s2", type=float, default=0.02,
+        help="per-sample accelerometer noise standard deviation",
+    )
+    parser.add_argument(
+        "--gyro-noise-deg-s", type=float, default=0.05,
+        help="per-sample gyroscope noise standard deviation",
+    )
+    parser.add_argument(
+        "--mag-noise-ut", type=float, default=0.20,
+        help="per-update magnetometer noise standard deviation",
+    )
+    parser.add_argument(
+        "--mag-rate-hz", type=float,
+        help="magnetometer publication rate; defaults to the IMU rate",
+    )
+    parser.add_argument(
+        "--gps-position-noise-m", type=float, default=0.5,
+        help="GNSS position noise standard deviation",
+    )
+    parser.add_argument(
+        "--gps-velocity-noise-m-s", type=float, default=0.1,
+        help="GNSS velocity noise standard deviation",
+    )
+    parser.add_argument(
+        "--rate-invariant-streams", action="store_true",
+        help=(
+            "draw GNSS noise only at its fixed-rate update epochs so the same seed "
+            "represents the same aiding stream at different IMU rates"
+        ),
+    )
     parser.add_argument("--metadata", type=Path, help="optional JSON generation manifest")
     parser.add_argument(
         "--trusted-heading", action="store_true",
@@ -368,13 +445,27 @@ def main() -> None:
 
     if args.duration <= 0.0 or args.rate <= 0.0:
         parser.error("--duration and --rate must be positive")
-    if args.accel_bias_std_m_s2 < 0.0 or args.gyro_bias_std_deg_s < 0.0 \
-            or args.timestamp_jitter_std_us < 0.0:
-        parser.error("bias and timestamp-jitter standard deviations must be non-negative")
+    non_negative = (
+        args.accel_bias_std_m_s2,
+        args.gyro_bias_std_deg_s,
+        args.timestamp_jitter_std_us,
+        args.accel_noise_m_s2,
+        args.gyro_noise_deg_s,
+        args.mag_noise_ut,
+        args.gps_position_noise_m,
+        args.gps_velocity_noise_m_s,
+    )
+    if any(value < 0.0 for value in non_negative):
+        parser.error("noise, bias, and timestamp-jitter values must be non-negative")
+    if args.mag_rate_hz is not None and (
+        args.mag_rate_hz <= 0.0 or args.mag_rate_hz > args.rate
+    ):
+        parser.error("--mag-rate-hz must be positive and no greater than --rate")
 
     rng = np.random.default_rng(args.seed)
     timing_rng = np.random.default_rng(args.seed ^ 0xA34A91)
     heading_rng = np.random.default_rng(args.seed ^ 0x5EAD1A6)
+    gps_rng = np.random.default_rng(args.seed ^ 0x6A5A1D)
     time_s, roll_deg, pitch_deg, yaw_deg = generate_motion(args.duration, args.rate, args.motion)
     acceleration_ned = np.zeros((len(time_s), 3), dtype=np.float64)
     velocity_ned = np.zeros_like(acceleration_ned)
@@ -389,9 +480,9 @@ def main() -> None:
         pitch_deg,
         yaw_deg,
         rng,
-        accel_noise_m_s2=0.02,
-        gyro_noise_deg_s=0.05,
-        mag_noise_ut=0.20,
+        accel_noise_m_s2=args.accel_noise_m_s2,
+        gyro_noise_deg_s=args.gyro_noise_deg_s,
+        mag_noise_ut=args.mag_noise_ut,
         acceleration_ned_m_s2=acceleration_ned,
     )
     # Preserve the historical deterministic random stream when injection is disabled.
@@ -430,10 +521,29 @@ def main() -> None:
         if args.motion == "navigation_outage":
             available = (time_s < 6.0) | (time_s >= 11.0)
         gps_updates = ((np.arange(len(time_s)) % gps_period == 0) & available).astype(np.int64)
-        gps_position = position_ned + rng.normal(0.0, 0.5, position_ned.shape)
-        gps_velocity = velocity_ned + rng.normal(0.0, 0.1, velocity_ned.shape)
+        if args.rate_invariant_streams:
+            update_indices = np.flatnonzero(gps_updates)
+            gps_position = position_ned.copy()
+            gps_velocity = velocity_ned.copy()
+            gps_position[update_indices] += gps_rng.normal(
+                0.0, args.gps_position_noise_m, (len(update_indices), 3)
+            )
+            gps_velocity[update_indices] += gps_rng.normal(
+                0.0, args.gps_velocity_noise_m_s, (len(update_indices), 3)
+            )
+        else:
+            gps_position = position_ned + rng.normal(
+                0.0, args.gps_position_noise_m, position_ned.shape
+            )
+            gps_velocity = velocity_ned + rng.normal(
+                0.0, args.gps_velocity_noise_m_s, velocity_ned.shape
+            )
     magnetometer_valid = np.full(len(time_s), int(not args.disable_magnetometer), dtype=np.int64)
-    magnetometer_updates = np.ones(len(time_s), dtype=np.int64)
+    mag_rate_hz = args.rate if args.mag_rate_hz is None else args.mag_rate_hz
+    magnetometer_period = max(1, int(round(args.rate / mag_rate_hz)))
+    magnetometer_updates = (
+        np.arange(len(time_s)) % magnetometer_period == 0
+    ).astype(np.int64)
     heading_valid = np.zeros(len(time_s), dtype=np.int64)
     heading_updates = np.zeros(len(time_s), dtype=np.int64)
     heading_rad = np.zeros(len(time_s), dtype=np.float64)
@@ -487,6 +597,13 @@ def main() -> None:
                     "accel_bias_std_m_s2": args.accel_bias_std_m_s2,
                     "gyro_bias_std_deg_s": args.gyro_bias_std_deg_s,
                     "timestamp_jitter_std_us": args.timestamp_jitter_std_us,
+                    "accel_noise_m_s2": args.accel_noise_m_s2,
+                    "gyro_noise_deg_s": args.gyro_noise_deg_s,
+                    "mag_noise_ut": args.mag_noise_ut,
+                    "mag_rate_hz": mag_rate_hz,
+                    "gps_position_noise_m": args.gps_position_noise_m,
+                    "gps_velocity_noise_m_s": args.gps_velocity_noise_m_s,
+                    "rate_invariant_streams": args.rate_invariant_streams,
                     "timestamp_interval_min_us": int(np.min(np.diff(timestamp_us))),
                     "timestamp_interval_max_us": int(np.max(np.diff(timestamp_us))),
                     "trusted_heading_updates": int(np.count_nonzero(heading_updates)),

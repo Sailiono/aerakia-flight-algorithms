@@ -17,12 +17,25 @@ typedef struct {
     float maximum_aiding_age_s;
     /** Maximum time without accepted horizontal position/velocity constraint before invalidation. */
     float maximum_horizontal_dead_reckoning_s;
+    /** Maximum time without an accepted magnetic/trusted heading observation. */
+    float maximum_heading_dead_reckoning_s;
+    /** Independent vertical position/velocity validity timeouts. */
+    float maximum_vertical_position_dead_reckoning_s;
+    float maximum_vertical_velocity_dead_reckoning_s;
     bool fuse_magnetometer;
     bool gate_magnetometer;
     float magnetometer_variance;
     float magnetic_reference_ned[3];
     AerakiaMagGateConfig magnetic_gate;
     uint32_t navigation_recovery_rejection_limit;
+    uint32_t navigation_recovery_min_consistent_observations;
+    uint32_t navigation_recovery_probationary_acceptances;
+    float recovery_max_position_variance_m2;
+    float recovery_max_velocity_variance_m2_s2;
+    float recovery_position_consistency_m;
+    float recovery_velocity_consistency_m_s;
+    float recovery_max_position_correction_m;
+    float recovery_max_velocity_correction_m_s;
     float recovery_position_variance_floor_m2;
     float recovery_velocity_variance_floor_m2_s2;
     bool enable_static_alignment;
@@ -69,6 +82,20 @@ typedef struct {
     float variance_m2;
 } AerakiaBarometerObservation;
 
+/**
+ * One-shot authorization from the private estimator supervisor.
+ *
+ * The adapter still enforces rejection count, observation consistency, variance, correction
+ * bounds, timestamp binding, and post-reset probation. The application attests only that the
+ * physical source-quality checks outside this hardware-neutral library passed.
+ */
+typedef struct {
+    uint64_t observation_timestamp_us;
+    bool source_quality_verified;
+    float maximum_position_correction_m;
+    float maximum_velocity_correction_m_s;
+} AerakiaNavigationRecoveryAuthorization;
+
 typedef struct {
     AerakiaAttitudeEstimate attitude;
     AerakiaVec3f position_ned_m;
@@ -80,15 +107,21 @@ typedef struct {
     ESKF_InnovResult last_heading_innovation;
     ESKF_InnovResult last_position_innovation;
     ESKF_InnovResult last_velocity_innovation;
+    ESKF_InnovResult last_barometer_innovation;
     bool magnetometer_accepted;
     bool heading_accepted;
     bool position_accepted;
     bool velocity_accepted;
+    bool barometer_accepted;
     bool navigation_recovered;
     uint32_t navigation_recovery_count;
     uint32_t consecutive_navigation_rejections;
     uint32_t consecutive_position_rejections;
     uint32_t consecutive_velocity_rejections;
+    uint32_t recovery_candidate_consistent_observations;
+    bool navigation_recovery_candidate_ready;
+    bool navigation_recovery_probationary;
+    uint32_t navigation_recovery_probation_acceptances;
     bool static_alignment_complete;
     bool static_tilt_alignment_complete;
     bool static_heading_alignment_complete;
@@ -97,9 +130,16 @@ typedef struct {
     uint32_t static_alignment_samples;
     uint32_t zero_velocity_update_count;
     float horizontal_aiding_age_s;
+    float heading_aiding_age_s;
+    float vertical_position_aiding_age_s;
+    float vertical_velocity_aiding_age_s;
     bool horizontal_position_valid;
     bool horizontal_velocity_valid;
     bool horizontal_navigation_valid;
+    bool heading_valid;
+    bool vertical_position_valid;
+    bool vertical_velocity_valid;
+    bool vertical_navigation_valid;
     bool healthy;
 } AerakiaNavigationEstimate;
 
@@ -114,20 +154,28 @@ typedef struct {
     uint64_t last_heading_timestamp_us;
     uint64_t last_barometer_timestamp_us;
     uint64_t last_horizontal_aiding_timestamp_us;
+    uint64_t last_heading_aiding_timestamp_us;
+    uint64_t last_vertical_position_aiding_timestamp_us;
+    uint64_t last_vertical_velocity_aiding_timestamp_us;
     uint32_t rejected_samples;
     ESKF_InnovResult last_magnetometer_innovation;
     ESKF_InnovResult last_heading_innovation;
     ESKF_InnovResult last_position_innovation;
     ESKF_InnovResult last_velocity_innovation;
+    ESKF_InnovResult last_barometer_innovation;
     bool magnetometer_accepted;
     bool heading_accepted;
     bool position_accepted;
     bool velocity_accepted;
+    bool barometer_accepted;
     bool navigation_recovered;
     uint32_t navigation_recovery_count;
     uint32_t consecutive_navigation_rejections;
     uint32_t consecutive_position_rejections;
     uint32_t consecutive_velocity_rejections;
+    AerakiaGpsObservation recovery_candidate;
+    uint32_t recovery_candidate_consistent_observations;
+    uint32_t navigation_recovery_probation_acceptances;
     double static_acceleration_sum[3];
     double static_angular_rate_sum[3];
     double static_magnetic_sum[3];
@@ -149,6 +197,11 @@ typedef struct {
     bool has_heading_timestamp;
     bool has_barometer_timestamp;
     bool has_horizontal_aiding_timestamp;
+    bool has_heading_aiding_timestamp;
+    bool has_vertical_position_aiding_timestamp;
+    bool has_vertical_velocity_aiding_timestamp;
+    bool has_recovery_candidate;
+    bool navigation_recovery_probationary;
     bool horizontal_position_initialized;
 } AerakiaEskf;
 
@@ -198,6 +251,15 @@ void aerakia_eskf_update_gps(
 AerakiaStatus aerakia_eskf_update_gps_observation(
     AerakiaEskf *filter,
     const AerakiaGpsObservation *observation
+);
+
+/**
+ * Apply a bounded, explicitly authorized re-anchor to the latest consistent rejected GNSS pair.
+ * The resulting navigation output remains invalid until probationary accepted updates complete.
+ */
+AerakiaStatus aerakia_eskf_authorize_navigation_recovery(
+    AerakiaEskf *filter,
+    const AerakiaNavigationRecoveryAuthorization *authorization
 );
 
 /** Fuse timestamped position when a receiver does not publish valid velocity. */

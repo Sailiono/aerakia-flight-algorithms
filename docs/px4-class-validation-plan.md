@@ -21,6 +21,11 @@ Long-duration IMU-only horizontal navigation, global ECEF navigation, optical fl
 and full PX4 feature parity are not part of the first claim. They can become later capability
 increments only after their sensors, use cases, and acceptance evidence are defined.
 
+Within the eVTOL family, hover/VTOL, transition, and fixed-wing cruise are separate validation and
+configuration profiles. The public state model and source remain common; profile differences must
+be justified by sensor/vibration/dynamics evidence and frozen before their validation set. See
+[FCOne/eVTOL target profiles and repository flow](vehicle-target-and-repository-flow.md).
+
 ## Why two comparison tracks are mandatory
 
 | Track | Question answered | Required reference | What it cannot prove |

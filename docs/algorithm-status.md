@@ -21,14 +21,14 @@ flight safety.
 
 | Area | Evidence | Status |
 | --- | --- | --- |
-| Error-state math | 15-dimensional error state, quaternion injection/reset Jacobian, Joseph-form scalar and vector measurement updates | Implemented and unit tested |
+| Error-state math | 15-dimensional error state, exact discrete SO(3) attitude transition, position `dt²/2` coupling, quaternion injection/reset Jacobian, and Joseph-form scalar/vector updates | 10,000-case F/Q/H campaigns pass; maximum F/H errors are below `1.7e-7` / `2.2e-8` |
 | Covariance health | Long mixed predict/update sequence checked for finite, symmetric, positive-semidefinite covariance | Passing |
-| Measurement integrity | NIS gates, latched magnetic-disturbance rejection, recovery confirmation, navigation recovery supervision | Passing deterministic regressions |
+| Measurement integrity | Dimension-aware NIS gates, latched magnetic rejection, and source-quality/multi-sample/bounded/application-authorized probationary navigation recovery | Passing deterministic regressions; standalone observations cannot force re-anchor |
 | Heading semantics | Magnetometer, trusted heading, GNSS course, and PX4 GSF are separate paths; course is never silently treated as body yaw | Implemented |
 | Trusted-heading fault behavior | Cold-start completion, normal fusion, four-second dropout, two 90° outliers, rejection, geometry validity, and recovery with magnetometer disabled | Passing deterministic synthetic and Vicon-derived fault gates; INSANE physical dual-RTK path passes 1,378 updates, but shares its yaw reference |
 | Online IMU bias behavior | Static gyro initialization plus motion/GNSS-aided accelerometer-bias convergence, with truth error and settling time reported separately | Passing deterministic multi-axis synthetic gate; single-pose accelerometer observability limit and hardware thermal behavior remain explicit |
 | Cold-start alignment | Static accelerometer tilt, magnetic heading with explicit declination, IMU-bias initialization, and covariance reset at the new linearization point; no PX4 attitude seed | Passing unit/noisy synthetic checks and direct-Vicon tilt (0.862° post-alignment RMSE); external yaw truth still pending |
-| Navigation consistency | GNSS position/velocity NIS and posterior 6-state navigation NEES through a five-second outage and reacquisition | 20-seed measurement-noise baseline and constant-bias/timestamp-jitter extension pass with zero numerical/recovery failures; thermal and transport faults pending |
+| Navigation consistency | GNSS position/velocity NIS and posterior 6-state navigation NEES through a five-second outage and reacquisition | 1,000 independent seeds pass distribution, hard-envelope, and aggregate-consistency gates with zero numerical/recovery failures; thermal effects remain hardware evidence |
 | EuRoC public replay | 36,381-sample Leica/IMU `MH_01_easy` and 20,932-sample direct-pose `V1_03_difficult`; raw, cold-start, derived-heading, and reference-bias tracks retained | Navigation NIS/NEES consistent; direct Vicon pose passes high-dynamic replay; derived heading is not a recorded heading sensor |
 | Blackbird public replay | 26,995 recorded IMU samples over 270.1 s against independent motion capture; common time base and published body/IMU extrinsic are checked before conversion | ESKF 1.573° geodesic / 1.131° tilt RMSE, 100% health, zero recovery; retained Mahony drift proves fallback must be bounded |
 | UrbanNav public replay | 314,185 recorded IMU samples, 655 checksum/quality-screened F9P positions, SPAN truth, and one 131 s recorded outage | Position-only API and recovery pass with 100% numerical health; horizontal navigation is valid for 83.90% of samples and explicitly expires after five unaided seconds; 6.52 m nominal aided RMSE and first-update reacquisition are retained alongside severe unaided drift and inconsistent NIS/NEES |
@@ -37,7 +37,7 @@ flight safety.
 | Host regression | Strict C99 warnings-as-errors build, public API tests, deterministic synthetic fault suite | Passing reviewed thresholds |
 | Input/transport integrity | Exhaustive required-IMU non-finite checks; timestamp order/gap behavior; optional-mag isolation; timestamped GNSS/heading/barometer freshness and recovery | Passing 100 seeds, 1,020,000 IMU attempts, 2,100 aiding attempts, and burst lengths through 100 with zero invariant/health failures |
 | Estimator supervision | ESKF-primary startup, hard-invalid immediate response, soft observability hysteresis, continuity-gated and time-bounded Mahony attitude-only degradation, navigation invalidation, continuity-gated recovery, and transition evidence | Passing executable public contract; private FCOne policy and actuator interaction remain open |
-| Output qualification | Numerical health is distinct from horizontal position/velocity validity; only accepted position/velocity/ZUPT observations refresh the configurable dead-reckoning interval | Passing public API and UrbanNav outage gates; FCOne must consume the validity fields rather than infer validity from finite values |
+| Output qualification | Numerical health is distinct from horizontal, heading, vertical-position, and vertical-velocity validity; only accepted applicable constraints refresh each age | Passing public API and UrbanNav outage gates; startup alignment is not treated as continuing observability |
 | FCOne-neutral adapter | Physical timestamp preservation, FRD sentinel axes, g/deg/s/gauss conversion, independent validity bits, missing data, duplicate/gap recovery, and future/stale aiding | Passing executable mock-publication contract; exact v2 message and scheduler remain open |
 | Private replay | Sanitized relative GNSS, reset events, GSF diagnostics, and native C replay across the selected ULog suite | Operational; PX4 remains an engineering reference |
 
@@ -75,11 +75,11 @@ This document is an engineering maturity statement, not an airworthiness claim.
 
 - Controlled synthetic scenarios: ESKF full-attitude RMSE is 0.33–0.89° across clean motion,
   magnetic spikes/bias, navigation outage, trusted-heading recovery, and online-bias excitation.
-- Independent-reference EuRoC raw IMU: tilt RMSE is 0.713° on `MH_01_easy`, 1.047° on
-  `V1_03_difficult`, and 0.862° after Vicon-declared cold-start tilt alignment.
+- Independent-reference EuRoC raw IMU: tilt RMSE is 0.691° on `MH_01_easy`, 1.041° on
+  `V1_03_difficult`, and 0.860° after Vicon-declared cold-start tilt alignment.
 - With a 10 Hz, 1°-noise heading stream derived from Vicon truth, the V1_03 cold start completes in
-  1.0 s and post-alignment geodesic attitude RMSE is 1.498°. On geometry-observable samples yaw RMSE
-  is 1.130°; two injected 90° observations are both rejected. These are real-motion software-path
+  1.0 s and post-alignment geodesic attitude RMSE is 1.453°. On geometry-observable samples yaw RMSE
+  is 1.111°; two injected 90° observations are both rejected. These are real-motion software-path
   results, not recorded heading-sensor accuracy.
 - On INSANE `outdoor_1`, 39,174 recorded UAV IMU samples and 1,378 physical dual-RTK heading
   observations produce 2.018° yaw RMSE with reference initialization. Independent cold start reaches
@@ -92,12 +92,12 @@ This document is an engineering maturity statement, not an airworthiness claim.
   attitude RMSE is 1.573°, tilt RMSE 1.131°, and Euler-yaw RMSE 1.069°. Tilt-only cold start
   completes in 1.009 s with 1.131° post-alignment tilt RMSE. No heading alignment is claimed because
   the package has no magnetometer or trusted-heading observation.
-- EuRoC full-attitude raw-IMU RMSE is 8.804° and 4.102°. This is dominated by yaw drift from the
+- EuRoC full-attitude raw-IMU RMSE is 8.406° and 4.088°. This is dominated by yaw drift from the
   recorded approximately 0.08 rad/s z-gyro bias with no magnetometer or trusted heading; it is an
   observed limitation, not an acceptable heading-accuracy claim.
-- Reference-bias-corrected EuRoC diagnostic tracks reach 3.254° and 2.474° full-attitude RMSE, but
+- Reference-bias-corrected EuRoC diagnostic tracks reach 2.974° and 2.572° full-attitude RMSE, but
   batch truth-bias subtraction is not online estimation and is never reported as flight accuracy.
-- EuRoC position RMSE is 0.131–0.137 m and velocity RMSE 0.082–0.091 m/s with deterministic
+- EuRoC position RMSE is 0.123–0.128 m and velocity RMSE 0.082–0.089 m/s with deterministic
   synthetic 10 Hz GNSS generated from external reference truth. These values validate fusion math,
   covariance, and replay determinism—not a physical GNSS receiver.
 - Blackbird position/velocity RMSE is 0.123 m / 0.082 m/s with the same declared synthetic-GNSS
@@ -132,9 +132,9 @@ This document is an engineering maturity statement, not an airworthiness claim.
   Mahony full-attitude RMSE without magnetometer/heading; even static reference-bias subtraction
   leaves 10.13°. Therefore Mahony is classified as continuity-gated, finite-duration degraded
   attitude—not a second long-duration navigation solution.
-- Estimation consistency is currently reasonable: EuRoC navigation NEES means are 5.19–5.70 for a
-  six-dimensional expected mean of 6; position NIS is 3.07–3.08 for expected mean 3. Velocity NIS
-  at 2.43–2.58 is mildly conservative rather than overconfident.
+- Estimation consistency is currently reasonable: EuRoC navigation NEES means are 4.94–5.19 for a
+  six-dimensional expected mean of 6; position NIS is 3.06–3.08 for expected mean 3. Velocity NIS
+  at 2.43–2.57 is mildly conservative rather than overconfident.
 - UrbanNav exposes a different consistency failure that synthetic paired GNSS did not: position
   NIS means 0.011/0.339 are very conservative while six-state navigation NEES means 12.91/16.27 are
   overconfident. The position-only stream leaves velocity weakly observed, so this evidence blocks
@@ -148,7 +148,7 @@ This document is an engineering maturity statement, not an airworthiness claim.
   FCOne v2 or controlled public data.
 - The Vicon heading stress track explicitly excludes 4,582 of 20,932 samples where the body-forward
   horizontal projection is below 0.25. During the controlled observable outage, maximum yaw error is
-  3.943°; recovery takes 0.995 s and post-recovery yaw RMSE is 1.224°.
+  3.950°; recovery takes 0.995 s and post-recovery yaw RMSE is 1.190°.
 - The INSANE physical dual-RTK track adds 199.7 s of recorded UAV motion and maintains 100% health;
   97.10% of normal updates are accepted with reference initialization and 91.15% after cold start.
   Natural data has no declared heading faults, so outlier rejection remains proven by the separate
@@ -162,12 +162,12 @@ This document is an engineering maturity statement, not an airworthiness claim.
 
 | Scope | Current judgment | Reason |
 | --- | ---: | --- |
-| Portable algorithm/math implementation | 84–88% | Core equations, covariance handling, independent position/velocity aiding, cold start, and recovery are mature; real-receiver covariance consistency and physical heading truth remain open |
-| Host-side software robustness | 91–94% | Million-attempt malformed/timing campaign, sanitizers, 7.13 million audited PX4 IMU samples, and 1.63 million new native-C physical replays pass, including fixed-wing clipping and aerial GPS/RTK schemas |
-| Heading robustness | 68–72% | Real-motion fault/recovery and physical dual-RTK input now pass; independent physical yaw truth and GNSS-velocity GSF fallback remain open |
-| Navigation robustness | 68–73% | Recorded outage/reacquisition, fail-closed no-aiding validity, long fixed-wing replay, and aerial position/RTK reference pass; high real-log NIS, missing physical receiver-velocity input, and delay modeling remain open |
-| FCOne integration readiness | 75–80% | Neutral adapter, independent aiding, and bounded-fallback supervisor contracts are executable; exact private messages, scheduling, target precision, and resource use are unverified |
-| Flight-main-estimator readiness | 50–60% | Suitable for shadow mode and bench/HIL preparation, not justified as the sole flight estimator yet |
+| Portable algorithm/math implementation | 89–92% | Exact SO(3) F and all heading H gates, dimension-aware NIS, supervised recovery, covariance handling, cold start, and 1,000-seed consistency now pass; delayed fusion and physical heading evidence remain open |
+| Host-side software robustness | 94–96% | Million-attempt malformed/timing campaign, 1,000 independent navigation trials, sanitizers, 7.13 million audited PX4 IMU samples, and 1.63 million native-C physical replays pass |
+| Heading robustness | 70–74% | Continuous validity, real-motion fault/recovery, and physical dual-RTK input pass; independent physical yaw truth and GNSS-velocity GSF fallback remain open |
+| Navigation robustness | 73–78% | Safe recovery authorization, probation, recorded outage/reacquisition, validity expiry, fixed-wing replay, and aerial position reference pass; real delay/receiver-velocity modeling remain open |
+| FCOne integration readiness | 78–82% | Neutral adapter, independent aiding/validity, and bounded supervisor contracts are executable; exact redundant-sensor messages, scheduling, target precision, and resources are unverified |
+| Flight-main-estimator readiness | 55–65% | Suitable for shadow mode and bench/HIL preparation; independent heading, target timing, sensor switching, delay compensation, and bounded flight evidence still block sole-estimator authority |
 
 The highest-value non-hardware work remaining is a recorded receiver position-plus-Doppler-velocity
 track with independent truth, a second independently scored physical-heading track, delay/time-

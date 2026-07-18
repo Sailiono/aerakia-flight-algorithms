@@ -15,26 +15,18 @@
 
 #include <aerakia/eskf.h>
 #include "eskf_math.h"
+#include "eskf_models.h"
 #include <string.h>
 
 /* ============================================================================
  * Innovation Gating Thresholds (Integrity Monitoring)
  * ============================================================================ */
 
-/** Magnetometer innovation gate (3-sigma) */
-#define ESKF_GATE_MAG       3.0
+/** 99.7300204% chi-square limit for a scalar observation (equivalent to 3 sigma). */
+#define ESKF_NIS_LIMIT_1D_3SIGMA 9.0
 
-/** GPS position innovation gate (3-sigma) */
-#define ESKF_GATE_POS       3.0
-
-/** GPS velocity innovation gate (3-sigma) */
-#define ESKF_GATE_VEL       3.0
-
-/** Trusted heading innovation gate (3-sigma) */
-#define ESKF_GATE_HEADING   3.0
-
-/** Barometer innovation gate (3-sigma) */
-#define ESKF_GATE_BARO      3.0
+/** 99.7300204% chi-square limit for a three-dimensional observation. */
+#define ESKF_NIS_LIMIT_3D_3SIGMA 14.1564136091267
 
 /* ============================================================================
  * Private Helper Functions
@@ -153,7 +145,7 @@ static void _quaternion_from_euler(eskf_float_t roll,
  * Implements standard Kalman update equations with innovation test:
  *   S = H * P * H^T + R
  *   NIS = z^T * S^{-1} * z  (Normalized Innovation Squared)
- *   If NIS > gate^2: REJECT update
+ *   If NIS > nis_limit: REJECT update
  *   Else: K = P * H^T * S^{-1}, dx = K * z,
  *         P = (I-KH)P(I-KH)^T + KRK^T (Joseph form)
  *
@@ -161,7 +153,7 @@ static void _quaternion_from_euler(eskf_float_t roll,
  * @param z       Residual vector (3x1)
  * @param H       Jacobian matrix (3x15)
  * @param R       Measurement noise covariance (3x3)
- * @param gate    Innovation gate threshold (sigma), 0 = disable gating
+ * @param nis_limit Innovation NIS/chi-square limit, 0 = disable gating
  * @param result  Output: Innovation test result (can be NULL)
  * @return        true if update was accepted and applied
  */
@@ -169,7 +161,7 @@ static bool _measurement_update_3d(ESKF_Handle *h,
                                     const eskf_float_t z[3],
                                     eskf_float_t H[3][15],
                                     eskf_float_t R[3][3],
-                                    eskf_float_t gate,
+                                    eskf_float_t nis_limit,
                                     ESKF_InnovResult *result) {
     if (!h) return false;
 
@@ -204,7 +196,7 @@ static bool _measurement_update_3d(ESKF_Handle *h,
     }
 
     /* --- 4. Innovation Gating (NIS Test) --- */
-    if (gate > 0.0 || result != NULL) {
+    if (nis_limit > 0.0 || result != NULL) {
         /* Compute NIS = z^T * S_inv * z (Mahalanobis distance squared) */
         eskf_float_t S_inv_z[3];
         for (int i = 0; i < 3; i++) {
@@ -221,12 +213,12 @@ static bool _measurement_update_3d(ESKF_Handle *h,
             result->innov_var[1] = S[1][1];
             result->innov_var[2] = S[2][2];
             result->nis = (float)nis;
-            result->test_ratio = (gate > 0.0) ? (nis / (gate * gate)) : 0.0;
-            result->accepted = (gate <= 0.0) || (nis <= gate * gate);
+            result->test_ratio = (nis_limit > 0.0) ? (nis / nis_limit) : 0.0;
+            result->accepted = (nis_limit <= 0.0) || (nis <= nis_limit);
         }
 
         /* Reject update if innovation exceeds gate */
-        if (gate > 0.0 && nis > gate * gate) {
+        if (nis_limit > 0.0 && nis > nis_limit) {
             return false;  /* Measurement rejected by gate */
         }
     }
@@ -307,13 +299,13 @@ static bool _measurement_update_3d(ESKF_Handle *h,
  * @brief Efficient Kalman measurement update for 1D (scalar) observations with Gating
  *
  * Optimized for scalar measurements like barometer.
- * NIS = z^2 / S, test against gate^2
+ * NIS = z^2 / S, test against a one-dimensional chi-square limit.
  *
  * @param h       Pointer to filter handle
  * @param z       Residual (scalar)
  * @param H       Jacobian row vector (1x15)
  * @param R       Measurement noise variance (scalar)
- * @param gate    Innovation gate threshold (sigma), 0 = disable gating
+ * @param nis_limit Innovation NIS/chi-square limit, 0 = disable gating
  * @param result  Output: Innovation test result (can be NULL)
  * @return        true if update was accepted and applied
  */
@@ -321,7 +313,7 @@ static bool _measurement_update_1d(ESKF_Handle *h,
                                     eskf_float_t z,
                                     const eskf_float_t H[15],
                                     eskf_float_t R,
-                                    eskf_float_t gate,
+                                    eskf_float_t nis_limit,
                                     ESKF_InnovResult *result) {
     if (!h) return false;
 
@@ -347,7 +339,7 @@ static bool _measurement_update_1d(ESKF_Handle *h,
     }
 
     /* --- 4. Innovation Gating (NIS Test for scalar) --- */
-    if (gate > 0.0 || result != NULL) {
+    if (nis_limit > 0.0 || result != NULL) {
         /* Compute NIS = z^2 / S (1-DOF chi-squared) */
         eskf_float_t nis = (z * z) / S;
 
@@ -360,12 +352,12 @@ static bool _measurement_update_1d(ESKF_Handle *h,
             result->innov_var[1] = 0.0;
             result->innov_var[2] = 0.0;
             result->nis = (float)nis;
-            result->test_ratio = (gate > 0.0) ? (nis / (gate * gate)) : 0.0;
-            result->accepted = (gate <= 0.0) || (nis <= gate * gate);
+            result->test_ratio = (nis_limit > 0.0) ? (nis / nis_limit) : 0.0;
+            result->accepted = (nis_limit <= 0.0) || (nis <= nis_limit);
         }
 
         /* Reject update if innovation exceeds gate */
-        if (gate > 0.0 && nis > gate * gate) {
+        if (nis_limit > 0.0 && nis > nis_limit) {
             return false;  /* Measurement rejected by gate */
         }
     }
@@ -542,6 +534,10 @@ void eskf_predict(ESKF_Handle *h,
     eskf_float_t acc_total[3];
     eskf_vec3_add(acc_earth, h->gravity, acc_total);
 
+    /* Linearize at the pre-integration state used by the nominal update. */
+    eskf_float_t F[15][15];
+    eskf_model_transition(h->state.q, acc_correct, gyr_correct, dt, F);
+
     /* ========================================
      * Step 5: Integrate Nominal State
      * ======================================== */
@@ -572,64 +568,6 @@ void eskf_predict(ESKF_Handle *h,
     eskf_quat_copy(q_new, h->state.q);
 
     /* ========================================
-     * Step 6: Build State Transition Jacobian F (15x15)
-     *
-     * Error state order: dθ(0-2), dv(3-5), dp(6-8), dab(9-11), dgb(12-14)
-     *
-     * F ≈ I + Fx*dt where Fx is the continuous-time Jacobian:
-     *
-     *      |  -[ω]×   0    0    0   -I  |  dθ
-     *      | -R[a]×   0    0   -R    0  |  dv
-     * Fx = |    0     I    0    0    0  |  dp
-     *      |    0     0    0    0    0  |  dab
-     *      |    0     0    0    0    0  |  dgb
-     *
-     * For discrete time: F = I + Fx*dt (first-order approximation)
-     * ======================================== */
-    eskf_float_t F[15][15];
-    eskf_mat15_identity(F);
-
-    /* F_θθ = I - [ω]× * dt ≈ exp(-[ω]×*dt) for small angles */
-    /* [ω]× is skew(gyr_correct) */
-    eskf_float_t skew_w[3][3];
-    eskf_mat3_skew(gyr_correct, skew_w);
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 3; j++) {
-            F[i][j] -= skew_w[i][j] * dt;
-        }
-    }
-
-    /* F_θ_gb = -I * dt (gyro bias affects attitude rate) */
-    F[0][12] = -dt;
-    F[1][13] = -dt;
-    F[2][14] = -dt;
-
-    /* F_v_θ = -R * [acc_correct]× * dt (attitude error affects rotated accel) */
-    eskf_float_t skew_a[3][3];
-    eskf_mat3_skew(acc_correct, skew_a);
-
-    eskf_float_t R_skew_a[3][3];
-    eskf_mat3_mul_mat3(R, skew_a, R_skew_a);
-
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 3; j++) {
-            F[3 + i][j] = -R_skew_a[i][j] * dt;
-        }
-    }
-
-    /* F_v_ab = -R * dt (accel bias affects velocity through rotation) */
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 3; j++) {
-            F[3 + i][9 + j] = -R[i][j] * dt;
-        }
-    }
-
-    /* F_p_v = I * dt (velocity affects position) */
-    F[6][3] = dt;
-    F[7][4] = dt;
-    F[8][5] = dt;
-
-    /* ========================================
      * Step 7: Build Process Noise Q (15x15)
      *
      * First-order discretization of continuous white-noise densities:
@@ -645,28 +583,7 @@ void eskf_predict(ESKF_Handle *h,
      * on sample rate and become overconfident at high IMU rates.
      * ======================================== */
     eskf_float_t Q[15][15];
-    eskf_mat15_zero(Q);
-
-    eskf_float_t sigma_acc_squared = h->cfg.sigma_acc * h->cfg.sigma_acc;
-    eskf_float_t q_theta = h->cfg.sigma_gyr * h->cfg.sigma_gyr * dt;
-    eskf_float_t q_v = sigma_acc_squared * dt;
-    eskf_float_t q_vp = sigma_acc_squared * dt * dt * 0.5;
-    eskf_float_t q_p = sigma_acc_squared * dt * dt * dt / 3.0;
-    eskf_float_t q_ab = h->cfg.sigma_acc_bias * h->cfg.sigma_acc_bias * dt;
-    eskf_float_t q_gb = h->cfg.sigma_gyr_bias * h->cfg.sigma_gyr_bias * dt;
-
-    /* Q_θ */
-    Q[0][0] = q_theta; Q[1][1] = q_theta; Q[2][2] = q_theta;
-    /* Q_v */
-    Q[3][3] = q_v; Q[4][4] = q_v; Q[5][5] = q_v;
-    /* Integrated acceleration noise in position and velocity-position cross terms. */
-    Q[6][6] = q_p; Q[7][7] = q_p; Q[8][8] = q_p;
-    Q[3][6] = q_vp; Q[4][7] = q_vp; Q[5][8] = q_vp;
-    Q[6][3] = q_vp; Q[7][4] = q_vp; Q[8][5] = q_vp;
-    /* Q_ab */
-    Q[9][9] = q_ab; Q[10][10] = q_ab; Q[11][11] = q_ab;
-    /* Q_gb */
-    Q[12][12] = q_gb; Q[13][13] = q_gb; Q[14][14] = q_gb;
+    eskf_model_process_noise(&h->cfg, dt, Q);
 
     /* ========================================
      * Step 8: Propagate Covariance
@@ -706,7 +623,7 @@ void eskf_update_position(ESKF_Handle *h,
     R[1][1] = R_pos;
     R[2][2] = R_pos;
 
-    _measurement_update_3d(h, z, H, R, ESKF_GATE_POS, result);
+    _measurement_update_3d(h, z, H, R, ESKF_NIS_LIMIT_3D_3SIGMA, result);
 }
 
 void eskf_update_velocity(ESKF_Handle *h,
@@ -727,7 +644,7 @@ void eskf_update_velocity(ESKF_Handle *h,
     R[0][0] = R_velocity;
     R[1][1] = R_velocity;
     R[2][2] = R_velocity;
-    _measurement_update_3d(h, z, H, R, ESKF_GATE_VEL, result);
+    _measurement_update_3d(h, z, H, R, ESKF_NIS_LIMIT_3D_3SIGMA, result);
 }
 
 void eskf_update_mag(ESKF_Handle *h,
@@ -741,28 +658,16 @@ void eskf_update_mag(ESKF_Handle *h,
     eskf_vec3_copy(mag_m, mag_norm);
     if (eskf_vec3_normalize(mag_norm) < ESKF_EPSILON) return;
 
-    /* Rotate the measured field into NED. Only its horizontal heading is used. */
-    eskf_float_t R_nb[3][3];
-    eskf_quat_to_rot_mat3(h->state.q, R_nb);
     {
-        eskf_float_t measured_ned[3];
-        eskf_float_t horizontal_measured;
-        eskf_float_t horizontal_reference;
         eskf_float_t residual;
         eskf_float_t H[15];
-        eskf_mat3_mul_vec3(R_nb, mag_norm, measured_ned);
-        horizontal_measured = hypot(measured_ned[0], measured_ned[1]);
-        horizontal_reference = hypot(h->mag_ref[0], h->mag_ref[1]);
-        if (horizontal_measured < ESKF_EPSILON || horizontal_reference < ESKF_EPSILON) return;
-        residual = _wrap_pi(
-            atan2(h->mag_ref[1], h->mag_ref[0])
-            - atan2(measured_ned[1], measured_ned[0])
-        );
         memset(H, 0, sizeof(H));
-        H[ESKF_IDX_DTHETA + 0] = R_nb[2][0];
-        H[ESKF_IDX_DTHETA + 1] = R_nb[2][1];
-        H[ESKF_IDX_DTHETA + 2] = R_nb[2][2];
-        _measurement_update_1d(h, residual, H, R_mag, ESKF_GATE_MAG, result);
+        if (!eskf_model_magnetic_heading(
+                h->state.q, mag_norm, h->mag_ref,
+                &residual, &H[ESKF_IDX_DTHETA])) return;
+        _measurement_update_1d(
+            h, residual, H, R_mag, ESKF_NIS_LIMIT_1D_3SIGMA, result
+        );
     }
 }
 
@@ -770,33 +675,20 @@ void eskf_update_heading(ESKF_Handle *h,
                          eskf_float_t heading_ned_rad,
                          eskf_float_t R_heading,
                          ESKF_InnovResult *result) {
-    eskf_float_t R_nb[3][3];
     eskf_float_t current_heading;
-    eskf_float_t horizontal_squared;
     eskf_float_t H[15];
     if (result != NULL) memset(result, 0, sizeof(*result));
     if (!h || !h->initialized || !isfinite(heading_ned_rad) || R_heading <= 0.0) return;
 
-    eskf_quat_to_rot_mat3(h->state.q, R_nb);
-    horizontal_squared = R_nb[0][0] * R_nb[0][0] + R_nb[1][0] * R_nb[1][0];
-    /* Body-forward heading is undefined when the forward axis is vertical. */
-    if (horizontal_squared < 1.0e-4) return;
-    current_heading = atan2(R_nb[1][0], R_nb[0][0]);
     memset(H, 0, sizeof(H));
-    /* Constrain the update to navigation-frame down/yaw. For the right-multiplicative
-     * attitude error this direction is R_nb^T * down, i.e. the third row of R_nb. This is
-     * intentionally not the unconstrained Euler-yaw derivative: the trusted-heading path
-     * must not use one scalar observation to alter the independently observed tilt.
-     */
-    H[ESKF_IDX_DTHETA + 0] = R_nb[2][0];
-    H[ESKF_IDX_DTHETA + 1] = R_nb[2][1];
-    H[ESKF_IDX_DTHETA + 2] = R_nb[2][2];
+    if (!eskf_model_heading(
+            h->state.q, &current_heading, &H[ESKF_IDX_DTHETA])) return;
     _measurement_update_1d(
         h,
         _wrap_pi(heading_ned_rad - current_heading),
         H,
         R_heading,
-        ESKF_GATE_HEADING,
+        ESKF_NIS_LIMIT_1D_3SIGMA,
         result
     );
 }
@@ -818,7 +710,7 @@ void eskf_update_baro(ESKF_Handle *h,
     memset(H, 0, sizeof(H));
     H[ESKF_IDX_DP + 2] = 1.0;  /* Index 8 */
 
-    _measurement_update_1d(h, z, H, R_baro, ESKF_GATE_BARO, result);
+    _measurement_update_1d(h, z, H, R_baro, ESKF_NIS_LIMIT_1D_3SIGMA, result);
 }
 
 void eskf_update_static_constraint(ESKF_Handle *h, eskf_float_t R_zupt) {

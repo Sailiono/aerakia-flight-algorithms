@@ -8,6 +8,8 @@ adapter; they do not maintain a second algorithm copy.
 Public branch, history, and tagging rules are defined in the [release policy](release-policy.md).
 The scoped definition of PX4-class capability, evidence grades, anti-overfitting rules, and G0--G4
 acceptance gates are defined in the [PX4-class validation plan](px4-class-validation-plan.md).
+The eVTOL flight-regime profiles and public/private source-of-truth loop are defined in
+[FCOne/eVTOL target profiles and repository flow](vehicle-target-and-repository-flow.md).
 
 ## Current baseline
 
@@ -71,6 +73,23 @@ Before additional dataset volume is promoted as capability evidence:
 These items precede numerical PX4 parity claims. PX4 M0 scaffolding and small independent-truth
 dataset intake may proceed in parallel because they do not require changing the shared estimator
 source.
+
+### G0 closure checkpoint
+
+The audited G0 blockers are now implemented and executable:
+
+- 10,000-case transition/process/heading model campaigns;
+- degree-of-freedom-aware NIS gates;
+- source-quality and supervisor-authorized bounded recovery with probation;
+- continuous horizontal, heading, vertical-position, and vertical-velocity validity;
+- separate public reproducibility and one-way capability gates;
+- repository-wide warnings-as-errors plus sanitizer CI;
+- 32-seed accuracy/consistency invariance at 100/200/400/1000 Hz;
+- 1,000-seed navigation Monte Carlo with empirical P05/P95, hard envelopes, resumable per-seed
+  evidence, and zero health/recovery failures.
+
+G0 closes known mathematical/safety blockers in the declared host model. It does not close G1
+physical-truth volume, G2 same-input PX4 non-inferiority, or G3 FCOne target evidence.
 
 ## P1 — FCOne v2 integration before hardware arrival
 

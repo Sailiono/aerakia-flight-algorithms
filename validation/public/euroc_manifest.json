@@ -86,6 +86,13 @@
         },
         {
           "id": "raw_imu_cold_start_reference_derived_heading",
+          "capability_required": true,
+          "capability_gates": [
+            {"name": "post_alignment_attitude", "metric_path": "cold_start_alignment.post_alignment_attitude_rmse_deg", "maximum": 3.0},
+            {"name": "observable_yaw", "metric_path": "trusted_heading.overall_post_first_accept_yaw_rmse_deg", "maximum": 2.5},
+            {"name": "fault_rejection", "metric_path": "trusted_heading.fault_rejection_ratio", "minimum": 0.99},
+            {"name": "heading_recovery", "metric_path": "trusted_heading.recovery_time_s", "maximum": 2.0}
+          ],
           "converter_args": [
             "--pose-source", "vicon", "--pose-time-offset-us", "40000",
             "--static-hint-duration-s", "1.2", "--synthetic-gnss-rate-hz", "10",
@@ -138,6 +145,13 @@
         },
         {
           "id": "reference_bias_corrected_trusted_attitude_init",
+          "capability_required": true,
+          "capability_gates": [
+            {"name": "attitude_rmse", "metric_path": "algorithms.eskf.overall_attitude_rmse_deg", "maximum": 3.0},
+            {"name": "tilt_rmse", "metric_path": "algorithms.eskf.tilt_rmse_deg", "maximum": 1.5},
+            {"name": "navigation_nees_lower", "metric_path": "eskf_consistency.navigation_nees.mean", "minimum": 1.0},
+            {"name": "navigation_nees_upper", "metric_path": "eskf_consistency.navigation_nees.mean", "maximum": 12.0}
+          ],
           "converter_args": [
             "--pose-source", "vicon", "--pose-time-offset-us", "40000",
             "--synthetic-gnss-rate-hz", "10", "--seed", "7", "--apply-reference-bias"

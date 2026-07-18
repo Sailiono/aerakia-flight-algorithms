@@ -75,7 +75,7 @@ class MonteCarloRunnerTests(unittest.TestCase):
     def test_summary_reports_threshold_failure_seed(self) -> None:
         trial = {
             "seed": 9,
-            "position_rmse_m": 0.80,
+            "position_rmse_m": 1.30,
             "velocity_rmse_m_s": 0.10,
             "attitude_rmse_deg": 0.20,
             "position_nis_mean": 3.0,
@@ -87,6 +87,25 @@ class MonteCarloRunnerTests(unittest.TestCase):
         summary = monte_carlo.summarize_trials([trial])
         self.assertEqual(summary["failures"][0]["seed"], 9)
         self.assertIn("position_rmse_m", summary["failures"][0]["reasons"][0])
+
+    def test_summary_separates_tail_distribution_from_hard_envelope(self) -> None:
+        trials = []
+        for seed in range(20):
+            trials.append({
+                "seed": seed,
+                "position_rmse_m": 0.80,
+                "velocity_rmse_m_s": 0.10,
+                "attitude_rmse_deg": 0.20,
+                "position_nis_mean": 3.0,
+                "velocity_nis_mean": 3.0,
+                "navigation_nees_mean": 6.0,
+                "healthy_ratio": 1.0,
+                "navigation_recoveries": 0,
+            })
+        summary = monte_carlo.summarize_trials(trials)
+        self.assertEqual(summary["failures"], [])
+        self.assertIn("position_rmse_m.p95", summary["distribution_failures"][0])
+        self.assertEqual(summary["consistency_failures"], [])
 
     def test_timestamp_jitter_is_deterministic_and_monotonic(self) -> None:
         import numpy as np
@@ -133,6 +152,33 @@ class MonteCarloRunnerTests(unittest.TestCase):
         self.assertTrue(np.all(np.ptp(acceleration, axis=0) > 0.5))
         self.assertTrue(np.all(np.isfinite(velocity)))
         self.assertTrue(np.all(np.isfinite(position)))
+
+    def test_interval_average_body_rate_reconstructs_reference_quaternions(self) -> None:
+        import numpy as np
+
+        time_s, roll_deg, pitch_deg, yaw_deg = synthetic_generator.generate_motion(
+            4.0, 100.0, "slow_sin"
+        )
+        roll_rad = np.radians(roll_deg)
+        pitch_rad = np.radians(pitch_deg)
+        yaw_rad = np.radians(yaw_deg)
+        reference = synthetic_generator.euler_to_quaternion(
+            roll_rad, pitch_rad, yaw_rad
+        )
+        body_rate = synthetic_generator.interval_average_body_rate(
+            time_s, roll_rad, pitch_rad, yaw_rad
+        )
+        reconstructed = reference[0].copy()
+        for index in range(1, len(time_s)):
+            rotation_vector = body_rate[index] * (time_s[index] - time_s[index - 1])
+            angle = float(np.linalg.norm(rotation_vector))
+            delta = np.empty(4, dtype=np.float64)
+            delta[0] = math.cos(0.5 * angle)
+            delta[1:] = rotation_vector * (math.sin(0.5 * angle) / angle)
+            reconstructed = synthetic_generator.quaternion_multiply(reconstructed, delta)
+            reconstructed /= np.linalg.norm(reconstructed)
+            self.assertAlmostEqual(abs(float(np.dot(reconstructed, reference[index]))), 1.0, 11)
+        np.testing.assert_array_equal(body_rate[0], np.zeros(3))
 
 
 class Px4UlogCorpusAuditTests(unittest.TestCase):
@@ -897,6 +943,22 @@ class PublicDatasetSuiteTests(unittest.TestCase):
         self.assertFalse(public_dataset_suite.compare_value(
             True, False, absolute_tolerance=0.0, relative_tolerance=0.0
         )[0])
+
+    def test_capability_gates_are_one_way_not_baseline_tolerances(self) -> None:
+        self.assertTrue(public_dataset_suite.evaluate_capability_gate(
+            1.2, {"maximum": 1.5}
+        ))
+        self.assertFalse(public_dataset_suite.evaluate_capability_gate(
+            1.6, {"maximum": 1.5}
+        ))
+        self.assertTrue(public_dataset_suite.evaluate_capability_gate(
+            0.99, {"minimum": 0.95}
+        ))
+        self.assertTrue(public_dataset_suite.evaluate_capability_gate(
+            False, {"equals": False}
+        ))
+        with self.assertRaises(ValueError):
+            public_dataset_suite.evaluate_capability_gate(1.0, {})
 
 
 if __name__ == "__main__":

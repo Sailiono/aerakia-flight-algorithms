@@ -473,9 +473,9 @@ static void test_eskf_independent_navigation_observations(void)
                    == AERAKIA_STATUS_OK,
                "position-only observation is accepted without receiver velocity");
     aerakia_eskf_get_estimate(&filter, &estimate);
-    check_true(estimate.navigation_recovered, "rejected position-only aid reanchors position");
-    check_true(near(estimate.position_ned_m.x, 1000.0f, 1.0e-4f),
-               "position-only recovery changes position");
+    check_true(!estimate.navigation_recovered, "position-only aid cannot force a re-anchor");
+    check_true(near(estimate.position_ned_m.x, 0.0f, 1.0e-4f),
+               "rejected position-only aid preserves position");
     check_true(near(estimate.velocity_ned_m_s.x, 0.0f, 1.0e-4f),
                "position-only recovery preserves velocity");
 
@@ -483,11 +483,11 @@ static void test_eskf_independent_navigation_observations(void)
                    == AERAKIA_STATUS_OK,
                "velocity-only observation may share an epoch with position-only aid");
     aerakia_eskf_get_estimate(&filter, &estimate);
-    check_true(estimate.navigation_recovered, "rejected velocity-only aid reanchors velocity");
-    check_true(near(estimate.position_ned_m.x, 1000.0f, 1.0e-4f),
-               "velocity-only recovery preserves position");
-    check_true(near(estimate.velocity_ned_m_s.x, 100.0f, 1.0e-4f),
-               "velocity-only recovery changes velocity");
+    check_true(!estimate.navigation_recovered, "velocity-only aid cannot force a re-anchor");
+    check_true(near(estimate.position_ned_m.x, 0.0f, 1.0e-4f),
+               "rejected velocity-only aid preserves position");
+    check_true(near(estimate.velocity_ned_m_s.x, 0.0f, 1.0e-4f),
+               "rejected velocity-only aid preserves velocity");
 
     before = filter;
     check_true(aerakia_eskf_update_position_observation(&filter, &position)
@@ -533,9 +533,9 @@ static void test_eskf_independent_navigation_observations(void)
     (void)aerakia_eskf_update_position_observation(&filter, &position);
     (void)aerakia_eskf_update_velocity_observation(&filter, &velocity);
     aerakia_eskf_get_estimate(&filter, &estimate);
-    check_true(estimate.navigation_recovered
-                   && estimate.consecutive_velocity_rejections == 0U,
-               "velocity recovery triggers despite interleaved accepted positions");
+    check_true(!estimate.navigation_recovered
+                   && estimate.consecutive_velocity_rejections == 2U,
+               "standalone velocity rejection cannot bypass recovery supervision");
 }
 
 static void test_eskf_horizontal_navigation_validity_timeout(void)
@@ -831,20 +831,78 @@ static void test_eskf_navigation_recovery_and_heading(void)
     AerakiaEskf filter;
     AerakiaEskfConfig config;
     AerakiaNavigationEstimate estimate;
-    AerakiaVec3f position = {1000.0f, 1000.0f, 1000.0f};
-    AerakiaVec3f velocity = {100.0f, 100.0f, 100.0f};
+    AerakiaImuSample sample = level_sample(1000000U);
+    AerakiaGpsObservation observation = {
+        1010000U, {50.0f, 0.0f, 0.0f}, {10.0f, 0.0f, 0.0f}, 1.0f, 1.0f
+    };
+    AerakiaNavigationRecoveryAuthorization authorization = {
+        1010000U, false, 60.0f, 15.0f
+    };
     double initial_q[4] = {cos(0.1), 0.0, 0.0, sin(0.1)};
     float yaw_before;
+    int index;
 
     aerakia_eskf_default_config(&config);
-    config.navigation_recovery_rejection_limit = 2U;
+    config.enable_static_alignment = false;
+    config.navigation_recovery_rejection_limit = 3U;
+    config.navigation_recovery_min_consistent_observations = 3U;
+    config.navigation_recovery_probationary_acceptances = 2U;
     aerakia_eskf_init(&filter, &config, NULL, initial_q);
-    aerakia_eskf_update_gps(&filter, position, velocity, 1.0f, 1.0f);
-    aerakia_eskf_update_gps(&filter, position, velocity, 1.0f, 1.0f);
+    (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
+
+    for (index = 0; index < 3; ++index) {
+        sample.timestamp_us = 1010000U + (uint64_t)index * 10000U;
+        observation.timestamp_us = sample.timestamp_us;
+        observation.position_ned_m.x = 50.0f + 0.10f * (float)index;
+        (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
+        check_true(aerakia_eskf_update_gps_observation(&filter, &observation)
+                       == AERAKIA_STATUS_OK,
+                   "consistent rejected GNSS candidate is recorded");
+    }
     aerakia_eskf_get_estimate(&filter, &estimate);
-    check_true(estimate.navigation_recovered, "paired GPS rejection triggers navigation recovery");
+    check_true(!estimate.navigation_recovered
+                   && estimate.navigation_recovery_candidate_ready
+                   && estimate.recovery_candidate_consistent_observations == 3U,
+               "rejection count alone only makes a supervised recovery candidate ready");
+
+    authorization.observation_timestamp_us = observation.timestamp_us;
+    check_true(aerakia_eskf_authorize_navigation_recovery(&filter, &authorization)
+                   == AERAKIA_STATUS_RECOVERY_REJECTED,
+               "recovery requires explicit physical source-quality attestation");
+    authorization.source_quality_verified = true;
+    authorization.maximum_position_correction_m = 10.0f;
+    check_true(aerakia_eskf_authorize_navigation_recovery(&filter, &authorization)
+                   == AERAKIA_STATUS_RECOVERY_REJECTED,
+               "supervisor authorization cannot exceed the correction bound");
+    authorization.maximum_position_correction_m = 60.0f;
+    check_true(aerakia_eskf_authorize_navigation_recovery(&filter, &authorization)
+                   == AERAKIA_STATUS_OK,
+               "quality-verified consistent bounded recovery is applied once");
+    aerakia_eskf_get_estimate(&filter, &estimate);
+    check_true(estimate.navigation_recovered && estimate.navigation_recovery_probationary,
+               "authorized reset enters probation rather than declaring navigation valid");
     check_true(estimate.navigation_recovery_count == 1U, "navigation recovery is counted");
-    check_true(near(estimate.position_ned_m.x, 1000.0f, 1.0e-4f), "recovery reanchors position");
+    check_true(near(estimate.position_ned_m.x, 50.2f, 1.0e-4f),
+               "authorized recovery uses the timestamp-bound candidate");
+    check_true(!estimate.horizontal_navigation_valid,
+               "probationary recovery does not qualify controller-facing navigation");
+
+    for (index = 0; index < 2; ++index) {
+        sample.timestamp_us += 10000U;
+        observation.timestamp_us = sample.timestamp_us;
+        observation.position_ned_m.x += 0.10f;
+        (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
+        (void)aerakia_eskf_update_gps_observation(&filter, &observation);
+        aerakia_eskf_get_estimate(&filter, &estimate);
+        if (index == 0) {
+            check_true(estimate.navigation_recovery_probationary
+                           && !estimate.horizontal_navigation_valid,
+                       "one accepted post-reset pair is not enough to qualify navigation");
+        }
+    }
+    check_true(!estimate.navigation_recovery_probationary
+                   && estimate.horizontal_navigation_valid,
+               "configured accepted-update dwell exits recovery probation");
 
     yaw_before = fabsf(estimate.attitude.euler_rad.z);
     aerakia_eskf_update_heading(&filter, 0.0f, 0.01f);
@@ -897,6 +955,56 @@ static void test_eskf_cold_start_attitude_alignment(void)
                "cold start recovers yaw");
 }
 
+static void test_eskf_heading_and_vertical_validity(void)
+{
+    AerakiaEskf filter;
+    AerakiaEskfConfig config;
+    AerakiaNavigationEstimate estimate;
+    AerakiaImuSample sample = level_sample(0U);
+    AerakiaHeadingObservation heading = {10000U, 0.0f, 0.01f};
+    AerakiaBarometerObservation barometer = {10000U, 0.0f, 0.25f};
+    AerakiaVelocityObservation velocity = {10000U, {0.0f, 0.0f, 0.0f}, 0.04f};
+
+    aerakia_eskf_default_config(&config);
+    config.enable_static_alignment = false;
+    config.maximum_heading_dead_reckoning_s = 0.05f;
+    config.maximum_vertical_position_dead_reckoning_s = 0.05f;
+    config.maximum_vertical_velocity_dead_reckoning_s = 0.05f;
+    aerakia_eskf_init(&filter, &config, NULL, NULL);
+    (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
+    sample.timestamp_us = 10000U;
+    (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
+    check_true(!estimate.heading_valid && !estimate.vertical_position_valid
+                   && !estimate.vertical_velocity_valid
+                   && isinf(estimate.heading_aiding_age_s)
+                   && isinf(estimate.vertical_position_aiding_age_s)
+                   && isinf(estimate.vertical_velocity_aiding_age_s),
+               "heading and vertical outputs start invalid without accepted aiding");
+
+    (void)aerakia_eskf_update_heading_observation(&filter, &heading);
+    (void)aerakia_eskf_update_barometer_observation(&filter, &barometer);
+    (void)aerakia_eskf_update_velocity_observation(&filter, &velocity);
+    aerakia_eskf_get_estimate(&filter, &estimate);
+    check_true(estimate.heading_valid && estimate.vertical_position_valid
+                   && estimate.vertical_velocity_valid && estimate.vertical_navigation_valid,
+               "accepted heading, barometer, and velocity independently qualify outputs");
+    check_true(estimate.barometer_accepted
+                   && near(estimate.heading_aiding_age_s, 0.0f, 1.0e-6f)
+                   && near(estimate.vertical_position_aiding_age_s, 0.0f, 1.0e-6f)
+                   && near(estimate.vertical_velocity_aiding_age_s, 0.0f, 1.0e-6f),
+               "continuous aiding ages report the physical observation epoch");
+
+    sample.timestamp_us = 70000U;
+    (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
+    check_true(!estimate.heading_valid && !estimate.vertical_position_valid
+                   && !estimate.vertical_velocity_valid && !estimate.vertical_navigation_valid,
+               "heading and vertical validity expire independently after aiding loss");
+    check_true(near(estimate.heading_aiding_age_s, 0.06f, 1.0e-6f)
+                   && near(estimate.vertical_position_aiding_age_s, 0.06f, 1.0e-6f)
+                   && near(estimate.vertical_velocity_aiding_age_s, 0.06f, 1.0e-6f),
+               "expired outputs retain inspectable aiding ages");
+}
+
 int main(void)
 {
     test_mahony_level_initialization();
@@ -914,6 +1022,7 @@ int main(void)
     test_eskf_static_supervisor();
     test_eskf_navigation_recovery_and_heading();
     test_eskf_cold_start_attitude_alignment();
+    test_eskf_heading_and_vertical_validity();
 
     if (failures != 0) {
         fprintf(stderr, "%d public API assertion(s) failed\n", failures);
