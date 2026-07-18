@@ -296,6 +296,15 @@ consistency, health, recovery, or 99% bootstrap failures. The exact 95% zero-fai
 upper bound is `0.2991%`. The sanitized result is committed as
 `validation/public/g0_monte_carlo_confirmation.json`.
 
+After the independent audit changes were committed, a separate previously unused range,
+40000--40999, was run from clean commit `5109568` with a protocol fingerprint covering the Git
+state, runner, generator, analyzer, thresholds, gate policy, timing, noise, and bias profile. All
+1,000 trials completed with zero execution, hard-envelope, distribution, consistency, recovery,
+health, or 99% bootstrap failures. Position/velocity/attitude RMSE P95 were `0.6361 m`,
+`0.2915 m/s`, and `1.7041°`; mean position NIS, velocity NIS, and six-state navigation NEES were
+`2.9560`, `2.5318`, and `4.9758`. This confirms the calibrated navigation-outage regression but does
+not close the independent VTOL bias-observability failure described below.
+
 This calibrated-input bound is provisional, not a specification invented for the final hardware.
 FCOne v2 multi-orientation and thermal characterization must measure it. If hardware exceeds it,
 the profile fails and requires better calibration, a longer/multi-pose alignment procedure, or a

@@ -1167,6 +1167,22 @@ The bound remains a pre-hardware hypothesis. FCOne v2 static multi-orientation a
 must verify or replace it; a hardware violation fails the profile instead of silently expanding the
 host gate.
 
+### Clean post-audit confirmation
+
+After the audit implementation was fixed at commit `5109568`, seeds 40000--40999 were opened as a
+new confirmation range. The protocol fingerprint recorded `git.dirty=false` and bound the exact
+runner, generator, analyzer, thresholds, gate policy, timing, noise, bias profile, and commit.
+All 1,000 trials completed with zero execution, hard-envelope, distribution, aggregate-consistency,
+health, recovery, or 99% bootstrap failures. Position/velocity/attitude RMSE P95 were
+`0.6361 m / 0.2915 m/s / 1.7041°`; mean position NIS, velocity NIS, and six-state navigation NEES
+were `2.9560 / 2.5318 / 4.9758`. The protocol semantic SHA-256 is
+`4b335a794546866e8dbc8e5787723ad0b23cc78e088cc966d6af4a0bc8e10789`, and the committed summary
+records the protocol-file and result-file hashes.
+
+This is a navigation-outage Monte Carlo confirmation, not a substitute for the frozen VTOL
+bias-observability holdout. The latter remains unopened until a candidate fixes or explicitly
+re-budgets the retained boundary-bias convergence failure.
+
 ### Post-confirmation audit closures
 
 The probation source/generation/quality check was found to occur after the core GPS update. A wrong
