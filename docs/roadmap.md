@@ -26,6 +26,8 @@ Public branch, history, and tagging rules are defined in the [release policy](re
 | Bias convergence | Gyroscope and accelerometer bias error, convergence time, and steady-state uncertainty are reported separately; batch reference-bias correction is not counted as online convergence | Multi-axis synthetic gate implemented; thermal and physical characterization remain P2 evidence |
 | Timing and malformed input | Duplicate, stale, out-of-order, delayed, missing, non-finite, and implausible samples have explicit deterministic behavior and tests | Implemented deterministic matrix plus 1,020,000-attempt, 100-seed campaign; retain as a host gate |
 | Public dataset runner | Dataset manifest records source, hash, frame transform, time offset, command, code commit, and output summary; selected datasets reproduce with one command | Implemented for 6 EuRoC, 3 Blackbird, and 2 UrbanNav tracks; 398,493 unique external-reference IMU samples and 865,845 replay attempts; keep all reviewed baseline gates passing |
+| High-volume PX4 compatibility | Audit current PX4 schemas at corpus scale, select stress tracks before scoring, and retain resets/clipping/innovation failures without treating PX4 estimates as truth | IDF-DS audit complete: 13 raw ULogs, 7.13 million IMU samples over 9.92 h; three selected native replays total 1.61 million samples and expose high NIS/recovery counts |
+| Aerial physical position/reference | Exercise physical aircraft IMU and GPS position input against a separately recorded RTK position/velocity path without synthesizing absent receiver fields | Electrical-survey `voo_3` complete: 16,560 replay samples, 2,070 GPS position updates, RTK reference path; physical drone-GPS velocity remains absent |
 | Recorded GNSS degradation | Recorded receiver data and independent navigation truth cover nominal aiding, a real outage, drift, and reacquisition without inventing missing receiver fields | UrbanNav Medium Urban 1 complete: 314,185 IMU samples, 655 valid F9P position epochs, one 131 s outage; physical receiver velocity and aircraft dynamics remain complementary gaps |
 | No-aiding output qualification | Numerical health remains separate from horizontal navigation validity; accepted constraints refresh validity, rejected data do not, and a configurable timeout is enforced | Default five-second timeout implemented and exercised over the recorded 131 s UrbanNav outage; exact FCOne failsafe policy remains private P1 work |
 | Same-input PX4 comparison | A pinned PX4 EKF2 and Aerakia consume identical immutable IMU/aiding data, initial state, masks, delays, and outage windows; validity, drift, recovery, consistency, CPU, and memory are reported | Comparison protocol documented; harness and results pending, so no numerical PX4/Aerakia accuracy ratio is claimed |
@@ -81,7 +83,8 @@ Additional ordinary ULogs are lower priority. The highest-value new evidence is:
 3. Controlled GNSS interruption and recovery with detailed aiding-source innovations.
 4. Controlled motor-current magnetic-disturbance data at fixed vehicle attitude.
 5. Recorded receiver position and Doppler velocity with independent navigation truth, preferably on
-   an aerial platform; UrbanNav closes position-outage coverage but publishes no receiver velocity.
+   an aerial platform; UrbanNav closes position-outage coverage and the electrical survey adds an
+   aerial RTK velocity reference, but neither publishes physical receiver velocity as filter input.
 
 No physical dataset should be described as ground truth unless its independent measurement chain,
 frame transform, and synchronization uncertainty are recorded.

@@ -10,10 +10,15 @@ and derived reports belong in version control.
 | P0 | [EuRoC MAV](https://www.research-collection.ethz.ch/entities/researchdata/bcaf173e-5dac-484b-bc37-faf97a594f1f) | IMU propagation and attitude/position accuracy against Vicon or Leica truth | No GNSS or magnetometer; Machine Hall orientation is IMU-aided | `MH_01_easy` and direct-pose `V1_03_difficult` complete |
 | P0 | [INSANE](https://www.aau.at/en/smart-systems-technologies/control-of-networked-systems/datasets/insane-dataset/) | Recorded UAV IMU plus physical 1.16 m dual-RTK body-heading observations | Published yaw and direct heading share the RTK baseline; published tilt currently fails gravity consistency | `outdoor_1_sensors` yaw-path intake complete |
 | P0 | [Blackbird](https://github.com/mit-aera/Blackbird-Dataset) | Aggressive UAV dynamics against motion-capture truth | No GNSS or magnetometer; the reviewed redistributed sequence reaches about 3 m/s rather than the full corpus maximum | MathWorks `NYC Subway Winter` sensor/pose package complete |
+| P0 | [UAV electrical-infrastructure survey](https://doi.org/10.5281/zenodo.8092105) | Aerial physical IMU/GPS plus separately recorded RTK position/velocity and multiple IMU topics | Smallest bag has no drone-GPS velocity; DJI attitude shares onboard measurements and RTK is not claimed as metrology-grade independent truth | Smallest 2.20 GB flight intake and native replay complete |
 | P1 | [RELLIS-3D](https://github.com/unmannedlab/RELLIS-3D) | Recorded VectorNav VN-300 fused attitude and IMU under outdoor off-road motion | Ground vehicle; public topics do not expose raw dual-baseline validity and the reviewed bag lacks a readable index | Retain as a secondary device-output audit, not heading truth |
 | P1 | [UrbanNav](https://github.com/IPNL-POLYU/UrbanNavDataset) | GNSS/IMU behavior in urban canyons and tunnels against SPAN-CPT truth | Ground vehicle; selected F9P NMEA contains positions but no receiver velocity or heading | `UrbanNav-HK-Medium-Urban-1` complete; tunnel remains optional diversity |
 | P1 | [GVINS](https://github.com/HKUST-Aerial-Robotics/GVINS) | Raw multi-constellation GNSS, IMU, and intermittent-GNSS comparison | ROS bag and ENU/ECEF conventions need an explicit adapter | Sports-field bag after license and checksum review |
+| P1 | [IDF-DS](https://doi.org/10.5281/zenodo.16992975) | 120 Pixhawk 6X/PX4 fixed-wing flights with IMU, GNSS, magnetometer, barometer, airspeed, innovations, and control telemetry | PX4 local position/attitude are onboard estimates, not independent truth | Full archive audited; 13 raw ULogs and three selected native replays complete |
 | P1 | [PX4 Flight Review v2](https://github.com/PX4/flight-review-rs) | Real ULog schema coverage, estimator resets, and unusual sensor combinations | Public PX4 estimates are not independent truth; publication terms and privacy must be checked | Metadata-screened logs only; never bulk-commit raw logs |
+| P2 | [RTK-SLAM](https://isprs.org/resources/datasets/benchmarks/RTK-SLAM/default.aspx) | Deliberate GNSS degradation with RTK as estimator input and an independent total-station truth chain | Ground platform and a newly published benchmark; format, calibration, and download stability still require intake | High-value independent outage benchmark after the aerial receiver-velocity intake |
+| P2 | [NTU VIRAL](https://ntu-aris.github.io/ntu_viral_dataset/) | Outdoor/indoor aerial IMU motion with high-accuracy laser-tracker truth | No physical GNSS input for the current filter; full sequences are 4--9 GB and duplicate EuRoC/Blackbird attitude coverage | Retain for later aerial motion diversity, not the present GNSS gap |
+| P2 | [ALFA](https://theairlab.org/alfa-dataset/) | 47 annotated fixed-wing fault flights plus raw and dataflash logs | ArduPilot-era onboard estimates and fault labels do not provide independent navigation truth | Useful later for fault diversity, below current truth/velocity priorities |
 
 ## Acceptance checklist
 
@@ -361,3 +366,100 @@ Doppler velocity with independent truth remains the next navigation evidence gap
 physical-heading source is still desirable, but it must expose either raw
 antenna-baseline validity or an independently synchronized yaw reference. None is counted until raw
 topics, timing, frames, license, and hashes pass the same intake checklist.
+
+## Completed high-volume compatibility intake: IDF-DS Pixhawk fixed wing
+
+The official Zenodo Pixhawk archive was downloaded and verified before extraction:
+
+| Item | Value |
+| --- | --- |
+| DOI | `10.5281/zenodo.16992975` |
+| License | CC-BY-4.0 |
+| Archive | `Holybro Pixhawk.zip`, 2,121,943,653 bytes |
+| Publisher MD5 | `8b990cc4c7ec1225a16e9a28225e5162` (matched) |
+| Published layouts | 120 synchronized per-flight CSVs plus per-topic CSVs |
+| Raw ULog subset in archive | 13 files |
+
+The reusable corpus auditor parsed all 13 raw ULogs with zero errors: 7,128,090 physical IMU
+samples and 310,799 physical GNSS samples over 35,697.16 s (9.92 h). Twelve logs contain PX4
+attitude-reset events, one reports IMU clipping, maximum gyro norm is 7.268 rad/s, maximum
+acceleration norm is 240.62 m/s², and maximum GNSS speed is 27.59 m/s. None contains direct
+dual-antenna GNSS heading.
+
+This intake exposed a real schema defect: the current `vehicle_gps_position.timestamp_sample`
+field is present but constantly zero in this corpus. The converter previously preferred it merely
+because the field existed, collapsing the physical GNSS stream to one timestamp. Conversion now
+requires a usable varying sample timestamp and otherwise falls back to the publication timestamp;
+both legacy and current SI-unit geodetic fields have regression coverage.
+
+Three deliberately different raw logs were replayed through the native C estimator:
+
+| Track | IMU samples / duration | ESKF full / tilt / yaw | Position / velocity | Position / velocity accepted | NIS mean pos / vel | Recoveries |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| aggressive rotation | 557,722 / 2791.7 s | 3.241° / 2.449° / 2.105° | 2.073 m / 0.335 m/s | 82.0% / 60.3% | 35.68 / 13.73 | 34 |
+| maximum speed | 523,470 / 2621.5 s | 5.823° / 2.472° / 5.257° | 3.619 m / 0.632 m/s | 79.8% / 53.6% | 95.83 / 20.52 | 80 |
+| reported clipping | 527,793 / 2641.2 s | 3.781° / 2.589° / 2.740° | 2.244 m / 0.373 m/s | 86.0% / 55.1% | 36.59 / 15.60 | 26 |
+
+All 1,608,985 replay samples remain numerically healthy, but the high NIS, rejected GNSS updates,
+and repeated recoveries are retained failures of the present real-receiver noise/delay model.
+These long tracks are materially harsher than the earlier short selected ULogs. PX4 attitude and
+local position remain onboard references, so the table measures agreement and compatibility—not
+absolute accuracy or superiority over PX4. Robust Mahony full-attitude RMSE is 96--98° on these
+roughly 44-minute tracks, confirming that it is a time-bounded attitude fallback rather than a
+parallel navigation solution.
+The machine-readable aggregate is retained in
+[`validation/public/idf_ds_summary.json`](../validation/public/idf_ds_summary.json).
+
+## Completed aerial physical-GPS/RTK intake: electrical-infrastructure `voo_3`
+
+The smallest official ROS bag was downloaded from Zenodo and retained outside Git. The
+2,199,738,167-byte file matches publisher MD5
+`ccb69193138b5b7f5ae1e44bde81228d`. Intake is deliberately fail-closed: all required topics must
+exist, header timestamps must be monotonic, the common overlap must exceed ten seconds, and the RTK
+velocity frame must agree with differentiated RTK position before conversion.
+
+| Item | Reviewed result |
+| --- | --- |
+| Common required-stream overlap | 41.393 s |
+| DJI IMU | 16,673 samples, 400.04 Hz effective rate |
+| DJI GPS position | 2,084 samples, 50.00 Hz effective rate |
+| RTK position and velocity | 208 paired samples each, 5.001 Hz |
+| Motion coverage | gyro P95/max 0.595/1.678 rad/s; acceleration norm P95/max 9.934/10.500 m/s² |
+| Header-vs-bag timing P95 | 1.62 ms DJI IMU, 1.82 ms GPS, 0.28 ms RTK, 4.98 ms second IMU |
+| Audited RTK velocity frame | native NED xyz; 3D differentiated-position RMSE 0.197 m/s |
+| DJI GPS vs RTK relative position | 0.109 m horizontal RMSE, 0.149 m P95, 0.193 m max |
+
+The replay uses 16,560 DJI IMU samples over 41.392 s. DJI GPS position is the only navigation
+aiding; the missing physical drone-GPS velocity is not synthesized. Separately recorded RTK
+position/velocity scores navigation. DJI onboard orientation scores attitude only as a shared-source
+engineering reference, not independent yaw truth.
+
+| Metric | Result |
+| --- | ---: |
+| ESKF geodesic / tilt / yaw RMSE vs onboard orientation | 2.766° / 0.966° / 2.601° |
+| Position RMSE / P95 vs RTK reference | 0.179 m / 0.277 m |
+| Velocity RMSE vs RTK reference | 0.263 m/s |
+| Position update acceptance / numerical health | 100% / 100% |
+| Position NIS mean (3 expected) | 0.00107 |
+| Robust Mahony geodesic / tilt RMSE | 136.77° / 1.629° |
+
+The extremely low position NIS is not treated as superior consistency. The bag provides no
+receiver position variance, so conversion uses a declared conservative fixed `4 m²`, while the DJI
+GPS and RTK relative trajectories are unusually close and may share receiver/correction sources.
+The data therefore validates frames, timing, physical position-aiding compatibility, and a
+separately recorded RTK reference path. It does not establish independent absolute accuracy,
+receiver-velocity fusion, or long-duration yaw performance. Mahony receives no magnetometer or
+trusted heading in this replay; its large yaw drift is expected and reinforces its bounded
+attitude-only fallback role.
+The machine-readable reviewed result is retained in
+[`validation/public/uav_electrical_voo3_summary.json`](../validation/public/uav_electrical_voo3_summary.json).
+
+```bash
+python validation/audit_uav_electrical_bag.py voo_3_electrical.bag \
+  --expected-md5 ccb69193138b5b7f5ae1e44bde81228d --out intake.json
+python simulation/tools/convert_uav_electrical_to_replay.py voo_3_electrical.bag \
+  --out replay.csv --metadata source.json
+build/aerakia_validation_runner replay.csv results.csv
+python validation/analyze_results.py results.csv --out-dir report \
+  --scenario uav_electrical_voo3 --reference-kind external_reference
+```

@@ -718,3 +718,120 @@ consistency metrics remain unchanged.
 
 This closes output qualification, not long-duration pure INS. The latter is not a supported
 capability for either Aerakia or PX4-class MEMS inputs without another velocity/position constraint.
+
+## 2026-07-18 — IDF-DS volume expansion and current-PX4 schema repair
+
+### Reason and source quality
+
+The preceding public corpus had strong independent/external references but limited total flight
+time. IDF-DS was selected for volume, fixed-wing duration, aggressive dynamics, PX4 schema
+coverage, reset events, clipping, airspeed, GNSS, and estimator diagnostics. It is not an
+independent-truth dataset: PX4 attitude/local position are onboard comparison references.
+
+The official 2,121,943,653-byte Pixhawk archive matched publisher MD5
+`8b990cc4c7ec1225a16e9a28225e5162`. The published package contains 120 synchronized flight CSVs
+and 13 original ULogs. Only ignored local extraction/replay artifacts were retained; code, audit
+logic, checksums, aggregate coverage, and reviewed metrics enter Git.
+
+### Full raw-ULog intake
+
+All 13 original ULogs parsed without error:
+
+- 7,128,090 IMU samples and 310,799 GNSS samples;
+- 35,697.16 s (9.92 h) total duration;
+- maximum 7.268 rad/s gyro, 240.62 m/s² acceleration, and 27.59 m/s GNSS speed;
+- 12 logs with PX4 attitude resets, one with reported clipping, and zero with direct GNSS heading.
+
+The intake found that current PX4 `vehicle_gps_position` can contain a constantly zero
+`timestamp_sample` while its publication `timestamp` remains valid. The old field-presence rule
+would collapse such GNSS data to one epoch. Timestamp selection now requires a usable varying
+stream and otherwise falls back to publication time. Current `latitude_deg/longitude_deg` and SI
+altitude fields are also supported alongside legacy integer geodetic fields. Both repairs have
+unit tests.
+
+### Selected native-C replays
+
+Three tracks were chosen from the full audit rather than by favorable score: maximum rotation,
+maximum speed, and the only log with reported clipping. They add 1,608,985 native-C replay samples
+over 8,054.42 s. Numerical health is 100% on all three, but the retained results expose unresolved
+real-receiver modeling:
+
+| Track | Full / tilt / yaw RMSE | Position / velocity RMSE | Position / velocity NIS mean | Recoveries |
+| --- | ---: | ---: | ---: | ---: |
+| rotation | 3.241° / 2.449° / 2.105° | 2.073 m / 0.335 m/s | 35.68 / 13.73 | 34 |
+| speed | 5.823° / 2.472° / 5.257° | 3.619 m / 0.632 m/s | 95.83 / 20.52 | 80 |
+| clipping | 3.781° / 2.589° / 2.740° | 2.244 m / 0.373 m/s | 36.59 / 15.60 | 26 |
+
+For three-dimensional measurements the expected NIS mean is 3. These large values, 54--86%
+component acceptance, and 26--80 recoveries block any claim that GNSS delay/noise tuning is
+complete. They are not tuned away on these evaluation tracks. Mahony robust full-attitude RMSE is
+96--98° over the long runs, supporting its bounded degraded-attitude role and rejecting a
+long-duration parallel-navigation interpretation.
+
+## 2026-07-18 — aerial physical-GPS and RTK-reference intake
+
+### Reason and evidence boundary
+
+UrbanNav closed real position/outage coverage but did not publish receiver velocity, and the
+long-duration IDF tracks use PX4 estimates as references. The Zenodo electrical-infrastructure UAV
+survey was selected to add aircraft motion, physical DJI GPS position, paired RTK position/velocity,
+and multiple physical IMUs. The smallest 2,199,738,167-byte bag matched publisher MD5
+`ccb69193138b5b7f5ae1e44bde81228d`.
+
+The bag does not contain a separate drone-GPS velocity topic. RTK velocity is used only as a scored
+reference, never silently relabeled as receiver aiding. DJI onboard orientation shares onboard
+measurements and is likewise an engineering attitude reference, not independent truth.
+
+### Intake repairs and audit
+
+The first timing summary incorrectly used the inverse median interval as the reported rate. Bursty
+header timestamps made that number physically impossible. The auditor now reports effective rate
+as `(samples - 1) / duration`, retains median interval separately, and fails non-monotonic streams.
+The first RTK frame decision compared only horizontal velocity and could not distinguish vertical
+sign. Selection now minimizes full three-dimensional differentiated-position RMSE and records all
+candidate correlations/errors.
+
+Accepted intake evidence:
+
+- common overlap `41.393 s`;
+- DJI IMU/GPS effective rates `400.04/50.00 Hz`; RTK position/velocity `5.001 Hz`;
+- selected native NED RTK velocity has north/east/down correlations
+  `0.9794/0.9717/0.9834` and `0.197 m/s` 3D RMSE against differentiated RTK position;
+- DJI GPS versus RTK relative horizontal RMSE/P95/max is `0.109/0.149/0.193 m`;
+- header-to-bag timestamp P95 is at most `4.98 ms` across required streams, although isolated
+  maximum outliers reach `98 ms` and are retained in metadata.
+
+### Native replay result
+
+The hardware-neutral replay contains 16,560 physical IMU samples, 2,070 physical GPS position
+updates, and no invented GPS velocity. All samples remain numerically healthy and all position
+updates are accepted. Against the separately recorded RTK reference, position RMSE/P95 is
+`0.179/0.277 m` and velocity RMSE is `0.263 m/s`. Against DJI onboard orientation, ESKF geodesic,
+tilt, and yaw RMSE are `2.766/0.966/2.601°`.
+
+Position NIS mean is only `0.00107` for expected mean 3. This is retained as a covariance/source-
+independence limitation: the bag has no position variance, conversion declares fixed `4 m²`, and
+the DJI GPS/RTK streams may share receiver or correction sources. It is not an accuracy claim.
+Robust Mahony reaches `136.77°` full-attitude RMSE but `1.629°` tilt RMSE because this replay has no
+magnetometer or trusted heading; it remains a finite-duration attitude fallback, not navigation.
+
+### Reproduction and checkpoint validation
+
+```bash
+python validation/audit_uav_electrical_bag.py voo_3_electrical.bag \
+  --expected-md5 ccb69193138b5b7f5ae1e44bde81228d --out intake.json
+python simulation/tools/convert_uav_electrical_to_replay.py voo_3_electrical.bag \
+  --out replay.csv --metadata source.json
+build/aerakia_validation_runner replay.csv results.csv
+python validation/analyze_results.py results.csv --out-dir report \
+  --scenario uav_electrical_voo3 --reference-kind external_reference
+```
+
+The raw bag, replay, result CSV, and plots remain under ignored `build/`. Reusable intake/conversion
+code, source checksum, reason, corrections, metrics, and limitations enter Git. Python unit tests
+now include current-PX4 timestamp/schema regressions, NED geodetic axes, and the UAV ENU/FLU to
+NED/FRD proper-rotation round trip.
+
+Final checkpoint after the new evidence classes and converters: strict Release CTest `6/6`, Python
+tools `39/39`, all deterministic scenario thresholds, the 1,020,000-attempt input-integrity gate,
+Python byte-compilation, and `git diff --check` pass through the one-command host regression.

@@ -134,7 +134,14 @@ def _quaternion(data: dict[str, np.ndarray], base: str) -> np.ndarray:
 
 
 def _timestamps(data: dict[str, np.ndarray]) -> np.ndarray:
-    return _field(data, "timestamp_sample", "timestamp").astype(np.int64)
+    for name in ("timestamp_sample", "timestamp"):
+        if name not in data:
+            continue
+        candidate = np.asarray(data[name], dtype=np.float64)
+        finite = candidate[np.isfinite(candidate) & (candidate >= 0.0)]
+        if finite.size == 1 or (finite.size >= 2 and float(np.max(finite)) > float(np.min(finite))):
+            return candidate.astype(np.int64)
+    raise KeyError("no usable varying positive timestamp_sample or timestamp field")
 
 
 def _sort_unique(timestamp: np.ndarray, *values: np.ndarray) -> tuple[np.ndarray, ...]:
@@ -164,9 +171,14 @@ def _gravity_body_mg(quaternion: np.ndarray) -> np.ndarray:
 
 
 def _relative_gps_ned(gps: dict[str, np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
-    latitude = _field(gps, "lat").astype(np.float64) * 1.0e-7
-    longitude = _field(gps, "lon").astype(np.float64) * 1.0e-7
-    altitude = _field(gps, "alt", "alt_ellipsoid").astype(np.float64) * 1.0e-3
+    if "latitude_deg" in gps and "longitude_deg" in gps:
+        latitude = _field(gps, "latitude_deg").astype(np.float64)
+        longitude = _field(gps, "longitude_deg").astype(np.float64)
+        altitude = _field(gps, "altitude_msl_m", "altitude_ellipsoid_m").astype(np.float64)
+    else:
+        latitude = _field(gps, "lat").astype(np.float64) * 1.0e-7
+        longitude = _field(gps, "lon").astype(np.float64) * 1.0e-7
+        altitude = _field(gps, "alt", "alt_ellipsoid").astype(np.float64) * 1.0e-3
     fix_type = _field(gps, "fix_type", default=np.full(len(latitude), 3))
     valid = (fix_type >= 3) & np.isfinite(latitude) & np.isfinite(longitude) & np.isfinite(altitude)
     valid &= (np.abs(latitude) > 1.0e-9) | (np.abs(longitude) > 1.0e-9)

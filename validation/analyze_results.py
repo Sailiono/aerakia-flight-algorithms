@@ -1129,6 +1129,10 @@ def write_markdown(
         lines.append(
             "> The estimator input and scoring reference share physical measurements; results validate integration behavior, not independent absolute accuracy."
         )
+    elif reference_kind == "external_reference":
+        lines.append(
+            "> At least one scored channel uses a separately recorded external reference; channel-level independence and shared-source limitations remain defined by the dataset manifest."
+        )
     else:
         lines.append("> Synthetic truth validates implementation behavior, not physical flight reliability.")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -1141,7 +1145,13 @@ def main() -> None:
     parser.add_argument("--scenario", default="validation")
     parser.add_argument(
         "--reference-kind",
-        choices=("synthetic", "independent_truth", "shared_sensor_reference", "px4_estimate"),
+        choices=(
+            "synthetic",
+            "independent_truth",
+            "external_reference",
+            "shared_sensor_reference",
+            "px4_estimate",
+        ),
         default="synthetic",
     )
     args = parser.parse_args()

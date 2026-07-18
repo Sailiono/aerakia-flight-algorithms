@@ -11,6 +11,9 @@ aggressive angular motion. UrbanNav adds 785.5 s of recorded 400 Hz IMU, physica
 aiding, independent SPAN-CPT postprocessed truth, and a real 131 s GNSS outage. Vicon-derived
 heading tests yaw alignment and faults under recorded
 motion, and INSANE exercises the same production path with 1,378 physical dual-RTK observations.
+IDF-DS adds a 9.92-hour, 13-ULog PX4 schema/coverage audit and 1,608,985 selected fixed-wing native
+replay samples. The electrical-infrastructure UAV set adds physical DJI position aiding and a
+separately recorded RTK position/velocity reference over 16,560 replay samples.
 Neither derived/shared-source heading track establishes independent absolute heading accuracy or
 flight safety.
 
@@ -29,6 +32,8 @@ flight safety.
 | EuRoC public replay | 36,381-sample Leica/IMU `MH_01_easy` and 20,932-sample direct-pose `V1_03_difficult`; raw, cold-start, derived-heading, and reference-bias tracks retained | Navigation NIS/NEES consistent; direct Vicon pose passes high-dynamic replay; derived heading is not a recorded heading sensor |
 | Blackbird public replay | 26,995 recorded IMU samples over 270.1 s against independent motion capture; common time base and published body/IMU extrinsic are checked before conversion | ESKF 1.573° geodesic / 1.131° tilt RMSE, 100% health, zero recovery; retained Mahony drift proves fallback must be bounded |
 | UrbanNav public replay | 314,185 recorded IMU samples, 655 checksum/quality-screened F9P positions, SPAN truth, and one 131 s recorded outage | Position-only API and recovery pass with 100% numerical health; horizontal navigation is valid for 83.90% of samples and explicitly expires after five unaided seconds; 6.52 m nominal aided RMSE and first-update reacquisition are retained alongside severe unaided drift and inconsistent NIS/NEES |
+| IDF-DS fixed-wing volume | 13 raw PX4 ULogs, 7,128,090 audited IMU samples over 9.92 h; rotation, speed, and clipping tracks selected before scoring | 1,608,985 native replay samples remain healthy; 3.24–5.82° agreement with PX4 attitude and 2.07–3.62 m with PX4 position, but high NIS and 26–80 recoveries retain real delay/noise-model gaps |
+| Aerial GPS/RTK reference | 16,560 physical DJI IMU samples, 2,070 physical GPS position updates, and separately recorded 5 Hz RTK position/velocity | 100% health; 0.179 m position and 0.263 m/s velocity RMSE against RTK reference; no receiver-velocity aiding or independent attitude/absolute truth claim |
 | Host regression | Strict C99 warnings-as-errors build, public API tests, deterministic synthetic fault suite | Passing reviewed thresholds |
 | Input/transport integrity | Exhaustive required-IMU non-finite checks; timestamp order/gap behavior; optional-mag isolation; timestamped GNSS/heading/barometer freshness and recovery | Passing 100 seeds, 1,020,000 IMU attempts, 2,100 aiding attempts, and burst lengths through 100 with zero invariant/health failures |
 | Estimator supervision | ESKF-primary startup, hard-invalid immediate response, soft observability hysteresis, continuity-gated and time-bounded Mahony attitude-only degradation, navigation invalidation, continuity-gated recovery, and transition evidence | Passing executable public contract; private FCOne policy and actuator interaction remain open |
@@ -50,7 +55,9 @@ flight safety.
    checks.
 5. Add a complementary physical receiver track with recorded Doppler velocity and independent
    truth, preferably under aircraft dynamics. UrbanNav closes recorded position/outage coverage but
-   has no receiver velocity, heading, magnetometer, or aircraft motion.
+   has no receiver velocity, heading, magnetometer, or aircraft motion. The UAV electrical survey
+   adds aircraft position aiding and an RTK velocity reference, but still does not expose physical
+   drone-GPS velocity as estimator input.
 
 ## P1 work when the new hardware is available
 
@@ -104,6 +111,14 @@ This document is an engineering maturity statement, not an airworthiness claim.
   (83.90%) while numerical health remains 100%; rejected aiding cannot refresh that validity.
   Cold-start tilt reaches 2.211° RMSE, while yaw reaches 36.65° because the sequence provides no
   magnetometer or heading observation. This is a retained observability failure, not a yaw claim.
+- Three selected long IDF fixed-wing replays remain healthy and agree with PX4 references at
+  3.241–5.823° full attitude, 2.449–2.589° tilt, 2.073–3.619 m position, and 0.335–0.632 m/s
+  velocity RMSE. PX4 is not truth; high NIS and 26–80 recoveries make these compatibility/stress
+  results rather than absolute-accuracy evidence.
+- The 41.4 s electrical-survey replay reaches 2.766° geodesic / 0.966° tilt RMSE against shared
+  DJI onboard attitude and 0.179 m position / 0.263 m/s velocity RMSE against the separately
+  recorded RTK reference. The unusually close DJI GPS/RTK trajectories and declared fixed `4 m²`
+  aiding variance prevent an independent absolute-accuracy or consistency claim.
 
 ### Robustness
 
@@ -138,15 +153,19 @@ This document is an engineering maturity statement, not an airworthiness claim.
   97.10% of normal updates are accepted with reference initialization and 91.15% after cold start.
   Natural data has no declared heading faults, so outlier rejection remains proven by the separate
   injected-fault tracks.
+- The IDF volume audit expands physical PX4 compatibility to 7.13 million IMU samples over 9.92 h;
+  the selected 1.61 million-sample replays expose rather than conceal high innovation inconsistency.
+  The aerial DJI/RTK replay adds a second physical aircraft position path but remains too short and
+  too source-coupled to close receiver-delay or independent-navigation-truth requirements.
 
 ### Maturity judgment
 
 | Scope | Current judgment | Reason |
 | --- | ---: | --- |
 | Portable algorithm/math implementation | 84–88% | Core equations, covariance handling, independent position/velocity aiding, cold start, and recovery are mature; real-receiver covariance consistency and physical heading truth remain open |
-| Host-side software robustness | 90–93% | High-volume malformed/timing campaign, sanitizers, and 398,493 unique public external-reference IMU samples pass, including a recorded 131 s aiding outage |
+| Host-side software robustness | 91–94% | Million-attempt malformed/timing campaign, sanitizers, 7.13 million audited PX4 IMU samples, and 1.63 million new native-C physical replays pass, including fixed-wing clipping and aerial GPS/RTK schemas |
 | Heading robustness | 68–72% | Real-motion fault/recovery and physical dual-RTK input now pass; independent physical yaw truth and GNSS-velocity GSF fallback remain open |
-| Navigation robustness | 68–74% | Recorded position outage/reacquisition and fail-closed no-aiding validity now pass, but long unaided drift, missing receiver velocity, delay modeling, and NIS/NEES tuning remain open |
+| Navigation robustness | 68–73% | Recorded outage/reacquisition, fail-closed no-aiding validity, long fixed-wing replay, and aerial position/RTK reference pass; high real-log NIS, missing physical receiver-velocity input, and delay modeling remain open |
 | FCOne integration readiness | 75–80% | Neutral adapter, independent aiding, and bounded-fallback supervisor contracts are executable; exact private messages, scheduling, target precision, and resource use are unverified |
 | Flight-main-estimator readiness | 50–60% | Suitable for shadow mode and bench/HIL preparation, not justified as the sole flight estimator yet |
 

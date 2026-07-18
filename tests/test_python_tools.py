@@ -17,12 +17,15 @@ import convert_capture_to_golden as converter  # noqa: E402
 import convert_blackbird_to_replay as blackbird_converter  # noqa: E402
 import convert_euroc_to_replay as euroc_converter  # noqa: E402
 import convert_insane_to_replay as insane_converter  # noqa: E402
+import convert_uav_electrical_to_replay as uav_electrical_converter  # noqa: E402
 import convert_urbannav_to_replay as urbannav_converter  # noqa: E402
 import convert_ulog_to_replay as ulog_converter  # noqa: E402
 import analyze_results as analyzer  # noqa: E402
 import generate_synthetic_imu as synthetic_generator  # noqa: E402
 import run_monte_carlo as monte_carlo  # noqa: E402
 import run_public_dataset_suite as public_dataset_suite  # noqa: E402
+import audit_px4_ulog_corpus as ulog_audit  # noqa: E402
+import audit_uav_electrical_bag as uav_electrical_audit  # noqa: E402
 
 
 def record(sequence: int, timestamp_us: int) -> str:
@@ -132,6 +135,75 @@ class MonteCarloRunnerTests(unittest.TestCase):
         self.assertTrue(np.all(np.isfinite(position)))
 
 
+class Px4UlogCorpusAuditTests(unittest.TestCase):
+    def test_gap_and_summary_keep_reference_boundary_explicit(self) -> None:
+        import numpy as np
+
+        self.assertAlmostEqual(
+            ulog_audit._maximum_gap_s(np.array([1_000_000, 2_000_000, 8_000_000])), 6.0
+        )
+        summary = ulog_audit.summarize(
+            [
+                {
+                    "duration_s": 10.0,
+                    "imu_samples": 2000,
+                    "gps_samples": 100,
+                    "direct_gnss_heading_samples": 0,
+                    "attitude_reset_events": 2,
+                    "maximum_reported_clipping_count": 3,
+                    "gps_maximum_gap_s": 6.0,
+                    "gyro_norm_max_rad_s": 4.0,
+                    "accel_norm_max_m_s2": 30.0,
+                    "gps_speed_max_m_s": 20.0,
+                }
+            ],
+            [],
+        )
+        self.assertEqual(summary["corpus"]["total_imu_samples"], 2000)
+        self.assertEqual(summary["corpus"]["files_with_attitude_resets"], 1)
+        self.assertIn("not independent", summary["evidence_boundary"])
+
+    def test_zero_sample_timestamp_falls_back_to_publication_timestamp(self) -> None:
+        import numpy as np
+
+        data = {
+            "timestamp_sample": np.array([0, 0, 0], dtype=np.uint64),
+            "timestamp": np.array([1_000_000, 2_000_000, 3_000_000], dtype=np.uint64),
+        }
+        np.testing.assert_array_equal(ulog_audit._timestamps(data), data["timestamp"])
+        np.testing.assert_array_equal(ulog_converter._timestamps(data), data["timestamp"])
+
+    def test_uav_electrical_geodetic_conversion_uses_ned_axes(self) -> None:
+        import numpy as np
+
+        origin = np.array([41.0, -8.0, 100.0])
+        points = np.array([[41.0, -8.0, 100.0], [41.00001, -7.99999, 101.0]])
+        ned = uav_electrical_audit._geodetic_to_ned(points, origin)
+        np.testing.assert_allclose(ned[0], np.zeros(3), atol=1.0e-6)
+        self.assertGreater(ned[1, 0], 1.0)
+        self.assertGreater(ned[1, 1], 0.8)
+        self.assertAlmostEqual(ned[1, 2], -1.0, delta=0.01)
+
+    def test_uav_electrical_identity_attitude_transform_is_proper_rotation(self) -> None:
+        import numpy as np
+
+        source = uav_electrical_converter._rotation_from_quaternion_wxyz(
+            np.array([[1.0, 0.0, 0.0, 0.0]])
+        )[0]
+        transformed = (
+            uav_electrical_converter.NED_FROM_ENU
+            @ source
+            @ uav_electrical_converter.FLU_FROM_FRD
+        )
+        quaternion = urbannav_converter._quaternion_from_rotation(transformed[None, ...])[0]
+        reconstructed = uav_electrical_converter._rotation_from_quaternion_wxyz(
+            quaternion[None, ...]
+        )[0]
+        np.testing.assert_allclose(reconstructed, transformed, atol=1.0e-12)
+        np.testing.assert_allclose(transformed @ transformed.T, np.eye(3), atol=1.0e-12)
+        self.assertAlmostEqual(float(np.linalg.det(transformed)), 1.0, places=12)
+
+
 class FakeDataset:
     def __init__(self, name: str, data: dict[str, object]) -> None:
         self.name = name
@@ -151,6 +223,26 @@ class FakeULog:
 
 
 class ULogConverterTests(unittest.TestCase):
+    def test_relative_gps_accepts_current_px4_si_fields(self) -> None:
+        import numpy as np
+
+        old = {
+            "lat": np.array([31_0000000, 31_0000100]),
+            "lon": np.array([121_0000000, 121_0000100]),
+            "alt": np.array([10_000, 10_500]),
+            "fix_type": np.array([3, 3]),
+        }
+        current = {
+            "latitude_deg": np.array([31.0, 31.00001]),
+            "longitude_deg": np.array([121.0, 121.00001]),
+            "altitude_msl_m": np.array([10.0, 10.5]),
+            "fix_type": np.array([3, 3]),
+        }
+        old_ned, old_valid = ulog_converter._relative_gps_ned(old)
+        current_ned, current_valid = ulog_converter._relative_gps_ned(current)
+        np.testing.assert_allclose(current_ned, old_ned)
+        np.testing.assert_array_equal(current_valid, old_valid)
+
     def test_quaternion_interpolation_handles_equivalent_signs(self) -> None:
         import numpy as np
 

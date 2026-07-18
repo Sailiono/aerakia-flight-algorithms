@@ -150,11 +150,12 @@ ULog reports keep three yaw views separate: raw agreement with PX4, agreement af
 the logged PX4 reset deltas, and per-reset-segment drift. Direct dual-antenna GNSS heading is
 fused only when PX4 marks it finite; ordinary GNSS course and PX4's GSF yaw remain diagnostics.
 
-The reviewed public evidence now combines EuRoC and Blackbird motion-capture/reference tracks with
-UrbanNav recorded Xsens IMU, u-blox F9P positions, independent SPAN-CPT postprocessed truth, and a
-131 s recorded GNSS outage. Its converters, source hashes, frame/time audits, results, and explicit
-limitations are documented in [Public datasets](docs/public-datasets.md). Raw archives remain
-outside Git.
+The reviewed public evidence combines EuRoC and Blackbird motion-capture/reference tracks,
+UrbanNav recorded Xsens/F9P data with a 131 s outage, a 9.92-hour IDF-DS PX4 compatibility audit,
+and an aerial DJI-GPS/RTK-reference replay. Independent truth, shared-source reference, and PX4
+estimate results remain separate. Converters, source hashes, frame/time audits, results, and
+explicit limitations are documented in [Public datasets](docs/public-datasets.md). Raw archives
+remain outside Git.
 
 After restoring the minimal EuRoC inputs, reproduce all five reviewed tracks with:
 
