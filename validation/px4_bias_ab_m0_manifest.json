@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "protocol_id": "aerakia-px4-accel-bias-ab-m0",
+  "px4_commit": "de8158101c96ad6b04170dc91f087148104c58eb",
+  "schema_path": "validation/px4_bias_ab_schema_v1.json",
+  "required_px4_files": {
+    "src/modules/ekf2/EKF/common.h": "11bfecda557f9f3ebb87ef37d61465864590b0fad2fbb56e1ba34cea7827eff5",
+    "src/modules/ekf2/EKF/covariance.cpp": "4d56cf4dd4d5dac602595cd01950f908eb1aba5597d56ca4efbe1c6a537b9bd9",
+    "src/modules/ekf2/EKF/ekf_helper.cpp": "9af92ce24eff2aa2f6de15ef7034f8ccf643b80a4df74e710427a47584256824",
+    "src/modules/ekf2/module.yaml": "c40f850ea9348ff4b0a8bc99b22cab0e2773ab59505f8490d6802c6ea6a0042b",
+    "src/modules/ekf2/params_accel_bias.yaml": "3a6d505173a88933cf21bb8f5dbae9bd60d7f6dda3e51dfe349ea71955216374"
+  },
+  "profiles": {
+    "stock": {
+      "aerakia": {
+        "sigma_acc": 0.1,
+        "sigma_gyr": 0.01,
+        "sigma_acc_bias": 0.001,
+        "sigma_gyr_bias": 0.0001
+      },
+      "px4": {
+        "EKF2_ABIAS_INIT": 0.2,
+        "EKF2_ABL_ACCLIM": 25.0,
+        "EKF2_ABL_GYRLIM": 3.0,
+        "EKF2_ABL_LIM": 0.4,
+        "EKF2_ABL_TAU": 0.5,
+        "EKF2_ACC_B_NOISE": 0.003,
+        "EKF2_IMU_CTRL": 7
+      }
+    }
+  },
+  "comparison": {
+    "bias_vector_error_limit_m_s2": 0.05,
+    "convergence_budget_s": 35.0,
+    "minimum_input_duration_s": 60.0,
+    "settling_hold_s": 10.0,
+    "time_alignment_tolerance_us": 0
+  },
+  "output_time_semantics": "delayed_core_fusion_horizon",
+  "claim_boundary": "A completed M0 run is diagnostic. It is not a PX4-parity or flight-readiness claim."
+}

@@ -7,6 +7,13 @@ project(
     LANGUAGES C
 )
 
+if(NOT MSVC)
+    # Enforce the advertised language contract instead of inheriting a newer compiler default.
+    set(CMAKE_C_STANDARD 99)
+    set(CMAKE_C_STANDARD_REQUIRED ON)
+    set(CMAKE_C_EXTENSIONS OFF)
+endif()
+
 option(AERAKIA_BUILD_TESTS "Build host-side tests" ON)
 option(AERAKIA_BUILD_VALIDATION "Build the PC validation runner" ON)
 option(AERAKIA_WARNINGS_AS_ERRORS "Treat warnings as build failures" ON)
@@ -80,6 +87,10 @@ if(AERAKIA_BUILD_TESTS)
         AERAKIA_CMAKE_VERSION_STRING="${PROJECT_VERSION}"
     )
     add_test(NAME public_version COMMAND test_version)
+
+    add_executable(test_validation_covariance tests/test_validation_covariance.c)
+    target_link_libraries(test_validation_covariance PRIVATE Aerakia::Algorithms)
+    add_test(NAME validation_covariance COMMAND test_validation_covariance)
 
     add_executable(aerakia_input_integrity_campaign validation/input_integrity_campaign.c)
     target_link_libraries(aerakia_input_integrity_campaign PRIVATE Aerakia::Algorithms)

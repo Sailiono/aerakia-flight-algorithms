@@ -191,7 +191,7 @@ static void test_randomized_prediction_transition(void)
     printf("transition finite-difference maximum absolute error: %.9g\n", maximum_error);
 }
 
-static int matrix15_is_positive_semidefinite(const double matrix[15][15])
+static int matrix15_is_positive_semidefinite(double matrix[15][15])
 {
     double lower[15][15] = {{0.0}};
     const double tolerance = 1.0e-13;
@@ -247,9 +247,9 @@ static void expected_process_noise(const ESKF_Config *config,
     }
 }
 
-static void reduced_covariance_derivative(const double Q[15][15],
-                                          const double A[15][15],
-                                          const double W[15][15],
+static void reduced_covariance_derivative(double Q[15][15],
+                                          double A[15][15],
+                                          double W[15][15],
                                           double derivative[15][15])
 {
     int row;

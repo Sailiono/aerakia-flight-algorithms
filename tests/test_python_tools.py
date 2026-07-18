@@ -821,6 +821,35 @@ class UrbanNavConverterTests(unittest.TestCase):
 
 
 class ValidationAnalyzerTests(unittest.TestCase):
+    def test_quaternion_right_error_rotation_vector_matches_post_multiplication(self) -> None:
+        import numpy as np
+
+        rotation_vector = np.array([0.12, -0.08, 0.03])
+        angle = np.linalg.norm(rotation_vector)
+        delta = np.concatenate(
+            ([np.cos(0.5 * angle)], np.sin(0.5 * angle) * rotation_vector / angle)
+        )
+        estimate = np.array([np.cos(0.3), 0.0, 0.0, np.sin(0.3)])
+
+        def multiply(left: np.ndarray, right: np.ndarray) -> np.ndarray:
+            lw, lx, ly, lz = left
+            rw, rx, ry, rz = right
+            return np.array(
+                [
+                    lw * rw - lx * rx - ly * ry - lz * rz,
+                    lw * rx + lx * rw + ly * rz - lz * ry,
+                    lw * ry - lx * rz + ly * rw + lz * rx,
+                    lw * rz + lx * ry - ly * rx + lz * rw,
+                ]
+            )
+
+        truth = multiply(estimate, delta)
+        recovered = analyzer.quaternion_right_error_rotation_vector(
+            np.vstack((estimate, -estimate)), np.vstack((truth, -truth))
+        )
+        np.testing.assert_allclose(recovered[0], rotation_vector, atol=1.0e-12)
+        np.testing.assert_allclose(recovered[1], rotation_vector, atol=1.0e-12)
+
     def test_fallback_envelope_reports_continuity_gate_and_time_budget(self) -> None:
         import numpy as np
 
@@ -950,12 +979,34 @@ class ValidationAnalyzerTests(unittest.TestCase):
             for component in ("xx", "xy", "xz", "yy", "yz", "zz"):
                 value = diagonal if component in ("xx", "yy", "zz") else 0.0
                 columns[f"{prefix}_cov_{component}_{suffix}"] = np.full(count, value)
+        tilt_error = np.array([0.1, -0.2, 0.0])
+        tilt_angle = np.linalg.norm(tilt_error)
+        truth_quaternion = np.concatenate(
+            ([np.cos(0.5 * tilt_angle)], np.sin(0.5 * tilt_angle) * tilt_error / tilt_angle)
+        )
+        for axis_index, axis in enumerate(("w", "x", "y", "z")):
+            columns[f"truth_q_{axis}"] = np.full(count, truth_quaternion[axis_index])
+            columns[f"eskf_q_{axis}"] = np.full(count, 1.0 if axis == "w" else 0.0)
+        columns["eskf_right_error_tilt_cov_xx_rad2"] = np.full(count, 0.04)
+        columns["eskf_right_error_tilt_cov_xy_rad2"] = np.zeros(count)
+        columns["eskf_right_error_tilt_cov_yy_rad2"] = np.full(count, 0.04)
+        for tilt_axis in ("x", "y"):
+            for bias_axis in ("x", "y", "z"):
+                columns[
+                    f"eskf_right_error_tilt_accel_bias_cov_{tilt_axis}_{bias_axis}_rad_m_s2"
+                ] = np.zeros(count)
 
         metrics = analyzer.bias_metrics(columns)
         assert metrics is not None
         self.assertTrue(metrics["bias_consistency_available"])
         self.assertAlmostEqual(metrics["accel_bias_nees"]["mean"], 0.21375)
         self.assertAlmostEqual(metrics["gyro_bias_nees"]["mean"], 0.85125)
+        self.assertAlmostEqual(metrics["tilt_accel_bias_joint_nees"]["mean"], 1.46375)
+        self.assertEqual(metrics["tilt_accel_bias_joint_nees"]["degrees_of_freedom"], 5)
+        self.assertEqual(
+            metrics["tilt_accel_bias_joint_nees_status"],
+            "reported_5d_right_error_marginal",
+        )
         self.assertEqual(metrics["accel_bias_nees"]["invalid_covariance_samples"], 0)
         self.assertEqual(metrics["accel_continuous_5s_convergence"]["time_after_alignment_s"], 2.0)
         self.assertEqual(metrics["gyro_continuous_5s_convergence"]["time_after_alignment_s"], 2.0)

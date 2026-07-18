@@ -67,6 +67,8 @@ jobs:
 
   sanitizers:
     runs-on: ubuntu-latest
+    env:
+      CC: gcc-14
     steps:
       - uses: actions/checkout@v4
       - name: Configure ASan and UBSan

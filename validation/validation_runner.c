@@ -6,6 +6,8 @@
 #include <aerakia/eskf_adapter.h>
 #include <aerakia/mahony.h>
 
+#include "eskf_joint_covariance.h"
+
 #include <errno.h>
 #include <math.h>
 #include <stdio.h>
@@ -301,6 +303,8 @@ int main(int argc, char *argv[])
     AerakiaEskfConfig eskf_config;
     AerakiaAttitudeEstimate standard_estimate, robust_estimate;
     AerakiaNavigationEstimate eskf_estimate;
+    eskf_float_t tilt_accel_bias_covariance
+        [AERAKIA_TILT_ACCEL_BIAS_DIM][AERAKIA_TILT_ACCEL_BIAS_DIM];
     unsigned long samples = 0U, malformed = 0U, gps_updates = 0U, heading_updates = 0U;
     unsigned long zupt_updates = 0U;
     int eskf_initialized = 0, mag_reference_initialized = 0, mahony_reference_seeded = 0;
@@ -409,6 +413,14 @@ int main(int argc, char *argv[])
         "truth_gyro_bias_x_rad_s,truth_gyro_bias_y_rad_s,truth_gyro_bias_z_rad_s,"
         "eskf_accel_bias_x_m_s2,eskf_accel_bias_y_m_s2,eskf_accel_bias_z_m_s2,"
         "eskf_gyro_bias_x_rad_s,eskf_gyro_bias_y_rad_s,eskf_gyro_bias_z_rad_s,"
+        "eskf_right_error_tilt_cov_xx_rad2,eskf_right_error_tilt_cov_xy_rad2,"
+        "eskf_right_error_tilt_cov_yy_rad2,"
+        "eskf_right_error_tilt_accel_bias_cov_x_x_rad_m_s2,"
+        "eskf_right_error_tilt_accel_bias_cov_x_y_rad_m_s2,"
+        "eskf_right_error_tilt_accel_bias_cov_x_z_rad_m_s2,"
+        "eskf_right_error_tilt_accel_bias_cov_y_x_rad_m_s2,"
+        "eskf_right_error_tilt_accel_bias_cov_y_y_rad_m_s2,"
+        "eskf_right_error_tilt_accel_bias_cov_y_z_rad_m_s2,"
         "eskf_accel_bias_cov_xx_m2_s4,eskf_accel_bias_cov_xy_m2_s4,"
         "eskf_accel_bias_cov_xz_m2_s4,eskf_accel_bias_cov_yy_m2_s4,"
         "eskf_accel_bias_cov_yz_m2_s4,eskf_accel_bias_cov_zz_m2_s4,"
@@ -625,6 +637,9 @@ int main(int argc, char *argv[])
             if (ok) (void)aerakia_eskf_update_barometer_observation(&eskf, &observation);
         }
         aerakia_eskf_get_estimate(&eskf, &eskf_estimate);
+        aerakia_validation_extract_tilt_accel_bias_covariance(
+            &eskf.core, tilt_accel_bias_covariance
+        );
         if (eskf_estimate.zero_velocity_update_applied) zupt_updates++;
 
         fprintf(
@@ -640,6 +655,7 @@ int main(int argc, char *argv[])
             "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,"
             "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,"
             "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,"
+            "%.12g,%.12g,%.12g,%.12g,%.12g,%.12g,%.12g,%.12g,%.12g,"
             "%.12g,%.12g,%.12g,%.12g,%.12g,%.12g,"
             "%.12g,%.12g,%.12g,%.12g,%.12g,%.12g\n",
             sequence, (unsigned long long)sample.timestamp_us, truth_roll, truth_pitch, truth_yaw,
@@ -714,6 +730,15 @@ int main(int argc, char *argv[])
             eskf_estimate.gyroscope_bias_rad_s.x,
             eskf_estimate.gyroscope_bias_rad_s.y,
             eskf_estimate.gyroscope_bias_rad_s.z,
+            tilt_accel_bias_covariance[0][0],
+            tilt_accel_bias_covariance[0][1],
+            tilt_accel_bias_covariance[1][1],
+            tilt_accel_bias_covariance[0][2],
+            tilt_accel_bias_covariance[0][3],
+            tilt_accel_bias_covariance[0][4],
+            tilt_accel_bias_covariance[1][2],
+            tilt_accel_bias_covariance[1][3],
+            tilt_accel_bias_covariance[1][4],
             eskf.core.P[ESKF_IDX_DAB + 0][ESKF_IDX_DAB + 0],
             eskf.core.P[ESKF_IDX_DAB + 0][ESKF_IDX_DAB + 1],
             eskf.core.P[ESKF_IDX_DAB + 0][ESKF_IDX_DAB + 2],

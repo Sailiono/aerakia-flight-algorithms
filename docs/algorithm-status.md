@@ -324,13 +324,24 @@ trials; all five zero-bias trials passed. Terminal horizontal-bias P95 ranged fr
 stable five-second pass. This is a genuine retained G0 failure, not a smoke-infrastructure failure.
 It shows that the previous single-trajectory convergence result does not generalize yet.
 
-Bias reporting now exports each 3x3 bias covariance block and calculates 3D accelerometer/gyro
-bias NEES, per-axis error, terminal-five-second statistics, continuous-five-second convergence,
-and explicit right-censoring. In the paired `+X/-Y` example, accelerometer-bias NEES mean is
-`0.782` versus the three-dimensional expectation `3`, gyro-bias NEES mean is `0.113`, and the
-accelerometer estimate is censored at `38.99 s`. The covariances are conservative in that track;
-tilt+bias joint NEES remains intentionally unavailable until the complete right-error 6x6 block is
-exported.
+Bias reporting now exports each 3x3 bias covariance block and the complete 5x5 marginal covariance
+for right-error tilt x/y plus accelerometer bias. It calculates their joint NEES with all cross
+terms while excluding unobservable yaw, as well as per-axis error, terminal-five-second statistics,
+continuous-five-second convergence, and explicit right-censoring. In the paired `+X/-Y` diagnostic,
+the earlier accelerometer/gyro bias-only NEES means were `0.782 / 0.113`; a reproducible seed-7
+review with explicit `+0.15/-0.15 m/s²` horizontal bias gives 5D joint NEES mean `0.768` versus the
+expected `5`, with zero invalid covariance samples. The covariance is clearly conservative, yet
+that fact does not by itself make the physical bias converge.
+
+A source-fixed train/tune study at commit `5109568` completed 324/324 runs without opening the
+frozen holdout. Broadening post-alignment accelerometer-bias covariance from `0.04` to `0.09`
+increased passes from 23/108 to 33/108 and reduced right-censoring from 81/108 to 73/108, but all
+64 non-zero train trials still failed and remained censored; terminal and attitude tails also
+worsened. Raising `sigma_acc_bias` from `0.001` to `0.003 m/s3/sqrt(Hz)` added no material benefit.
+Both temporary-wrapper candidates were rejected and were not implemented. G0 therefore remains
+open on tilt--horizontal-bias observability; the frozen holdout remains unopened. The compact
+candidate evidence is retained in
+[`validation/public/g0_bias_candidate_study.json`](../validation/public/g0_bias_candidate_study.json).
 
 The adapter now exposes one explicit `process_noise` profile and applies it atomically to the core.
 Named VTOL/transition/fixed-wing profiles belong to the private FCOne product configuration and

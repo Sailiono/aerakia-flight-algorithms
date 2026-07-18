@@ -1,0 +1,215 @@
+{
+  "schema_version": 1,
+  "study_id": "g0-horizontal-accelerometer-bias-train-tune-candidates",
+  "status": "completed_candidates_rejected",
+  "source_commit": "51095687fd7925d149e6c16f1e1a3bb55f06b4cf",
+  "protocol": {
+    "path": "validation/bias_observability_protocol_v1.json",
+    "sha256": "93a6493eaffc41ae12649adcbad7175afc695b14ccecf21f326fc743e60e0ab5"
+  },
+  "selection": {
+    "splits": ["train", "tune"],
+    "train_seeds": [0, 1, 2, 3],
+    "tune_seeds": [1000, 1001, 1002, 1003],
+    "trajectories": [
+      "hover_axis_pulses",
+      "takeoff_box_land",
+      "yaw_quadrant_hover"
+    ],
+    "bias_vectors": [
+      "zero",
+      "x_neg",
+      "x_pos",
+      "y_neg",
+      "y_pos",
+      "xy_neg_neg",
+      "xy_neg_pos",
+      "xy_pos_neg",
+      "xy_pos_pos"
+    ],
+    "trials_per_candidate": 108,
+    "candidate_count": 3,
+    "executed_trial_count": 324
+  },
+  "holdout_accessed": false,
+  "holdout_seed_range_half_open": [30000, 30064],
+  "method": {
+    "temporary_wrapper_only": true,
+    "core_source_modified": false,
+    "candidate_implemented": false,
+    "covariance_override_timing": "immediately_after_static_alignment",
+    "truth_assisted_initialization": false
+  },
+  "candidates": {
+    "baseline": {
+      "definition": {
+        "accel_bias_covariance_m2_s4": 0.04,
+        "accel_bias_prior_std_m_s2": 0.2,
+        "sigma_acc_bias_m_s3_sqrt_hz": 0.001,
+        "static_tilt_prior_deg": 2.0
+      },
+      "runner_sha256": "ab62fbb334fc5c725a33164dfa98b9b762e90ecf7f85537d6bd050b32de761ef",
+      "overall": {
+        "trials": 108,
+        "passed": 23,
+        "pass_rate": 0.21296296296296297,
+        "right_censored": 81,
+        "right_censored_rate": 0.75,
+        "terminal_horizontal_p95_m_s2": {
+          "mean": 0.12165533026063119,
+          "median": 0.14720740249976494,
+          "p95": 0.216977568442404,
+          "max": 0.22510850080465133
+        },
+        "post_alignment_attitude_rmse_deg": {
+          "mean": 1.4332716597974184,
+          "p95": 2.246414220631603,
+          "max": 2.3364028503319823
+        },
+        "position_rmse_m": {
+          "mean": 0.15118970413843064,
+          "p95": 0.18027813228585296,
+          "max": 0.18028798356809334
+        },
+        "velocity_rmse_m_s": {
+          "mean": 0.07478028341146646,
+          "p95": 0.07819519554960834,
+          "max": 0.07841645984421283
+        },
+        "healthy_ratio_min": 1.0,
+        "navigation_recoveries_total": 0
+      }
+    },
+    "p009": {
+      "definition": {
+        "accel_bias_covariance_m2_s4": 0.09,
+        "accel_bias_prior_std_m_s2": 0.3,
+        "sigma_acc_bias_m_s3_sqrt_hz": 0.001,
+        "static_tilt_prior_deg": 2.0
+      },
+      "runner_sha256": "0c909a82b2a0906818255116b76af2604ba0008cf54a9a2ab5fe9d9eb1b5193c",
+      "overall": {
+        "trials": 108,
+        "passed": 33,
+        "pass_rate": 0.3055555555555556,
+        "right_censored": 73,
+        "right_censored_rate": 0.6759259259259259,
+        "terminal_horizontal_p95_m_s2": {
+          "mean": 0.1191272729626611,
+          "median": 0.14563706509479216,
+          "p95": 0.22070382292779697,
+          "max": 0.23478626632513896
+        },
+        "post_alignment_attitude_rmse_deg": {
+          "mean": 1.4115250040464018,
+          "p95": 2.242672409407578,
+          "max": 2.3959956126572233
+        },
+        "position_rmse_m": {
+          "mean": 0.15119526055552052,
+          "p95": 0.1803200382724596,
+          "max": 0.1803302819216904
+        },
+        "velocity_rmse_m_s": {
+          "mean": 0.07491103924005242,
+          "p95": 0.07828236781039871,
+          "max": 0.07850337204060025
+        },
+        "healthy_ratio_min": 1.0,
+        "navigation_recoveries_total": 0
+      },
+      "paired_vs_baseline": {
+        "paired_trials": 108,
+        "pass_wins": 10,
+        "pass_losses": 0,
+        "censor_wins": 8,
+        "censor_losses": 0,
+        "terminal_p95_delta_m_s2": {
+          "mean": -0.0025280572979700824,
+          "median": -0.00127371403312454,
+          "p95": 0.008921537875639794,
+          "min": -0.016082889084330677,
+          "max": 0.011266371089748093
+        },
+        "attitude_rmse_delta_deg": {
+          "mean": -0.021746655751016114,
+          "p95": 0.045180392917671675,
+          "min": -0.1456248750123177,
+          "max": 0.06758381215040643
+        },
+        "conclusion": "Some tune directions improve, but all 64 non-zero train trials still fail and remain right-censored; terminal and attitude tails worsen."
+      }
+    },
+    "p009_rw003": {
+      "definition": {
+        "accel_bias_covariance_m2_s4": 0.09,
+        "accel_bias_prior_std_m_s2": 0.3,
+        "sigma_acc_bias_m_s3_sqrt_hz": 0.003,
+        "static_tilt_prior_deg": 2.0
+      },
+      "runner_sha256": "b305ab3789e53deb67b91a2ec603638d7644d98dc1a7f725d65f6bd14f5dc054",
+      "overall": {
+        "trials": 108,
+        "passed": 33,
+        "pass_rate": 0.3055555555555556,
+        "right_censored": 73,
+        "right_censored_rate": 0.6759259259259259,
+        "terminal_horizontal_p95_m_s2": {
+          "mean": 0.11911222187830542,
+          "median": 0.1456417334185708,
+          "p95": 0.22068814904509892,
+          "max": 0.23479259789113038
+        },
+        "post_alignment_attitude_rmse_deg": {
+          "mean": 1.411452311859213,
+          "p95": 2.2427300574397493,
+          "max": 2.396154820599791
+        },
+        "position_rmse_m": {
+          "mean": 0.15119573609448816,
+          "p95": 0.18031983614671543,
+          "max": 0.18033007707393695
+        },
+        "velocity_rmse_m_s": {
+          "mean": 0.07493699212015087,
+          "p95": 0.0783149934674588,
+          "max": 0.0785358729367296
+        },
+        "healthy_ratio_min": 1.0,
+        "navigation_recoveries_total": 0
+      },
+      "paired_vs_baseline": {
+        "paired_trials": 108,
+        "pass_wins": 10,
+        "pass_losses": 0,
+        "censor_wins": 8,
+        "censor_losses": 0,
+        "terminal_p95_delta_m_s2": {
+          "mean": -0.0025431083823257796,
+          "median": -0.0012561660206426711,
+          "p95": 0.008944771200983472,
+          "min": -0.01625769243174903,
+          "max": 0.01129430847775035
+        },
+        "attitude_rmse_delta_deg": {
+          "mean": -0.021819347938205152,
+          "p95": 0.0451875561410173,
+          "min": -0.1460070898667396,
+          "max": 0.06757004196814442
+        },
+        "conclusion": "The larger random-walk noise is numerically indistinguishable from p009 at this campaign duration."
+      }
+    }
+  },
+  "decision": {
+    "result": "reject_both_candidates",
+    "implemented_in_core": false,
+    "reasons": [
+      "Every non-zero train trial remains failed and right-censored.",
+      "The broader covariance improves only selected tune directions and does not close the hard xy_pos_neg direction.",
+      "The broader covariance worsens the terminal-error and attitude-error tails and raises zero-bias terminal error on every trajectory.",
+      "Increasing sigma_acc_bias from 0.001 to 0.003 m/s3/sqrt(Hz) provides no material additional gain."
+    ],
+    "next_research_direction": "Address tilt-horizontal-bias observability coupling with an excitation-aware prior or update, then select only on train and tune before opening the frozen holdout once."
+  }
+}

@@ -108,14 +108,17 @@ the product budget reviewed independently.
 The causal analysis and frozen non-multisine cross-validation design are recorded in
 [Horizontal accelerometer-bias observability](bias-observability.md). New bias reports include
 three-axis covariance/NEES, per-axis and terminal-window error, continuous-five-second convergence,
-and explicit right-censoring; they intentionally do not claim a tilt+bias joint NEES until the
-complete right-error 6x6 covariance block is exported.
+and explicit right-censoring. The runner now also exports the complete 5x5 marginal covariance for
+right-error tilt x/y plus three-axis accelerometer bias, so their joint NEES retains the cross terms
+without adding unobservable yaw.
 
 The first protocol smoke is deliberately not green at the capability layer: 15/15 trials execute,
-all five zero-bias tracks pass, and all ten boundary-bias tracks fail stable convergence. The next
-G0 work is therefore the predeclared data-contract/observability experiment matrix and a small
-train/tune covariance/process-noise study, followed by one opening of the 1,152-trial holdout. The
-release holdout is not run merely to produce a larger known failure set before a candidate exists.
+all five zero-bias tracks pass, and all ten boundary-bias tracks fail stable convergence. A 324-run
+train/tune study subsequently rejected both a broader scalar bias prior and a larger bias random
+walk: neither fixed the non-zero train cases and both left worse tail behavior. The next G0 work is
+therefore an excitation-aware tilt/bias candidate, followed by one opening of the 1,152-trial
+holdout only if train/tune selects it. The release holdout is not run merely to produce a larger
+known failure set before a candidate exists.
 
 The statistical result assumes each calibrated startup residual-bias component lies within three sigma
 (`0.15 m/s²` accelerometer and `0.6 deg/s` gyroscope under the current provisional prior). FCOne

@@ -73,6 +73,29 @@ exact horizontal bias vectors, disjoint train/tune/holdout seeds, interval-start
 per-trajectory/vector release gates. Smoke mode may report rather than enforce capability gates,
 but its JSON and Markdown status must still say `capability_failed` whenever any metric fails.
 
+### Tilt and accelerometer-bias consistency
+
+The native runner exports the complete 5-by-5 marginal covariance for
+`[δθx, δθy, δba_x, δba_y, δba_z]`. The attitude components are the first two axes of the ESKF
+right-error tangent vector, consistent with nominal injection `q_true = q_estimate ⊗ Exp(δθ)`;
+the analyzer obtains them from `Log(q_estimate^-1 ⊗ q_truth)`. Bias errors use
+`bias_truth - bias_estimate`, matching the error-state injection sign. The exported tilt 2-by-2,
+tilt/bias 2-by-3, and accelerometer-bias 3-by-3 blocks retain their cross covariance and are
+assembled without conditioning.
+
+The resulting 5D NEES is reported only when quaternion truth and every covariance block are
+present and positive definite. Its expected mean is 5; per-sample 95% coverage is diagnostic,
+not an independent-trial confidence claim, because adjacent replay rows are correlated. `δθz` is
+deliberately excluded: without an accepted trusted-heading source yaw is unobservable, and adding
+it would turn a tilt/bias consistency check into a test dominated by arbitrary yaw uncertainty.
+This marginal score is valid in the ESKF local-error regime and does not claim full 6D
+attitude-plus-bias consistency.
+
+Bias reports also include signed per-axis errors, terminal-five-second statistics, and the first
+interval that remains below the declared norm threshold continuously for five seconds. Runs that
+never satisfy the dwell requirement are explicitly right-censored at their observed duration;
+their final sample is not relabeled as convergence.
+
 ## Current deterministic scenarios
 
 - `clean_motion`: combined roll, pitch, and yaw without injected magnetic faults;

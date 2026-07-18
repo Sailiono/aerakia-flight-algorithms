@@ -85,3 +85,44 @@ Interpret results as follows:
 
 This A/B does not replace independent truth. It establishes engineering non-inferiority only for
 the declared vehicle profile and input contract.
+
+## M0 executable skeleton
+
+M0 freezes the comparison before either exporter is accepted:
+
+- `validation/px4_bias_ab_m0_manifest.json` freezes the PX4 commit, audited source-file hashes,
+  stock configurations, time semantics, and absolute convergence gates;
+- `validation/px4_bias_ab_schema_v1.json` defines one dense physical-input CSV, one estimator-output
+  CSV, and the mandatory provenance sidecars;
+- `validation/run_px4_bias_ab_m0.py` verifies the local PX4 Git tree and every artifact hash, then
+  compares only outputs aligned at the same delayed fusion horizon;
+- `tests/test_px4_bias_ab_m0.py` locks the fail-closed behavior and the first comparison metrics.
+
+The runner has no clone, fetch, download, or fallback-estimator path. A normal invocation is:
+
+```bash
+python3 validation/run_px4_bias_ab_m0.py \
+  --px4-source /absolute/path/to/PX4-Autopilot \
+  --input-csv /absolute/path/to/input.csv \
+  --input-metadata /absolute/path/to/input.metadata.json \
+  --aerakia-output /absolute/path/to/aerakia.csv \
+  --aerakia-metadata /absolute/path/to/aerakia.metadata.json \
+  --px4-output /absolute/path/to/px4.csv \
+  --px4-metadata /absolute/path/to/px4.metadata.json \
+  --out-dir build/px4-bias-ab-m0
+```
+
+It always writes `run-manifest.json`. Exit status `0` means the supplied frozen artifacts were
+compared, `1` means a supplied source or artifact violated the protocol, and `2` means a required
+local dependency or exporter artifact is absent. Only status `completed` may contain comparison
+metrics. Even then, the manifest keeps `claim_status: no_px4_parity_claim` because M0 is a narrow
+accelerometer-bias diagnostic, not flight-readiness evidence.
+
+Bias validity is part of the score, not decorative metadata. Three-sigma coverage and bias NEES
+use only samples with `accel_bias_valid=1` and strictly positive reported variances. A continuous
+settling interval fails if any sample marks the bias invalid, even when the numerical bias value is
+inside the error threshold.
+
+At this milestone the canonical Aerakia and PX4 exporters are still an explicit blocked dependency.
+Until both produce the declared CSV and provenance sidecar from the same input, no numerical PX4
+result is reported.

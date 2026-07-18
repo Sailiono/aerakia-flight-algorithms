@@ -16,6 +16,7 @@ ALGORITHMS = ("mahony_standard", "mahony_robust", "eskf")
 AXES = ("roll", "pitch", "yaw")
 CHI_SQUARE_95 = {
     3: (0.215795, 9.348404),
+    5: (0.831212, 12.832502),
     6: (1.237344, 14.449375),
 }
 
@@ -114,6 +115,31 @@ def quaternion_attitude_errors_deg(
     down_dot = np.sum(down_body(estimate) * down_body(truth), axis=1)
     tilt = np.degrees(np.arccos(np.clip(down_dot, -1.0, 1.0)))
     return geodesic, tilt
+
+
+def quaternion_right_error_rotation_vector(
+    estimate: np.ndarray, truth: np.ndarray
+) -> np.ndarray:
+    """Return Log(q_estimate^-1 * q_truth) for the ESKF right-error convention."""
+    estimate = estimate / np.linalg.norm(estimate, axis=1)[:, None]
+    truth = truth / np.linalg.norm(truth, axis=1)[:, None]
+    ew, ex, ey, ez = estimate.T
+    tw, tx, ty, tz = truth.T
+    error = np.column_stack(
+        (
+            ew * tw + ex * tx + ey * ty + ez * tz,
+            ew * tx - ex * tw - ey * tz + ez * ty,
+            ew * ty + ex * tz - ey * tw - ez * tx,
+            ew * tz - ex * ty + ey * tx - ez * tw,
+        )
+    )
+    error[error[:, 0] < 0.0] *= -1.0
+    vector_norm = np.linalg.norm(error[:, 1:], axis=1)
+    angle = 2.0 * np.arctan2(vector_norm, np.clip(error[:, 0], 0.0, 1.0))
+    scale = np.full(len(error), 2.0, dtype=np.float64)
+    nonzero = vector_norm > 1.0e-12
+    scale[nonzero] = angle[nonzero] / vector_norm[nonzero]
+    return error[:, 1:] * scale[:, None]
 
 
 def metrics_for(
@@ -641,12 +667,15 @@ def bias_metrics(columns: dict[str, np.ndarray]) -> dict[str, object] | None:
         covariance[:, 2, 2] = values[:, 5]
         return covariance
 
-    def bias_nees(
-        error_vector: np.ndarray, covariance: np.ndarray
+    def state_nees(
+        error_vector: np.ndarray,
+        covariance: np.ndarray,
+        score_mask: np.ndarray,
+        degrees_of_freedom: int,
     ) -> tuple[dict[str, object], np.ndarray]:
         nees = np.full(len(error_vector), np.nan, dtype=np.float64)
         covariance_valid = np.zeros(len(error_vector), dtype=bool)
-        for index in indices:
+        for index in np.flatnonzero(score_mask):
             matrix = 0.5 * (covariance[index] + covariance[index].T)
             if not np.all(np.isfinite(matrix)):
                 continue
@@ -657,16 +686,20 @@ def bias_metrics(columns: dict[str, np.ndarray]) -> dict[str, object] | None:
                 error_vector[index] @ np.linalg.solve(matrix, error_vector[index])
             )
             covariance_valid[index] = True
-        summary: dict[str, object] = _consistency_summary(nees[valid], 3)
-        finite = nees[valid & np.isfinite(nees)]
-        terminal = nees[terminal_mask & np.isfinite(nees)]
+        summary: dict[str, object] = _consistency_summary(
+            nees[score_mask], degrees_of_freedom
+        )
+        finite = nees[score_mask & np.isfinite(nees)]
+        terminal = nees[terminal_mask & score_mask & np.isfinite(nees)]
         summary.update(
             {
                 "median": float(np.median(finite)) if len(finite) else float("nan"),
                 "terminal_5s_mean": (
                     float(np.mean(terminal)) if len(terminal) else float("nan")
                 ),
-                "invalid_covariance_samples": int(np.count_nonzero(valid & ~covariance_valid)),
+                "invalid_covariance_samples": int(
+                    np.count_nonzero(score_mask & ~covariance_valid)
+                ),
             }
         )
         return summary, covariance_valid
@@ -698,15 +731,18 @@ def bias_metrics(columns: dict[str, np.ndarray]) -> dict[str, object] | None:
         "bias_consistency_available": False,
         "tilt_accel_bias_joint_nees": None,
         "tilt_accel_bias_joint_nees_status": (
-            "not_reported: the runner does not export the complete attitude-bias 6x6 "
-            "covariance in the ESKF right-error tangent frame"
+            "not_reported: right-error quaternion or complete 5x5 marginal covariance missing"
         ),
     }
     accel_covariance = covariance_series("eskf_accel_bias")
     gyro_covariance = covariance_series("eskf_gyro_bias")
     if accel_covariance is not None and gyro_covariance is not None:
-        accel_nees, accel_covariance_valid = bias_nees(accel_error_vector, accel_covariance)
-        gyro_nees, gyro_covariance_valid = bias_nees(gyro_error_vector, gyro_covariance)
+        accel_nees, accel_covariance_valid = state_nees(
+            accel_error_vector, accel_covariance, valid, 3
+        )
+        gyro_nees, gyro_covariance_valid = state_nees(
+            gyro_error_vector, gyro_covariance, valid, 3
+        )
         accel_terminal_covariance = terminal_mask & accel_covariance_valid
         gyro_terminal_covariance = terminal_mask & gyro_covariance_valid
         result.update(
@@ -723,6 +759,67 @@ def bias_metrics(columns: dict[str, np.ndarray]) -> dict[str, object] | None:
                 "gyro_bias_terminal_5s_mean_covariance_rad2_s2": (
                     np.mean(gyro_covariance[gyro_terminal_covariance], axis=0).tolist()
                     if np.any(gyro_terminal_covariance) else None
+                ),
+            }
+        )
+
+    joint_covariance_names = [
+        "eskf_right_error_tilt_cov_xx_rad2",
+        "eskf_right_error_tilt_cov_xy_rad2",
+        "eskf_right_error_tilt_cov_yy_rad2",
+        "eskf_right_error_tilt_accel_bias_cov_x_x_rad_m_s2",
+        "eskf_right_error_tilt_accel_bias_cov_x_y_rad_m_s2",
+        "eskf_right_error_tilt_accel_bias_cov_x_z_rad_m_s2",
+        "eskf_right_error_tilt_accel_bias_cov_y_x_rad_m_s2",
+        "eskf_right_error_tilt_accel_bias_cov_y_y_rad_m_s2",
+        "eskf_right_error_tilt_accel_bias_cov_y_z_rad_m_s2",
+    ]
+    truth_quaternion = _normalized_quaternion_columns(columns, "truth")
+    estimate_quaternion = _normalized_quaternion_columns(columns, "eskf")
+    if (
+        accel_covariance is not None
+        and truth_quaternion is not None
+        and estimate_quaternion is not None
+        and all(name in columns for name in joint_covariance_names)
+    ):
+        joint_covariance = np.zeros((len(truth_accel), 5, 5), dtype=np.float64)
+        joint_values = np.column_stack([columns[name] for name in joint_covariance_names])
+        joint_covariance[:, 0, 0] = joint_values[:, 0]
+        joint_covariance[:, 0, 1] = joint_covariance[:, 1, 0] = joint_values[:, 1]
+        joint_covariance[:, 1, 1] = joint_values[:, 2]
+        joint_covariance[:, 0, 2:] = joint_values[:, 3:6]
+        joint_covariance[:, 2:, 0] = joint_values[:, 3:6]
+        joint_covariance[:, 1, 2:] = joint_values[:, 6:9]
+        joint_covariance[:, 2:, 1] = joint_values[:, 6:9]
+        joint_covariance[:, 2:, 2:] = accel_covariance
+        attitude_error = quaternion_right_error_rotation_vector(
+            estimate_quaternion, truth_quaternion
+        )
+        joint_error = np.column_stack((attitude_error[:, :2], -accel_error_vector))
+        joint_mask = valid & np.all(np.isfinite(joint_error), axis=1)
+        joint_nees, joint_covariance_valid = state_nees(
+            joint_error, joint_covariance, joint_mask, 5
+        )
+        joint_terminal_covariance = terminal_mask & joint_mask & joint_covariance_valid
+        result.update(
+            {
+                "tilt_accel_bias_joint_nees": joint_nees,
+                "tilt_accel_bias_joint_nees_status": "reported_5d_right_error_marginal",
+                "tilt_accel_bias_joint_error_order": [
+                    "right_error_dtheta_x_rad",
+                    "right_error_dtheta_y_rad",
+                    "truth_minus_estimate_dab_x_m_s2",
+                    "truth_minus_estimate_dab_y_m_s2",
+                    "truth_minus_estimate_dab_z_m_s2",
+                ],
+                "tilt_accel_bias_yaw_boundary": (
+                    "dtheta_z is omitted because yaw is unobservable without an accepted trusted "
+                    "heading source; this is the 5D marginal covariance, not a conditioned 6D score"
+                ),
+                "tilt_accel_bias_final_covariance": joint_covariance[last].tolist(),
+                "tilt_accel_bias_terminal_5s_mean_covariance": (
+                    np.mean(joint_covariance[joint_terminal_covariance], axis=0).tolist()
+                    if np.any(joint_terminal_covariance) else None
                 ),
             }
         )
@@ -1248,10 +1345,21 @@ def write_markdown(
                     f"- Gyroscope-bias 3D NEES mean: {gyro_nees['mean']:.3f} "
                     f"(expected 3, n={gyro_nees['samples']}, invalid covariance="
                     f"{gyro_nees['invalid_covariance_samples']}).",
-                    "- Tilt-plus-accelerometer-bias joint NEES is not reported because the full "
-                    "right-error 6x6 cross-covariance is not exported.",
                 ]
             )
+            joint_nees = bias.get("tilt_accel_bias_joint_nees")
+            if joint_nees:
+                lines.append(
+                    f"- Right-error tilt plus accelerometer-bias 5D marginal NEES mean: "
+                    f"{joint_nees['mean']:.3f} (expected 5, n={joint_nees['samples']}, "
+                    f"invalid covariance={joint_nees['invalid_covariance_samples']}); yaw is "
+                    "excluded because it is not observable without trusted heading."
+                )
+            else:
+                lines.append(
+                    f"- Tilt-plus-accelerometer-bias joint NEES: "
+                    f"{bias['tilt_accel_bias_joint_nees_status']}."
+                )
     consistency = metrics.get("eskf_consistency")
     if consistency:
         position_nis = consistency["position_nis"]

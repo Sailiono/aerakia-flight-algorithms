@@ -1235,11 +1235,17 @@ attitude while retaining sensor-derived bias initialization reduced the three gr
 same final distribution: median bias error about `0.0184 m/s²`, P95 about `0.0374 m/s²`. Together
 with near-odd-symmetric sign response, this rejects an axis-sign bug as the leading cause.
 
-The runner now exports both complete 3x3 bias covariance blocks. The analyzer adds bias NEES,
-per-axis/terminal-five-second error, continuous-five-second convergence, and right-censoring. It
-does not synthesize a tilt+bias joint NEES without the complete 6x6 right-error covariance. The
-focused `+X/-Y` replay gives accelerometer/gyro bias NEES means `0.782 / 0.113`; the accelerometer
-bias remains right-censored at `38.99 s` while the gyro reaches its continuous window at `19.10 s`.
+The runner first exported both complete 3x3 bias covariance blocks. The analyzer added bias NEES,
+per-axis/terminal-five-second error, continuous-five-second convergence, and right-censoring. The
+focused `+X/-Y` replay gave accelerometer/gyro bias NEES means `0.782 / 0.113`; the accelerometer
+bias remained right-censored at `38.99 s` while the gyro reached its continuous window at `19.10 s`.
+The subsequent joint-consistency extension exports the exact 5x5 marginal covariance for
+`[δθx, δθy, δba_x, δba_y, δba_z]` and evaluates `Log(q_estimate^-1 q_truth)` in the same right-error
+tangent frame. Yaw is excluded rather than falsely scored when no trusted heading is observable.
+A seed-7, 4000-sample review with explicit `+0.15/-0.15/0 m/s²` accelerometer bias completed with
+zero malformed samples or recovery and produced joint NEES mean `0.768`, terminal-five-second mean
+`0.278`, and zero invalid covariance samples. The low score confirms conservative covariance but
+does not remove the retained convergence failure.
 
 A new frozen protocol then replaced reliance on the old multisine with five minimum-jerk VTOL
 profiles: hover axis pulses, takeoff-box-land, yaw-quadrant hover, early-transition S-curve, and
@@ -1259,3 +1265,76 @@ FCOne VTOL/transition/fixed-wing configurations can be named and pinned without 
 source. Invalid profile fields fall back atomically to the public default; zero remains an explicit
 valid value. PX4 numerical values are not copied because the two implementations use different
 discrete process-noise semantics.
+
+## 2026-07-18 — G0 train/tune accelerometer-bias candidate study
+
+The estimator source was fixed at commit `5109568`, and three temporary wrapper-built runners were
+used only to study the current post-alignment accelerometer-bias covariance (`0.04`), a broader
+covariance (`0.09`), and that broader covariance with `sigma_acc_bias` increased from `0.001` to
+`0.003 m/s3/sqrt(Hz)`. The wrapper applied the covariance immediately after static alignment; no
+candidate changed the estimator core or became a product configuration.
+
+All 324 scheduled runs completed: three train/tune trajectories, four frozen seeds per split, nine
+bias vectors, and three candidates. The frozen holdout seeds 30000--30063 were neither scheduled nor
+opened. Baseline passed 23/108 with 81 right-censored trials. The broader covariance passed 33/108
+with 73 right-censored trials, but all 64 non-zero train trials still failed and remained censored;
+its terminal horizontal-error P95 tail and maximum worsened from `0.21698 / 0.22511` to
+`0.22070 / 0.23479 m/s²`, and maximum attitude RMSE rose from `2.336°` to `2.396°`. The larger
+random-walk noise produced the same pass/censor counts and only a `-0.000015 m/s²` mean terminal-P95
+change relative to the broader-prior candidate.
+
+Both candidates were rejected. The result points to unresolved tilt--horizontal-bias observability
+coupling rather than a scalar covariance/noise setting that can safely close G0. The compact,
+reviewable evidence is committed as
+[`validation/public/g0_bias_candidate_study.json`](../validation/public/g0_bias_candidate_study.json);
+the temporary wrappers and generated trial files remain uncommitted research artifacts.
+
+## 2026-07-18 — PX4 M0 fail-closed comparison skeleton
+
+The M0 protocol freezes PX4 commit `de8158101c96ad6b04170dc91f087148104c58eb`, five audited
+source-file hashes, stock estimator profiles, one canonical physical-input schema, one delayed-core
+fusion-horizon output schema, and mandatory provenance sidecars. The runner has no download or
+fallback path and always emits a status manifest. Bias-validity flags now participate in the score:
+invalid samples cannot satisfy the continuous settling gate, and coverage/NEES require positive
+variance as well as a valid bias estimate.
+
+The local FCOne v1 PX4 tree was inspected read-only at `08bb3acfd004aa9f6d26924a0e9f632c4877b304`,
+which does not match the frozen M0 commit. The preflight therefore failed closed before comparing
+outputs. Missing canonical exporters remain an explicit blocker, and no PX4 parity number was
+generated or inferred.
+
+## 2026-07-18 — GCC 14 strict-C99 CI compatibility
+
+The first remote CI attempt at commit `18e5968` failed before sanitizer execution. Reproduction on
+GCC 14 identified a strict-C99 diagnostic in two test-only helpers: converting writable 15x15
+arrays to pointers-to-arrays with added `const` qualifiers is not permitted before C23 under
+`-pedantic -Werror`. GCC 15 and Clang 21 accepted the code and had hidden the portability failure.
+
+The two helper signatures were made C99-compatible without changing estimator code. Non-MSVC CMake
+builds now require C99 with extensions disabled, and the sanitizer job pins GCC 14. The reviewed
+GCC 14 Release build shows explicit `-std=c99 -pedantic -Werror` and passes all nine CTest targets;
+the current-tree GCC 14 ASan/UBSan build also passes all nine targets. The 1,020,000-attempt input
+integrity campaign took `183.84 s`, and the complete sanitizer suite took `196.02 s` with zero
+failures.
+
+## 2026-07-18 — integrated G0 regression confirmation
+
+The integrated candidate tree was rebuilt and exercised after the joint-consistency, M0 protocol,
+and GCC 14 portability changes. The hardware-free host regression passed all nine CTest targets,
+all 69 Python tests, the 1,020,000-attempt malformed/input-integrity campaign, and all seven frozen
+deterministic scenarios. Representative ESKF geodesic attitude RMSE was `0.311°` for the clean
+scenario, `0.331°` under a magnetic spike, `0.327°` under sustained magnetic bias, and `0.686°`
+after alignment in the navigation-outage scenario; the latter also reported `0.507 m` position and
+`0.231 m/s` velocity RMSE. Trusted-heading recovery reported `0.228°` post-recovery yaw RMSE.
+
+The six-track EuRoC suite replayed 156,490 IMU samples and passed every frozen baseline and one-way
+capability gate. The difficult Vicon track retained `2.572°` reference-bias-corrected ESKF
+geodesic attitude RMSE, `0.829°` tilt RMSE, and navigation NEES `4.950`. The derived-heading track
+retained `1.549°` post-alignment geodesic attitude and `0.920°` observable-yaw RMSE, with `0.995 s`
+recovery. This remains Vicon-derived heading evidence, not a physical heading-sensor dataset.
+
+A final focused seed-7 bias replay after rebuilding the runner completed all 4,000 samples with
+zero malformed samples and zero navigation recovery. Its five-dimensional tilt/accelerometer-bias
+joint NEES mean was `0.768` (expected 5), with terminal-five-second mean `0.278` and no invalid
+covariance. The track converged in `28.5 s`, but this individual pass does not override the failed
+multi-trajectory train/tune study or authorize opening the frozen holdout.
