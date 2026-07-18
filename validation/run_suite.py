@@ -24,6 +24,15 @@ SCENARIOS = {
         "motion": "navigation_outage", "anomaly": "none", "cold_start": True,
         "static_hint": True,
     },
+    "trusted_heading_recovery": {
+        "motion": "heading_recovery", "anomaly": "none", "cold_start": True,
+        "static_hint": True, "trusted_heading": True, "disable_magnetometer": True,
+    },
+    "bias_convergence": {
+        "motion": "bias_excitation", "anomaly": "none", "cold_start": True,
+        "static_hint": True, "accel_bias_std_m_s2": 0.08,
+        "gyro_bias_std_deg_s": 0.30, "duration": 40.0,
+    },
 }
 
 
@@ -39,6 +48,20 @@ def main() -> None:
     parser.add_argument("--duration", type=float, default=20.0)
     parser.add_argument("--rate", type=float, default=100.0)
     parser.add_argument("--seed", type=int, default=7)
+    parser.add_argument("--accel-bias-std-m-s2", type=float, default=0.0)
+    parser.add_argument("--gyro-bias-std-deg-s", type=float, default=0.0)
+    parser.add_argument("--accel-bias-vector-m-s2", type=float, nargs=3, metavar=("X", "Y", "Z"))
+    parser.add_argument("--gyro-bias-vector-deg-s", type=float, nargs=3, metavar=("X", "Y", "Z"))
+    parser.add_argument("--bias-sigma-limit", type=float, default=0.0)
+    parser.add_argument("--timestamp-jitter-std-us", type=float, default=0.0)
+    parser.add_argument("--accel-noise-m-s2", type=float, default=0.02)
+    parser.add_argument("--gyro-noise-deg-s", type=float, default=0.05)
+    parser.add_argument("--mag-noise-ut", type=float, default=0.20)
+    parser.add_argument("--mag-rate-hz", type=float)
+    parser.add_argument("--gps-position-noise-m", type=float, default=0.5)
+    parser.add_argument("--gps-velocity-noise-m-s", type=float, default=0.1)
+    parser.add_argument("--rate-invariant-streams", action="store_true")
+    parser.add_argument("--no-plots", action="store_true")
     args = parser.parse_args()
 
     root = Path(__file__).resolve().parents[1]
@@ -61,35 +84,68 @@ def main() -> None:
         scenario_dir.mkdir(parents=True, exist_ok=True)
         input_csv = scenario_dir / "input.csv"
         results_csv = scenario_dir / "results.csv"
+        generation_metadata = scenario_dir / "input-metadata.json"
 
         generator_command = [
             sys.executable,
             str(generator),
             "--out", str(input_csv),
-            "--duration", str(args.duration),
+            "--duration", str(scenario.get("duration", args.duration)),
             "--rate", str(args.rate),
             "--seed", str(args.seed),
             "--motion", str(scenario["motion"]),
             "--anomaly", str(scenario["anomaly"]),
+            "--accel-bias-std-m-s2", str(
+                scenario.get("accel_bias_std_m_s2", args.accel_bias_std_m_s2)
+            ),
+            "--gyro-bias-std-deg-s", str(
+                scenario.get("gyro_bias_std_deg_s", args.gyro_bias_std_deg_s)
+            ),
+            "--bias-sigma-limit", str(args.bias_sigma_limit),
+            "--timestamp-jitter-std-us", str(args.timestamp_jitter_std_us),
+            "--accel-noise-m-s2", str(args.accel_noise_m_s2),
+            "--gyro-noise-deg-s", str(args.gyro_noise_deg_s),
+            "--mag-noise-ut", str(args.mag_noise_ut),
+            "--gps-position-noise-m", str(args.gps_position_noise_m),
+            "--gps-velocity-noise-m-s", str(args.gps_velocity_noise_m_s),
+            "--metadata", str(generation_metadata),
         ]
+        if args.mag_rate_hz is not None:
+            generator_command.extend(["--mag-rate-hz", str(args.mag_rate_hz)])
+        if args.accel_bias_vector_m_s2 is not None:
+            generator_command.extend([
+                "--accel-bias-vector-m-s2",
+                *(str(value) for value in args.accel_bias_vector_m_s2),
+            ])
+        if args.gyro_bias_vector_deg_s is not None:
+            generator_command.extend([
+                "--gyro-bias-vector-deg-s",
+                *(str(value) for value in args.gyro_bias_vector_deg_s),
+            ])
+        if args.rate_invariant_streams:
+            generator_command.append("--rate-invariant-streams")
         if scenario.get("static_hint"):
             generator_command.append("--static-hint")
+        if scenario.get("trusted_heading"):
+            generator_command.append("--trusted-heading")
+        if scenario.get("disable_magnetometer"):
+            generator_command.append("--disable-magnetometer")
         run(generator_command)
         runner_command = [str(args.runner)]
         if scenario.get("cold_start"):
             runner_command.append("--cold-start")
         runner_command.extend([str(input_csv), str(results_csv)])
         run(runner_command)
-        run(
-            [
+        analyzer_command = [
                 sys.executable,
                 str(analyzer),
                 str(results_csv),
                 "--out-dir", str(scenario_dir),
                 "--scenario", scenario_name,
-            ],
-            plot_environment,
-        )
+        ]
+        if args.no_plots:
+            analyzer_command.append("--no-plots")
+        run(analyzer_command, plot_environment)
         summaries.append(json.loads((scenario_dir / "metrics.json").read_text(encoding="utf-8")))
 
     report_lines = [

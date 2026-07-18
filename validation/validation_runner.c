@@ -16,6 +16,16 @@
 #define MAX_LINE_LENGTH 16384
 #define MAX_COLUMNS 128
 
+static FILE *open_portable_file(const char *path, const char *mode)
+{
+#if defined(_MSC_VER)
+    FILE *stream = NULL;
+    return fopen_s(&stream, path, mode) == 0 ? stream : NULL;
+#else
+    return fopen(path, mode);
+#endif
+}
+
 typedef struct {
     int seq, ts_us;
     int acc_x, acc_y, acc_z, gyro_x, gyro_y, gyro_z, mag_x, mag_y, mag_z;
@@ -24,15 +34,18 @@ typedef struct {
     int ref_q_w, ref_q_x, ref_q_y, ref_q_z;
     int position_ref_valid, ref_position_n, ref_position_e, ref_position_d;
     int ref_velocity_n, ref_velocity_e, ref_velocity_d;
-    int position_update, gps_position_n, gps_position_e, gps_position_d;
+    int position_update, gps_position_update, gps_velocity_update;
+    int gps_position_n, gps_position_e, gps_position_d;
     int gps_velocity_n, gps_velocity_e, gps_velocity_d;
     int gps_position_variance, gps_velocity_variance;
-    int heading_valid, heading_update, heading, heading_variance;
+    int heading_valid, heading_update, heading, heading_variance, heading_fault;
     int course_valid, course_update, course, course_variance, ground_speed;
     int gsf_yaw_valid, gsf_yaw_update, gsf_yaw, gsf_yaw_variance;
     int baro_update, baro_height, baro_variance, static_hint;
     int reset_counter, reset_event;
     int reset_q_w, reset_q_x, reset_q_y, reset_q_z;
+    int truth_accel_bias_x, truth_accel_bias_y, truth_accel_bias_z;
+    int truth_gyro_bias_x, truth_gyro_bias_y, truth_gyro_bias_z;
 } ColumnMap;
 
 static int split_csv(char *line, char *columns[], int maximum_columns)
@@ -81,6 +94,8 @@ static int load_column_map(char *header, ColumnMap *map)
     MAP(ref_velocity_n, "ref_velocity_n_m_s"); MAP(ref_velocity_e, "ref_velocity_e_m_s");
     MAP(ref_velocity_d, "ref_velocity_d_m_s");
     MAP(position_update, "position_update");
+    MAP(gps_position_update, "gps_position_update");
+    MAP(gps_velocity_update, "gps_velocity_update");
     MAP(gps_position_n, "gps_position_n_m"); MAP(gps_position_e, "gps_position_e_m");
     MAP(gps_position_d, "gps_position_d_m");
     MAP(gps_velocity_n, "gps_velocity_n_m_s"); MAP(gps_velocity_e, "gps_velocity_e_m_s");
@@ -89,6 +104,7 @@ static int load_column_map(char *header, ColumnMap *map)
     MAP(gps_velocity_variance, "gps_velocity_variance_m2_s2");
     MAP(heading_valid, "gnss_heading_valid"); MAP(heading_update, "gnss_heading_update");
     MAP(heading, "gnss_heading_rad"); MAP(heading_variance, "gnss_heading_variance_rad2");
+    MAP(heading_fault, "gnss_heading_fault");
     MAP(course_valid, "gnss_course_valid"); MAP(course_update, "gnss_course_update");
     MAP(course, "gnss_course_rad"); MAP(course_variance, "gnss_course_variance_rad");
     MAP(ground_speed, "gnss_ground_speed_m_s");
@@ -100,6 +116,12 @@ static int load_column_map(char *header, ColumnMap *map)
     MAP(reset_counter, "ref_attitude_reset_counter"); MAP(reset_event, "ref_attitude_reset_event");
     MAP(reset_q_w, "ref_delta_q_reset_w"); MAP(reset_q_x, "ref_delta_q_reset_x");
     MAP(reset_q_y, "ref_delta_q_reset_y"); MAP(reset_q_z, "ref_delta_q_reset_z");
+    MAP(truth_accel_bias_x, "truth_accel_bias_x_m_s2");
+    MAP(truth_accel_bias_y, "truth_accel_bias_y_m_s2");
+    MAP(truth_accel_bias_z, "truth_accel_bias_z_m_s2");
+    MAP(truth_gyro_bias_x, "truth_gyro_bias_x_rad_s");
+    MAP(truth_gyro_bias_y, "truth_gyro_bias_y_rad_s");
+    MAP(truth_gyro_bias_z, "truth_gyro_bias_z_rad_s");
     return map->seq >= 0 && map->ts_us >= 0
         && map->acc_x >= 0 && map->acc_y >= 0 && map->acc_z >= 0
         && map->gyro_x >= 0 && map->gyro_y >= 0 && map->gyro_z >= 0
@@ -329,9 +351,9 @@ int main(int argc, char *argv[])
         fputs("--cold-start and --reference-attitude-init are mutually exclusive\n", stderr);
         return 2;
     }
-    input = fopen(argv[input_argument], "r");
+    input = open_portable_file(argv[input_argument], "r");
     if (input == NULL) { perror("open input"); return 2; }
-    output = fopen(argv[output_argument], "w");
+    output = open_portable_file(argv[output_argument], "w");
     if (output == NULL) { perror("open output"); fclose(input); return 2; }
     if (fgets(line, sizeof(line), input) == NULL || !load_column_map(line, &map)) {
         fputs("Input does not satisfy the replay CSV contract\n", stderr);
@@ -363,11 +385,14 @@ int main(int argc, char *argv[])
         "eskf_navigation_recovery_count,eskf_healthy,eskf_static_aligned,"
         "eskf_static_tilt_aligned,eskf_static_heading_aligned,"
         "eskf_stationary_detected,eskf_zupt_applied,eskf_zupt_count,"
-        "input_mag_update,input_position_update,position_ref_valid,"
+        "eskf_horizontal_aiding_age_s,eskf_horizontal_position_aiding_age_s,"
+        "eskf_horizontal_velocity_aiding_age_s,eskf_horizontal_position_valid,"
+        "eskf_horizontal_velocity_valid,eskf_horizontal_navigation_valid,"
+        "input_mag_update,input_position_update,input_velocity_update,position_ref_valid,"
         "ref_attitude_reset_counter,ref_attitude_reset_event,"
         "ref_delta_q_reset_w,ref_delta_q_reset_x,ref_delta_q_reset_y,ref_delta_q_reset_z,"
         "input_heading_update,eskf_heading_accepted,eskf_heading_innovation_rad,"
-        "gnss_heading_valid,gnss_heading_rad,gnss_heading_variance_rad2,"
+        "gnss_heading_valid,gnss_heading_rad,gnss_heading_variance_rad2,input_heading_fault,"
         "gnss_course_valid,gnss_course_update,gnss_course_rad,gnss_course_variance_rad,"
         "gnss_ground_speed_m_s,px4_gsf_yaw_valid,px4_gsf_yaw_update,"
         "px4_gsf_yaw_rad,px4_gsf_yaw_variance_rad2,"
@@ -379,7 +404,17 @@ int main(int argc, char *argv[])
         "truth_q_w,truth_q_x,truth_q_y,truth_q_z,"
         "mahony_standard_q_w,mahony_standard_q_x,mahony_standard_q_y,mahony_standard_q_z,"
         "mahony_robust_q_w,mahony_robust_q_x,mahony_robust_q_y,mahony_robust_q_z,"
-        "eskf_q_w,eskf_q_x,eskf_q_y,eskf_q_z\n",
+        "eskf_q_w,eskf_q_x,eskf_q_y,eskf_q_z,"
+        "truth_accel_bias_x_m_s2,truth_accel_bias_y_m_s2,truth_accel_bias_z_m_s2,"
+        "truth_gyro_bias_x_rad_s,truth_gyro_bias_y_rad_s,truth_gyro_bias_z_rad_s,"
+        "eskf_accel_bias_x_m_s2,eskf_accel_bias_y_m_s2,eskf_accel_bias_z_m_s2,"
+        "eskf_gyro_bias_x_rad_s,eskf_gyro_bias_y_rad_s,eskf_gyro_bias_z_rad_s,"
+        "eskf_accel_bias_cov_xx_m2_s4,eskf_accel_bias_cov_xy_m2_s4,"
+        "eskf_accel_bias_cov_xz_m2_s4,eskf_accel_bias_cov_yy_m2_s4,"
+        "eskf_accel_bias_cov_yz_m2_s4,eskf_accel_bias_cov_zz_m2_s4,"
+        "eskf_gyro_bias_cov_xx_rad2_s2,eskf_gyro_bias_cov_xy_rad2_s2,"
+        "eskf_gyro_bias_cov_xz_rad2_s2,eskf_gyro_bias_cov_yy_rad2_s2,"
+        "eskf_gyro_bias_cov_yz_rad2_s2,eskf_gyro_bias_cov_zz_rad2_s2\n",
         output
     );
 
@@ -407,7 +442,15 @@ int main(int argc, char *argv[])
         const double magnetic_declination_rad = parse_double(
             columns, count, map.magnetic_declination, 0.0, &ok
         );
-        const int position_update = (int)parse_double(columns, count, map.position_update, 0.0, &ok) != 0;
+        const int paired_navigation_update = (int)parse_double(
+            columns, count, map.position_update, 0.0, &ok
+        ) != 0;
+        const int position_update = paired_navigation_update || ((int)parse_double(
+            columns, count, map.gps_position_update, 0.0, &ok
+        ) != 0);
+        const int velocity_update = paired_navigation_update || ((int)parse_double(
+            columns, count, map.gps_velocity_update, 0.0, &ok
+        ) != 0);
         const int heading_valid = (int)parse_double(
             columns, count, map.heading_valid, 0.0, &ok
         ) != 0;
@@ -512,38 +555,74 @@ int main(int argc, char *argv[])
         (void)aerakia_mahony_update(&robust, &sample, &robust_estimate);
         (void)aerakia_eskf_process_imu(&eskf, &sample, &eskf_estimate);
 
-        if (position_update) {
-            const AerakiaVec3f gps_position = parse_vector(
+        if (position_update && velocity_update) {
+            AerakiaGpsObservation observation = {0};
+            observation.timestamp_us = sample.timestamp_us;
+            observation.position_ned_m = parse_vector(
                 columns, count, map.gps_position_n, map.gps_position_e, map.gps_position_d, 1.0, &ok
             );
-            const AerakiaVec3f gps_velocity = parse_vector(
+            observation.velocity_ned_m_s = parse_vector(
                 columns, count, map.gps_velocity_n, map.gps_velocity_e, map.gps_velocity_d, 1.0, &ok
             );
-            const float position_variance = (float)parse_double(
+            observation.position_variance_m2 = (float)parse_double(
                 columns, count, map.gps_position_variance, 1.0, &ok
             );
-            const float velocity_variance = (float)parse_double(
+            observation.velocity_variance_m2_s2 = (float)parse_double(
                 columns, count, map.gps_velocity_variance, 1.0, &ok
             );
-            if (ok) {
-                aerakia_eskf_update_gps(
-                    &eskf, gps_position, gps_velocity, position_variance, velocity_variance
-                );
+            if (ok && aerakia_eskf_update_gps_observation(&eskf, &observation)
+                    == AERAKIA_STATUS_OK) {
+                gps_updates++;
+            }
+        } else if (position_update) {
+            AerakiaPositionObservation observation;
+            observation.timestamp_us = sample.timestamp_us;
+            observation.position_ned_m = parse_vector(
+                columns, count, map.gps_position_n, map.gps_position_e,
+                map.gps_position_d, 1.0, &ok
+            );
+            observation.variance_m2 = (float)parse_double(
+                columns, count, map.gps_position_variance, 1.0, &ok
+            );
+            if (ok && aerakia_eskf_update_position_observation(&eskf, &observation)
+                    == AERAKIA_STATUS_OK) {
+                gps_updates++;
+            }
+        } else if (velocity_update) {
+            AerakiaVelocityObservation observation;
+            observation.timestamp_us = sample.timestamp_us;
+            observation.velocity_ned_m_s = parse_vector(
+                columns, count, map.gps_velocity_n, map.gps_velocity_e,
+                map.gps_velocity_d, 1.0, &ok
+            );
+            observation.variance_m2_s2 = (float)parse_double(
+                columns, count, map.gps_velocity_variance, 1.0, &ok
+            );
+            if (ok && aerakia_eskf_update_velocity_observation(&eskf, &observation)
+                    == AERAKIA_STATUS_OK) {
                 gps_updates++;
             }
         }
         if (heading_update && isfinite(heading_rad) && heading_variance > 0.0) {
-            aerakia_eskf_update_heading(
-                &eskf, (float)heading_rad, (float)heading_variance
-            );
-            heading_updates++;
+            AerakiaHeadingObservation observation;
+            observation.timestamp_us = sample.timestamp_us;
+            observation.heading_ned_rad = (float)heading_rad;
+            observation.variance_rad2 = (float)heading_variance;
+            if (aerakia_eskf_update_heading_observation(&eskf, &observation)
+                    == AERAKIA_STATUS_OK) {
+                heading_updates++;
+            }
         }
         if ((int)parse_double(columns, count, map.baro_update, 0.0, &ok) != 0) {
-            aerakia_eskf_update_barometer(
-                &eskf,
-                (float)parse_double(columns, count, map.baro_height, 0.0, &ok),
-                (float)parse_double(columns, count, map.baro_variance, 1.0, &ok)
+            AerakiaBarometerObservation observation;
+            observation.timestamp_us = sample.timestamp_us;
+            observation.height_up_m = (float)parse_double(
+                columns, count, map.baro_height, 0.0, &ok
             );
+            observation.variance_m2 = (float)parse_double(
+                columns, count, map.baro_variance, 1.0, &ok
+            );
+            if (ok) (void)aerakia_eskf_update_barometer_observation(&eskf, &observation);
         }
         aerakia_eskf_get_estimate(&eskf, &eskf_estimate);
         if (eskf_estimate.zero_velocity_update_applied) zupt_updates++;
@@ -553,12 +632,16 @@ int main(int argc, char *argv[])
             "%ld,%llu,%.9f,%.9f,%.9f,"
             "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,"
             "%.6f,%.6f,%.6f,%d,%.9f,%.9f,%d,%d,%d,%u,%d,%d,%d,%d,%d,%d,%u,"
-            "%d,%d,%d,%.0f,%.0f,%.9f,%.9f,%.9f,%.9f,"
-            "%d,%d,%.9f,%d,%.9f,%.9f,%d,%d,%.9f,%.9f,%.9f,%d,%d,%.9f,%.9f,"
+            "%.9f,%.9f,%.9f,%d,%d,%d,"
+            "%d,%d,%d,%d,%.0f,%.0f,%.9f,%.9f,%.9f,%.9f,"
+            "%d,%d,%.9f,%d,%.9f,%.9f,%d,%d,%d,%.9f,%.9f,%.9f,%d,%d,%.9f,%.9f,"
             "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,"
             "%.9f,%.9f,%.9f,"
             "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,"
-            "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f\n",
+            "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,"
+            "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,"
+            "%.12g,%.12g,%.12g,%.12g,%.12g,%.12g,"
+            "%.12g,%.12g,%.12g,%.12g,%.12g,%.12g\n",
             sequence, (unsigned long long)sample.timestamp_us, truth_roll, truth_pitch, truth_yaw,
             radians_to_degrees(standard_estimate.euler_rad.x),
             radians_to_degrees(standard_estimate.euler_rad.y),
@@ -580,7 +663,14 @@ int main(int argc, char *argv[])
             eskf_estimate.static_heading_alignment_complete ? 1 : 0,
             eskf_estimate.stationary_detected ? 1 : 0,
             eskf_estimate.zero_velocity_update_applied ? 1 : 0,
-            eskf_estimate.zero_velocity_update_count, mag_update, position_update, position_ref_valid,
+            eskf_estimate.zero_velocity_update_count,
+            eskf_estimate.horizontal_aiding_age_s,
+            eskf_estimate.horizontal_position_aiding_age_s,
+            eskf_estimate.horizontal_velocity_aiding_age_s,
+            eskf_estimate.horizontal_position_valid ? 1 : 0,
+            eskf_estimate.horizontal_velocity_valid ? 1 : 0,
+            eskf_estimate.horizontal_navigation_valid ? 1 : 0,
+            mag_valid && mag_update, position_update, velocity_update, position_ref_valid,
             parse_double(columns, count, map.reset_counter, 0.0, &ok),
             parse_double(columns, count, map.reset_event, 0.0, &ok),
             parse_double(columns, count, map.reset_q_w, 1.0, &ok),
@@ -591,6 +681,7 @@ int main(int argc, char *argv[])
             heading_update && eskf_estimate.heading_accepted ? 1 : 0,
             heading_update ? eskf_estimate.last_heading_innovation.innovation[0] : 0.0,
             heading_valid, heading_rad, heading_variance,
+            (int)parse_double(columns, count, map.heading_fault, 0.0, &ok),
             course_valid, course_update, course_rad, course_variance, ground_speed,
             gsf_yaw_valid, gsf_yaw_update, gsf_yaw_rad, gsf_yaw_variance,
             reference_position.x, reference_position.y, reference_position.z,
@@ -599,8 +690,8 @@ int main(int argc, char *argv[])
             eskf_estimate.position_ned_m.z, eskf_estimate.velocity_ned_m_s.x,
             eskf_estimate.velocity_ned_m_s.y, eskf_estimate.velocity_ned_m_s.z,
             position_update ? eskf_estimate.last_position_innovation.nis : NAN,
-            position_update ? eskf_estimate.last_velocity_innovation.nis : NAN,
-            position_update && position_ref_valid
+            velocity_update ? eskf_estimate.last_velocity_innovation.nis : NAN,
+            (position_update || velocity_update) && position_ref_valid
                 ? navigation_nees(&eskf, reference_position, reference_velocity) : NAN,
             reference_q[0], reference_q[1], reference_q[2], reference_q[3],
             standard_estimate.quaternion_wxyz[0], standard_estimate.quaternion_wxyz[1],
@@ -610,7 +701,31 @@ int main(int argc, char *argv[])
             eskf_estimate.attitude.quaternion_wxyz[0],
             eskf_estimate.attitude.quaternion_wxyz[1],
             eskf_estimate.attitude.quaternion_wxyz[2],
-            eskf_estimate.attitude.quaternion_wxyz[3]
+            eskf_estimate.attitude.quaternion_wxyz[3],
+            parse_double(columns, count, map.truth_accel_bias_x, NAN, &ok),
+            parse_double(columns, count, map.truth_accel_bias_y, NAN, &ok),
+            parse_double(columns, count, map.truth_accel_bias_z, NAN, &ok),
+            parse_double(columns, count, map.truth_gyro_bias_x, NAN, &ok),
+            parse_double(columns, count, map.truth_gyro_bias_y, NAN, &ok),
+            parse_double(columns, count, map.truth_gyro_bias_z, NAN, &ok),
+            eskf_estimate.accelerometer_bias_m_s2.x,
+            eskf_estimate.accelerometer_bias_m_s2.y,
+            eskf_estimate.accelerometer_bias_m_s2.z,
+            eskf_estimate.gyroscope_bias_rad_s.x,
+            eskf_estimate.gyroscope_bias_rad_s.y,
+            eskf_estimate.gyroscope_bias_rad_s.z,
+            eskf.core.P[ESKF_IDX_DAB + 0][ESKF_IDX_DAB + 0],
+            eskf.core.P[ESKF_IDX_DAB + 0][ESKF_IDX_DAB + 1],
+            eskf.core.P[ESKF_IDX_DAB + 0][ESKF_IDX_DAB + 2],
+            eskf.core.P[ESKF_IDX_DAB + 1][ESKF_IDX_DAB + 1],
+            eskf.core.P[ESKF_IDX_DAB + 1][ESKF_IDX_DAB + 2],
+            eskf.core.P[ESKF_IDX_DAB + 2][ESKF_IDX_DAB + 2],
+            eskf.core.P[ESKF_IDX_DGB + 0][ESKF_IDX_DGB + 0],
+            eskf.core.P[ESKF_IDX_DGB + 0][ESKF_IDX_DGB + 1],
+            eskf.core.P[ESKF_IDX_DGB + 0][ESKF_IDX_DGB + 2],
+            eskf.core.P[ESKF_IDX_DGB + 1][ESKF_IDX_DGB + 1],
+            eskf.core.P[ESKF_IDX_DGB + 1][ESKF_IDX_DGB + 2],
+            eskf.core.P[ESKF_IDX_DGB + 2][ESKF_IDX_DGB + 2]
         );
         samples++;
     }

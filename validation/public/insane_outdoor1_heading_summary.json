@@ -1,0 +1,27 @@
+{
+  "dataset": "INSANE",
+  "sequence": "outdoor_1_sensors",
+  "evidence_class": "shared_sensor_reference",
+  "duration_s": 199.7351622581482,
+  "recorded_imu_samples": 39174,
+  "recorded_dual_rtk_heading_updates": 1378,
+  "baseline_length_median_m": 1.1590696357068044,
+  "baseline_length_std_m": 0.03932920039420272,
+  "reference_seeded_tracking": {
+    "yaw_rmse_deg": 2.0177646834549896,
+    "normal_heading_acceptance_ratio": 0.9709724238026125,
+    "healthy_ratio": 1.0
+  },
+  "cold_start": {
+    "heading_alignment_time_s": 11.492035999999999,
+    "post_alignment_yaw_rmse_deg": 1.5343770329620088,
+    "normal_heading_acceptance_ratio": 0.9114658925979681,
+    "reported_recovery_time_s": 2.000368,
+    "healthy_ratio": 1.0
+  },
+  "limitations": [
+    "The direct heading observation and published pose share the dual-RTK baseline and are not independent sensor-versus-truth evidence.",
+    "The published full-pose tilt is inconsistent with the initial accelerometer gravity direction; only yaw-path evidence is accepted from this intake.",
+    "No declared heading faults are present, so fault rejection remains covered by synthetic and Vicon-derived stress tracks."
+  ]
+}

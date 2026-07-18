@@ -1,5 +1,8 @@
 # Integration guide
 
+This guide describes public API v0.3.0. Projects upgrading from an earlier checkout must apply the
+[v0.3 migration](api-migration-v0.3.md) before compiling their private adapter.
+
 ## Data ownership
 
 The application owns every algorithm context. Aerakia does not allocate memory or start tasks.
@@ -25,6 +28,37 @@ void estimator_init(void)
 }
 ```
 
+The ESKF is the primary navigation estimator. Configure the Mahony instance with the reviewed
+robust profile and run it as a separate attitude fallback/cross-monitor. Standard Mahony is a
+validation baseline, not the intended product fallback. The FCOne application owns mode selection,
+handover continuity, alarms, and per-output validity; see
+[Estimator supervision](estimator-supervision.md). Mahony-only operation must invalidate position
+and velocity rather than presenting a degraded attitude estimate as full navigation.
+
+## Process-noise profiles
+
+`AerakiaEskfConfig.process_noise` exposes the four continuous process-noise terms consumed by the
+portable core: accelerometer, gyroscope, accelerometer-bias random walk, and gyroscope-bias random
+walk. `aerakia_eskf_default_config()` supplies the core defaults (`0.1`, `0.01`, `0.001`, and
+`0.0001` in the units documented by `ESKF_Config`). A private FCOne vehicle profile may override
+them only from a reviewed IMU characterization or frozen A/B protocol:
+
+```c
+aerakia_eskf_default_config(&navigation_config);
+navigation_config.process_noise.sigma_acc = profile.accel_noise_density;
+navigation_config.process_noise.sigma_gyr = profile.gyro_noise_density;
+navigation_config.process_noise.sigma_acc_bias = profile.accel_bias_random_walk;
+navigation_config.process_noise.sigma_gyr_bias = profile.gyro_bias_random_walk;
+```
+
+The four values form one atomic profile. If any value is non-finite or negative,
+`aerakia_eskf_init()` replaces all four with the defaults before configuring the core. Always call
+`aerakia_eskf_default_config()` before applying overrides; zero is valid and deliberately disables
+that process-noise contribution. PX4 parameter numbers must not be copied directly because its
+discrete process-noise semantics differ. Vehicle type does not select a hidden algorithm profile:
+the private application owns the named VTOL/fixed-wing profile and must record it with validation
+results.
+
 ## Private driver adapter responsibilities
 
 Before publishing `AerakiaImuSample`, the board/application layer must:
@@ -36,6 +70,13 @@ Before publishing `AerakiaImuSample`, the board/application layer must:
 5. set validity flags only for measurements that passed driver-level checks;
 6. publish samples in monotonic timestamp order.
 
+The hardware-free oracle in `validation/fcone_adapter_contract.c` demonstrates and tests the final
+boundary using a mock FCOne publication: physical timestamps are preserved, FRD axes are not
+silently remapped, `g`/degrees-per-second/gauss are converted to m/s²/rad/s/µT, and validity flags
+remain independent. The private adapter may start from different raw units, but its output must pass
+the same sentinel-value, missing-field, duplicate, gap, future-aiding, stale-aiding, and recovery
+checks before integration is accepted.
+
 The public algorithm layer does not know whether the source is SPI, I²C, CAN, a middleware topic, a file, or a PC simulator.
 
 If the application already has a trusted startup attitude (for example, vision or a retained
@@ -46,21 +87,101 @@ exists. A trusted seed is an integration contract, not a substitute for validati
 
 ## Scheduling
 
-Call the estimator once per new IMU sample. The timestamp, not task wake-up time, defines the integration interval. Duplicate, reversed, or excessively delayed samples return `AERAKIA_STATUS_TIMESTAMP_ERROR`.
+Call the estimator once per new IMU sample. The timestamp, not task wake-up time, defines the
+integration interval. Duplicate, reversed, and below-minimum intervals return
+`AERAKIA_STATUS_TIMESTAMP_ERROR` without advancing estimator time. A forward interval above the
+configured maximum is also rejected, but re-anchors estimator time so the next fresh sample can
+resume without integrating across the missing interval.
 
 Lower-rate aiding measurements are explicit calls:
 
 ```c
-aerakia_eskf_update_gps(&navigation_filter,
-                        gps_position_ned_m, gps_velocity_ned_m_s,
-                        gps_position_variance_m2, gps_velocity_variance_m2_s2);
-aerakia_eskf_update_barometer(&navigation_filter, barometric_height_up_m, baro_variance_m2);
-aerakia_eskf_update_heading(&navigation_filter, heading_ned_rad, heading_variance_rad2);
+AerakiaGpsObservation gps = {
+    gps_sample_time_us, gps_position_ned_m, gps_velocity_ned_m_s,
+    gps_position_variance_m2, gps_velocity_variance_m2_s2
+};
+AerakiaHeadingObservation heading = {
+    heading_sample_time_us, heading_ned_rad, heading_variance_rad2
+};
+AerakiaBarometerObservation barometer = {
+    barometer_sample_time_us, barometric_height_up_m, baro_variance_m2
+};
+
+gps_status = aerakia_eskf_update_gps_observation(&navigation_filter, &gps);
+heading_status = aerakia_eskf_update_heading_observation(&navigation_filter, &heading);
+barometer_status = aerakia_eskf_update_barometer_observation(&navigation_filter, &barometer);
 ```
 
-The paired GPS API gates position and velocity separately. If both are rejected for the configured consecutive limit, it re-anchors only position/velocity with covariance floors; attitude and learned IMU biases are preserved.
+If the receiver publishes position and velocity independently, use the source-specific contracts:
 
-Trusted heading is independent of magnetometer fusion. It can come from dual-antenna GNSS, vision, motion capture, or another upstream estimator, provided the application converts it to clockwise-from-North NED radians and supplies a defensible variance.
+```c
+AerakiaPositionObservation position = {
+    gps_position_time_us, gps_position_ned_m, gps_position_variance_m2
+};
+AerakiaVelocityObservation velocity = {
+    gps_velocity_time_us, gps_velocity_ned_m_s, gps_velocity_variance_m2_s2
+};
+
+aerakia_eskf_update_position_observation(&navigation_filter, &position);
+aerakia_eskf_update_velocity_observation(&navigation_filter, &velocity);
+```
+
+Do not differentiate receiver positions inside the adapter and mark the result as measured Doppler
+velocity. If only one source is valid, publish only that observation. The paired API remains the
+preferred path when a receiver truly provides synchronized position and velocity.
+
+Use the physical measurement time, not message-delivery or task-wakeup time. The timestamped APIs
+reject observations before the first IMU, from the future, duplicate/reordered per source, or older
+than `maximum_aiding_age_s`. The older untimestamped update functions remain source-compatible for
+existing host applications, but cannot enforce freshness and must not be used by the FCOne adapter.
+
+The paired GPS API gates position and velocity separately. Independent APIs maintain separate
+freshness timestamps, but neither is allowed to re-anchor state after repeated rejection. A
+syntactically and temporally valid observation consumes its source timestamp even if its innovation
+is rejected, preventing the same physical sample from being retried as if it were new.
+
+Repeated rejection can only create a recovery candidate from synchronized paired GNSS
+position/velocity observations that pass configured variance bounds and multi-sample kinematic
+consistency. It cannot reset the filter by itself. The private estimator supervisor must explicitly
+authorize the exact candidate timestamp using `aerakia_eskf_authorize_navigation_recovery`, declare
+that upstream source quality was independently verified, and provide application-level correction
+bounds. Recovery observations and authorization also carry a nonzero stable `source_id`, a
+`source_generation` that changes on receiver reset/failover/reconfiguration, and a
+`quality_sequence` identifying one unchanged supervisor-quality snapshot. Candidate accumulation,
+authorization, and probation are fail-closed if any stamp changes, the evidence gap exceeds 0.30 s,
+the candidate is older than 0.25 s, or the required 0.20 s dwell is not met. These defaults target
+5--10 Hz GNSS; a lower-rate source needs an explicitly reviewed profile. A successful re-anchor
+preserves attitude and learned IMU biases, enters probation, and keeps navigation invalid until
+subsequent same-source paired updates meet both count and duration requirements. Rejected
+authorization, stale candidates, excessive corrections, source changes, and standalone
+observations leave the nominal state unchanged.
+
+Accepted horizontal position and velocity constraints refresh independent ages. By default,
+`maximum_horizontal_position_dead_reckoning_s` and
+`maximum_horizontal_velocity_dead_reckoning_s` are both 5 seconds. Position-only aiding never
+qualifies velocity, velocity-only aiding never invents a position origin, and
+`horizontal_navigation_valid` is true only while both outputs are independently valid. The legacy
+summary `horizontal_aiding_age_s` is the older (maximum) of the two required ages and must not be
+used as a substitute for the individual validity flags. `healthy` means the state and covariance
+are finite and numerically coherent; it does not establish navigation observability. Rejected
+observations do not refresh validity. An accepted ZUPT refreshes velocity only and cannot refresh or
+initialize position.
+
+The FCOne adapter must propagate these validity fields to the private estimator supervisor. A
+vehicle-specific policy may choose a shorter limit, but must not silently extend it without physical
+evidence and a matching failsafe review.
+
+Heading, vertical-position, and vertical-velocity aiding have independent ages and validity fields.
+Startup alignment completion is historical state, not proof of continued observability. The
+supervisor must consume current validity and must not keep yaw or altitude qualified solely because
+alignment once succeeded.
+
+Trusted heading is independent of magnetometer fusion. It can come from dual-antenna GNSS, vision,
+motion capture, or another upstream estimator, provided the application converts it to
+clockwise-from-North NED radians and supplies a defensible variance. This path uses the complete
+raw body-X heading Jacobian; roll/pitch correlations in its covariance update are part of the
+physical measurement model. The application must reject geometrically ill-conditioned heading
+before fusion.
 
 ## Application-declared stationary alignment
 
@@ -76,6 +197,17 @@ After alignment, the same flag enables periodic zero-velocity updates. The adapt
 
 ## Coordinate and magnetic reference configuration
 
-The ESKF magnetic update compares horizontal heading only; magnetic inclination is deliberately excluded so it cannot inject roll/pitch error. Configure a valid local horizontal field direction before enabling magnetometer fusion. For a magnetic declination `D`, a sufficient heading reference is `[cos(D), sin(D), 0]` in NED. The FCOne application should obtain `D` from a reviewed geomagnetic model using the current GNSS location, refresh it after a material location change, or prefer a trusted heading observation. Omitting declination produces a stable magnetic-north/true-north yaw offset rather than estimator divergence. The magnitude anomaly gate still uses the measured field norm.
+The ESKF magnetic update compares horizontal heading only; magnetic inclination is deliberately
+excluded so it cannot inject roll/pitch error. It is a tilt-conditioned NED-yaw pseudo correction,
+not the same physical measurement model as trusted heading. Its configured variance is a reviewed
+yaw-correction tuning variance, and its pseudo-NIS must not be used as a general high-tilt heading
+consistency claim. The first VTOL/hover profile may enable it only after tilt alignment and magnetic
+quality checks; transition requires a separately reviewed heading model/profile. Configure a valid
+local horizontal field direction before enabling magnetometer fusion. For a magnetic declination
+`D`, a sufficient heading reference is `[cos(D), sin(D), 0]` in NED. The FCOne application should
+obtain `D` from a reviewed geomagnetic model using the current GNSS location, refresh it after a
+material location change, or prefer a trusted heading observation. Omitting declination produces a
+stable magnetic-north/true-north yaw offset rather than estimator divergence. The magnitude anomaly
+gate still uses the measured field norm.
 
 See [Coordinate conventions](coordinate-conventions.md) for the complete frame and sign contract.

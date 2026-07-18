@@ -110,12 +110,15 @@ void eskf_update_velocity(ESKF_Handle *h,
 /**
  * @brief Magnetometer Update (Yaw Correction)
  *
- * Corrects attitude estimate using magnetometer.
- * Uses heading-only update to avoid magnetic inclination issues.
+ * Corrects yaw using a tilt-conditioned local NED-yaw pseudo observation.
+ * This deliberately prevents magnetic inclination/model errors from updating
+ * roll and pitch. R_mag is a reviewed yaw-correction tuning variance; the
+ * returned NIS is a pseudo-innovation diagnostic and is not a general
+ * physical-heading consistency statistic at arbitrary tilt.
  *
  * @param h       Pointer to filter handle
  * @param mag_m   Measured magnetic field [x, y, z] (normalized or Gauss)
- * @param R_mag   Magnetometer measurement noise variance
+ * @param R_mag   Local yaw-correction tuning variance (rad²)
  * @param result  Output: Innovation test result (can be NULL if not needed)
  */
 void eskf_update_mag(ESKF_Handle *h,
@@ -126,6 +129,9 @@ void eskf_update_mag(ESKF_Handle *h,
 /**
  * Correct yaw from a trusted navigation-frame heading observation.
  * heading_ned_rad is clockwise from North in the NED convention.
+ * The update uses the complete body-X atan2 heading Jacobian; at large tilt it
+ * can legitimately update correlated attitude components. Reject geometrically
+ * ill-conditioned observations before fusion.
  */
 void eskf_update_heading(ESKF_Handle *h,
                          eskf_float_t heading_ned_rad,
@@ -169,6 +175,16 @@ void eskf_reset_navigation(ESKF_Handle *h,
                            eskf_float_t position_variance_m2,
                            eskf_float_t velocity_variance_m2_s2);
 
+/** Re-anchor position without changing velocity, attitude, or learned IMU biases. */
+void eskf_reset_position(ESKF_Handle *h,
+                         const eskf_float_t position_ned_m[3],
+                         eskf_float_t position_variance_m2);
+
+/** Re-anchor velocity without changing position, attitude, or learned IMU biases. */
+void eskf_reset_velocity(ESKF_Handle *h,
+                         const eskf_float_t velocity_ned_m_s[3],
+                         eskf_float_t velocity_variance_m2_s2);
+
 /* ============================================================================
  * Calibration / Alignment
  * ============================================================================ */
@@ -196,10 +212,23 @@ bool eskf_align_static_heading(
 );
 
 /**
+ * Replace the three attitude-error variances after an absolute attitude seed.
+ * Existing attitude cross-covariances are cleared because they describe the
+ * pre-alignment linearization point.
+ */
+bool eskf_reset_attitude_covariance(
+    ESKF_Handle *h,
+    const eskf_float_t attitude_variance_rad2[3]
+);
+
+/**
  * @brief Static Bias Alignment
  *
  * Initialize biases from stationary IMU data.
- * Call this with data collected while vehicle is stationary.
+ * Call this with data collected while vehicle is stationary. Gyroscope bias is
+ * directly observable. A single gravity direction does not fully distinguish
+ * accelerometer bias from tilt, so accelerometer-bias covariance deliberately
+ * remains broad for later motion-aided convergence.
  *
  * @param h         Pointer to filter handle
  * @param acc_buf   Buffer of accelerometer readings [n_samples x 3]

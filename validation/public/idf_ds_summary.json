@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "dataset": "IDF-DS Holybro Pixhawk fixed-wing corpus",
+  "source_doi": "10.5281/zenodo.16992975",
+  "source_license": "CC-BY-4.0",
+  "archive": {
+    "file": "Holybro Pixhawk.zip",
+    "bytes": 2121943653,
+    "publisher_md5": "8b990cc4c7ec1225a16e9a28225e5162",
+    "checksum_verified": true
+  },
+  "evidence_boundary": "Physical PX4 compatibility and stress coverage. PX4 attitude and local position are onboard estimates, not independent truth.",
+  "corpus": {
+    "raw_ulog_files": 13,
+    "parse_errors": 0,
+    "duration_s": 35697.162981,
+    "imu_samples": 7128090,
+    "gps_samples": 310799,
+    "files_with_attitude_resets": 12,
+    "files_with_reported_clipping": 1,
+    "files_with_direct_gnss_heading": 0,
+    "maximum_gyro_norm_rad_s": 7.2682,
+    "maximum_acceleration_norm_m_s2": 240.617,
+    "maximum_gps_speed_m_s": 27.5879,
+    "maximum_gps_gap_s": 1.992093
+  },
+  "selected_replays": [
+    {
+      "selection_reason": "maximum recorded angular motion",
+      "source": "log_86_2025-8-22-12-18-38.ulg",
+      "samples": 557722,
+      "duration_s": 2791.734999,
+      "eskf_geodesic_rmse_deg": 3.2412047352,
+      "eskf_tilt_rmse_deg": 2.4492166778,
+      "eskf_yaw_rmse_deg": 2.1047799436,
+      "position_rmse_m": 2.072554626,
+      "velocity_rmse_m_s": 0.3346096618,
+      "position_acceptance_ratio": 0.8201766657,
+      "velocity_acceptance_ratio": 0.6032615212,
+      "position_nis_mean": 35.6839234366,
+      "velocity_nis_mean": 13.7305428799,
+      "navigation_recoveries": 34,
+      "healthy_ratio": 1.0
+    },
+    {
+      "selection_reason": "maximum recorded GNSS speed",
+      "source": "log_113_2025-8-23-13-14-28.ulg",
+      "samples": 523470,
+      "duration_s": 2621.524997,
+      "eskf_geodesic_rmse_deg": 5.8225215239,
+      "eskf_tilt_rmse_deg": 2.47181694,
+      "eskf_yaw_rmse_deg": 5.2574798823,
+      "position_rmse_m": 3.6193138694,
+      "velocity_rmse_m_s": 0.6320385454,
+      "position_acceptance_ratio": 0.7982633102,
+      "velocity_acceptance_ratio": 0.5358740461,
+      "position_nis_mean": 95.8284787161,
+      "velocity_nis_mean": 20.5209616578,
+      "navigation_recoveries": 80,
+      "healthy_ratio": 1.0
+    },
+    {
+      "selection_reason": "only raw ULog reporting IMU clipping",
+      "source": "log_115_2025-8-23-14-06-08.ulg",
+      "samples": 527793,
+      "duration_s": 2641.159999,
+      "eskf_geodesic_rmse_deg": 3.7814707326,
+      "eskf_tilt_rmse_deg": 2.5892205889,
+      "eskf_yaw_rmse_deg": 2.7404267181,
+      "position_rmse_m": 2.2437045096,
+      "velocity_rmse_m_s": 0.3725066106,
+      "position_acceptance_ratio": 0.8598126881,
+      "velocity_acceptance_ratio": 0.5505784634,
+      "position_nis_mean": 36.5928082627,
+      "velocity_nis_mean": 15.5976104496,
+      "navigation_recoveries": 26,
+      "healthy_ratio": 1.0
+    }
+  ]
+}

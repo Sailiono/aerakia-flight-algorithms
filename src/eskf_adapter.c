@@ -19,9 +19,215 @@ static bool vector_is_finite(AerakiaVec3f vector)
     return isfinite(vector.x) && isfinite(vector.y) && isfinite(vector.z);
 }
 
+static bool state_is_finite_and_normalized(const ESKF_NominalState *state)
+{
+    int axis;
+    eskf_float_t quaternion_norm_squared = 0.0;
+    if (state == NULL) return false;
+    for (axis = 0; axis < 3; ++axis) {
+        if (!isfinite(state->p[axis]) || !isfinite(state->v[axis])
+            || !isfinite(state->ab[axis]) || !isfinite(state->gb[axis])) {
+            return false;
+        }
+    }
+    for (axis = 0; axis < 4; ++axis) {
+        if (!isfinite(state->q[axis])) return false;
+        quaternion_norm_squared += state->q[axis] * state->q[axis];
+    }
+    return isfinite(quaternion_norm_squared)
+        && fabs(quaternion_norm_squared - 1.0) <= 1.0e-3;
+}
+
 static float vector_norm(AerakiaVec3f vector)
 {
     return sqrtf(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
+}
+
+static float vector_distance(AerakiaVec3f first, AerakiaVec3f second)
+{
+    const AerakiaVec3f difference = {
+        first.x - second.x, first.y - second.y, first.z - second.z
+    };
+    return vector_norm(difference);
+}
+
+static AerakiaStatus validate_aiding_timestamp(
+    const AerakiaEskf *filter,
+    uint64_t timestamp_us,
+    uint64_t last_source_timestamp_us,
+    bool has_source_timestamp
+)
+{
+    double age_s;
+    if (filter == NULL || !filter->has_timestamp) return AERAKIA_STATUS_TIMESTAMP_ERROR;
+    if (timestamp_us > filter->last_timestamp_us) return AERAKIA_STATUS_TIMESTAMP_ERROR;
+    if (has_source_timestamp && timestamp_us <= last_source_timestamp_us) {
+        return AERAKIA_STATUS_TIMESTAMP_ERROR;
+    }
+    age_s = (double)(filter->last_timestamp_us - timestamp_us) * 1.0e-6;
+    if (filter->config.maximum_aiding_age_s >= 0.0f
+        && age_s > filter->config.maximum_aiding_age_s) {
+        return AERAKIA_STATUS_STALE_MEASUREMENT;
+    }
+    return AERAKIA_STATUS_OK;
+}
+
+static void mark_horizontal_position_aiding(AerakiaEskf *filter, uint64_t timestamp_us)
+{
+    if (filter == NULL || !filter->has_timestamp || timestamp_us > filter->last_timestamp_us) {
+        return;
+    }
+    filter->last_horizontal_position_aiding_timestamp_us = timestamp_us;
+    filter->has_horizontal_position_aiding_timestamp = true;
+    filter->horizontal_position_initialized = true;
+}
+
+static void mark_horizontal_velocity_aiding(AerakiaEskf *filter, uint64_t timestamp_us)
+{
+    if (filter == NULL || !filter->has_timestamp || timestamp_us > filter->last_timestamp_us) {
+        return;
+    }
+    filter->last_horizontal_velocity_aiding_timestamp_us = timestamp_us;
+    filter->has_horizontal_velocity_aiding_timestamp = true;
+}
+
+static void mark_heading_aiding(AerakiaEskf *filter, uint64_t timestamp_us)
+{
+    if (filter == NULL || !filter->has_timestamp || timestamp_us > filter->last_timestamp_us) return;
+    filter->last_heading_aiding_timestamp_us = timestamp_us;
+    filter->has_heading_aiding_timestamp = true;
+}
+
+static void mark_vertical_position_aiding(AerakiaEskf *filter, uint64_t timestamp_us)
+{
+    if (filter == NULL || !filter->has_timestamp || timestamp_us > filter->last_timestamp_us) return;
+    filter->last_vertical_position_aiding_timestamp_us = timestamp_us;
+    filter->has_vertical_position_aiding_timestamp = true;
+}
+
+static void mark_vertical_velocity_aiding(AerakiaEskf *filter, uint64_t timestamp_us)
+{
+    if (filter == NULL || !filter->has_timestamp || timestamp_us > filter->last_timestamp_us) return;
+    filter->last_vertical_velocity_aiding_timestamp_us = timestamp_us;
+    filter->has_vertical_velocity_aiding_timestamp = true;
+}
+
+static void clear_recovery_candidate(AerakiaEskf *filter)
+{
+    if (filter == NULL) return;
+    memset(&filter->recovery_candidate, 0, sizeof(filter->recovery_candidate));
+    filter->recovery_candidate_start_timestamp_us = 0U;
+    filter->recovery_candidate_consistent_observations = 0U;
+    filter->has_recovery_candidate = false;
+}
+
+static bool recovery_candidate_is_quality_bounded(
+    const AerakiaEskf *filter,
+    const AerakiaGpsObservation *observation
+)
+{
+    return observation->source_id != 0U && observation->quality_sequence != 0U
+        && observation->position_variance_m2 <= filter->config.recovery_max_position_variance_m2
+        && observation->velocity_variance_m2_s2
+            <= filter->config.recovery_max_velocity_variance_m2_s2;
+}
+
+static void record_recovery_candidate(
+    AerakiaEskf *filter,
+    const AerakiaGpsObservation *observation
+)
+{
+    if (!recovery_candidate_is_quality_bounded(filter, observation)) {
+        clear_recovery_candidate(filter);
+        return;
+    }
+    if (filter->has_recovery_candidate
+        && observation->timestamp_us > filter->recovery_candidate.timestamp_us
+        && observation->source_id == filter->recovery_candidate.source_id
+        && observation->source_generation == filter->recovery_candidate.source_generation
+        && observation->quality_sequence == filter->recovery_candidate.quality_sequence) {
+        const float dt_s = (float)(
+            (double)(observation->timestamp_us - filter->recovery_candidate.timestamp_us) * 1.0e-6
+        );
+        const AerakiaVec3f expected_position = {
+            filter->recovery_candidate.position_ned_m.x
+                + 0.5f * (filter->recovery_candidate.velocity_ned_m_s.x
+                          + observation->velocity_ned_m_s.x) * dt_s,
+            filter->recovery_candidate.position_ned_m.y
+                + 0.5f * (filter->recovery_candidate.velocity_ned_m_s.y
+                          + observation->velocity_ned_m_s.y) * dt_s,
+            filter->recovery_candidate.position_ned_m.z
+                + 0.5f * (filter->recovery_candidate.velocity_ned_m_s.z
+                          + observation->velocity_ned_m_s.z) * dt_s,
+        };
+        const bool consistent = dt_s <= filter->config.navigation_recovery_max_candidate_gap_s
+            && vector_distance(expected_position, observation->position_ned_m)
+                <= filter->config.recovery_position_consistency_m
+            && vector_distance(
+                   filter->recovery_candidate.velocity_ned_m_s,
+                   observation->velocity_ned_m_s
+               ) <= filter->config.recovery_velocity_consistency_m_s;
+        if (consistent) {
+            filter->recovery_candidate_consistent_observations++;
+        } else {
+            filter->recovery_candidate_consistent_observations = 1U;
+            filter->recovery_candidate_start_timestamp_us = observation->timestamp_us;
+        }
+    } else {
+        filter->recovery_candidate_consistent_observations = 1U;
+        filter->recovery_candidate_start_timestamp_us = observation->timestamp_us;
+    }
+    filter->recovery_candidate = *observation;
+    filter->has_recovery_candidate = true;
+}
+
+static bool recovery_probation_source_matches(
+    const AerakiaEskf *filter,
+    const AerakiaGpsObservation *observation
+)
+{
+    return filter != NULL && observation != NULL
+        && observation->source_id == filter->navigation_recovery_source_id
+        && observation->source_generation == filter->navigation_recovery_source_generation
+        && observation->quality_sequence == filter->navigation_recovery_quality_sequence;
+}
+
+static bool recovery_probation_accepts(
+    AerakiaEskf *filter,
+    const AerakiaGpsObservation *observation,
+    bool paired_update_accepted
+)
+{
+    if (!filter->navigation_recovery_probationary) return true;
+    if (!paired_update_accepted || !recovery_probation_source_matches(filter, observation)) {
+        filter->navigation_recovery_probation_acceptances = 0U;
+        filter->navigation_recovery_probation_start_timestamp_us = 0U;
+        return false;
+    }
+    if (filter->navigation_recovery_probation_last_timestamp_us != 0U) {
+        const bool ordered = observation->timestamp_us
+            > filter->navigation_recovery_probation_last_timestamp_us;
+        const double gap_s = ordered
+            ? (double)(observation->timestamp_us
+                - filter->navigation_recovery_probation_last_timestamp_us) * 1.0e-6
+            : INFINITY;
+        if (!ordered || gap_s > filter->config.navigation_recovery_probation_max_update_gap_s) {
+            filter->navigation_recovery_probation_acceptances = 0U;
+            filter->navigation_recovery_probation_start_timestamp_us = 0U;
+        }
+    }
+    if (filter->navigation_recovery_probation_start_timestamp_us == 0U) {
+        filter->navigation_recovery_probation_start_timestamp_us = observation->timestamp_us;
+    }
+    filter->navigation_recovery_probation_last_timestamp_us = observation->timestamp_us;
+    filter->navigation_recovery_probation_acceptances++;
+    if (filter->navigation_recovery_probation_acceptances
+        < filter->config.navigation_recovery_probationary_acceptances) return false;
+    if ((double)(observation->timestamp_us
+            - filter->navigation_recovery_probation_start_timestamp_us) * 1.0e-6 + 1.0e-6
+        < filter->config.navigation_recovery_probation_min_duration_s) return false;
+    filter->navigation_recovery_probationary = false;
+    return true;
 }
 
 static AerakiaVec3f quaternion_to_euler(const eskf_float_t q[4])
@@ -124,8 +330,18 @@ static void collect_static_sample(AerakiaEskf *filter, const AerakiaImuSample *s
             angular_rate_mean[axis] = filter->static_angular_rate_sum[axis] * inverse_count;
         }
         if (filter->config.static_align_attitude && !filter->attitude_seeded) {
+            eskf_float_t attitude_variance[3] = {
+                filter->core.P[0][0], filter->core.P[1][1], filter->core.P[2][2]
+            };
             filter->static_tilt_alignment_complete =
                 eskf_align_static_tilt(&filter->core, acceleration_mean);
+            if (filter->static_tilt_alignment_complete) {
+                const eskf_float_t tilt_variance =
+                    filter->config.static_tilt_uncertainty_rad
+                    * filter->config.static_tilt_uncertainty_rad;
+                attitude_variance[0] = tilt_variance;
+                attitude_variance[1] = tilt_variance;
+            }
             if (filter->static_tilt_alignment_complete
                 && filter->static_magnetic_samples > 0U) {
                 eskf_float_t magnetic_mean[3];
@@ -137,6 +353,14 @@ static void collect_static_sample(AerakiaEskf *filter, const AerakiaImuSample *s
                 }
                 filter->static_heading_alignment_complete =
                     eskf_align_static_heading(&filter->core, magnetic_mean);
+                if (filter->static_heading_alignment_complete) {
+                    mark_heading_aiding(filter, sample->timestamp_us);
+                    attitude_variance[2] = filter->config.static_heading_uncertainty_rad
+                        * filter->config.static_heading_uncertainty_rad;
+                }
+            }
+            if (filter->static_tilt_alignment_complete) {
+                (void)eskf_reset_attitude_covariance(&filter->core, attitude_variance);
             }
         }
         eskf_align_static_bias_means(&filter->core, acceleration_mean, angular_rate_mean);
@@ -152,6 +376,17 @@ void aerakia_eskf_default_config(AerakiaEskfConfig *config)
     }
     config->minimum_dt_s = 0.0001f;
     config->maximum_dt_s = 0.1f;
+    /* Keep these defaults identical to the portable core's eskf_init profile. */
+    config->process_noise.sigma_acc = 0.1;
+    config->process_noise.sigma_gyr = 0.01;
+    config->process_noise.sigma_acc_bias = 0.001;
+    config->process_noise.sigma_gyr_bias = 0.0001;
+    config->maximum_aiding_age_s = 0.5f;
+    config->maximum_horizontal_position_dead_reckoning_s = 5.0f;
+    config->maximum_horizontal_velocity_dead_reckoning_s = 5.0f;
+    config->maximum_heading_dead_reckoning_s = 2.0f;
+    config->maximum_vertical_position_dead_reckoning_s = 5.0f;
+    config->maximum_vertical_velocity_dead_reckoning_s = 5.0f;
     config->fuse_magnetometer = false;
     config->gate_magnetometer = true;
     config->magnetometer_variance = 0.05f;
@@ -159,17 +394,42 @@ void aerakia_eskf_default_config(AerakiaEskfConfig *config)
     config->magnetic_reference_ned[1] = 0.0f;
     config->magnetic_reference_ned[2] = 0.0f;
     config->navigation_recovery_rejection_limit = 10U;
+    config->navigation_recovery_min_consistent_observations = 3U;
+    config->navigation_recovery_probationary_acceptances = 3U;
+    config->navigation_recovery_max_candidate_gap_s = 0.3f;
+    config->navigation_recovery_min_candidate_duration_s = 0.2f;
+    config->navigation_recovery_authorization_max_age_s = 0.25f;
+    config->navigation_recovery_probation_min_duration_s = 0.2f;
+    config->navigation_recovery_probation_max_update_gap_s = 0.3f;
+    config->recovery_max_position_variance_m2 = 100.0f;
+    config->recovery_max_velocity_variance_m2_s2 = 25.0f;
+    config->recovery_position_consistency_m = 10.0f;
+    config->recovery_velocity_consistency_m_s = 5.0f;
+    config->recovery_max_position_correction_m = 100.0f;
+    config->recovery_max_velocity_correction_m_s = 20.0f;
     config->recovery_position_variance_floor_m2 = 25.0f;
     config->recovery_velocity_variance_floor_m2_s2 = 4.0f;
     config->enable_static_alignment = true;
     config->static_align_attitude = true;
     config->static_alignment_duration_s = 1.0f;
     config->static_alignment_min_samples = 100U;
+    /* Conservative floors include residual calibration and mounting error. */
+    config->static_tilt_uncertainty_rad = 2.0f * AERAKIA_PI_F / 180.0f;
+    config->static_heading_uncertainty_rad = 10.0f * AERAKIA_PI_F / 180.0f;
     config->stationary_gyro_threshold_rad_s = 0.05f;
     config->stationary_acceleration_tolerance_m_s2 = 0.20f * AERAKIA_GRAVITY_M_S2;
     config->zero_velocity_interval_s = 0.10f;
     config->zero_velocity_variance_m2_s2 = 0.01f;
     aerakia_mag_gate_default_config(&config->magnetic_gate);
+}
+
+static bool process_noise_config_is_valid(const ESKF_Config *config)
+{
+    return config != NULL
+        && isfinite(config->sigma_acc) && config->sigma_acc >= 0.0
+        && isfinite(config->sigma_gyr) && config->sigma_gyr >= 0.0
+        && isfinite(config->sigma_acc_bias) && config->sigma_acc_bias >= 0.0
+        && isfinite(config->sigma_gyr_bias) && config->sigma_gyr_bias >= 0.0;
 }
 
 void aerakia_eskf_init(
@@ -188,8 +448,40 @@ void aerakia_eskf_init(
     aerakia_eskf_default_config(&defaults);
     memset(filter, 0, sizeof(*filter));
     filter->config = config != NULL ? *config : defaults;
+    if (!process_noise_config_is_valid(&filter->config.process_noise)) {
+        /* Treat the four values as one reviewed profile; never retain a partial invalid profile. */
+        filter->config.process_noise = defaults.process_noise;
+    }
+    if (filter->config.navigation_recovery_min_consistent_observations < 2U) {
+        filter->config.navigation_recovery_min_consistent_observations = 2U;
+    }
+    if (filter->config.navigation_recovery_probationary_acceptances < 1U) {
+        filter->config.navigation_recovery_probationary_acceptances = 1U;
+    }
+    if (!isfinite(filter->config.navigation_recovery_max_candidate_gap_s)
+        || filter->config.navigation_recovery_max_candidate_gap_s <= 0.0f) {
+        filter->config.navigation_recovery_max_candidate_gap_s = 0.3f;
+    }
+    if (!isfinite(filter->config.navigation_recovery_min_candidate_duration_s)
+        || filter->config.navigation_recovery_min_candidate_duration_s < 0.0f) {
+        filter->config.navigation_recovery_min_candidate_duration_s = 0.2f;
+    }
+    if (!isfinite(filter->config.navigation_recovery_authorization_max_age_s)
+        || filter->config.navigation_recovery_authorization_max_age_s < 0.0f) {
+        filter->config.navigation_recovery_authorization_max_age_s = 0.25f;
+    }
+    if (!isfinite(filter->config.navigation_recovery_probation_min_duration_s)
+        || filter->config.navigation_recovery_probation_min_duration_s < 0.0f) {
+        filter->config.navigation_recovery_probation_min_duration_s = 0.2f;
+    }
+    if (!isfinite(filter->config.navigation_recovery_probation_max_update_gap_s)
+        || filter->config.navigation_recovery_probation_max_update_gap_s <= 0.0f) {
+        filter->config.navigation_recovery_probation_max_update_gap_s = 0.3f;
+    }
+    filter->horizontal_position_initialized = initial_position_ned_m != NULL;
     filter->attitude_seeded = initial_quaternion_wxyz != NULL;
     eskf_init(&filter->core, initial_position_ned_m, initial_quaternion_wxyz);
+    eskf_set_config(&filter->core, &filter->config.process_noise);
     aerakia_mag_gate_init(&filter->magnetic_gate, &filter->config.magnetic_gate);
     reference[0] = filter->config.magnetic_reference_ned[0];
     reference[1] = filter->config.magnetic_reference_ned[1];
@@ -247,11 +539,17 @@ AerakiaStatus aerakia_eskf_process_imu(
         return AERAKIA_STATUS_INITIALIZED;
     }
     dt = (float)(sample->timestamp_us - filter->last_timestamp_us) * 1.0e-6f;
-    filter->last_timestamp_us = sample->timestamp_us;
-    if (dt < filter->config.minimum_dt_s || dt > filter->config.maximum_dt_s) {
+    if (dt < filter->config.minimum_dt_s) {
         filter->rejected_samples++;
         return AERAKIA_STATUS_TIMESTAMP_ERROR;
     }
+    if (dt > filter->config.maximum_dt_s) {
+        /* Re-anchor after a forward transport gap; never integrate across it. */
+        filter->last_timestamp_us = sample->timestamp_us;
+        filter->rejected_samples++;
+        return AERAKIA_STATUS_TIMESTAMP_ERROR;
+    }
+    filter->last_timestamp_us = sample->timestamp_us;
 
     acceleration[0] = sample->acceleration_m_s2.x;
     acceleration[1] = sample->acceleration_m_s2.y;
@@ -269,6 +567,8 @@ AerakiaStatus aerakia_eskf_process_imu(
         filter->last_zero_velocity_timestamp_us = sample->timestamp_us;
         filter->zero_velocity_update_applied = true;
         filter->zero_velocity_update_count++;
+        mark_horizontal_velocity_aiding(filter, sample->timestamp_us);
+        mark_vertical_velocity_aiding(filter, sample->timestamp_us);
     }
 
     filter->magnetometer_accepted = false;
@@ -297,6 +597,9 @@ AerakiaStatus aerakia_eskf_process_imu(
                 &filter->last_magnetometer_innovation
             );
             filter->magnetometer_accepted = filter->last_magnetometer_innovation.accepted;
+            if (filter->magnetometer_accepted) {
+                mark_heading_aiding(filter, sample->timestamp_us);
+            }
         }
     }
 
@@ -322,6 +625,10 @@ void aerakia_eskf_update_position(
     memset(&filter->last_position_innovation, 0, sizeof(filter->last_position_innovation));
     eskf_update_position(&filter->core, position, variance_m2, &filter->last_position_innovation);
     filter->position_accepted = filter->last_position_innovation.accepted;
+    if (filter->position_accepted && !filter->navigation_recovery_probationary) {
+        mark_horizontal_position_aiding(filter, filter->last_timestamp_us);
+        mark_vertical_position_aiding(filter, filter->last_timestamp_us);
+    }
 }
 
 void aerakia_eskf_update_velocity(
@@ -340,6 +647,10 @@ void aerakia_eskf_update_velocity(
     memset(&filter->last_velocity_innovation, 0, sizeof(filter->last_velocity_innovation));
     eskf_update_velocity(&filter->core, velocity, variance_m2_s2, &filter->last_velocity_innovation);
     filter->velocity_accepted = filter->last_velocity_innovation.accepted;
+    if (filter->velocity_accepted && !filter->navigation_recovery_probationary) {
+        mark_horizontal_velocity_aiding(filter, filter->last_timestamp_us);
+        mark_vertical_velocity_aiding(filter, filter->last_timestamp_us);
+    }
 }
 
 void aerakia_eskf_update_gps(
@@ -374,28 +685,264 @@ void aerakia_eskf_update_gps(
     filter->position_accepted = filter->last_position_innovation.accepted;
     filter->velocity_accepted = filter->last_velocity_innovation.accepted;
 
-    if (filter->position_accepted || filter->velocity_accepted) {
-        filter->consecutive_navigation_rejections = 0U;
-    } else {
-        filter->consecutive_navigation_rejections++;
-        if (filter->config.navigation_recovery_rejection_limit > 0U
-            && filter->consecutive_navigation_rejections
-                >= filter->config.navigation_recovery_rejection_limit) {
-            eskf_reset_navigation(
-                &filter->core,
-                position,
-                velocity,
-                fmaxf(position_variance_m2, filter->config.recovery_position_variance_floor_m2),
-                fmaxf(
-                    velocity_variance_m2_s2,
-                    filter->config.recovery_velocity_variance_floor_m2_s2
-                )
-            );
-            filter->navigation_recovered = true;
-            filter->navigation_recovery_count++;
-            filter->consecutive_navigation_rejections = 0U;
+    filter->consecutive_position_rejections = filter->position_accepted
+        ? 0U : filter->consecutive_position_rejections + 1U;
+    filter->consecutive_velocity_rejections = filter->velocity_accepted
+        ? 0U : filter->consecutive_velocity_rejections + 1U;
+    filter->consecutive_navigation_rejections =
+        filter->consecutive_position_rejections > filter->consecutive_velocity_rejections
+            ? filter->consecutive_position_rejections
+            : filter->consecutive_velocity_rejections;
+    if (!filter->navigation_recovery_probationary) {
+        if (filter->position_accepted) {
+            mark_horizontal_position_aiding(filter, filter->last_timestamp_us);
+            mark_vertical_position_aiding(filter, filter->last_timestamp_us);
+        }
+        if (filter->velocity_accepted) {
+            mark_horizontal_velocity_aiding(filter, filter->last_timestamp_us);
+            mark_vertical_velocity_aiding(filter, filter->last_timestamp_us);
         }
     }
+}
+
+AerakiaStatus aerakia_eskf_update_gps_observation(
+    AerakiaEskf *filter,
+    const AerakiaGpsObservation *observation
+)
+{
+    AerakiaStatus position_status;
+    AerakiaStatus velocity_status;
+    if (filter == NULL || observation == NULL) return AERAKIA_STATUS_INVALID_ARGUMENT;
+    if (!vector_is_finite(observation->position_ned_m)
+        || !vector_is_finite(observation->velocity_ned_m_s)
+        || !isfinite(observation->position_variance_m2)
+        || !isfinite(observation->velocity_variance_m2_s2)
+        || observation->position_variance_m2 <= 0.0f
+        || observation->velocity_variance_m2_s2 <= 0.0f) {
+        return AERAKIA_STATUS_MISSING_MEASUREMENT;
+    }
+    position_status = validate_aiding_timestamp(
+        filter, observation->timestamp_us, filter->last_position_timestamp_us,
+        filter->has_position_timestamp
+    );
+    if (position_status != AERAKIA_STATUS_OK) return position_status;
+    velocity_status = validate_aiding_timestamp(
+        filter, observation->timestamp_us, filter->last_velocity_timestamp_us,
+        filter->has_velocity_timestamp
+    );
+    if (velocity_status != AERAKIA_STATUS_OK) return velocity_status;
+    if (filter->navigation_recovery_probationary
+        && !recovery_probation_source_matches(filter, observation)) {
+        return AERAKIA_STATUS_RECOVERY_REJECTED;
+    }
+    aerakia_eskf_update_gps(
+        filter, observation->position_ned_m, observation->velocity_ned_m_s,
+        observation->position_variance_m2, observation->velocity_variance_m2_s2
+    );
+    filter->last_gps_timestamp_us = observation->timestamp_us;
+    filter->last_position_timestamp_us = observation->timestamp_us;
+    filter->last_velocity_timestamp_us = observation->timestamp_us;
+    filter->has_gps_timestamp = true;
+    filter->has_position_timestamp = true;
+    filter->has_velocity_timestamp = true;
+    if (recovery_probation_accepts(
+            filter, observation, filter->position_accepted && filter->velocity_accepted)) {
+        if (filter->position_accepted) {
+            mark_horizontal_position_aiding(filter, observation->timestamp_us);
+            mark_vertical_position_aiding(filter, observation->timestamp_us);
+        }
+        if (filter->velocity_accepted) {
+            mark_horizontal_velocity_aiding(filter, observation->timestamp_us);
+            mark_vertical_velocity_aiding(filter, observation->timestamp_us);
+        }
+    }
+    if (!filter->position_accepted && !filter->velocity_accepted) {
+        record_recovery_candidate(filter, observation);
+    } else {
+        clear_recovery_candidate(filter);
+    }
+    return AERAKIA_STATUS_OK;
+}
+
+AerakiaStatus aerakia_eskf_authorize_navigation_recovery(
+    AerakiaEskf *filter,
+    const AerakiaNavigationRecoveryAuthorization *authorization
+)
+{
+    AerakiaVec3f current_position;
+    AerakiaVec3f current_velocity;
+    eskf_float_t position[3];
+    eskf_float_t velocity[3];
+    float position_bound;
+    float velocity_bound;
+
+    if (filter == NULL || authorization == NULL) return AERAKIA_STATUS_INVALID_ARGUMENT;
+    if (!authorization->source_quality_verified) return AERAKIA_STATUS_RECOVERY_REJECTED;
+    if (!isfinite(authorization->maximum_position_correction_m)
+        || !isfinite(authorization->maximum_velocity_correction_m_s)
+        || authorization->maximum_position_correction_m <= 0.0f
+        || authorization->maximum_velocity_correction_m_s <= 0.0f) {
+        return AERAKIA_STATUS_INVALID_ARGUMENT;
+    }
+    if (!filter->has_recovery_candidate
+        || authorization->observation_timestamp_us != filter->recovery_candidate.timestamp_us
+        || !filter->has_timestamp
+        || filter->last_timestamp_us < filter->recovery_candidate.timestamp_us
+        || (double)(filter->last_timestamp_us - filter->recovery_candidate.timestamp_us) * 1.0e-6
+            > filter->config.navigation_recovery_authorization_max_age_s
+        || filter->config.navigation_recovery_rejection_limit == 0U
+        || filter->consecutive_navigation_rejections
+            < filter->config.navigation_recovery_rejection_limit
+        || filter->recovery_candidate_consistent_observations
+            < filter->config.navigation_recovery_min_consistent_observations
+        || filter->recovery_candidate.timestamp_us < filter->recovery_candidate_start_timestamp_us
+        || (double)(filter->recovery_candidate.timestamp_us
+                - filter->recovery_candidate_start_timestamp_us) * 1.0e-6 + 1.0e-6
+            < filter->config.navigation_recovery_min_candidate_duration_s) {
+        return AERAKIA_STATUS_NOT_READY;
+    }
+    if (authorization->source_id != filter->recovery_candidate.source_id
+        || authorization->source_generation != filter->recovery_candidate.source_generation
+        || authorization->quality_sequence != filter->recovery_candidate.quality_sequence) {
+        return AERAKIA_STATUS_RECOVERY_REJECTED;
+    }
+
+    current_position = (AerakiaVec3f){
+        (float)filter->core.state.p[0],
+        (float)filter->core.state.p[1],
+        (float)filter->core.state.p[2],
+    };
+    current_velocity = (AerakiaVec3f){
+        (float)filter->core.state.v[0],
+        (float)filter->core.state.v[1],
+        (float)filter->core.state.v[2],
+    };
+    position_bound = fminf(
+        authorization->maximum_position_correction_m,
+        filter->config.recovery_max_position_correction_m
+    );
+    velocity_bound = fminf(
+        authorization->maximum_velocity_correction_m_s,
+        filter->config.recovery_max_velocity_correction_m_s
+    );
+    if (vector_distance(current_position, filter->recovery_candidate.position_ned_m)
+            > position_bound
+        || vector_distance(current_velocity, filter->recovery_candidate.velocity_ned_m_s)
+            > velocity_bound) {
+        return AERAKIA_STATUS_RECOVERY_REJECTED;
+    }
+
+    position[0] = filter->recovery_candidate.position_ned_m.x;
+    position[1] = filter->recovery_candidate.position_ned_m.y;
+    position[2] = filter->recovery_candidate.position_ned_m.z;
+    velocity[0] = filter->recovery_candidate.velocity_ned_m_s.x;
+    velocity[1] = filter->recovery_candidate.velocity_ned_m_s.y;
+    velocity[2] = filter->recovery_candidate.velocity_ned_m_s.z;
+    eskf_reset_navigation(
+        &filter->core,
+        position,
+        velocity,
+        fmaxf(
+            filter->recovery_candidate.position_variance_m2,
+            filter->config.recovery_position_variance_floor_m2
+        ),
+        fmaxf(
+            filter->recovery_candidate.velocity_variance_m2_s2,
+            filter->config.recovery_velocity_variance_floor_m2_s2
+        )
+    );
+    filter->navigation_recovered = true;
+    filter->navigation_recovery_count++;
+    filter->navigation_recovery_probationary = true;
+    filter->navigation_recovery_probation_acceptances = 0U;
+    filter->navigation_recovery_probation_start_timestamp_us = 0U;
+    filter->navigation_recovery_probation_last_timestamp_us =
+        filter->recovery_candidate.timestamp_us;
+    filter->navigation_recovery_source_id = filter->recovery_candidate.source_id;
+    filter->navigation_recovery_source_generation =
+        filter->recovery_candidate.source_generation;
+    filter->navigation_recovery_quality_sequence =
+        filter->recovery_candidate.quality_sequence;
+    filter->has_horizontal_position_aiding_timestamp = false;
+    filter->has_horizontal_velocity_aiding_timestamp = false;
+    filter->has_vertical_position_aiding_timestamp = false;
+    filter->has_vertical_velocity_aiding_timestamp = false;
+    filter->consecutive_navigation_rejections = 0U;
+    filter->consecutive_position_rejections = 0U;
+    filter->consecutive_velocity_rejections = 0U;
+    clear_recovery_candidate(filter);
+    return AERAKIA_STATUS_OK;
+}
+
+AerakiaStatus aerakia_eskf_update_position_observation(
+    AerakiaEskf *filter,
+    const AerakiaPositionObservation *observation
+)
+{
+    AerakiaStatus status;
+    if (filter == NULL || observation == NULL) return AERAKIA_STATUS_INVALID_ARGUMENT;
+    if (!vector_is_finite(observation->position_ned_m)
+        || !isfinite(observation->variance_m2) || observation->variance_m2 <= 0.0f) {
+        return AERAKIA_STATUS_MISSING_MEASUREMENT;
+    }
+    status = validate_aiding_timestamp(
+        filter, observation->timestamp_us, filter->last_position_timestamp_us,
+        filter->has_position_timestamp
+    );
+    if (status != AERAKIA_STATUS_OK) return status;
+
+    filter->navigation_recovered = false;
+    aerakia_eskf_update_position(
+        filter, observation->position_ned_m, observation->variance_m2
+    );
+    if (filter->position_accepted) {
+        filter->consecutive_position_rejections = 0U;
+    } else {
+        filter->consecutive_position_rejections++;
+    }
+    filter->consecutive_navigation_rejections =
+        filter->consecutive_position_rejections > filter->consecutive_velocity_rejections
+            ? filter->consecutive_position_rejections
+            : filter->consecutive_velocity_rejections;
+    filter->last_position_timestamp_us = observation->timestamp_us;
+    filter->has_position_timestamp = true;
+    return AERAKIA_STATUS_OK;
+}
+
+AerakiaStatus aerakia_eskf_update_velocity_observation(
+    AerakiaEskf *filter,
+    const AerakiaVelocityObservation *observation
+)
+{
+    AerakiaStatus status;
+    if (filter == NULL || observation == NULL) return AERAKIA_STATUS_INVALID_ARGUMENT;
+    if (!vector_is_finite(observation->velocity_ned_m_s)
+        || !isfinite(observation->variance_m2_s2)
+        || observation->variance_m2_s2 <= 0.0f) {
+        return AERAKIA_STATUS_MISSING_MEASUREMENT;
+    }
+    status = validate_aiding_timestamp(
+        filter, observation->timestamp_us, filter->last_velocity_timestamp_us,
+        filter->has_velocity_timestamp
+    );
+    if (status != AERAKIA_STATUS_OK) return status;
+
+    filter->navigation_recovered = false;
+    aerakia_eskf_update_velocity(
+        filter, observation->velocity_ned_m_s, observation->variance_m2_s2
+    );
+    if (filter->velocity_accepted) {
+        filter->consecutive_velocity_rejections = 0U;
+    } else {
+        filter->consecutive_velocity_rejections++;
+    }
+    filter->consecutive_navigation_rejections =
+        filter->consecutive_position_rejections > filter->consecutive_velocity_rejections
+            ? filter->consecutive_position_rejections
+            : filter->consecutive_velocity_rejections;
+    filter->last_velocity_timestamp_us = observation->timestamp_us;
+    filter->has_velocity_timestamp = true;
+    return AERAKIA_STATUS_OK;
 }
 
 void aerakia_eskf_update_heading(
@@ -413,6 +960,38 @@ void aerakia_eskf_update_heading(
         &filter->last_heading_innovation
     );
     filter->heading_accepted = filter->last_heading_innovation.accepted;
+    if (filter->heading_accepted && filter->has_timestamp) {
+        mark_heading_aiding(filter, filter->last_timestamp_us);
+    }
+    if (filter->heading_accepted && filter->static_alignment_complete
+        && filter->static_tilt_alignment_complete) {
+        filter->static_heading_alignment_complete = true;
+    }
+}
+
+AerakiaStatus aerakia_eskf_update_heading_observation(
+    AerakiaEskf *filter,
+    const AerakiaHeadingObservation *observation
+)
+{
+    AerakiaStatus status;
+    if (filter == NULL || observation == NULL) return AERAKIA_STATUS_INVALID_ARGUMENT;
+    if (!isfinite(observation->heading_ned_rad) || !isfinite(observation->variance_rad2)
+        || observation->variance_rad2 <= 0.0f) {
+        return AERAKIA_STATUS_MISSING_MEASUREMENT;
+    }
+    status = validate_aiding_timestamp(
+        filter, observation->timestamp_us, filter->last_heading_timestamp_us,
+        filter->has_heading_timestamp
+    );
+    if (status != AERAKIA_STATUS_OK) return status;
+    aerakia_eskf_update_heading(
+        filter, observation->heading_ned_rad, observation->variance_rad2
+    );
+    filter->last_heading_timestamp_us = observation->timestamp_us;
+    filter->has_heading_timestamp = true;
+    if (filter->heading_accepted) mark_heading_aiding(filter, observation->timestamp_us);
+    return AERAKIA_STATUS_OK;
 }
 
 void aerakia_eskf_update_barometer(
@@ -422,14 +1001,50 @@ void aerakia_eskf_update_barometer(
 )
 {
     if (filter != NULL && isfinite(height_up_m) && variance_m2 > 0.0f) {
-        eskf_update_baro(&filter->core, height_up_m, variance_m2, NULL);
+        memset(&filter->last_barometer_innovation, 0, sizeof(filter->last_barometer_innovation));
+        eskf_update_baro(
+            &filter->core, height_up_m, variance_m2, &filter->last_barometer_innovation
+        );
+        filter->barometer_accepted = filter->last_barometer_innovation.accepted;
+        if (filter->barometer_accepted && filter->has_timestamp) {
+            mark_vertical_position_aiding(filter, filter->last_timestamp_us);
+        }
     }
+}
+
+AerakiaStatus aerakia_eskf_update_barometer_observation(
+    AerakiaEskf *filter,
+    const AerakiaBarometerObservation *observation
+)
+{
+    AerakiaStatus status;
+    if (filter == NULL || observation == NULL) return AERAKIA_STATUS_INVALID_ARGUMENT;
+    if (!isfinite(observation->height_up_m) || !isfinite(observation->variance_m2)
+        || observation->variance_m2 <= 0.0f) {
+        return AERAKIA_STATUS_MISSING_MEASUREMENT;
+    }
+    status = validate_aiding_timestamp(
+        filter, observation->timestamp_us, filter->last_barometer_timestamp_us,
+        filter->has_barometer_timestamp
+    );
+    if (status != AERAKIA_STATUS_OK) return status;
+    aerakia_eskf_update_barometer(filter, observation->height_up_m, observation->variance_m2);
+    filter->last_barometer_timestamp_us = observation->timestamp_us;
+    filter->has_barometer_timestamp = true;
+    if (filter->barometer_accepted) {
+        mark_vertical_position_aiding(filter, observation->timestamp_us);
+    }
+    return AERAKIA_STATUS_OK;
 }
 
 void aerakia_eskf_apply_zero_velocity(AerakiaEskf *filter, float variance_m2_s2)
 {
     if (filter != NULL && variance_m2_s2 > 0.0f) {
         eskf_update_static_constraint(&filter->core, variance_m2_s2);
+        if (filter->has_timestamp) {
+            mark_horizontal_velocity_aiding(filter, filter->last_timestamp_us);
+            mark_vertical_velocity_aiding(filter, filter->last_timestamp_us);
+        }
     }
 }
 
@@ -439,10 +1054,11 @@ void aerakia_eskf_get_estimate(
 )
 {
     int index;
-    bool healthy = true;
+    bool healthy;
     if (filter == NULL || estimate == NULL) {
         return;
     }
+    healthy = state_is_finite_and_normalized(&filter->core.state);
     memset(estimate, 0, sizeof(*estimate));
     for (index = 0; index < 4; ++index) {
         estimate->attitude.quaternion_wxyz[index] = (float)filter->core.state.q[index];
@@ -476,13 +1092,44 @@ void aerakia_eskf_get_estimate(
     estimate->last_heading_innovation = filter->last_heading_innovation;
     estimate->last_position_innovation = filter->last_position_innovation;
     estimate->last_velocity_innovation = filter->last_velocity_innovation;
+    estimate->last_barometer_innovation = filter->last_barometer_innovation;
     estimate->magnetometer_accepted = filter->magnetometer_accepted;
     estimate->heading_accepted = filter->heading_accepted;
     estimate->position_accepted = filter->position_accepted;
     estimate->velocity_accepted = filter->velocity_accepted;
+    estimate->barometer_accepted = filter->barometer_accepted;
     estimate->navigation_recovered = filter->navigation_recovered;
     estimate->navigation_recovery_count = filter->navigation_recovery_count;
     estimate->consecutive_navigation_rejections = filter->consecutive_navigation_rejections;
+    estimate->consecutive_position_rejections = filter->consecutive_position_rejections;
+    estimate->consecutive_velocity_rejections = filter->consecutive_velocity_rejections;
+    estimate->recovery_candidate_consistent_observations =
+        filter->recovery_candidate_consistent_observations;
+    estimate->recovery_candidate_duration_s = 0.0f;
+    if (filter->has_recovery_candidate
+        && filter->recovery_candidate.timestamp_us
+            >= filter->recovery_candidate_start_timestamp_us) {
+        estimate->recovery_candidate_duration_s = (float)(
+            (double)(filter->recovery_candidate.timestamp_us
+                - filter->recovery_candidate_start_timestamp_us) * 1.0e-6
+        );
+    }
+    estimate->navigation_recovery_candidate_ready =
+        filter->has_recovery_candidate
+        && filter->has_timestamp
+        && filter->last_timestamp_us >= filter->recovery_candidate.timestamp_us
+        && (double)(filter->last_timestamp_us - filter->recovery_candidate.timestamp_us) * 1.0e-6
+            <= filter->config.navigation_recovery_authorization_max_age_s
+        && filter->config.navigation_recovery_rejection_limit > 0U
+        && filter->consecutive_navigation_rejections
+            >= filter->config.navigation_recovery_rejection_limit
+        && filter->recovery_candidate_consistent_observations
+            >= filter->config.navigation_recovery_min_consistent_observations
+        && estimate->recovery_candidate_duration_s
+            >= filter->config.navigation_recovery_min_candidate_duration_s;
+    estimate->navigation_recovery_probationary = filter->navigation_recovery_probationary;
+    estimate->navigation_recovery_probation_acceptances =
+        filter->navigation_recovery_probation_acceptances;
     estimate->static_alignment_complete = filter->static_alignment_complete;
     estimate->static_tilt_alignment_complete = filter->static_tilt_alignment_complete;
     estimate->static_heading_alignment_complete = filter->static_heading_alignment_complete;
@@ -490,6 +1137,79 @@ void aerakia_eskf_get_estimate(
     estimate->zero_velocity_update_applied = filter->zero_velocity_update_applied;
     estimate->static_alignment_samples = filter->static_alignment_samples;
     estimate->zero_velocity_update_count = filter->zero_velocity_update_count;
+    estimate->horizontal_aiding_age_s = INFINITY;
+    estimate->horizontal_position_aiding_age_s = INFINITY;
+    estimate->horizontal_velocity_aiding_age_s = INFINITY;
+    estimate->heading_aiding_age_s = INFINITY;
+    estimate->vertical_position_aiding_age_s = INFINITY;
+    estimate->vertical_velocity_aiding_age_s = INFINITY;
+    if (filter->has_timestamp && filter->has_horizontal_position_aiding_timestamp
+        && filter->last_timestamp_us >= filter->last_horizontal_position_aiding_timestamp_us) {
+        estimate->horizontal_position_aiding_age_s = (float)(
+            (double)(filter->last_timestamp_us
+                - filter->last_horizontal_position_aiding_timestamp_us) * 1.0e-6
+        );
+        estimate->horizontal_position_valid = !filter->navigation_recovery_probationary
+            && filter->horizontal_position_initialized
+            && (filter->config.maximum_horizontal_position_dead_reckoning_s < 0.0f
+                || estimate->horizontal_position_aiding_age_s
+                    <= filter->config.maximum_horizontal_position_dead_reckoning_s);
+    }
+    if (filter->has_timestamp && filter->has_horizontal_velocity_aiding_timestamp
+        && filter->last_timestamp_us >= filter->last_horizontal_velocity_aiding_timestamp_us) {
+        estimate->horizontal_velocity_aiding_age_s = (float)(
+            (double)(filter->last_timestamp_us
+                - filter->last_horizontal_velocity_aiding_timestamp_us) * 1.0e-6
+        );
+        estimate->horizontal_velocity_valid = !filter->navigation_recovery_probationary
+            && (filter->config.maximum_horizontal_velocity_dead_reckoning_s < 0.0f
+                || estimate->horizontal_velocity_aiding_age_s
+                    <= filter->config.maximum_horizontal_velocity_dead_reckoning_s);
+    }
+    if (isfinite(estimate->horizontal_position_aiding_age_s)
+        && isfinite(estimate->horizontal_velocity_aiding_age_s)) {
+        estimate->horizontal_aiding_age_s = fmaxf(
+            estimate->horizontal_position_aiding_age_s,
+            estimate->horizontal_velocity_aiding_age_s
+        );
+    }
+    estimate->horizontal_navigation_valid = estimate->horizontal_position_valid
+        && estimate->horizontal_velocity_valid;
+    if (filter->has_timestamp && filter->has_heading_aiding_timestamp
+        && filter->last_timestamp_us >= filter->last_heading_aiding_timestamp_us) {
+        estimate->heading_aiding_age_s = (float)(
+            (double)(filter->last_timestamp_us - filter->last_heading_aiding_timestamp_us)
+            * 1.0e-6
+        );
+        estimate->heading_valid = filter->config.maximum_heading_dead_reckoning_s < 0.0f
+            || estimate->heading_aiding_age_s <= filter->config.maximum_heading_dead_reckoning_s;
+    }
+    if (filter->has_timestamp && filter->has_vertical_position_aiding_timestamp
+        && filter->last_timestamp_us >= filter->last_vertical_position_aiding_timestamp_us) {
+        estimate->vertical_position_aiding_age_s = (float)(
+            (double)(
+                filter->last_timestamp_us - filter->last_vertical_position_aiding_timestamp_us
+            ) * 1.0e-6
+        );
+        estimate->vertical_position_valid =
+            filter->config.maximum_vertical_position_dead_reckoning_s < 0.0f
+            || estimate->vertical_position_aiding_age_s
+                <= filter->config.maximum_vertical_position_dead_reckoning_s;
+    }
+    if (filter->has_timestamp && filter->has_vertical_velocity_aiding_timestamp
+        && filter->last_timestamp_us >= filter->last_vertical_velocity_aiding_timestamp_us) {
+        estimate->vertical_velocity_aiding_age_s = (float)(
+            (double)(
+                filter->last_timestamp_us - filter->last_vertical_velocity_aiding_timestamp_us
+            ) * 1.0e-6
+        );
+        estimate->vertical_velocity_valid =
+            filter->config.maximum_vertical_velocity_dead_reckoning_s < 0.0f
+            || estimate->vertical_velocity_aiding_age_s
+                <= filter->config.maximum_vertical_velocity_dead_reckoning_s;
+    }
+    estimate->vertical_navigation_valid = estimate->vertical_position_valid
+        && estimate->vertical_velocity_valid;
     estimate->healthy = healthy;
     estimate->attitude.healthy = healthy;
 }

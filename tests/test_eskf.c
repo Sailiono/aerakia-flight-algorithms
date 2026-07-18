@@ -236,7 +236,7 @@ static void test_velocity_update_and_gate(void)
     check_true(near(filter.state.v[0], before[0], 1e-12), "rejected velocity leaves state unchanged");
 }
 
-static void test_heading_updates_are_yaw_only(void)
+static void test_heading_measurement_models(void)
 {
     ESKF_Handle filter;
     ESKF_InnovResult result;
@@ -267,19 +267,32 @@ static void test_heading_updates_are_yaw_only(void)
                      30.0 * ESKF_PI / 180.0, q);
     eskf_init(&filter, NULL, q);
     {
-        const double roll_before = roll_from_quaternion(filter.state.q);
-        const double pitch_before = pitch_from_quaternion(filter.state.q);
+        const double observed_heading = 20.0 * ESKF_PI / 180.0;
+        const double error_before = fabs(atan2(
+            sin(observed_heading - yaw_from_quaternion(filter.state.q)),
+            cos(observed_heading - yaw_from_quaternion(filter.state.q))
+        ));
         eskf_update_heading(&filter, 20.0 * ESKF_PI / 180.0, 0.01, &result);
         check_true(result.accepted, "tilted trusted heading update is accepted");
         check_true(
-            near(roll_from_quaternion(filter.state.q), roll_before, 1.0e-10),
-            "tilted heading update preserves roll"
+            fabs(atan2(
+                sin(observed_heading - yaw_from_quaternion(filter.state.q)),
+                cos(observed_heading - yaw_from_quaternion(filter.state.q))
+            )) < error_before,
+            "full tilted-heading Jacobian reduces the physical heading residual"
         );
-        check_true(
-            near(pitch_from_quaternion(filter.state.q), pitch_before, 1.0e-10),
-            "tilted heading update preserves pitch"
-        );
+        check_true(isfinite(result.nis), "tilted trusted heading reports finite NIS");
     }
+
+    euler_quaternion(0.0, 90.0 * ESKF_PI / 180.0, 0.0, q);
+    eskf_init(&filter, NULL, q);
+    result.accepted = true;
+    eskf_update_heading(&filter, 0.5, 0.01, &result);
+    check_true(!result.accepted, "vertical body-forward heading is rejected as unobservable");
+    check_true(near(filter.state.q[0], q[0], 1.0e-12), "rejected vertical heading leaves q_w");
+    check_true(near(filter.state.q[1], q[1], 1.0e-12), "rejected vertical heading leaves q_x");
+    check_true(near(filter.state.q[2], q[2], 1.0e-12), "rejected vertical heading leaves q_y");
+    check_true(near(filter.state.q[3], q[3], 1.0e-12), "rejected vertical heading leaves q_z");
 }
 
 static void test_joseph_covariance_stays_psd(void)
@@ -360,6 +373,10 @@ static void test_static_bias_alignment(void)
     check_true(near(filter.state.ab[0], 0.10, 1e-12), "accelerometer x bias aligns");
     check_true(near(filter.state.ab[2], 0.30, 1e-12), "accelerometer z bias aligns");
     check_true(near(filter.state.gb[2], -0.03, 1e-12), "gyroscope bias aligns");
+    check_true(near(filter.P[ESKF_IDX_DAB][ESKF_IDX_DAB], 4e-2, 1e-12),
+               "single-pose accel bias uncertainty remains observable later");
+    check_true(near(filter.P[ESKF_IDX_DGB][ESKF_IDX_DGB], 1e-4, 1e-12),
+               "stationary gyro bias alignment is confident");
 }
 
 static void test_static_attitude_alignment(void)
@@ -412,6 +429,29 @@ static void test_static_attitude_alignment(void)
     }
 }
 
+static void test_attitude_covariance_reset(void)
+{
+    ESKF_Handle filter;
+    const eskf_float_t variance[3] = {0.001, 0.002, 0.03};
+    int axis;
+    int index;
+
+    eskf_init(&filter, NULL, NULL);
+    filter.P[0][6] = filter.P[6][0] = 0.2;
+    filter.P[1][9] = filter.P[9][1] = -0.1;
+    check_true(eskf_reset_attitude_covariance(&filter, variance),
+               "attitude covariance reset accepts positive variances");
+    for (axis = 0; axis < 3; ++axis) {
+        check_true(near(filter.P[axis][axis], variance[axis], 1.0e-14),
+                   "attitude covariance reset applies requested diagonal");
+        for (index = 3; index < 15; ++index) {
+            check_true(near(filter.P[axis][index], 0.0, 1.0e-14)
+                       && near(filter.P[index][axis], 0.0, 1.0e-14),
+                       "attitude covariance reset clears stale cross covariance");
+        }
+    }
+}
+
 int main(void)
 {
     test_initialization();
@@ -420,11 +460,12 @@ int main(void)
     test_yaw_integration();
     test_position_update_and_gate();
     test_velocity_update_and_gate();
-    test_heading_updates_are_yaw_only();
+    test_heading_measurement_models();
     test_joseph_covariance_stays_psd();
     test_navigation_reset_preserves_attitude_and_biases();
     test_static_bias_alignment();
     test_static_attitude_alignment();
+    test_attitude_covariance_reset();
 
     if (failures != 0) {
         fprintf(stderr, "%d ESKF assertion(s) failed\n", failures);

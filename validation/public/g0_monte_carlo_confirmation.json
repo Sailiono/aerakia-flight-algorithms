@@ -1,0 +1,84 @@
+{
+  "schema_version": 2,
+  "evidence_grade": "synthetic",
+  "scenario": "navigation_outage",
+  "consumed_unbounded_confirmation": {
+    "seeds": "10000:11000",
+    "completed_trials": 1000,
+    "hard_failures": 1,
+    "failure_seed": 10988,
+    "failure_attitude_rmse_deg": 3.7151371298988534,
+    "limit_deg": 3.5,
+    "acceleration_bias_y_m_s2": 0.1992518552745198,
+    "disposition": "retained failure; this range was not reused as a blind pass"
+  },
+  "calibrated_input_regression": {
+    "seeds": "20000:21000",
+    "completed_trials": 1000,
+    "execution_failures": 0,
+    "hard_failures": 0,
+    "distribution_failures": 0,
+    "consistency_failures": 0,
+    "confidence_failures": 0,
+    "position_rmse_p95_m": 0.6391922307304052,
+    "velocity_rmse_p95_m_s": 0.29729198040528393,
+    "attitude_rmse_p95_deg": 1.7120280061081778,
+    "disposition": "known regression range retained for nightly reproducibility"
+  },
+  "post_audit_confirmation": {
+    "seeds": "40000:41000",
+    "completed_trials": 1000,
+    "execution_failures": 0,
+    "hard_failures": 0,
+    "distribution_failures": 0,
+    "consistency_failures": 0,
+    "confidence_failures": 0,
+    "git_commit": "51095687fd7925d149e6c16f1e1a3bb55f06b4cf",
+    "git_dirty": false,
+    "protocol_semantic_sha256": "4b335a794546866e8dbc8e5787723ad0b23cc78e088cc966d6af4a0bc8e10789",
+    "protocol_file_sha256": "4e685df1ca870e8ef15ef3ecdbeed7c1c237eb3b5c9a886cf5ce72a07f28c6fd",
+    "summary_file_sha256": "231e50a61b93636738f5bcc4ce1a15ea5886c964770bf7fa102ff61463c06203",
+    "command": "python3 validation/run_monte_carlo.py --runner build/g0-confirmation-clean/aerakia_validation_runner --out-dir build/g0-monte-carlo-clean-40000-v2 --seeds 40000:41000 --bias-sigma-limit 3.0 --jobs 8 --compact",
+    "aggregates": {
+      "position_rmse_m": {
+        "mean": 0.38922257037443636,
+        "p95": 0.6360732142039056,
+        "maximum": 1.0188166701850763
+      },
+      "velocity_rmse_m_s": {
+        "mean": 0.17231194874770916,
+        "p95": 0.2915164021361541,
+        "maximum": 0.48003928145858743
+      },
+      "attitude_rmse_deg": {
+        "mean": 0.9643087741726146,
+        "p95": 1.7040740440544961,
+        "maximum": 2.8118498382943207
+      },
+      "position_nis_mean": 2.9559938966194133,
+      "velocity_nis_mean": 2.531779822901167,
+      "navigation_nees_mean": 4.975769206450367
+    },
+    "bootstrap_99_percent": {
+      "position_rmse_p95_interval_m": [0.6051111126667207, 0.6598305718944555],
+      "velocity_rmse_p95_interval_m_s": [0.27361784443809123, 0.3104236172067391],
+      "attitude_rmse_p95_interval_deg": [1.6102431017801835, 1.8040908223627512],
+      "position_nis_mean_interval": [2.9395729171102722, 2.972419260871732],
+      "velocity_nis_mean_interval": [2.516852661077361, 2.546896276028546],
+      "navigation_nees_mean_interval": [4.885453931343884, 5.067143459880606]
+    },
+    "zero_failure_probability_upper_95": 0.0029912495450953314
+  },
+  "input_contract": {
+    "accel_bias_std_m_s2": 0.05,
+    "gyro_bias_std_deg_s": 0.2,
+    "per_axis_bias_sigma_limit": 3.0,
+    "timestamp_jitter_std_us": 250.0
+  },
+  "limitations": [
+    "This confirmation covers one synthetic navigation-outage profile, not the frozen VTOL bias-observability holdout.",
+    "The bias bound is provisional until FCOne hardware characterization replaces it.",
+    "It does not cover thermal drift, vibration, motor magnetic interference, target timing, or flight qualification.",
+    "A green result here does not close the retained horizontal accelerometer-bias convergence failure."
+  ]
+}

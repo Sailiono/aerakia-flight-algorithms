@@ -51,6 +51,28 @@ Metrics: attitude/velocity/position RMSE, bias error, innovation acceptance, NIS
 6. Failed or numerically unhealthy runs remain in the report.
 7. Synthetic results are labeled synthetic and never presented as flight proof.
 
+The internal numerical gate validates all 15 columns of the discrete transition against finite
+differences. All 225 process-noise entries are checked by a complete structure oracle, full-Q
+finiteness/symmetry/positive-semidefiniteness, and an independent numerical integration of the
+declared reduced continuous model. That reduced model includes direct IMU/bias white noise and
+velocity-to-position integration; it does not yet include every within-step higher-order coupling
+from attitude, specific force, angular rate, and bias random walk. Multi-rate NIS/NEES evidence
+supports the approximation at 100--1000 Hz, but a full coupled Van Loan or equivalent oracle remains
+open.
+
+Trusted physical heading uses the complete right-error Jacobian of raw body-X `atan2` heading and
+is checked per axis over 10,000 attitudes. Magnetometer fusion is deliberately a separate,
+tilt-conditioned NED-yaw-only pseudo correction so magnetic inclination/model error cannot request
+roll/pitch correction. Its tuning variance and pseudo-NIS are not represented as general
+physical-heading consistency at arbitrary tilt. Near-singular threshold cases fail closed.
+
+Horizontal accelerometer-bias generalization uses the frozen
+[`bias_observability_protocol_v1.json`](../validation/bias_observability_protocol_v1.json) and
+`run_bias_observability_cross_validation.py`. It contains five non-multisine VTOL profiles, nine
+exact horizontal bias vectors, disjoint train/tune/holdout seeds, interval-start ZOH truth, and
+per-trajectory/vector release gates. Smoke mode may report rather than enforce capability gates,
+but its JSON and Markdown status must still say `capability_failed` whenever any metric fails.
+
 ## Current deterministic scenarios
 
 - `clean_motion`: combined roll, pitch, and yaw without injected magnetic faults;
@@ -61,6 +83,11 @@ Metrics: attitude/velocity/position RMSE, bias error, innovation acceptance, NIS
   identity and CI scores only samples after independently reported tilt/heading alignment.
 - `navigation_outage`: stationary cold start, horizontal maneuvers, a five-second GNSS outage, and
   reacquisition with independent synthetic position/velocity truth.
+- `trusted_heading_recovery`: magnetometer-disabled cold start using an explicit 10 Hz body-heading
+  source, two 90° outliers, a four-second dropout, rejection, coast, and recovery.
+- `bias_convergence`: one-pose static initialization followed by multi-axis attitude/specific-force
+  excitation and continuous GNSS aiding; reports accelerometer and gyroscope truth error, reduction,
+  settling time, navigation accuracy, and consistency separately.
 
 The native `aerakia_validation_runner` replays the public C code. `run_suite.py` generates reports and `check_thresholds.py` turns reviewed error limits into CI gates.
 
@@ -69,6 +96,33 @@ squared (NIS). When the reference is declared synthetic or external truth, the r
 reports posterior six-state `[velocity, position]` normalized estimation error squared (NEES). Reports include
 single-sample chi-square coverage as a diagnostic; consecutive replay samples are correlated, so
 coverage is not treated as an independent-sample hypothesis test.
+
+Position and velocity are distinct measurement sources in the replay and public API. A receiver
+that publishes only position must use the timestamped position observation; validation must not
+differentiate positions and relabel the result as measured receiver velocity. The legacy paired API
+remains available when both measurements are physically present. Duplicate/freshness accounting
+and recovery timestamps are source-specific.
+
+Recorded aiding gaps are scored separately from nominal aided operation. Reports identify the
+longest gap, missing nominal epochs, error immediately before the gap, peak position/velocity drift,
+the first resumed posterior error, resume NIS, and sustained recovery time. A whole-run RMSE that
+mixes a long outage with nominal aiding is retained but is never presented as receiver accuracy.
+
+`run_monte_carlo.py` formalizes the reviewed multi-seed navigation gate. It retains every seed
+result, reports failure seeds, aggregates empirical P05/P95 ranges, and at 1,000 or more trials
+adds deterministic 10,000-resample 99% bootstrap bounds plus the exact 95% zero-failure probability
+upper bound. The current calibrated-input profile randomizes measurement noise, includes a fixed
+five-second GNSS outage, draws constant three-axis IMU biases inside a declared per-axis three-sigma
+residual-calibration envelope, and applies monotonic interval jitter. The first unbounded-prior
+confirmation and its one 4-sigma attitude failure remain public evidence; the later bounded range
+uses new seeds. Temperature-varying bias, delay compensation, vibration, and physical calibration
+remain separate hardware/profile gates, while deterministic transport reordering/loss/malformed
+values are covered by the input-integrity campaign.
+
+The bias scenario deliberately distinguishes observability phases. A stationary mean directly
+observes gyro bias, but one gravity direction cannot uniquely separate tilt from horizontal
+accelerometer bias. Static alignment therefore keeps accelerometer-bias uncertainty broad; only the
+subsequent multi-axis motion/GNSS interval is scored as online accelerometer-bias convergence.
 
 The staged external intake and the limits of each source are documented in
 [public datasets](public-datasets.md).
@@ -84,6 +138,24 @@ from external Vicon motion, and the validation runner records a gyro threshold c
 measured uncalibrated bias. Tilt completion and post-tilt gravity-direction RMSE are scored even when
 heading alignment cannot complete. Full-attitude cold-start scoring still requires an accepted
 heading source.
+
+Blackbird `NYC Subway Winter` adds a 270.1 s independent motion-capture track with recorded
+100 Hz IMU, aggressive angular motion, and an externally verified five-second static prefix. The
+converter keeps one absolute time base across IMU and truth, applies the published body/IMU
+extrinsic, and fails closed unless angular-rate correlation and gravity/frame residual checks pass.
+Its optional synthetic GNSS remains a navigation-math diagnostic, not receiver evidence.
+
+UrbanNav `Medium-Urban-1` adds 785.5 s of recorded 400 Hz ground-vehicle IMU, 655 valid F9P
+position epochs, independent SPAN-CPT postprocessed navigation truth, and a real 131 s receiver
+position gap. It tests independent position-only aiding and reacquisition. It does not test receiver
+velocity, physical body heading, aircraft dynamics, or fully independent truth because SPAN is a
+postprocessed GNSS/INS system.
+
+For independent-truth tracks, `analyze_results.py` also reports an offline Mahony fallback envelope:
+for declared entry-error gates it computes the first threshold crossing and worst/P95 truth error
+over 0.5, 1, 2, and 5 second windows. This metric is used to challenge supervisor policy, not as an
+online health signal—the flight supervisor cannot observe ground-truth error. Blackbird motivated a
+continuity check on fallback entry and a finite Mahony-only time budget.
 
 ## Private ULog track
 
