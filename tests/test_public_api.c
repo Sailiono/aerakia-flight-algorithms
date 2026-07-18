@@ -561,6 +561,30 @@ static void test_eskf_adapter_stationary(void)
     check_true(estimate.healthy, "ESKF adapter covariance remains healthy");
 }
 
+static void test_eskf_health_covers_state_and_covariance(void)
+{
+    AerakiaEskf filter;
+    AerakiaNavigationEstimate estimate;
+
+    aerakia_eskf_init(&filter, NULL, NULL, NULL);
+    aerakia_eskf_get_estimate(&filter, &estimate);
+    check_true(estimate.healthy, "fresh ESKF state and covariance are healthy");
+
+    filter.core.state.p[0] = NAN;
+    aerakia_eskf_get_estimate(&filter, &estimate);
+    check_true(!estimate.healthy, "non-finite ESKF nominal state is unhealthy");
+
+    filter.core.state.p[0] = 0.0;
+    filter.core.state.q[0] = 2.0;
+    aerakia_eskf_get_estimate(&filter, &estimate);
+    check_true(!estimate.healthy, "non-unit ESKF quaternion is unhealthy");
+
+    filter.core.state.q[0] = 1.0;
+    filter.core.P[0][0] = NAN;
+    aerakia_eskf_get_estimate(&filter, &estimate);
+    check_true(!estimate.healthy, "non-finite ESKF covariance is unhealthy");
+}
+
 static void test_eskf_static_supervisor(void)
 {
     AerakiaEskf filter;
@@ -684,6 +708,7 @@ int main(void)
     test_eskf_timestamped_aiding_integrity();
     test_eskf_aiding_numeric_exhaustive();
     test_eskf_adapter_stationary();
+    test_eskf_health_covers_state_and_covariance();
     test_eskf_static_supervisor();
     test_eskf_navigation_recovery_and_heading();
     test_eskf_cold_start_attitude_alignment();

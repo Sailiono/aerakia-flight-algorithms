@@ -15,6 +15,7 @@ sys.path.insert(0, str(VALIDATION))
 
 import convert_capture_to_golden as converter  # noqa: E402
 import convert_euroc_to_replay as euroc_converter  # noqa: E402
+import convert_insane_to_replay as insane_converter  # noqa: E402
 import convert_ulog_to_replay as ulog_converter  # noqa: E402
 import analyze_results as analyzer  # noqa: E402
 import generate_synthetic_imu as synthetic_generator  # noqa: E402
@@ -385,6 +386,38 @@ class EurocConverterTests(unittest.TestCase):
                 vicon_metadata["pose_reference"]["logged_timestamp_minus_physical_timestamp_us"],
                 5_000.0,
             )
+
+
+class InsaneConverterTests(unittest.TestCase):
+    def test_frame_transform_serializes_matching_euler_angles(self) -> None:
+        import numpy as np
+
+        source_quaternion = np.asarray([[1.0, 0.0, 0.0, 0.0]])
+        source_rotation = insane_converter._rotation_from_quaternion(source_quaternion)[0]
+        target_rotation = (
+            insane_converter.ENU_TO_NED
+            @ source_rotation
+            @ insane_converter.FLU_TO_FRD
+        )
+        target_quaternion = insane_converter._quaternion_from_rotation_matrix(target_rotation)
+        euler_deg = insane_converter._quaternion_to_euler_deg(target_quaternion[None, :])[0]
+
+        reconstructed = insane_converter._rotation_from_quaternion(target_quaternion[None, :])[0]
+        np.testing.assert_allclose(reconstructed, target_rotation, atol=1.0e-12)
+        self.assertAlmostEqual(euler_deg[0], 0.0)
+        self.assertAlmostEqual(euler_deg[1], 0.0)
+        self.assertAlmostEqual(euler_deg[2], 90.0)
+
+    def test_dual_rtk_pairing_requires_fixed_solution_and_timing(self) -> None:
+        import numpy as np
+
+        dtype = [("t_gps", "f8"), ("gps_fix_type", "f8")]
+        first = np.asarray([(1.000, 3.0), (2.000, 2.0), (3.000, 3.0)], dtype=dtype)
+        second = np.asarray([(1.001, 3.0), (2.001, 3.0), (3.010, 3.0)], dtype=dtype)
+
+        first_index, second_index = insane_converter._pair_dual_rtk(first, second, 0.002)
+        np.testing.assert_array_equal(first_index, np.asarray([0]))
+        np.testing.assert_array_equal(second_index, np.asarray([0]))
 
 
 class ValidationAnalyzerTests(unittest.TestCase):

@@ -19,6 +19,25 @@ static bool vector_is_finite(AerakiaVec3f vector)
     return isfinite(vector.x) && isfinite(vector.y) && isfinite(vector.z);
 }
 
+static bool state_is_finite_and_normalized(const ESKF_NominalState *state)
+{
+    int axis;
+    eskf_float_t quaternion_norm_squared = 0.0;
+    if (state == NULL) return false;
+    for (axis = 0; axis < 3; ++axis) {
+        if (!isfinite(state->p[axis]) || !isfinite(state->v[axis])
+            || !isfinite(state->ab[axis]) || !isfinite(state->gb[axis])) {
+            return false;
+        }
+    }
+    for (axis = 0; axis < 4; ++axis) {
+        if (!isfinite(state->q[axis])) return false;
+        quaternion_norm_squared += state->q[axis] * state->q[axis];
+    }
+    return isfinite(quaternion_norm_squared)
+        && fabs(quaternion_norm_squared - 1.0) <= 1.0e-3;
+}
+
 static float vector_norm(AerakiaVec3f vector)
 {
     return sqrtf(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
@@ -566,10 +585,11 @@ void aerakia_eskf_get_estimate(
 )
 {
     int index;
-    bool healthy = true;
+    bool healthy;
     if (filter == NULL || estimate == NULL) {
         return;
     }
+    healthy = state_is_finite_and_normalized(&filter->core.state);
     memset(estimate, 0, sizeof(*estimate));
     for (index = 0; index < 4; ++index) {
         estimate->attitude.quaternion_wxyz[index] = (float)filter->core.state.q[index];

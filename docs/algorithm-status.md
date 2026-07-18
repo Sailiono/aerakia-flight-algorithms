@@ -6,9 +6,10 @@ The portable estimator core is suitable for FCOne integration work and further b
 but it is not yet justified to claim that the complete flight-estimation system is verified.
 The current evidence establishes deterministic host behavior, measurement integrity handling,
 long-run covariance health, synthetic cold start, private PX4-referenced replay tracking, and two
-EuRoC external-reference sequences. Vicon-derived heading now tests yaw alignment and faults under
-recorded aggressive motion, but it does not yet establish flight safety or recorded heading-sensor
-accuracy.
+EuRoC external-reference sequences. Vicon-derived heading tests yaw alignment and faults under
+recorded aggressive motion, and INSANE now exercises the same production path with 1,378 physical
+dual-RTK observations. Neither shared-source track establishes independent absolute heading
+accuracy or flight safety.
 
 ## Evidence completed
 
@@ -18,7 +19,7 @@ accuracy.
 | Covariance health | Long mixed predict/update sequence checked for finite, symmetric, positive-semidefinite covariance | Passing |
 | Measurement integrity | NIS gates, latched magnetic-disturbance rejection, recovery confirmation, navigation recovery supervision | Passing deterministic regressions |
 | Heading semantics | Magnetometer, trusted heading, GNSS course, and PX4 GSF are separate paths; course is never silently treated as body yaw | Implemented |
-| Trusted-heading fault behavior | Cold-start completion, normal fusion, four-second dropout, two 90° outliers, rejection, geometry validity, and recovery with magnetometer disabled | Passing deterministic synthetic gate and Vicon-derived-heading physical-motion gate; recorded dual-GNSS/vision heading remains open |
+| Trusted-heading fault behavior | Cold-start completion, normal fusion, four-second dropout, two 90° outliers, rejection, geometry validity, and recovery with magnetometer disabled | Passing deterministic synthetic and Vicon-derived fault gates; INSANE physical dual-RTK path passes 1,378 updates, but shares its yaw reference |
 | Online IMU bias behavior | Static gyro initialization plus motion/GNSS-aided accelerometer-bias convergence, with truth error and settling time reported separately | Passing deterministic multi-axis synthetic gate; single-pose accelerometer observability limit and hardware thermal behavior remain explicit |
 | Cold-start alignment | Static accelerometer tilt, magnetic heading with explicit declination, IMU-bias initialization, and covariance reset at the new linearization point; no PX4 attitude seed | Passing unit/noisy synthetic checks and direct-Vicon tilt (0.862° post-alignment RMSE); external yaw truth still pending |
 | Navigation consistency | GNSS position/velocity NIS and posterior 6-state navigation NEES through a five-second outage and reacquisition | 20-seed measurement-noise baseline and constant-bias/timestamp-jitter extension pass with zero numerical/recovery failures; thermal and transport faults pending |
@@ -29,11 +30,11 @@ accuracy.
 
 ## P0 work before hardware flight tests
 
-1. Replace the Vicon-derived heading observation with recorded dual-antenna GNSS, vision, or
-   rate-table heading. The derived stream closes real-motion software behavior, not sensor accuracy.
-2. Keep the heading geometry gate explicit: scalar body-forward heading is invalid when its
-   horizontal projection is below 0.25. Validate the source validity/variance semantics on
-   RELLIS-3D VN-300 data before FCOne flight use.
+1. Add a second physical heading track with independent yaw truth, such as dual-antenna GNSS plus
+   motion capture/rate table. INSANE closes the recorded dual-RTK software path but shares its yaw
+   reference and cannot establish absolute sensor accuracy.
+2. Keep heading geometry, source validity, variance, baseline quality, and freshness explicit.
+   Validate the exact FCOne receiver status semantics before flight use.
 3. Keep the implemented transport delay, reordering, sample loss, malformed-value, and aiding-age
    campaign passing; add hardware thermal drift only when temperature data are available.
 4. Run the exact FCOne adapter through timestamp, frame, unit, dropout, and stale-data contract tests.
@@ -60,6 +61,12 @@ This document is an engineering maturity statement, not an airworthiness claim.
   1.0 s and post-alignment geodesic attitude RMSE is 1.498°. On geometry-observable samples yaw RMSE
   is 1.130°; two injected 90° observations are both rejected. These are real-motion software-path
   results, not recorded heading-sensor accuracy.
+- On INSANE `outdoor_1`, 39,174 recorded UAV IMU samples and 1,378 physical dual-RTK heading
+  observations produce 2.018° yaw RMSE with reference initialization. Independent cold start reaches
+  1.534° post-alignment yaw RMSE, with 91.15% normal update acceptance and 100% estimator health.
+  The scored yaw shares the RTK baseline, so this validates integration behavior rather than
+  independent absolute accuracy. Full-attitude scores are excluded because the published tilt and
+  measured gravity direction are inconsistent.
 - EuRoC full-attitude raw-IMU RMSE is 8.804° and 4.102°. This is dominated by yaw drift from the
   recorded approximately 0.08 rad/s z-gyro bias with no magnetometer or trusted heading; it is an
   observed limitation, not an acceptable heading-accuracy claim.
@@ -86,6 +93,10 @@ This document is an engineering maturity statement, not an airworthiness claim.
 - The Vicon heading stress track explicitly excludes 4,582 of 20,932 samples where the body-forward
   horizontal projection is below 0.25. During the controlled observable outage, maximum yaw error is
   3.943°; recovery takes 0.995 s and post-recovery yaw RMSE is 1.224°.
+- The INSANE physical dual-RTK track adds 199.7 s of recorded UAV motion and maintains 100% health;
+  97.10% of normal updates are accepted with reference initialization and 91.15% after cold start.
+  Natural data has no declared heading faults, so outlier rejection remains proven by the separate
+  injected-fault tracks.
 
 ### Maturity judgment
 
@@ -93,13 +104,13 @@ This document is an engineering maturity statement, not an airworthiness claim.
 | --- | ---: | --- |
 | Portable algorithm/math implementation | 80–85% | Core equations, covariance handling, cold start, aiding, recovery, and host gates are mature; full observability/physical truth remains open |
 | Host-side software robustness | 85–90% | High-volume malformed/timing campaign and sanitizer run pass; external dataset breadth is still only two unique EuRoC sequences |
-| Heading robustness | 60–65% | Real-motion derived-heading cold start/fault/recovery now passes with geometry gating; no recorded dual-GNSS/vision heading and no GNSS-velocity GSF fallback yet |
+| Heading robustness | 68–72% | Real-motion fault/recovery and physical dual-RTK input now pass; independent physical yaw truth and GNSS-velocity GSF fallback remain open |
 | FCOne integration readiness | 65–70% | Hardware-neutral contract is explicit; the exact private adapter, scheduling, target precision, and resource use are unverified |
 | Flight-main-estimator readiness | 45–55% | Suitable for shadow mode and bench/HIL preparation, not justified as the sole flight estimator yet |
 
-The highest-value non-hardware work remaining is recorded dual-antenna heading (`RELLIS-3D`),
-broader independent data (`Blackbird` aggressive motion and `UrbanNav` real GNSS degradation),
-followed by the FCOne-neutral mock publisher contract.
+The highest-value non-hardware work remaining is broader independent data (`Blackbird` aggressive
+motion and `UrbanNav` real GNSS degradation), a second independently scored physical-heading track,
+and the FCOne-neutral mock publisher/supervisor contracts.
 The highest-value physical evidence remains synchronized independent yaw truth, thermal/vibration
 characterization, motor magnetic disturbance, and target-MCU timing/stack measurements.
 

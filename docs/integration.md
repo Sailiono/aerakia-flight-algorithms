@@ -25,6 +25,13 @@ void estimator_init(void)
 }
 ```
 
+The ESKF is the primary navigation estimator. Configure the Mahony instance with the reviewed
+robust profile and run it as a separate attitude fallback/cross-monitor. Standard Mahony is a
+validation baseline, not the intended product fallback. The FCOne application owns mode selection,
+handover continuity, alarms, and per-output validity; see
+[Estimator supervision](estimator-supervision.md). Mahony-only operation must invalidate position
+and velocity rather than presenting a degraded attitude estimate as full navigation.
+
 ## Private driver adapter responsibilities
 
 Before publishing `AerakiaImuSample`, the board/application layer must:

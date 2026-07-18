@@ -7,12 +7,14 @@ flowchart TD
     A["Private drivers / middleware"] --> B["AerakiaImuSample"]
     C["Synthetic CSV or sanitized ULog replay"] --> D["PC validation runner"]
     D --> B
-    B --> E["Mahony attitude filters"]
-    B --> F["15-dimensional error-state ESKF"]
-    E --> G["Common estimates"]
+    B --> E["Robust Mahony<br/>independent attitude fallback"]
+    B --> F["15-dimensional error-state ESKF<br/>primary navigation estimator"]
+    E --> G["Private estimator supervisor"]
     F --> G
-    G --> H["Private control stack"]
-    G --> I["Metrics, plots, CI gates"]
+    G --> H["Validity-qualified control inputs"]
+    E --> I["Cross-monitor metrics"]
+    F --> I
+    I --> J["Plots and CI gates"]
 ```
 
 ## Dependency direction
@@ -24,6 +26,22 @@ flowchart TD
 - Python generates datasets and analyzes outputs; it does not reimplement the estimator.
 
 This prevents a demonstration from accidentally validating a Python approximation while the embedded product runs different C code.
+
+## Estimator roles
+
+The 15-error-state ESKF is the primary flight estimator. It owns the qualified attitude,
+velocity, position, IMU-bias, covariance, and aiding-health outputs used by the navigation and
+control stack.
+
+Robust Mahony is an independently configured attitude fallback and cross-monitor. It can preserve
+a bounded attitude output when the ESKF is not usable, and its disagreement with the ESKF is useful
+diagnostic evidence. It does not estimate velocity, position, full bias covariance, or navigation
+integrity, so it is not an equivalent navigation backup. Standard Mahony remains a validation
+baseline and is not the planned deployed fallback.
+
+Mode selection belongs to the private FCOne estimator supervisor. The public library exposes
+algorithm state and health evidence but does not silently switch control sources or copy Mahony
+attitude into the ESKF. See [Estimator supervision](estimator-supervision.md).
 
 ## State model choice
 

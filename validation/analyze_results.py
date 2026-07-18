@@ -781,12 +781,15 @@ def write_markdown(
         )
     trusted_heading = metrics.get("trusted_heading")
     if trusted_heading:
+        normal_acceptance = trusted_heading.get("normal_acceptance_ratio")
+        fault_rejection = trusted_heading.get("fault_rejection_ratio")
+        normal_text = "n/a" if normal_acceptance is None else f"{normal_acceptance:.3%}"
+        fault_text = "n/a (no declared fault samples)" if fault_rejection is None \
+            else f"{fault_rejection:.3%}"
         lines.extend(
             [
                 "", "## Trusted-heading behavior", "",
-                f"- Normal accepted updates: "
-                f"{trusted_heading['normal_acceptance_ratio']:.3%}; fault rejection: "
-                f"{trusted_heading['fault_rejection_ratio']:.3%}.",
+                f"- Normal accepted updates: {normal_text}; fault rejection: {fault_text}.",
                 f"- Longest dropout: {trusted_heading.get('dropout_duration_s', 0.0):.3f} s; "
                 f"maximum yaw error during dropout: "
                 f"{trusted_heading.get('dropout_max_abs_yaw_error_deg', 0.0):.3f}°.",
@@ -879,6 +882,10 @@ def write_markdown(
         lines.append(
             "> External truth is subject to the source dataset's calibration, synchronization, and observability limits."
         )
+    elif reference_kind == "shared_sensor_reference":
+        lines.append(
+            "> The estimator input and scoring reference share physical measurements; results validate integration behavior, not independent absolute accuracy."
+        )
     else:
         lines.append("> Synthetic truth validates implementation behavior, not physical flight reliability.")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -891,7 +898,7 @@ def main() -> None:
     parser.add_argument("--scenario", default="validation")
     parser.add_argument(
         "--reference-kind",
-        choices=("synthetic", "independent_truth", "px4_estimate"),
+        choices=("synthetic", "independent_truth", "shared_sensor_reference", "px4_estimate"),
         default="synthetic",
     )
     args = parser.parse_args()

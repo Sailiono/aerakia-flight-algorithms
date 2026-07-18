@@ -8,8 +8,9 @@ and derived reports belong in version control.
 | Priority | Dataset | What it can prove | Important limitation | Intake unit |
 | --- | --- | --- | --- | --- |
 | P0 | [EuRoC MAV](https://www.research-collection.ethz.ch/entities/researchdata/bcaf173e-5dac-484b-bc37-faf97a594f1f) | IMU propagation and attitude/position accuracy against Vicon or Leica truth | No GNSS or magnetometer; Machine Hall orientation is IMU-aided | `MH_01_easy` and direct-pose `V1_03_difficult` complete |
+| P0 | [INSANE](https://www.aau.at/en/smart-systems-technologies/control-of-networked-systems/datasets/insane-dataset/) | Recorded UAV IMU plus physical 1.16 m dual-RTK body-heading observations | Published yaw and direct heading share the RTK baseline; published tilt currently fails gravity consistency | `outdoor_1_sensors` yaw-path intake complete |
 | P0 | [Blackbird](https://github.com/mit-aera/Blackbird-Dataset) | Aggressive UAV dynamics against high-rate motion-capture truth | No GNSS or magnetometer; the full image dataset is multi-terabyte | Two sensor-only flight chunks at moderate and high speed |
-| P0 | [RELLIS-3D](https://github.com/unmannedlab/RELLIS-3D) | Recorded VectorNav VN-300 dual-antenna GNSS/INS heading and IMU under outdoor off-road motion | Ground vehicle; VN-300 output is a sensor observation rather than independent heading truth | One ROS-bag sequence after topic, frame, timing, and license audit |
+| P1 | [RELLIS-3D](https://github.com/unmannedlab/RELLIS-3D) | Recorded VectorNav VN-300 fused attitude and IMU under outdoor off-road motion | Ground vehicle; public topics do not expose raw dual-baseline validity and the reviewed bag lacks a readable index | Retain as a secondary device-output audit, not heading truth |
 | P1 | [UrbanNav](https://github.com/IPNL-POLYU/UrbanNavDataset) | GNSS/IMU behavior in urban canyons and tunnels against SPAN-CPT truth | Ground vehicle rather than aircraft; download IMU, GNSS, and truth separately | Medium-urban and tunnel sensor subsets |
 | P1 | [GVINS](https://github.com/HKUST-Aerial-Robotics/GVINS) | Raw multi-constellation GNSS, IMU, and intermittent-GNSS comparison | ROS bag and ENU/ECEF conventions need an explicit adapter | Sports-field bag after license and checksum review |
 | P1 | [PX4 Flight Review v2](https://github.com/PX4/flight-review-rs) | Real ULog schema coverage, estimator resets, and unusual sensor combinations | Public PX4 estimates are not independent truth; publication terms and privacy must be checked | Metadata-screened logs only; never bulk-commit raw logs |
@@ -36,6 +37,59 @@ Before a sequence is scored:
 - PX4 public ULogs support compatibility and fault discovery, not absolute accuracy claims.
 - Absence of magnetometer or dual-antenna heading must remain explicit; course over ground is never
   relabeled as body heading.
+
+## Completed physical-heading intake: INSANE `outdoor_1_sensors`
+
+The official sensor-only archive and calibration package were downloaded without the image data.
+Raw files remain outside Git; the converter and the reviewed metric summary are committed. The
+package contains two RTK-fixed position streams, PX4 IMU/magnetometer data, a declared IMU/truth
+time offset, and a 1.16 m calibrated antenna baseline.
+
+| Item | Recorded value |
+| --- | --- |
+| Sensor ZIP SHA-256 | `02ea94047ccb7d887c34f90f0c868f8430bdc448883bf82aeadd2a616d79bb79` |
+| Calibration ZIP SHA-256 | `cff4fbd099051cf0ff29838f7ab4bc67ff35d70cc6555029e537ca1036c215f2` |
+| Dataset tools commit | `9a1c8c0fdd195f2d869fff292f2ce5b273c5a03d` |
+| Retained replay | 39,174 recorded IMU samples, 199.735 s |
+| Physical heading input | 1,378 synchronized RTK-fixed baseline observations |
+| Baseline geometry | median 1.1591 m, standard deviation 0.0393 m after the geometry gate |
+| Frames | source ENU/FLU converted to Aerakia NED/FRD |
+| Evidence class | shared-sensor physical reference, not independent truth |
+
+```bash
+python simulation/tools/convert_insane_to_replay.py outdoor_1_sensors \
+  --out replay.csv --metadata source.json
+
+build/aerakia_validation_runner --cold-start replay.csv results.csv
+python validation/analyze_results.py results.csv \
+  --out-dir report --scenario insane-outdoor-1-dual-rtk-cold-start \
+  --reference-kind shared_sensor_reference
+```
+
+With reference attitude initialization, ESKF yaw RMSE is 2.018 degrees, normal heading acceptance
+is 97.10%, and estimator health is 100%. In the independent cold-start track, heading alignment
+completes at 11.492 s; post-alignment yaw RMSE is 1.534 degrees, normal heading acceptance is
+91.15%, the reported recovery interval is 2.000 s, and health remains 100%. There are no declared
+fault observations in this natural sequence, so it does not replace the existing outlier gate.
+
+The dataset's published orientation is constructed from the dual-RTK baseline and calibrated
+magnetometer. Direct baseline heading and scored yaw therefore share a physical source. In addition,
+the published initial roll/pitch disagrees with the measured gravity direction by roughly 18–20
+degrees under replay. Until that frame/export discrepancy is resolved, only the yaw input path is
+accepted from this sequence; full-attitude metrics are deliberately excluded from capability claims.
+
+## RELLIS-3D audit result
+
+The official full-stack download is a 4.0 GiB ZIP (SHA-256
+`95c0eacef45b28c832ec7a3bdb60042891230ea98c81f1a052e50b00bbb941da`) containing an 8.89 GB
+`example_filtered.bag`. The ZIP passes its integrity test, but the ROS bag lacks a readable index for
+the standard `rosbags` reader. A raw topic scan confirms `/vectornav/IMU`, `/vectornav/Odom`,
+`/vectornav/GPS`, `/vectornav/Mag`, `/vectornav/Pres`, and `/vectornav/Temp`.
+
+The reviewed VectorNav ROS driver publishes the unit's fused quaternion but does not preserve a raw
+dual-baseline validity/status stream in these messages. RELLIS is therefore retained as possible
+fused-device compatibility evidence after reindexing, not as an independent dual-GNSS heading truth
+source. INSANE is the higher-priority physical-heading track.
 
 ## Completed EuRoC intake: `MH_01_easy`
 
@@ -170,8 +224,8 @@ aggregate report. The two sequences contain 57,313 unique recorded IMU samples; 
 produce 156,490 replay attempts. Multiple tracks increase algorithm-path coverage but are not counted
 as additional physical data.
 
-RELLIS-3D is the next heading-specific intake because its platform records a VectorNav VN-300
-dual-antenna GNSS/INS. Blackbird sensor-only chunks remain desirable for aggressive aerial motion,
-and UrbanNav sensor subsets remain the next navigation intake for recorded GNSS degradation and
-outage behavior. None should be counted until raw topics, timing, frames, license, and hashes pass
-the same intake checklist.
+Blackbird sensor-only chunks remain desirable for aggressive aerial motion, and UrbanNav sensor
+subsets remain the next navigation intake for recorded GNSS degradation and outage behavior. A
+second physical-heading source is still desirable, but it must expose either raw antenna-baseline
+validity or an independently synchronized yaw reference. None is counted until raw topics, timing,
+frames, license, and hashes pass the same intake checklist.
