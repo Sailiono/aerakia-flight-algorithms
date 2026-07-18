@@ -258,7 +258,7 @@ static void test_eskf_input_integrity(void)
     }
 
     sample = level_sample(21000U);
-    sample.flags &= ~AERAKIA_SAMPLE_ACCEL_VALID;
+    sample.flags &= ~(uint32_t)AERAKIA_SAMPLE_ACCEL_VALID;
     before = filter;
     check_true(aerakia_eskf_process_imu(&filter, &sample, &estimate)
                    == AERAKIA_STATUS_MISSING_MEASUREMENT,
@@ -307,7 +307,7 @@ static void test_eskf_input_integrity(void)
     candidate = filter;
     control = filter;
     sample.timestamp_us += 10000U;
-    sample.flags &= ~AERAKIA_SAMPLE_MAG_VALID;
+    sample.flags &= ~(uint32_t)AERAKIA_SAMPLE_MAG_VALID;
     check_true(aerakia_eskf_process_imu(&control, &sample, &estimate) == AERAKIA_STATUS_OK,
                "ESKF processes control sample without magnetometer");
     sample.flags |= AERAKIA_SAMPLE_MAG_VALID;

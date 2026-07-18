@@ -1069,3 +1069,9 @@ structure implicitly. The Windows log reported MSVC `C4244`; Ubuntu and macOS ha
 The API boundary now uses explicit float conversions while all NIS and innovation calculations
 remain in `eskf_float_t`. A local clang-cl `/W4 /WX` compile of all C sources and the focused native
 core/model/public-API tests passed before the correction was republished.
+
+The next remote Windows build advanced past the library but still failed later in the all-target
+build. A stricter local `-Wconversion -Werror` audit of every source, test, and validation C file
+then exposed four enum-complement signedness conversions and one integer-to-double timestamp
+conversion in the public-API/input-integrity tests. Those test-harness boundaries now use explicit
+`uint32_t`/`double` conversions, and the complete conversion audit passes with zero diagnostics.

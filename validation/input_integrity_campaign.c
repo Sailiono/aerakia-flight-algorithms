@@ -325,7 +325,7 @@ static void run_bursts(
             AerakiaImuSample sample = level_sample(
                 base_timestamp + (uint64_t)(index + 1U) * nominal_dt_us
             );
-            sample.flags &= ~AERAKIA_SAMPLE_GYRO_VALID;
+            sample.flags &= ~(uint32_t)AERAKIA_SAMPLE_GYRO_VALID;
             (void)process_expected(
                 mahony, eskf, &sample, AERAKIA_STATUS_MISSING_MEASUREMENT, 0, counts
             );
@@ -335,7 +335,8 @@ static void run_bursts(
             AerakiaImuSample recovery = level_sample(
                 base_timestamp + (uint64_t)(length + 1U) * nominal_dt_us
             );
-            const double recovery_dt_s = (double)(length + 1U) * nominal_dt_us * 1.0e-6;
+            const double recovery_dt_s =
+                (double)(length + 1U) * (double)nominal_dt_us * 1.0e-6;
             if (recovery_dt_s > eskf->config.maximum_dt_s) {
                 (void)process_expected(
                     mahony, eskf, &recovery, AERAKIA_STATUS_TIMESTAMP_ERROR, 1, counts
@@ -386,12 +387,12 @@ static void run_seed(unsigned seed, CampaignCounts *counts)
         if (selector < 75U) {
             (void)process_expected(&mahony, &eskf, &sample, AERAKIA_STATUS_OK, 1, counts);
         } else if (selector < 78U) {
-            sample.flags &= ~AERAKIA_SAMPLE_ACCEL_VALID;
+            sample.flags &= ~(uint32_t)AERAKIA_SAMPLE_ACCEL_VALID;
             (void)process_expected(
                 &mahony, &eskf, &sample, AERAKIA_STATUS_MISSING_MEASUREMENT, 0, counts
             );
         } else if (selector < 81U) {
-            sample.flags &= ~AERAKIA_SAMPLE_GYRO_VALID;
+            sample.flags &= ~(uint32_t)AERAKIA_SAMPLE_GYRO_VALID;
             (void)process_expected(
                 &mahony, &eskf, &sample, AERAKIA_STATUS_MISSING_MEASUREMENT, 0, counts
             );
