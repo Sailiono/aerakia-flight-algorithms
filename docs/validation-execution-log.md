@@ -399,3 +399,69 @@ The same C targets were rebuilt with AddressSanitizer and UndefinedBehaviorSanit
 magnetic gate, public API, and the full 1,020,000-attempt campaign all passed. The campaign reported
 zero invariant failures and zero unhealthy outputs after 790,917 accepted IMU samples, 229,083
 intentional IMU rejections, timing/burst faults, and all declared aiding freshness/numeric cases.
+
+## 2026-07-18 — Executable FCOne-neutral integration contracts
+
+### Reason
+
+The previous milestone documented ESKF-primary/Mahony-fallback roles but did not execute the
+application-level invariants. Two host-only oracles were added without importing private FCOne
+headers or moving product policy into the public algorithm core:
+
+- `validation/estimator_supervisor_contract.c` models required mode/output behavior;
+- `validation/fcone_adapter_contract.c` models the final calibrated-publication boundary and drives
+  the real ESKF adapter through timing and aiding cases.
+
+### Supervisor coverage and safety finding
+
+The supervisor contract covers five-sample startup qualification, three-sample soft-observability
+confirmation, Mahony attitude-only degradation, position/velocity invalidation, 15-degree handover
+continuity, five-sample recovery dwell, both-estimators-invalid behavior, transition reason/count,
+and transition timestamp.
+
+The first design applied hysteresis to every ESKF health loss. Review found that this would allow a
+numerically invalid ESKF state to remain selected during the confirmation window. The contract now
+separates hard invalidity from soft degradation: non-finite state, invalid quaternion, or invalid
+covariance causes immediate Mahony/invalid transition; only finite but temporarily unobservable or
+aid-degraded navigation uses failure confirmation. This is a contract correction found before any
+private FCOne implementation existed.
+
+### Adapter coverage and retained test failures
+
+The mock FCOne publication uses physical timestamps, FRD engineering units, and independent source
+validity. Sentinel values verify `g` to m/s², degrees/s to rad/s, and gauss to µT without silent axis
+changes. The real adapter is then exercised for missing required gyro, corrected same-timestamp
+retry, duplicate rejection, forward-gap reanchor and recovery, delayed GNSS, future/stale/duplicate
+GNSS, and timestamped trusted heading.
+
+The first run failed two test expectations:
+
+1. the magnetic conversion comparison used a 1e-6 float tolerance even though decimal gauss values
+   multiplied by 100 incur slightly larger binary-float rounding; the sentinel tolerance was changed
+   to 1e-5 without changing conversion or algorithm code;
+2. a stale GNSS assertion was issued after a newer GNSS update, so the API correctly classified it
+   as reordered before evaluating age. The sequence now tests future and stale observations before
+   accepting the first fresh observation, then tests duplicate handling.
+
+After correction, both new contracts pass under strict `-Werror -pedantic` compilation. They are
+test oracles, not claims that the private FCOne v2 adapter, supervisor, scheduler, or flight response
+has already been implemented.
+
+### Complete gate
+
+```bash
+python validation/run_host_regression.py \
+  --build-dir build/integration-contract-final \
+  --out-dir build/integration-contract-report
+```
+
+- Release CTest: 6/6;
+- Python tools: 24/24;
+- deterministic accuracy/recovery/NIS/NEES/bias/magnetic thresholds: all passed;
+- release input-integrity campaign: 1,020,000 attempts, zero invariant failures and zero unhealthy
+  outputs.
+
+All five non-campaign C targets passed under ASan+UBSan. The full 1,020,000-attempt campaign was then
+run directly with the same sanitizers and also completed with zero invariant failures, zero unhealthy
+outputs, 790,917 accepted samples, 139,059 missing-measurement rejections, 90,024 timestamp
+rejections, 20,355 forward-gap reanchors, and every declared aiding fault class exercised.

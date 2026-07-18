@@ -26,8 +26,8 @@ Public branch, history, and tagging rules are defined in the [release policy](re
 | Bias convergence | Gyroscope and accelerometer bias error, convergence time, and steady-state uncertainty are reported separately; batch reference-bias correction is not counted as online convergence | Multi-axis synthetic gate implemented; thermal and physical characterization remain P2 evidence |
 | Timing and malformed input | Duplicate, stale, out-of-order, delayed, missing, non-finite, and implausible samples have explicit deterministic behavior and tests | Implemented deterministic matrix plus 1,020,000-attempt, 100-seed campaign; retain as a host gate |
 | Public dataset runner | Dataset manifest records source, hash, frame transform, time offset, command, code commit, and output summary; selected EuRoC runs reproduce with one command | Implemented for 6 EuRoC tracks and 156,490 replayed IMU samples; keep the reviewed baseline gate passing |
-| FCOne-neutral contract tests | A mock publisher verifies timestamp, FRD/NED frames, SI units, validity flags, update freshness, dropout, and stale-aiding behavior without including private FCOne headers | Pending |
-| Estimator-supervisor contract | Mock modes prove ESKF-primary, Mahony attitude-only degradation, output invalidation, transition logging, hysteresis, and recovery without implementing private flight policy in the public core | Contract documented; executable mock pending |
+| FCOne-neutral contract tests | A mock publisher verifies timestamp, FRD/NED frames, SI units, validity flags, update freshness, dropout, and stale-aiding behavior without including private FCOne headers | Executable oracle implemented; exact private FCOne v2 adapter remains P1 |
+| Estimator-supervisor contract | Mock modes prove ESKF-primary, Mahony attitude-only degradation, output invalidation, transition logging, hard-vs-soft failure handling, hysteresis, continuity, and recovery without implementing private flight policy in the public core | Executable host contract implemented; private FCOne policy remains P1 |
 
 Run the complete current host gate with:
 

@@ -43,6 +43,13 @@ Before publishing `AerakiaImuSample`, the board/application layer must:
 5. set validity flags only for measurements that passed driver-level checks;
 6. publish samples in monotonic timestamp order.
 
+The hardware-free oracle in `validation/fcone_adapter_contract.c` demonstrates and tests the final
+boundary using a mock FCOne publication: physical timestamps are preserved, FRD axes are not
+silently remapped, `g`/degrees-per-second/gauss are converted to m/s²/rad/s/µT, and validity flags
+remain independent. The private adapter may start from different raw units, but its output must pass
+the same sentinel-value, missing-field, duplicate, gap, future-aiding, stale-aiding, and recovery
+checks before integration is accepted.
+
 The public algorithm layer does not know whether the source is SPI, I²C, CAN, a middleware topic, a file, or a PC simulator.
 
 If the application already has a trusted startup attitude (for example, vision or a retained

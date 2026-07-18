@@ -29,6 +29,12 @@ The supervisor may also report a warning state while retaining `PRIMARY_ESKF`, f
 aiding source is rejected but the ESKF remains observable and healthy. A single innovation reject,
 magnetometer reject, or Mahony/ESKF disagreement must not cause an immediate source switch.
 
+Hard invalidity and soft degradation are different. A non-finite ESKF state, invalid quaternion,
+or invalid covariance must immediately stop ESKF output qualification and select a healthy Mahony
+attitude or `ESTIMATE_INVALID`; hysteresis must never keep publishing numerically invalid state.
+Loss of an aiding source, temporary lack of navigation observability, or isolated innovation reject
+may use confirmation counts and dwell time while the underlying state remains finite and bounded.
+
 ## Evidence used for a transition
 
 ESKF qualification should combine, at minimum:
@@ -64,6 +70,8 @@ wrong. The supervisor needs aiding health and vehicle context before assigning f
 ## Current boundary
 
 This repository validates estimator behavior and the public health evidence needed by a supervisor.
-It does not yet claim a flight-qualified automatic failover policy. FCOne-neutral mock-supervisor
-contract tests are a pre-hardware task; target timing, actuator interaction, and in-flight abort
-behavior require FCOne v2 hardware and HIL/flight evidence.
+`validation/estimator_supervisor_contract.c` is an executable host oracle for initialization,
+hard-invalid handling, soft-degradation hysteresis, attitude-only output invalidation, handover
+continuity, recovery dwell, and transition logging. It is not a flight-qualified automatic failover
+implementation. Target timing, actuator interaction, and in-flight abort behavior require the
+private FCOne supervisor plus FCOne v2 hardware and HIL/flight evidence.

@@ -26,6 +26,8 @@ accuracy or flight safety.
 | EuRoC public replay | 36,381-sample Leica/IMU `MH_01_easy` and 20,932-sample direct-pose `V1_03_difficult`; raw, cold-start, derived-heading, and reference-bias tracks retained | Navigation NIS/NEES consistent; direct Vicon pose passes high-dynamic replay; derived heading is not a recorded heading sensor |
 | Host regression | Strict C99 warnings-as-errors build, public API tests, deterministic synthetic fault suite | Passing reviewed thresholds |
 | Input/transport integrity | Exhaustive required-IMU non-finite checks; timestamp order/gap behavior; optional-mag isolation; timestamped GNSS/heading/barometer freshness and recovery | Passing 100 seeds, 1,020,000 IMU attempts, 2,100 aiding attempts, and burst lengths through 100 with zero invariant/health failures |
+| Estimator supervision | ESKF-primary startup, hard-invalid immediate response, soft observability hysteresis, Mahony attitude-only degradation, navigation invalidation, continuity-gated recovery, and transition evidence | Passing executable public contract; private FCOne policy and actuator interaction remain open |
+| FCOne-neutral adapter | Physical timestamp preservation, FRD sentinel axes, g/deg/s/gauss conversion, independent validity bits, missing data, duplicate/gap recovery, and future/stale aiding | Passing executable mock-publication contract; exact v2 message and scheduler remain open |
 | Private replay | Sanitized relative GNSS, reset events, GSF diagnostics, and native C replay across the selected ULog suite | Operational; PX4 remains an engineering reference |
 
 ## P0 work before hardware flight tests
@@ -37,7 +39,9 @@ accuracy or flight safety.
    Validate the exact FCOne receiver status semantics before flight use.
 3. Keep the implemented transport delay, reordering, sample loss, malformed-value, and aiding-age
    campaign passing; add hardware thermal drift only when temperature data are available.
-4. Run the exact FCOne adapter through timestamp, frame, unit, dropout, and stale-data contract tests.
+4. Apply the passing neutral adapter oracle to the exact private FCOne message and scheduler when
+   its v2 interfaces are available; keep the same timestamp, frame, unit, validity, and stale-data
+   checks.
 
 ## P1 work when the new hardware is available
 
@@ -105,12 +109,12 @@ This document is an engineering maturity statement, not an airworthiness claim.
 | Portable algorithm/math implementation | 80–85% | Core equations, covariance handling, cold start, aiding, recovery, and host gates are mature; full observability/physical truth remains open |
 | Host-side software robustness | 85–90% | High-volume malformed/timing campaign and sanitizer run pass; external dataset breadth is still only two unique EuRoC sequences |
 | Heading robustness | 68–72% | Real-motion fault/recovery and physical dual-RTK input now pass; independent physical yaw truth and GNSS-velocity GSF fallback remain open |
-| FCOne integration readiness | 65–70% | Hardware-neutral contract is explicit; the exact private adapter, scheduling, target precision, and resource use are unverified |
+| FCOne integration readiness | 70–75% | Neutral adapter and supervisor contracts are executable; exact private messages, scheduling, target precision, and resource use are unverified |
 | Flight-main-estimator readiness | 45–55% | Suitable for shadow mode and bench/HIL preparation, not justified as the sole flight estimator yet |
 
 The highest-value non-hardware work remaining is broader independent data (`Blackbird` aggressive
 motion and `UrbanNav` real GNSS degradation), a second independently scored physical-heading track,
-and the FCOne-neutral mock publisher/supervisor contracts.
+and applying the now-executable neutral contracts to the private FCOne v2 interfaces.
 The highest-value physical evidence remains synchronized independent yaw truth, thermal/vibration
 characterization, motor magnetic disturbance, and target-MCU timing/stack measurements.
 

@@ -49,6 +49,16 @@ if(AERAKIA_BUILD_TESTS)
     add_executable(aerakia_input_integrity_campaign validation/input_integrity_campaign.c)
     target_link_libraries(aerakia_input_integrity_campaign PRIVATE Aerakia::Algorithms)
     add_test(NAME input_integrity_campaign COMMAND aerakia_input_integrity_campaign)
+
+    add_executable(aerakia_estimator_supervisor_contract
+        validation/estimator_supervisor_contract.c
+    )
+    target_link_libraries(aerakia_estimator_supervisor_contract PRIVATE Aerakia::Algorithms)
+    add_test(NAME estimator_supervisor_contract COMMAND aerakia_estimator_supervisor_contract)
+
+    add_executable(aerakia_fcone_adapter_contract validation/fcone_adapter_contract.c)
+    target_link_libraries(aerakia_fcone_adapter_contract PRIVATE Aerakia::Algorithms)
+    add_test(NAME fcone_adapter_contract COMMAND aerakia_fcone_adapter_contract)
 endif()
 
 if(AERAKIA_BUILD_VALIDATION)
