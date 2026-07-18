@@ -584,6 +584,13 @@ def eskf_integrity_metrics(columns: dict[str, np.ndarray]) -> dict[str, object]:
     rejected_degrees = np.degrees(np.abs(innovation[rejected]))
     input_count = int(np.count_nonzero(input_mag))
     attempted_count = int(np.count_nonzero(attempted))
+    navigation_valid = columns.get(
+        "eskf_horizontal_navigation_valid", np.zeros(len(accepted))
+    ) > 0.5
+    aiding_age = columns.get(
+        "eskf_horizontal_aiding_age_s", np.full(len(accepted), np.inf)
+    )
+    finite_aiding_age = aiding_age[np.isfinite(aiding_age)]
     result: dict[str, object] = {
         "magnetometer_source_updates": input_count,
         "magnetometer_outer_gate_pass_ratio": (
@@ -605,6 +612,11 @@ def eskf_integrity_metrics(columns: dict[str, np.ndarray]) -> dict[str, object]:
             np.max(columns.get("eskf_static_heading_aligned", [0])) > 0.5
         ),
         "zero_velocity_updates": int(np.max(columns.get("eskf_zupt_count", [0]))),
+        "horizontal_navigation_valid_ratio": float(np.mean(navigation_valid)),
+        "horizontal_navigation_valid_samples": int(np.count_nonzero(navigation_valid)),
+        "maximum_finite_horizontal_aiding_age_s": (
+            float(np.max(finite_aiding_age)) if len(finite_aiding_age) else None
+        ),
     }
     return result
 
@@ -959,6 +971,11 @@ def write_markdown(
     lines.append(
         f"- Static alignment completed: {integrity['static_alignment_completed']}; "
         f"healthy ratio: {integrity['healthy_ratio']:.4f}."
+    )
+    lines.append(
+        f"- Horizontal navigation valid ratio: "
+        f"{integrity['horizontal_navigation_valid_ratio']:.4f}; valid samples: "
+        f"{integrity['horizontal_navigation_valid_samples']}."
     )
     cold_start = metrics.get("cold_start_alignment")
     if cold_start:

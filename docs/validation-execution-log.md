@@ -663,3 +663,58 @@ core limitations.
 The first Blackbird rerun failed before conversion because system Python lacked SciPy. No score was
 accepted from that attempt. An ignored repository-local virtual environment was created from
 `requirements.txt`; the complete Blackbird and EuRoC suites then passed under that isolated runtime.
+
+## 2026-07-18 — no-aiding validity and pinned PX4 comparison boundary
+
+### Reason
+
+The UrbanNav outage showed a dangerous qualification ambiguity: `healthy` described finite state
+and covariance only, so it remained true throughout 131 seconds without horizontal aiding even
+after position error became operationally unusable. A finite filter is not necessarily a valid
+navigation solution. The public contract and FCOne supervisor oracle needed to express that
+difference directly before integration.
+
+PX4 `main` was reviewed at commit
+`de8158101c96ad6b04170dc91f087148104c58eb`. Its generated state definition confirms that EKF2
+also uses three covariance dimensions for quaternion attitude, so comparing the labels `EKF` and
+`ESKF` is not meaningful. The reviewed PX4 system has a substantially broader 24-dimensional error
+state, delayed-fusion/output-prediction machinery, more aiding models, GSF yaw backup, and mature
+fusion/failsafe state machines. This is an operational feature gap, not evidence for an invented
+accuracy ratio. A same-input A/B protocol is retained in `docs/px4-ekf2-comparison.md`.
+
+### Contract correction
+
+- `AerakiaEskfConfig.maximum_horizontal_dead_reckoning_s` defaults to five seconds.
+- Numerical `healthy` is retained separately from horizontal position, velocity, and combined
+  navigation validity.
+- Only an accepted horizontal position/velocity constraint, an accepted zero-velocity constraint,
+  or an explicit navigation recovery refreshes the horizontal aiding timestamp.
+- A rejected observation cannot refresh validity, and velocity-only aiding cannot invent an
+  uninitialized position origin.
+- The estimator-supervisor executable contract now consumes the production validity flag instead
+  of a standalone test-only observability boolean.
+
+The five-second default mirrors the reviewed PX4 `EKF2_NOAID_TOUT` default but remains configurable;
+private FCOne policy must still decide vehicle mode and failsafe behavior.
+
+### Recorded-outage result
+
+Both immutable UrbanNav tracks pass their complete baseline after adding validity output. Numerical
+health remains `100%`, while horizontal navigation is valid for `263,605 / 314,185` samples, or
+`83.9012%`. Maximum finite aiding age reaches `130.9959 s`. Thus the recorded long outage remains
+available for drift/recovery analysis, but the public output is no longer qualified as valid for
+most of that interval. First-update reacquisition and all previously retained accuracy and
+consistency metrics remain unchanged.
+
+### Validation at this checkpoint
+
+- strict Release CTest: `6/6`;
+- Python tools: `34/34`;
+- one-command host regression: passed all reviewed deterministic gates;
+- UrbanNav baseline: `2/2`, 628,370 replay attempts;
+- ASan+UBSan: `6/6`; the complete 1,020,000-attempt campaign took `184.10 s`, and the
+  final expanded public-API timeout test was rebuilt and rerun separately under the same flags;
+- `git diff --check`: clean at the checkpoint.
+
+This closes output qualification, not long-duration pure INS. The latter is not a supported
+capability for either Aerakia or PX4-class MEMS inputs without another velocity/position constraint.

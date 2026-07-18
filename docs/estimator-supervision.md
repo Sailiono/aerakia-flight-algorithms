@@ -36,6 +36,10 @@ or invalid covariance must immediately stop ESKF output qualification and select
 attitude or `ESTIMATE_INVALID`; hysteresis must never keep publishing numerically invalid state.
 Loss of an aiding source, temporary lack of navigation observability, or isolated innovation reject
 may use confirmation counts and dwell time while the underlying state remains finite and bounded.
+The public estimate now separates these cases directly: `healthy` is numerical integrity, while
+`horizontal_navigation_valid` expires after the configured interval since the last accepted
+horizontal constraint. A supervisor must never publish position or velocity merely because the
+former remains true after the latter becomes false.
 
 ## Evidence used for a transition
 

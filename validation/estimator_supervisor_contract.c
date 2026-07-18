@@ -43,7 +43,6 @@ typedef struct {
     uint64_t timestamp_us;
     AerakiaNavigationEstimate eskf;
     AerakiaAttitudeEstimate mahony;
-    bool eskf_navigation_observable;
 } SupervisorEvidence;
 
 typedef struct {
@@ -93,7 +92,7 @@ static float quaternion_separation_rad(const float left[4], const float right[4]
 static bool eskf_qualified(const SupervisorEvidence *evidence)
 {
     return evidence->eskf.healthy && evidence->eskf.static_tilt_alignment_complete
-        && evidence->eskf_navigation_observable;
+        && evidence->eskf.horizontal_navigation_valid;
 }
 
 static bool attitudes_continuous(
@@ -271,7 +270,7 @@ static SupervisorEvidence healthy_evidence(uint64_t timestamp_us)
     evidence.eskf.healthy = true;
     evidence.eskf.attitude.healthy = true;
     evidence.eskf.static_tilt_alignment_complete = true;
-    evidence.eskf_navigation_observable = true;
+    evidence.eskf.horizontal_navigation_valid = true;
     evidence.eskf.attitude.quaternion_wxyz[0] = 1.0f;
     evidence.eskf.position_ned_m.x = 12.0f;
     evidence.eskf.velocity_ned_m_s.y = 3.0f;
@@ -302,7 +301,7 @@ static void test_primary_degraded_recovery_contract(void)
     check_true(output.position_ned_m.x == 12.0f && output.velocity_ned_m_s.y == 3.0f,
                "primary output comes from ESKF");
 
-    evidence.eskf_navigation_observable = false;
+    evidence.eskf.horizontal_navigation_valid = false;
     for (index = 0U; index < 2U; ++index) {
         evidence.timestamp_us += 10000U;
         output = supervisor_update(&supervisor, &evidence);
@@ -319,7 +318,7 @@ static void test_primary_degraded_recovery_contract(void)
     check_true(supervisor.last_transition_reason == TRANSITION_ESKF_UNOBSERVABLE,
                "degradation reason is logged");
 
-    evidence.eskf_navigation_observable = true;
+    evidence.eskf.horizontal_navigation_valid = true;
     evidence.eskf.attitude.quaternion_wxyz[0] = cosf(20.0f * AERAKIA_PI_F / 360.0f);
     evidence.eskf.attitude.quaternion_wxyz[3] = sinf(20.0f * AERAKIA_PI_F / 360.0f);
     for (index = 0U; index < 6U; ++index) {

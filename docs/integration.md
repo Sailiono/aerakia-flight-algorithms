@@ -115,6 +115,18 @@ and learned IMU biases. A syntactically and temporally valid observation consume
 timestamp even if its innovation is rejected, preventing the same physical sample from being
 retried as if it were new.
 
+An accepted position or velocity constraint also refreshes the estimate's horizontal-aiding age.
+By default, `maximum_horizontal_dead_reckoning_s` is 5 seconds. After that time without an accepted
+horizontal constraint, `horizontal_position_valid`, `horizontal_velocity_valid`, and
+`horizontal_navigation_valid` become false even if `healthy` remains true. `healthy` means the
+state and covariance are finite and numerically coherent; it must never be used as a substitute for
+navigation observability. Rejected observations do not refresh validity. An accepted ZUPT refreshes
+the velocity-drift constraint, but does not initialize a previously unknown position origin.
+
+The FCOne adapter must propagate these validity fields to the private estimator supervisor. A
+vehicle-specific policy may choose a shorter limit, but must not silently extend it without physical
+evidence and a matching failsafe review.
+
 Trusted heading is independent of magnetometer fusion. It can come from dual-antenna GNSS, vision, motion capture, or another upstream estimator, provided the application converts it to clockwise-from-North NED radians and supplies a defensible variance.
 
 ## Application-declared stationary alignment

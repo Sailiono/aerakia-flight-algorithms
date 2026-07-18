@@ -42,6 +42,8 @@
             "position_nis_mean": "eskf_consistency.position_nis.mean",
             "navigation_nees_mean": "eskf_consistency.navigation_nees.mean",
             "healthy_ratio": "eskf_integrity.healthy_ratio",
+            "horizontal_navigation_valid_ratio": "eskf_integrity.horizontal_navigation_valid_ratio",
+            "horizontal_navigation_valid_samples": "eskf_integrity.horizontal_navigation_valid_samples",
             "navigation_recoveries": "eskf_integrity.navigation_recoveries"
           }
         },
@@ -61,7 +63,9 @@
             "sustained_recovery_time_s": "navigation_aiding_gaps.longest_gap.sustained_recovery_time_s",
             "position_nis_mean": "eskf_consistency.position_nis.mean",
             "navigation_nees_mean": "eskf_consistency.navigation_nees.mean",
-            "healthy_ratio": "eskf_integrity.healthy_ratio"
+            "healthy_ratio": "eskf_integrity.healthy_ratio",
+            "horizontal_navigation_valid_ratio": "eskf_integrity.horizontal_navigation_valid_ratio",
+            "horizontal_navigation_valid_samples": "eskf_integrity.horizontal_navigation_valid_samples"
           }
         }
       ]

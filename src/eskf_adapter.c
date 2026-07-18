@@ -64,6 +64,21 @@ static AerakiaStatus validate_aiding_timestamp(
     return AERAKIA_STATUS_OK;
 }
 
+static void mark_horizontal_aiding(
+    AerakiaEskf *filter,
+    uint64_t timestamp_us,
+    bool initializes_position
+)
+{
+    if (filter == NULL || !filter->has_timestamp || timestamp_us > filter->last_timestamp_us) {
+        return;
+    }
+    filter->last_horizontal_aiding_timestamp_us = timestamp_us;
+    filter->has_horizontal_aiding_timestamp = true;
+    filter->horizontal_position_initialized =
+        filter->horizontal_position_initialized || initializes_position;
+}
+
 static AerakiaVec3f quaternion_to_euler(const eskf_float_t q[4])
 {
     AerakiaVec3f result;
@@ -210,6 +225,7 @@ void aerakia_eskf_default_config(AerakiaEskfConfig *config)
     config->minimum_dt_s = 0.0001f;
     config->maximum_dt_s = 0.1f;
     config->maximum_aiding_age_s = 0.5f;
+    config->maximum_horizontal_dead_reckoning_s = 5.0f;
     config->fuse_magnetometer = false;
     config->gate_magnetometer = true;
     config->magnetometer_variance = 0.05f;
@@ -249,6 +265,7 @@ void aerakia_eskf_init(
     aerakia_eskf_default_config(&defaults);
     memset(filter, 0, sizeof(*filter));
     filter->config = config != NULL ? *config : defaults;
+    filter->horizontal_position_initialized = initial_position_ned_m != NULL;
     filter->attitude_seeded = initial_quaternion_wxyz != NULL;
     eskf_init(&filter->core, initial_position_ned_m, initial_quaternion_wxyz);
     aerakia_mag_gate_init(&filter->magnetic_gate, &filter->config.magnetic_gate);
@@ -336,6 +353,7 @@ AerakiaStatus aerakia_eskf_process_imu(
         filter->last_zero_velocity_timestamp_us = sample->timestamp_us;
         filter->zero_velocity_update_applied = true;
         filter->zero_velocity_update_count++;
+        mark_horizontal_aiding(filter, sample->timestamp_us, false);
     }
 
     filter->magnetometer_accepted = false;
@@ -389,6 +407,9 @@ void aerakia_eskf_update_position(
     memset(&filter->last_position_innovation, 0, sizeof(filter->last_position_innovation));
     eskf_update_position(&filter->core, position, variance_m2, &filter->last_position_innovation);
     filter->position_accepted = filter->last_position_innovation.accepted;
+    if (filter->position_accepted) {
+        mark_horizontal_aiding(filter, filter->last_timestamp_us, true);
+    }
 }
 
 void aerakia_eskf_update_velocity(
@@ -407,6 +428,9 @@ void aerakia_eskf_update_velocity(
     memset(&filter->last_velocity_innovation, 0, sizeof(filter->last_velocity_innovation));
     eskf_update_velocity(&filter->core, velocity, variance_m2_s2, &filter->last_velocity_innovation);
     filter->velocity_accepted = filter->last_velocity_innovation.accepted;
+    if (filter->velocity_accepted) {
+        mark_horizontal_aiding(filter, filter->last_timestamp_us, false);
+    }
 }
 
 void aerakia_eskf_update_gps(
@@ -469,6 +493,12 @@ void aerakia_eskf_update_gps(
             filter->consecutive_velocity_rejections = 0U;
         }
     }
+    if (filter->position_accepted || filter->velocity_accepted || filter->navigation_recovered) {
+        mark_horizontal_aiding(
+            filter, filter->last_timestamp_us,
+            filter->position_accepted || filter->navigation_recovered
+        );
+    }
 }
 
 AerakiaStatus aerakia_eskf_update_gps_observation(
@@ -507,6 +537,12 @@ AerakiaStatus aerakia_eskf_update_gps_observation(
     filter->has_gps_timestamp = true;
     filter->has_position_timestamp = true;
     filter->has_velocity_timestamp = true;
+    if (filter->position_accepted || filter->velocity_accepted || filter->navigation_recovered) {
+        mark_horizontal_aiding(
+            filter, observation->timestamp_us,
+            filter->position_accepted || filter->navigation_recovered
+        );
+    }
     return AERAKIA_STATUS_OK;
 }
 
@@ -561,6 +597,9 @@ AerakiaStatus aerakia_eskf_update_position_observation(
             : filter->consecutive_velocity_rejections;
     filter->last_position_timestamp_us = observation->timestamp_us;
     filter->has_position_timestamp = true;
+    if (filter->position_accepted || filter->navigation_recovered) {
+        mark_horizontal_aiding(filter, observation->timestamp_us, true);
+    }
     return AERAKIA_STATUS_OK;
 }
 
@@ -616,6 +655,9 @@ AerakiaStatus aerakia_eskf_update_velocity_observation(
             : filter->consecutive_velocity_rejections;
     filter->last_velocity_timestamp_us = observation->timestamp_us;
     filter->has_velocity_timestamp = true;
+    if (filter->velocity_accepted || filter->navigation_recovered) {
+        mark_horizontal_aiding(filter, observation->timestamp_us, false);
+    }
     return AERAKIA_STATUS_OK;
 }
 
@@ -701,6 +743,9 @@ void aerakia_eskf_apply_zero_velocity(AerakiaEskf *filter, float variance_m2_s2)
 {
     if (filter != NULL && variance_m2_s2 > 0.0f) {
         eskf_update_static_constraint(&filter->core, variance_m2_s2);
+        if (filter->has_timestamp) {
+            mark_horizontal_aiding(filter, filter->last_timestamp_us, false);
+        }
     }
 }
 
@@ -764,6 +809,22 @@ void aerakia_eskf_get_estimate(
     estimate->zero_velocity_update_applied = filter->zero_velocity_update_applied;
     estimate->static_alignment_samples = filter->static_alignment_samples;
     estimate->zero_velocity_update_count = filter->zero_velocity_update_count;
+    estimate->horizontal_aiding_age_s = INFINITY;
+    if (filter->has_timestamp && filter->has_horizontal_aiding_timestamp
+        && filter->last_timestamp_us >= filter->last_horizontal_aiding_timestamp_us) {
+        estimate->horizontal_aiding_age_s = (float)(
+            (double)(filter->last_timestamp_us - filter->last_horizontal_aiding_timestamp_us)
+            * 1.0e-6
+        );
+        estimate->horizontal_velocity_valid =
+            filter->config.maximum_horizontal_dead_reckoning_s < 0.0f
+            || estimate->horizontal_aiding_age_s
+                <= filter->config.maximum_horizontal_dead_reckoning_s;
+        estimate->horizontal_position_valid = estimate->horizontal_velocity_valid
+            && filter->horizontal_position_initialized;
+        estimate->horizontal_navigation_valid = estimate->horizontal_position_valid
+            && estimate->horizontal_velocity_valid;
+    }
     estimate->healthy = healthy;
     estimate->attitude.healthy = healthy;
 }

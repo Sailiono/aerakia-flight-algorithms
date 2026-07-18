@@ -14,6 +14,7 @@ Portable C99 flight-estimation algorithms with a reproducible PC validation plat
 - Independent static cold-start tilt and magnetic-heading alignment with an explicit true-North declination reference
 - Deterministic scenario generation, native C replay, metric calculation, plots, and CI regression gates
 - GNSS NIS and independent-truth navigation NEES diagnostics, including outage/reacquisition replay
+- Separate numerical-health and horizontal-navigation-validity outputs with a configurable no-aiding timeout
 - No heap allocation, operating-system calls, MCU headers, or device drivers in the algorithm library
 
 ## Algorithms
@@ -57,6 +58,11 @@ aerakia_mahony_update(&mahony, &sample, &attitude);
 AerakiaNavigationEstimate navigation;
 aerakia_eskf_process_imu(&eskf, &sample, &navigation);
 
+/* `healthy` is numerical integrity; use this qualification before publishing position/velocity. */
+if (!navigation.horizontal_navigation_valid) {
+    invalidate_horizontal_navigation_output();
+}
+
 /* Lower-rate aiding stays hardware-neutral too. */
 AerakiaPositionObservation position = {
     gps_sample_time_us, gps_position_ned, gps_position_variance
@@ -73,6 +79,8 @@ aerakia_eskf_update_velocity_observation(&eskf, &velocity);
 Sensor register access, axis remapping, calibration, and unit conversion stay in the private adapter. Algorithms validate the monotonic sample timestamp and derive `dt` internally. See [Integration guide](docs/integration.md).
 
 The complete dependency direction is shown in [Architecture](docs/architecture.md).
+The mathematical and product-level comparison with PX4 EKF2, including the IMU-only boundary and
+the same-input A/B gate, is documented in [PX4 EKF2 comparison](docs/px4-ekf2-comparison.md).
 
 ## Build and test
 

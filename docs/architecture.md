@@ -43,6 +43,9 @@ Mode selection belongs to the private FCOne estimator supervisor. The public lib
 algorithm state and health evidence but does not silently switch control sources or copy Mahony
 attitude into the ESKF. See [Estimator supervision](estimator-supervision.md).
 
+For a state-by-state and capability comparison with PX4 EKF2, including the IMU-only navigation
+boundary, see [PX4 EKF2 comparison](px4-ekf2-comparison.md).
+
 ## State model choice
 
 The current nominal state has 16 stored components: position (3), velocity (3), body-to-NED quaternion (4), accelerometer bias (3), and gyroscope bias (3). Its local error state has 15 dimensions because quaternion attitude error is represented by a three-vector.

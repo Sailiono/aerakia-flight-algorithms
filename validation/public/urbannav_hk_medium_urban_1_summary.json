@@ -38,6 +38,8 @@
       "position_nis_mean": 0.011279,
       "navigation_nees_mean": 12.912064,
       "healthy_ratio": 1.0,
+      "horizontal_navigation_valid_ratio": 0.839012,
+      "horizontal_navigation_valid_samples": 263605,
       "navigation_recoveries": 0
     },
     "recorded_position_cold_start_tilt_only": {
@@ -52,7 +54,9 @@
       "sustained_recovery_time_s": 0.0,
       "position_nis_mean": 0.339475,
       "navigation_nees_mean": 16.274916,
-      "healthy_ratio": 1.0
+      "healthy_ratio": 1.0,
+      "horizontal_navigation_valid_ratio": 0.839012,
+      "horizontal_navigation_valid_samples": 263605
     }
   },
   "limitations": [

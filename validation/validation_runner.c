@@ -375,6 +375,8 @@ int main(int argc, char *argv[])
         "eskf_navigation_recovery_count,eskf_healthy,eskf_static_aligned,"
         "eskf_static_tilt_aligned,eskf_static_heading_aligned,"
         "eskf_stationary_detected,eskf_zupt_applied,eskf_zupt_count,"
+        "eskf_horizontal_aiding_age_s,eskf_horizontal_position_valid,"
+        "eskf_horizontal_velocity_valid,eskf_horizontal_navigation_valid,"
         "input_mag_update,input_position_update,input_velocity_update,position_ref_valid,"
         "ref_attitude_reset_counter,ref_attitude_reset_event,"
         "ref_delta_q_reset_w,ref_delta_q_reset_x,ref_delta_q_reset_y,ref_delta_q_reset_z,"
@@ -613,6 +615,7 @@ int main(int argc, char *argv[])
             "%ld,%llu,%.9f,%.9f,%.9f,"
             "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,"
             "%.6f,%.6f,%.6f,%d,%.9f,%.9f,%d,%d,%d,%u,%d,%d,%d,%d,%d,%d,%u,"
+            "%.9f,%d,%d,%d,"
             "%d,%d,%d,%d,%.0f,%.0f,%.9f,%.9f,%.9f,%.9f,"
             "%d,%d,%.9f,%d,%.9f,%.9f,%d,%d,%d,%.9f,%.9f,%.9f,%d,%d,%.9f,%.9f,"
             "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,"
@@ -642,6 +645,10 @@ int main(int argc, char *argv[])
             eskf_estimate.stationary_detected ? 1 : 0,
             eskf_estimate.zero_velocity_update_applied ? 1 : 0,
             eskf_estimate.zero_velocity_update_count,
+            eskf_estimate.horizontal_aiding_age_s,
+            eskf_estimate.horizontal_position_valid ? 1 : 0,
+            eskf_estimate.horizontal_velocity_valid ? 1 : 0,
+            eskf_estimate.horizontal_navigation_valid ? 1 : 0,
             mag_valid && mag_update, position_update, velocity_update, position_ref_valid,
             parse_double(columns, count, map.reset_counter, 0.0, &ok),
             parse_double(columns, count, map.reset_event, 0.0, &ok),

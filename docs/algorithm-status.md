@@ -28,10 +28,11 @@ flight safety.
 | Navigation consistency | GNSS position/velocity NIS and posterior 6-state navigation NEES through a five-second outage and reacquisition | 20-seed measurement-noise baseline and constant-bias/timestamp-jitter extension pass with zero numerical/recovery failures; thermal and transport faults pending |
 | EuRoC public replay | 36,381-sample Leica/IMU `MH_01_easy` and 20,932-sample direct-pose `V1_03_difficult`; raw, cold-start, derived-heading, and reference-bias tracks retained | Navigation NIS/NEES consistent; direct Vicon pose passes high-dynamic replay; derived heading is not a recorded heading sensor |
 | Blackbird public replay | 26,995 recorded IMU samples over 270.1 s against independent motion capture; common time base and published body/IMU extrinsic are checked before conversion | ESKF 1.573° geodesic / 1.131° tilt RMSE, 100% health, zero recovery; retained Mahony drift proves fallback must be bounded |
-| UrbanNav public replay | 314,185 recorded IMU samples, 655 checksum/quality-screened F9P positions, SPAN truth, and one 131 s recorded outage | Position-only API and recovery pass with 100% health; 6.52 m nominal aided RMSE and first-update reacquisition are retained alongside severe unaided drift and inconsistent NIS/NEES |
+| UrbanNav public replay | 314,185 recorded IMU samples, 655 checksum/quality-screened F9P positions, SPAN truth, and one 131 s recorded outage | Position-only API and recovery pass with 100% numerical health; horizontal navigation is valid for 83.90% of samples and explicitly expires after five unaided seconds; 6.52 m nominal aided RMSE and first-update reacquisition are retained alongside severe unaided drift and inconsistent NIS/NEES |
 | Host regression | Strict C99 warnings-as-errors build, public API tests, deterministic synthetic fault suite | Passing reviewed thresholds |
 | Input/transport integrity | Exhaustive required-IMU non-finite checks; timestamp order/gap behavior; optional-mag isolation; timestamped GNSS/heading/barometer freshness and recovery | Passing 100 seeds, 1,020,000 IMU attempts, 2,100 aiding attempts, and burst lengths through 100 with zero invariant/health failures |
 | Estimator supervision | ESKF-primary startup, hard-invalid immediate response, soft observability hysteresis, continuity-gated and time-bounded Mahony attitude-only degradation, navigation invalidation, continuity-gated recovery, and transition evidence | Passing executable public contract; private FCOne policy and actuator interaction remain open |
+| Output qualification | Numerical health is distinct from horizontal position/velocity validity; only accepted position/velocity/ZUPT observations refresh the configurable dead-reckoning interval | Passing public API and UrbanNav outage gates; FCOne must consume the validity fields rather than infer validity from finite values |
 | FCOne-neutral adapter | Physical timestamp preservation, FRD sentinel axes, g/deg/s/gauss conversion, independent validity bits, missing data, duplicate/gap recovery, and future/stale aiding | Passing executable mock-publication contract; exact v2 message and scheduler remain open |
 | Private replay | Sanitized relative GNSS, reset events, GSF diagnostics, and native C replay across the selected ULog suite | Operational; PX4 remains an engineering reference |
 
@@ -99,6 +100,8 @@ This document is an engineering maturity statement, not an airworthiness claim.
   131 s GNSS outage and is not reported as nominal position accuracy.
 - During that UrbanNav outage, position-only inertial error peaks at 1471.5 m and velocity error at
   27.40 m/s; the first resumed physical position update returns posterior position error to 5.395 m.
+  With the default five-second limit, horizontal navigation is valid for 263,605 of 314,185 samples
+  (83.90%) while numerical health remains 100%; rejected aiding cannot refresh that validity.
   Cold-start tilt reaches 2.211° RMSE, while yaw reaches 36.65° because the sequence provides no
   magnetometer or heading observation. This is a retained observability failure, not a yaw claim.
 
@@ -143,7 +146,7 @@ This document is an engineering maturity statement, not an airworthiness claim.
 | Portable algorithm/math implementation | 84–88% | Core equations, covariance handling, independent position/velocity aiding, cold start, and recovery are mature; real-receiver covariance consistency and physical heading truth remain open |
 | Host-side software robustness | 90–93% | High-volume malformed/timing campaign, sanitizers, and 398,493 unique public external-reference IMU samples pass, including a recorded 131 s aiding outage |
 | Heading robustness | 68–72% | Real-motion fault/recovery and physical dual-RTK input now pass; independent physical yaw truth and GNSS-velocity GSF fallback remain open |
-| Navigation robustness | 65–72% | Recorded position outage/reacquisition now passes, but long unaided drift, missing receiver velocity, delay modeling, and NIS/NEES tuning remain open |
+| Navigation robustness | 68–74% | Recorded position outage/reacquisition and fail-closed no-aiding validity now pass, but long unaided drift, missing receiver velocity, delay modeling, and NIS/NEES tuning remain open |
 | FCOne integration readiness | 75–80% | Neutral adapter, independent aiding, and bounded-fallback supervisor contracts are executable; exact private messages, scheduling, target precision, and resource use are unverified |
 | Flight-main-estimator readiness | 50–60% | Suitable for shadow mode and bench/HIL preparation, not justified as the sole flight estimator yet |
 

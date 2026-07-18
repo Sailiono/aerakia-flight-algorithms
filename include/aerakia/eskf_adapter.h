@@ -15,6 +15,8 @@ typedef struct {
     float maximum_dt_s;
     /** Maximum observation age relative to the latest IMU sample; negative disables the check. */
     float maximum_aiding_age_s;
+    /** Maximum time without accepted horizontal position/velocity constraint before invalidation. */
+    float maximum_horizontal_dead_reckoning_s;
     bool fuse_magnetometer;
     bool gate_magnetometer;
     float magnetometer_variance;
@@ -94,6 +96,10 @@ typedef struct {
     bool zero_velocity_update_applied;
     uint32_t static_alignment_samples;
     uint32_t zero_velocity_update_count;
+    float horizontal_aiding_age_s;
+    bool horizontal_position_valid;
+    bool horizontal_velocity_valid;
+    bool horizontal_navigation_valid;
     bool healthy;
 } AerakiaNavigationEstimate;
 
@@ -107,6 +113,7 @@ typedef struct {
     uint64_t last_velocity_timestamp_us;
     uint64_t last_heading_timestamp_us;
     uint64_t last_barometer_timestamp_us;
+    uint64_t last_horizontal_aiding_timestamp_us;
     uint32_t rejected_samples;
     ESKF_InnovResult last_magnetometer_innovation;
     ESKF_InnovResult last_heading_innovation;
@@ -141,6 +148,8 @@ typedef struct {
     bool has_velocity_timestamp;
     bool has_heading_timestamp;
     bool has_barometer_timestamp;
+    bool has_horizontal_aiding_timestamp;
+    bool horizontal_position_initialized;
 } AerakiaEskf;
 
 void aerakia_eskf_default_config(AerakiaEskfConfig *config);

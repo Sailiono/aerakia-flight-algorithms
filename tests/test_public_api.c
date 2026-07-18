@@ -538,6 +538,112 @@ static void test_eskf_independent_navigation_observations(void)
                "velocity recovery triggers despite interleaved accepted positions");
 }
 
+static void test_eskf_horizontal_navigation_validity_timeout(void)
+{
+    AerakiaEskf filter;
+    AerakiaEskfConfig config;
+    AerakiaNavigationEstimate estimate;
+    AerakiaImuSample sample = level_sample(0U);
+    AerakiaPositionObservation position = {
+        10000U, {0.0f, 0.0f, 0.0f}, 1.0f
+    };
+    AerakiaVelocityObservation velocity = {
+        10000U, {0.0f, 0.0f, 0.0f}, 1.0f
+    };
+
+    aerakia_eskf_default_config(&config);
+    check_true(near(config.maximum_horizontal_dead_reckoning_s, 5.0f, 1.0e-6f),
+               "default horizontal no-aiding validity limit is five seconds");
+    config.enable_static_alignment = false;
+    config.navigation_recovery_rejection_limit = 0U;
+    config.maximum_horizontal_dead_reckoning_s = 0.05f;
+    aerakia_eskf_init(&filter, &config, NULL, NULL);
+
+    (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
+    sample.timestamp_us = 10000U;
+    (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
+    check_true(!estimate.horizontal_navigation_valid
+                   && !estimate.horizontal_position_valid
+                   && !estimate.horizontal_velocity_valid
+                   && isinf(estimate.horizontal_aiding_age_s),
+               "navigation is invalid before any accepted horizontal constraint");
+
+    check_true(aerakia_eskf_update_velocity_observation(&filter, &velocity)
+                   == AERAKIA_STATUS_OK,
+               "velocity-only aiding is accepted before a position origin exists");
+    aerakia_eskf_get_estimate(&filter, &estimate);
+    check_true(!estimate.horizontal_navigation_valid
+                   && !estimate.horizontal_position_valid
+                   && estimate.horizontal_velocity_valid,
+               "velocity-only aiding cannot invent a horizontal position origin");
+
+    check_true(aerakia_eskf_update_position_observation(&filter, &position)
+                   == AERAKIA_STATUS_OK,
+               "accepted position initializes horizontal navigation validity");
+    aerakia_eskf_get_estimate(&filter, &estimate);
+    check_true(estimate.horizontal_navigation_valid
+                   && estimate.horizontal_position_valid
+                   && estimate.horizontal_velocity_valid
+                   && near(estimate.horizontal_aiding_age_s, 0.0f, 1.0e-6f),
+               "fresh accepted position qualifies position and velocity outputs");
+
+    sample.timestamp_us = 50000U;
+    (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
+    check_true(estimate.horizontal_navigation_valid
+                   && near(estimate.horizontal_aiding_age_s, 0.04f, 1.0e-6f),
+               "navigation remains valid inside the no-aiding interval");
+    sample.timestamp_us = 70000U;
+    (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
+    check_true(!estimate.horizontal_navigation_valid
+                   && !estimate.horizontal_position_valid
+                   && !estimate.horizontal_velocity_valid
+                   && near(estimate.horizontal_aiding_age_s, 0.06f, 1.0e-6f)
+                   && estimate.healthy,
+               "finite ESKF state is distinguished from stale navigation validity");
+
+    position.timestamp_us = 70000U;
+    position.position_ned_m.x = 1000.0f;
+    position.variance_m2 = 0.01f;
+    check_true(aerakia_eskf_update_position_observation(&filter, &position)
+                   == AERAKIA_STATUS_OK,
+               "fresh but inconsistent position reaches the innovation gate");
+    aerakia_eskf_get_estimate(&filter, &estimate);
+    check_true(!estimate.position_accepted
+                   && !estimate.horizontal_navigation_valid
+                   && near(estimate.horizontal_aiding_age_s, 0.06f, 1.0e-6f),
+               "rejected position cannot refresh horizontal validity");
+
+    velocity.timestamp_us = 70000U;
+    check_true(aerakia_eskf_update_velocity_observation(&filter, &velocity)
+                   == AERAKIA_STATUS_OK,
+               "accepted velocity can refresh an initialized horizontal solution");
+    aerakia_eskf_get_estimate(&filter, &estimate);
+    check_true(estimate.velocity_accepted && estimate.horizontal_navigation_valid
+                   && near(estimate.horizontal_aiding_age_s, 0.0f, 1.0e-6f),
+               "accepted velocity refreshes horizontal validity without changing origin");
+
+    sample.timestamp_us = 130000U;
+    (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
+    check_true(!estimate.horizontal_navigation_valid,
+               "horizontal navigation expires again after velocity aiding stops");
+    aerakia_eskf_apply_zero_velocity(&filter, 0.01f);
+    aerakia_eskf_get_estimate(&filter, &estimate);
+    check_true(estimate.horizontal_navigation_valid
+                   && near(estimate.horizontal_aiding_age_s, 0.0f, 1.0e-6f),
+               "explicit zero velocity refreshes drift constraint after position initialization");
+
+    sample.timestamp_us = 200000U;
+    filter.config.maximum_horizontal_dead_reckoning_s = -1.0f;
+    (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
+    check_true(estimate.horizontal_navigation_valid
+                   && near(estimate.horizontal_aiding_age_s, 0.07f, 1.0e-6f),
+               "negative timeout explicitly disables age-based invalidation");
+    filter.config.maximum_horizontal_dead_reckoning_s = 0.0f;
+    aerakia_eskf_get_estimate(&filter, &estimate);
+    check_true(!estimate.horizontal_navigation_valid,
+               "zero timeout accepts only a same-timestamp horizontal constraint");
+}
+
 static void test_eskf_aiding_numeric_exhaustive(void)
 {
     AerakiaEskf filter;
@@ -801,6 +907,7 @@ int main(void)
     test_eskf_input_integrity();
     test_eskf_timestamped_aiding_integrity();
     test_eskf_independent_navigation_observations();
+    test_eskf_horizontal_navigation_validity_timeout();
     test_eskf_aiding_numeric_exhaustive();
     test_eskf_adapter_stationary();
     test_eskf_health_covers_state_and_covariance();
