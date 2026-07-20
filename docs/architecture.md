@@ -65,3 +65,6 @@ The current nominal state has 16 stored components: position (3), velocity (3), 
 Solà's general formulation can add a three-component gravity state, yielding a 19-component nominal state and an 18-dimensional error state. Aerakia currently fixes gravity to local NED `[0, 0, g]`. That is the smaller, observable model for the current flight-log evidence; adding weakly observable gravity states would not solve magnetic-heading failures.
 
 Changing test location or flying over a large area is handled first by updating the local navigation origin, gravity model, magnetic reference, and trusted heading source. A dynamic gravity state should be added only when long-range/high-altitude evidence shows the fixed local model is the limiting error source.
+
+The decision rule and candidate additions for wind, barometer bias, magnetic field, terrain, and
+gravity states are recorded in the [state augmentation policy](state-augmentation-policy.md).
