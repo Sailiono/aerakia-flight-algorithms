@@ -1615,3 +1615,71 @@ and every frozen threshold. A fresh ASan/UBSan build passes `10/10`; its input c
 `145.85 s` and the complete sanitizer suite `155.41 s`, with no sanitizer findings. Raw archives,
 replays, and detailed result CSVs remain ignored build artifacts; aggregate JSON, code, tests,
 methods, and negative decisions are committed together at this checkpoint.
+
+## 2026-07-20 — physical magnetic source diagnostic and supervision pre-registration
+
+### Correction to the prior hypothesis
+
+An implementation audit corrected an earlier hypothesis that missing magnetic inclination or the
+reference Down component caused the `INSANE indoor_1` degradation. The current ESKF magnetic model
+is deliberately a horizontal NED-yaw pseudo observation: both static alignment and the online
+update use only horizontal `atan2(E, N)` terms. Reference Down is therefore absent from the residual
+and Jacobian. Supplying a full three-dimensional reference while keeping this model unchanged would
+produce the same update. No full-3D model was enabled or implied by this investigation.
+
+### Rebuilt split provenance
+
+The earlier calibration replay had been produced with an outdated source-window manifest. No raw
+input was changed; the ignored build manifest was repaired by adding the missing
+`calibration.source_sequence`, then current converter tooling rebuilt the three disjoint replays:
+calibration `[10,110) s`, development `[110,210) s`, and historical holdout `[210,310) s`.
+Their replay SHA-256 values are respectively
+`114cb0fe95c904fea6ed7e4e03f8835cb8e4eacc29ffcb4a0df5d5d8a5aaf2cf`,
+`31e230f431a3f354843a937e89b7b3ce4f8863a709d3f0521f8f8fe12bd0a59f`, and
+`35364c37cb0c92a66ec2f9eceb809ee044a4b39c9ebffd1d5ba8af6839055309`.
+The rebuilt development and holdout hashes match the prior valid replays; the calibration now has a
+correctly isolated 100-second window.
+
+### Paired source result
+
+A new offline-only diagnostic pairs the exact same replay with magnetometer-on and magnetometer-off
+ESKF results. It fails closed on timestamp/row mismatch, changing declared magnetic datum, invalid
+quaternion or field data, a magnetometer-on flag that differs from the replay, or any magnetic input
+in the off arm. Reference attitude is used only offline to rotate raw physical magnetometer samples
+to the reference NED frame and score the source; it is not an estimator input and is forbidden from
+future runtime source decisions.
+
+| Rebuilt `indoor_1` window | Physical updates | ESKF accepted | Mag on yaw / tilt RMSE | Mag off yaw / tilt RMSE | Datum residual P95 abs |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| calibration `[10,110) s` | 8,788 | 100% | `6.248 / 12.279 deg` | `0.298 / 0.608 deg` | `16.234 deg` |
+| development `[110,210) s` | 8,782 | 100% | `10.879 / 6.317 deg` | `0.250 / 0.615 deg` | `18.636 deg` |
+
+In development, the predeclared `>=15 deg` physical-datum-residual bin contains 977 samples. It
+still has 100% ESKF magnetic acceptance while the magnetometer-on yaw/tilt RMSE is
+`15.532/8.645 deg`, against `0.218/0.630 deg` in the paired off arm. The absolute physical residual
+to absolute on-minus-off yaw correlation is `0.569` on calibration and `0.572` on development.
+This supports the narrow conclusion that accepted physical magnetic updates can be harmful and that
+the existing magnitude plus pseudo-NIS protection is inadequate. It does not prove whether the
+underlying cause is environment/current, calibration/install residual, time/frame error, or later
+ESKF covariance coupling.
+
+### Frozen next step
+
+`validation/magnetic_supervision_protocol_v1.json` now reserves calibration and development for
+design only. The historical `indoor_1` holdout and `transition_1` cannot select thresholds. Before
+downloading `indoor_2`, a candidate must be implemented from causal physical inputs only, tested
+against predeclared synthetic disturbance families, and frozen with its configuration fingerprint.
+`indoor_2` then becomes first sealed validation and `indoor_3` is unchanged replication. A candidate
+cannot pass by rejecting all magnetic updates. The protocol explicitly records the fundamental
+limit: slow persistent magnetic heading error with nearly constant norm cannot be disambiguated from
+yaw drift using IMU plus magnetometer alone; independent heading or a stronger source constraint is
+required.
+
+### Verification at this checkpoint
+
+The magnetic-source diagnostic unit suite passes `3/3`, including paired-flag and off-arm acceptance
+fail-closed controls. The complete Python discovery passes `132/132`, strict C99 CTest passes
+`10/10`, and `validation/run_host_regression.py` passes. The Python public-dataset suite reports its
+expected `blocked` status for the optional PX4 comparison because `--px4-source` was not supplied;
+it is not a test failure and no network download was attempted. `git diff --check` and strict JSON
+validation of the protocol pass. No estimator parameter, runtime C path, or threshold was changed.

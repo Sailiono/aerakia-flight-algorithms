@@ -41,8 +41,11 @@ The paired `indoor_1` A/B changes only `mag_valid` and `mag_update`. With magnet
 ESKF geodesic/tilt/yaw RMSE is `0.718/0.666/0.270 deg`; with 8,776 physical updates enabled it is
 `14.092/6.737/12.528 deg`. The ESKF innovation stage accepts all 8,776 updates and the outer field
 gate passes 99.989%. This proves that the current magnitude gate and innovation test do not protect
-this track; it does not yet distinguish field contamination, datum error, the 3D observation model,
-or attitude/bias coupling as the root cause.
+this track; it does not yet distinguish field contamination, datum error, installation/time error,
+or attitude/bias coupling as the root cause. The current model is deliberately yaw-only, so adding a
+magnetic-reference Down component alone cannot alter this result. The
+[magnetic source supervision protocol](magnetic-source-supervision.md) now freezes the causal-input
+and dataset boundary before a runtime candidate is attempted.
 
 ## Class A intake protocol
 

@@ -58,6 +58,12 @@ shows that detection without an uncontaminated ESKF shadow cannot undo state/cov
    Before opening another holdout, pre-register a magnetic source-quality/supervision candidate on
    calibration/development data. Magnitude plus the current pseudo-NIS is insufficient because it
    accepted every `indoor_1` update while materially degrading attitude.
+   The pre-registered boundary is now [magnetic source supervision](magnetic-source-supervision.md):
+   current fusion is yaw-only, not a full 3D magnetic update; `indoor_1` calibration/development are
+   the only design windows; its opened holdout and `transition_1` cannot tune a candidate; and
+   `indoor_2`/`indoor_3` remain sealed validation/replication tracks. The new offline A/B source
+   diagnostic confirms the adverse effect already exists in both design windows, so a supervisor
+   must be justified by causal features rather than another holdout-specific threshold.
 2. Keep heading geometry, source validity, variance, baseline quality, and freshness explicit.
    Validate the exact FCOne receiver status semantics before flight use.
 3. Keep the implemented transport delay, reordering, sample loss, malformed-value, and aiding-age

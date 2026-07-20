@@ -1,0 +1,107 @@
+{
+  "schema_version": "aerakia.magnetic_supervision_protocol.v1",
+  "status": "pre_registered_before_runtime_candidate",
+  "purpose": "Freeze the data boundary, causal-input boundary, and release criteria for an opt-in magnetic source-quality supervisor. The protocol does not authorize a runtime gate by itself.",
+  "baseline": {
+    "estimator_model": "tilt-conditioned horizontal NED-yaw pseudo observation",
+    "explicit_non_goal": "This protocol does not change the current ESKF to a full three-dimensional magnetic-vector update.",
+    "known_failure": "Magnitude EMA and pseudo-NIS accepted every physical indoor_1 update while magnetometer-on ESKF materially degraded against independent OptiTrack attitude."
+  },
+  "data_partitions": {
+    "design_calibration": {
+      "sequence": "INSANE indoor_1",
+      "interval_s": [10.0, 110.0],
+      "replay_sha256": "114cb0fe95c904fea6ed7e4e03f8835cb8e4eacc29ffcb4a0df5d5d8a5aaf2cf",
+      "allowed_use": [
+        "derive frozen physical-field quality envelopes",
+        "derive a local magnetic datum already declared by the replay contract",
+        "measure candidate feature distributions"
+      ]
+    },
+    "design_development": {
+      "sequence": "INSANE indoor_1",
+      "interval_s": [110.0, 210.0],
+      "replay_sha256": "31e230f431a3f354843a937e89b7b3ce4f8863a709d3f0521f8f8fe12bd0a59f",
+      "allowed_use": [
+        "select only among predeclared candidate structures",
+        "set a frozen release configuration",
+        "report offline truth-scored source and estimator effects"
+      ]
+    },
+    "opened_diagnostic_holdout": {
+      "sequence": "INSANE indoor_1",
+      "interval_s": [210.0, 310.0],
+      "replay_sha256": "35364c37cb0c92a66ec2f9eceb809ee044a4b39c9ebffd1d5ba8af6839055309",
+      "policy": "Not available for candidate selection, threshold tuning, or release qualification because its results were already inspected. Retain only as historical adverse evidence."
+    },
+    "sealed_first_holdout": {
+      "sequence": "INSANE indoor_2",
+      "policy": "Do not download, inspect, or convert until a candidate code commit and configuration fingerprint are frozen. It may receive an independent local calibration only for frame/time/datum setup; supervisor thresholds and state-machine logic must remain unchanged."
+    },
+    "sealed_replication": {
+      "sequence": "INSANE indoor_3",
+      "policy": "Run only after indoor_2 with exactly the same frozen candidate commit and configuration. No result-driven changes are permitted between indoor_2 and indoor_3."
+    }
+  },
+  "runtime_input_boundary": {
+    "allowed": [
+      "physical magnetometer vector and timestamp",
+      "physical gyroscope samples available causally before the candidate decision",
+      "fixed calibration-derived field-norm envelope",
+      "fixed calibration-derived consecutive direction-change envelope",
+      "source identifier, generation, finite-value status, validity, and freshness",
+      "sequential latch and recovery state derived only from earlier candidate decisions"
+    ],
+    "forbidden": [
+      "reference quaternion or any ground-truth pose",
+      "truth yaw, estimated-output error, future samples, or trajectory identity",
+      "flight command labels, manually selected trouble intervals, or holdout-specific thresholds",
+      "an always-reject policy presented as protection"
+    ],
+    "fundamental_limit": "A slow persistent magnetic heading shift with near-constant field magnitude is not distinguishable from yaw drift using IMU plus magnetometer alone. An independent heading source, calibration constraint, or environment constraint is required to resolve that ambiguity."
+  },
+  "candidate_family": {
+    "required_stages": [
+      "evaluate source quality causally",
+      "apply the existing ESKF update only when the evaluator permits it",
+      "commit accepted baseline and recovery history only after the core update outcome is known"
+    ],
+    "required_fault_coverage": [
+      "constant-magnitude direction step",
+      "slow direction drift",
+      "persistent datum offset",
+      "field-norm change",
+      "frozen sample stream",
+      "stale timestamp, delay, loss, and reordering",
+      "impulse disturbance and sequential recovery"
+    ],
+    "required_properties": [
+      "fail closed on malformed input and stale source metadata",
+      "bounded rejection latch with explicit recovery evidence",
+      "separate evaluator decision from accepted ESKF innovation",
+      "diagnostic reason codes and update coverage accounting"
+    ]
+  },
+  "release_metrics": {
+    "always_report": [
+      "geodesic, tilt, and wrapped-yaw RMSE/P95/max against independent truth where available",
+      "magnetometer update coverage, acceptance, rejection reason, latch count, and recovery time",
+      "false acceptance by offline physical heading-residual bin",
+      "numerical health, covariance checks, and any ESKF recovery/reset",
+      "comparison with magnetometer-off and unsupervised-magnetometer baselines"
+    ],
+    "must_not_pass_by": [
+      "rejecting all physical magnetic updates",
+      "worsening tilt beyond the frozen tolerance while only improving a selected yaw interval",
+      "using truth, future samples, or sequence identity in the runtime decision"
+    ],
+    "selection_rule": "Select a candidate only after calibration/development evidence shows reduced false acceptance in adverse bins while retaining declared usable coverage and no unexplained degradation relative to both baselines. Numerical thresholds must be added in a versioned amendment before selection, not after opening indoor_2."
+  },
+  "provenance_requirements": [
+    "raw-input, replay, runner, candidate-source, and configuration SHA-256",
+    "converter and calibration command line",
+    "Git commit and clean/dirty worktree state",
+    "dataset license and public/private handling",
+    "strict build, unit, synthetic fault, and external-data result logs"
+  ]
+}
