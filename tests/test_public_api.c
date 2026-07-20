@@ -22,6 +22,9 @@ static int near(float actual, float expected, float tolerance)
 
 static int near_double(double actual, double expected, double tolerance)
 {
+#if defined(AERAKIA_ESKF_CORE_USE_FLOAT)
+    if (tolerance < 2.0e-6) tolerance = 2.0e-6;
+#endif
     return fabs(actual - expected) <= tolerance;
 }
 
@@ -418,7 +421,7 @@ static void test_eskf_magnetic_reference_validation(void)
     }
 
     eskf_init(&filter.core, NULL, NULL);
-    check_true(!eskf_set_mag_reference(&filter.core, (const double[3]){0.0, 0.0, 1.0}),
+    check_true(!eskf_set_mag_reference(&filter.core, (const eskf_float_t[3]){0.0, 0.0, 1.0}),
                "core rejects a vertical magnetic reference with no yaw datum");
     check_true(near_double(filter.core.mag_ref[0], 1.0, 1.0e-15)
                    && near_double(filter.core.mag_ref[1], 0.0, 1.0e-15),

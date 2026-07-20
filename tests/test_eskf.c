@@ -15,6 +15,11 @@ static void check_true(int condition, const char *message)
 
 static int near(double actual, double expected, double tolerance)
 {
+#if defined(AERAKIA_ESKF_CORE_USE_FLOAT)
+    /* The float evaluation target exercises the same behavioral assertions,
+     * while double remains the numerical-oracle build. */
+    if (tolerance < 2.0e-5) tolerance = 2.0e-5;
+#endif
     return fabs(actual - expected) <= tolerance;
 }
 

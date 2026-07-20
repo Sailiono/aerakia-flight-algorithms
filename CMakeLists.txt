@@ -18,6 +18,14 @@ option(AERAKIA_BUILD_TESTS "Build host-side tests" ON)
 option(AERAKIA_BUILD_VALIDATION "Build the PC validation runner" ON)
 option(AERAKIA_WARNINGS_AS_ERRORS "Treat warnings as build failures" ON)
 option(AERAKIA_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
+set(AERAKIA_ESKF_CORE_PRECISION "double" CACHE STRING
+    "ESKF core scalar type: double (reviewed default) or float (evaluation only)")
+set_property(CACHE AERAKIA_ESKF_CORE_PRECISION PROPERTY STRINGS double float)
+if(NOT AERAKIA_ESKF_CORE_PRECISION STREQUAL "double"
+   AND NOT AERAKIA_ESKF_CORE_PRECISION STREQUAL "float")
+    message(FATAL_ERROR
+        "AERAKIA_ESKF_CORE_PRECISION must be either 'double' or 'float'")
+endif()
 
 if(MSVC)
     add_compile_options(/W4)
@@ -54,6 +62,11 @@ target_include_directories(aerakia_algorithms
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 target_compile_features(aerakia_algorithms PUBLIC c_std_99)
+if(AERAKIA_ESKF_CORE_PRECISION STREQUAL "float")
+    # PUBLIC is intentional: applications allocate ESKF_Handle and must use
+    # the same scalar layout as this library.
+    target_compile_definitions(aerakia_algorithms PUBLIC AERAKIA_ESKF_CORE_USE_FLOAT=1)
+endif()
 
 if(NOT MSVC)
     target_link_libraries(aerakia_algorithms PUBLIC m)
@@ -66,10 +79,15 @@ if(AERAKIA_BUILD_TESTS)
     target_link_libraries(test_eskf PRIVATE Aerakia::Algorithms)
     add_test(NAME eskf_core COMMAND test_eskf)
 
-    add_executable(test_eskf_models tests/test_eskf_models.c)
-    target_include_directories(test_eskf_models PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
-    target_link_libraries(test_eskf_models PRIVATE Aerakia::Algorithms)
-    add_test(NAME eskf_models COMMAND test_eskf_models)
+    if(AERAKIA_ESKF_CORE_PRECISION STREQUAL "double")
+        # This target is a double-precision numerical oracle (finite differences
+        # and a high-order Q integration), not an implementation-agnostic API
+        # test. The float candidate is checked against a double replay instead.
+        add_executable(test_eskf_models tests/test_eskf_models.c)
+        target_include_directories(test_eskf_models PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        target_link_libraries(test_eskf_models PRIVATE Aerakia::Algorithms)
+        add_test(NAME eskf_models COMMAND test_eskf_models)
+    endif()
 
     add_executable(test_mag_gate tests/test_mag_gate.c)
     target_link_libraries(test_mag_gate PRIVATE Aerakia::Algorithms)

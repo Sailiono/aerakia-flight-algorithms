@@ -40,8 +40,8 @@ typedef struct {
     int position_update, gps_position_update, gps_velocity_update;
     int gps_position_n, gps_position_e, gps_position_d;
     int gps_velocity_n, gps_velocity_e, gps_velocity_d;
-    int gps_position_variance, gps_velocity_variance;
-    int heading_valid, heading_update, heading, heading_variance, heading_fault;
+    int gps_position_variance, gps_velocity_variance, gps_timestamp;
+    int heading_valid, heading_update, heading, heading_variance, heading_fault, heading_timestamp;
     int course_valid, course_update, course, course_variance, ground_speed;
     int gsf_yaw_valid, gsf_yaw_update, gsf_yaw, gsf_yaw_variance;
     int baro_update, baro_timestamp, baro_height, baro_variance, static_hint;
@@ -105,9 +105,11 @@ static int load_column_map(char *header, ColumnMap *map)
     MAP(gps_velocity_d, "gps_velocity_d_m_s");
     MAP(gps_position_variance, "gps_position_variance_m2");
     MAP(gps_velocity_variance, "gps_velocity_variance_m2_s2");
+    MAP(gps_timestamp, "gps_timestamp_us");
     MAP(heading_valid, "gnss_heading_valid"); MAP(heading_update, "gnss_heading_update");
     MAP(heading, "gnss_heading_rad"); MAP(heading_variance, "gnss_heading_variance_rad2");
     MAP(heading_fault, "gnss_heading_fault");
+    MAP(heading_timestamp, "gnss_heading_timestamp_us");
     MAP(course_valid, "gnss_course_valid"); MAP(course_update, "gnss_course_update");
     MAP(course, "gnss_course_rad"); MAP(course_variance, "gnss_course_variance_rad");
     MAP(ground_speed, "gnss_ground_speed_m_s");
@@ -306,6 +308,7 @@ int main(int argc, char *argv[])
     int reference_attitude_init = 0;
     int supervise_barometer = 0;
     float stationary_gyro_threshold_rad_s = -1.0f;
+    float maximum_aiding_age_s = NAN;
     int input_argument;
     int output_argument;
     int argument;
@@ -315,6 +318,7 @@ int main(int argc, char *argv[])
         fprintf(stderr,
                 "Usage: %s [--cold-start|--reference-attitude-init] "
                 "[--stationary-gyro-threshold-rad-s VALUE] "
+                "[--maximum-aiding-age-s VALUE] "
                 "[--supervise-barometer] "
                 "INPUT_REPLAY_CSV OUTPUT_RESULTS_CSV\n",
                 argv[0]);
@@ -342,6 +346,21 @@ int main(int argc, char *argv[])
                 return 2;
             }
             stationary_gyro_threshold_rad_s = (float)value;
+        } else if (strcmp(argv[argument], "--maximum-aiding-age-s") == 0) {
+            char *end;
+            double value;
+            if (++argument >= input_argument) {
+                fputs("Missing maximum aiding age value\n", stderr);
+                return 2;
+            }
+            errno = 0;
+            value = strtod(argv[argument], &end);
+            if (errno != 0 || end == argv[argument] || *end != '\0'
+                || !isfinite(value)) {
+                fputs("Invalid maximum aiding age\n", stderr);
+                return 2;
+            }
+            maximum_aiding_age_s = (float)value;
         } else if (strcmp(argv[argument], "--supervise-barometer") == 0) {
             supervise_barometer = 1;
         } else {
@@ -381,6 +400,9 @@ int main(int argc, char *argv[])
     if (stationary_gyro_threshold_rad_s > 0.0f) {
         eskf_config.stationary_gyro_threshold_rad_s = stationary_gyro_threshold_rad_s;
     }
+    if (isfinite(maximum_aiding_age_s)) {
+        eskf_config.maximum_aiding_age_s = maximum_aiding_age_s;
+    }
     eskf_config.fuse_magnetometer = true;
 
     fputs(
@@ -397,10 +419,12 @@ int main(int argc, char *argv[])
         "eskf_horizontal_aiding_age_s,eskf_horizontal_position_aiding_age_s,"
         "eskf_horizontal_velocity_aiding_age_s,eskf_horizontal_position_valid,"
         "eskf_horizontal_velocity_valid,eskf_horizontal_navigation_valid,"
-        "input_mag_update,input_position_update,input_velocity_update,position_ref_valid,"
+        "input_mag_update,input_position_update,input_velocity_update,"
+        "input_gps_timestamp_us,input_gps_age_s,input_gps_status,position_ref_valid,"
         "ref_attitude_reset_counter,ref_attitude_reset_event,"
         "ref_delta_q_reset_w,ref_delta_q_reset_x,ref_delta_q_reset_y,ref_delta_q_reset_z,"
-        "input_heading_update,eskf_heading_accepted,eskf_heading_innovation_rad,"
+        "input_heading_update,input_heading_timestamp_us,input_heading_age_s,input_heading_status,"
+        "eskf_heading_accepted,eskf_heading_innovation_rad,"
         "gnss_heading_valid,gnss_heading_rad,gnss_heading_variance_rad2,input_heading_fault,"
         "gnss_course_valid,gnss_course_update,gnss_course_rad,gnss_course_variance_rad,"
         "gnss_ground_speed_m_s,px4_gsf_yaw_valid,px4_gsf_yaw_update,"
@@ -524,6 +548,10 @@ int main(int argc, char *argv[])
         AerakiaBarometerSupervisorDecision barometer_decision;
         AerakiaStatus baro_status = AERAKIA_STATUS_NOT_READY;
         uint64_t baro_timestamp_us = timestamp_us;
+        uint64_t gps_timestamp_us = timestamp_us;
+        uint64_t heading_timestamp_us = timestamp_us;
+        AerakiaStatus gps_status = AERAKIA_STATUS_NOT_READY;
+        AerakiaStatus heading_status = AERAKIA_STATUS_NOT_READY;
 
         barometer_decision = last_barometer_decision;
         barometer_decision.accepted = false;
@@ -536,6 +564,13 @@ int main(int argc, char *argv[])
             truth_pitch * AERAKIA_PI_F / 180.0, truth_yaw * AERAKIA_PI_F / 180.0,
             reference_q, &ok
         );
+        if (!ok) { malformed++; continue; }
+        if (map.gps_timestamp >= 0) {
+            gps_timestamp_us = parse_uint64(columns, count, map.gps_timestamp, &ok);
+        }
+        if (map.heading_timestamp >= 0) {
+            heading_timestamp_us = parse_uint64(columns, count, map.heading_timestamp, &ok);
+        }
         if (!ok) { malformed++; continue; }
         memset(&sample, 0, sizeof(sample));
         sample.timestamp_us = timestamp_us;
@@ -579,7 +614,7 @@ int main(int argc, char *argv[])
 
         if (position_update && velocity_update) {
             AerakiaGpsObservation observation = {0};
-            observation.timestamp_us = sample.timestamp_us;
+            observation.timestamp_us = gps_timestamp_us;
             observation.position_ned_m = parse_vector(
                 columns, count, map.gps_position_n, map.gps_position_e, map.gps_position_d, 1.0, &ok
             );
@@ -592,13 +627,14 @@ int main(int argc, char *argv[])
             observation.velocity_variance_m2_s2 = (float)parse_double(
                 columns, count, map.gps_velocity_variance, 1.0, &ok
             );
-            if (ok && aerakia_eskf_update_gps_observation(&eskf, &observation)
-                    == AERAKIA_STATUS_OK) {
+            gps_status = ok ? aerakia_eskf_update_gps_observation(&eskf, &observation)
+                            : AERAKIA_STATUS_MISSING_MEASUREMENT;
+            if (gps_status == AERAKIA_STATUS_OK) {
                 gps_updates++;
             }
         } else if (position_update) {
             AerakiaPositionObservation observation;
-            observation.timestamp_us = sample.timestamp_us;
+            observation.timestamp_us = gps_timestamp_us;
             observation.position_ned_m = parse_vector(
                 columns, count, map.gps_position_n, map.gps_position_e,
                 map.gps_position_d, 1.0, &ok
@@ -606,13 +642,14 @@ int main(int argc, char *argv[])
             observation.variance_m2 = (float)parse_double(
                 columns, count, map.gps_position_variance, 1.0, &ok
             );
-            if (ok && aerakia_eskf_update_position_observation(&eskf, &observation)
-                    == AERAKIA_STATUS_OK) {
+            gps_status = ok ? aerakia_eskf_update_position_observation(&eskf, &observation)
+                            : AERAKIA_STATUS_MISSING_MEASUREMENT;
+            if (gps_status == AERAKIA_STATUS_OK) {
                 gps_updates++;
             }
         } else if (velocity_update) {
             AerakiaVelocityObservation observation;
-            observation.timestamp_us = sample.timestamp_us;
+            observation.timestamp_us = gps_timestamp_us;
             observation.velocity_ned_m_s = parse_vector(
                 columns, count, map.gps_velocity_n, map.gps_velocity_e,
                 map.gps_velocity_d, 1.0, &ok
@@ -620,18 +657,19 @@ int main(int argc, char *argv[])
             observation.variance_m2_s2 = (float)parse_double(
                 columns, count, map.gps_velocity_variance, 1.0, &ok
             );
-            if (ok && aerakia_eskf_update_velocity_observation(&eskf, &observation)
-                    == AERAKIA_STATUS_OK) {
+            gps_status = ok ? aerakia_eskf_update_velocity_observation(&eskf, &observation)
+                            : AERAKIA_STATUS_MISSING_MEASUREMENT;
+            if (gps_status == AERAKIA_STATUS_OK) {
                 gps_updates++;
             }
         }
         if (heading_update && isfinite(heading_rad) && heading_variance > 0.0) {
             AerakiaHeadingObservation observation;
-            observation.timestamp_us = sample.timestamp_us;
+            observation.timestamp_us = heading_timestamp_us;
             observation.heading_ned_rad = (float)heading_rad;
             observation.variance_rad2 = (float)heading_variance;
-            if (aerakia_eskf_update_heading_observation(&eskf, &observation)
-                    == AERAKIA_STATUS_OK) {
+            heading_status = aerakia_eskf_update_heading_observation(&eskf, &observation);
+            if (heading_status == AERAKIA_STATUS_OK) {
                 heading_updates++;
             }
         }
@@ -696,8 +734,8 @@ int main(int argc, char *argv[])
             "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,"
             "%.6f,%.6f,%.6f,%d,%.9f,%.9f,%d,%d,%d,%u,%d,%d,%d,%d,%d,%d,%u,"
             "%.9f,%.9f,%.9f,%d,%d,%d,"
-            "%d,%d,%d,%d,%.0f,%.0f,%.9f,%.9f,%.9f,%.9f,"
-            "%d,%d,%.9f,%d,%.9f,%.9f,%d,%d,%d,%.9f,%.9f,%.9f,%d,%d,%.9f,%.9f,"
+            "%d,%d,%d,%llu,%.9f,%d,%d,%.0f,%.0f,%.9f,%.9f,%.9f,%.9f,"
+            "%d,%llu,%.9f,%d,%d,%.9f,%d,%.9f,%.9f,%d,%d,%d,%.9f,%.9f,%.9f,%d,%d,%.9f,%.9f,"
             "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,"
             "%.9f,%.9f,%.9f,%d,%llu,%.9f,%d,%d,%d,%u,%d,%d,"
             "%.9f,%.9f,%.9f,%d,%.9f,%.9f,%.9f,%.9f,"
@@ -735,14 +773,22 @@ int main(int argc, char *argv[])
             eskf_estimate.horizontal_position_valid ? 1 : 0,
             eskf_estimate.horizontal_velocity_valid ? 1 : 0,
             eskf_estimate.horizontal_navigation_valid ? 1 : 0,
-            mag_valid && mag_update, position_update, velocity_update, position_ref_valid,
+            mag_valid && mag_update, position_update, velocity_update,
+            (unsigned long long)gps_timestamp_us,
+            gps_timestamp_us <= timestamp_us
+                ? (double)(timestamp_us - gps_timestamp_us) * 1.0e-6 : NAN,
+            (int)gps_status,
+            position_ref_valid,
             parse_double(columns, count, map.reset_counter, 0.0, &ok),
             parse_double(columns, count, map.reset_event, 0.0, &ok),
             parse_double(columns, count, map.reset_q_w, 1.0, &ok),
             parse_double(columns, count, map.reset_q_x, 0.0, &ok),
             parse_double(columns, count, map.reset_q_y, 0.0, &ok),
             parse_double(columns, count, map.reset_q_z, 0.0, &ok),
-            heading_update,
+            heading_update, (unsigned long long)heading_timestamp_us,
+            heading_timestamp_us <= timestamp_us
+                ? (double)(timestamp_us - heading_timestamp_us) * 1.0e-6 : NAN,
+            (int)heading_status,
             heading_update && eskf_estimate.heading_accepted ? 1 : 0,
             heading_update ? eskf_estimate.last_heading_innovation.innovation[0] : 0.0,
             heading_valid, heading_rad, heading_variance,

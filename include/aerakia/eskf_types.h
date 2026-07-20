@@ -21,7 +21,18 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+/*
+ * The reviewed public default is double precision.  A single-precision build
+ * is available only as a host/target evaluation profile; it must not be
+ * selected for a flight target until its own numerical and timing evidence is
+ * recorded.  CMake exports the definition to all consumers so public structs
+ * never disagree about their layout.
+ */
+#if defined(AERAKIA_ESKF_CORE_USE_FLOAT)
+typedef float eskf_float_t;
+#else
 typedef double eskf_float_t;
+#endif
 
 #define ESKF_PI         3.14159265358979323846
 #define ESKF_GRAVITY    9.80665

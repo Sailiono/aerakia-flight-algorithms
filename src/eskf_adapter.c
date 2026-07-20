@@ -441,6 +441,11 @@ void aerakia_eskf_init(
 {
     AerakiaEskfConfig defaults;
     eskf_float_t reference[3];
+    eskf_float_t initial_position[3];
+    eskf_float_t initial_quaternion[4];
+    const eskf_float_t *core_position = NULL;
+    const eskf_float_t *core_quaternion = NULL;
+    int axis;
 
     if (filter == NULL) {
         return;
@@ -480,7 +485,19 @@ void aerakia_eskf_init(
     }
     filter->horizontal_position_initialized = initial_position_ned_m != NULL;
     filter->attitude_seeded = initial_quaternion_wxyz != NULL;
-    eskf_init(&filter->core, initial_position_ned_m, initial_quaternion_wxyz);
+    if (initial_position_ned_m != NULL) {
+        for (axis = 0; axis < 3; ++axis) {
+            initial_position[axis] = (eskf_float_t)initial_position_ned_m[axis];
+        }
+        core_position = initial_position;
+    }
+    if (initial_quaternion_wxyz != NULL) {
+        for (axis = 0; axis < 4; ++axis) {
+            initial_quaternion[axis] = (eskf_float_t)initial_quaternion_wxyz[axis];
+        }
+        core_quaternion = initial_quaternion;
+    }
+    eskf_init(&filter->core, core_position, core_quaternion);
     eskf_set_config(&filter->core, &filter->config.process_noise);
     aerakia_mag_gate_init(&filter->magnetic_gate, &filter->config.magnetic_gate);
     reference[0] = filter->config.magnetic_reference_ned[0];
