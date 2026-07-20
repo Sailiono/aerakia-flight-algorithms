@@ -36,6 +36,7 @@ else()
 endif()
 
 add_library(aerakia_algorithms STATIC
+    src/barometer_supervisor.c
     src/eskf.c
     src/eskf_adapter.c
     src/eskf_math.c
@@ -73,6 +74,10 @@ if(AERAKIA_BUILD_TESTS)
     add_executable(test_mag_gate tests/test_mag_gate.c)
     target_link_libraries(test_mag_gate PRIVATE Aerakia::Algorithms)
     add_test(NAME magnetic_gate COMMAND test_mag_gate)
+
+    add_executable(test_barometer_supervisor tests/test_barometer_supervisor.c)
+    target_link_libraries(test_barometer_supervisor PRIVATE Aerakia::Algorithms)
+    add_test(NAME barometer_supervisor COMMAND test_barometer_supervisor)
 
     add_executable(test_public_api tests/test_public_api.c)
     target_link_libraries(test_public_api PRIVATE Aerakia::Algorithms)

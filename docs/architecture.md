@@ -21,6 +21,11 @@ flowchart TD
 
 - `include/aerakia/types.h` defines measurement and attitude contracts.
 - Mahony and the ESKF adapter depend only on those contracts and portable math.
+- The optional barometer source supervisor is a causal pre-fusion guard; it does not select FCOne
+  sensors, switch estimator lanes, or modify the ESKF internally. Its two-stage evaluate/commit
+  contract advances the fused residual baseline only after core acceptance; timestamp/freeze/fault
+  classification history advances during evaluation. Jump-latch recovery requires a separately
+  authorized reference and a return to the old residual basin.
 - The private target adapter depends on both its drivers and Aerakia, never the reverse.
 - The PC runner links the identical C library used by the target.
 - Python generates datasets and analyzes outputs; it does not reimplement the estimator.
@@ -42,6 +47,13 @@ baseline and is not the planned deployed fallback.
 Mode selection belongs to the private FCOne estimator supervisor. The public library exposes
 algorithm state and health evidence but does not silently switch control sources or copy Mahony
 attitude into the ESKF. See [Estimator supervision](estimator-supervision.md).
+
+The same boundary applies to barometer redundancy. Public validation may run raw, supervised, and
+barometer-free ESKF lanes in parallel, but FCOne owns the active-lane mux and controller reset
+deltas. A fault latch cannot sanitize a lane that already fused bad measurements; failover must use
+a separately propagated, uncontaminated state and covariance. The current PC mux switches only
+vertical output fields and is explicitly an upper bound; executable full-state/covariance transfer
+and reset semantics remain private FCOne work.
 
 For a state-by-state and capability comparison with PX4 EKF2, including the IMU-only navigation
 boundary, see [PX4 EKF2 comparison](px4-ekf2-comparison.md).

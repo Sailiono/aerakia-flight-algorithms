@@ -324,6 +324,8 @@ AerakiaStatus aerakia_eskf_update_barometer_observation(
     const AerakiaBarometerObservation *observation
 );
 
+void aerakia_eskf_note_barometer_rejection(AerakiaEskf *filter);
+
 void aerakia_eskf_apply_zero_velocity(AerakiaEskf *filter, float variance_m2_s2);
 
 void aerakia_eskf_get_estimate(

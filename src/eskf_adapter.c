@@ -1000,6 +1000,7 @@ void aerakia_eskf_update_barometer(
     float variance_m2
 )
 {
+    if (filter != NULL) filter->barometer_accepted = false;
     if (filter != NULL && isfinite(height_up_m) && variance_m2 > 0.0f) {
         memset(&filter->last_barometer_innovation, 0, sizeof(filter->last_barometer_innovation));
         eskf_update_baro(
@@ -1019,6 +1020,7 @@ AerakiaStatus aerakia_eskf_update_barometer_observation(
 {
     AerakiaStatus status;
     if (filter == NULL || observation == NULL) return AERAKIA_STATUS_INVALID_ARGUMENT;
+    filter->barometer_accepted = false;
     if (!isfinite(observation->height_up_m) || !isfinite(observation->variance_m2)
         || observation->variance_m2 <= 0.0f) {
         return AERAKIA_STATUS_MISSING_MEASUREMENT;
@@ -1035,6 +1037,13 @@ AerakiaStatus aerakia_eskf_update_barometer_observation(
         mark_vertical_position_aiding(filter, observation->timestamp_us);
     }
     return AERAKIA_STATUS_OK;
+}
+
+void aerakia_eskf_note_barometer_rejection(AerakiaEskf *filter)
+{
+    if (filter == NULL) return;
+    filter->barometer_accepted = false;
+    memset(&filter->last_barometer_innovation, 0, sizeof(filter->last_barometer_innovation));
 }
 
 void aerakia_eskf_apply_zero_velocity(AerakiaEskf *filter, float variance_m2_s2)

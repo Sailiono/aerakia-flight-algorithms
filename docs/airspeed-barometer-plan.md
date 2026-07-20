@@ -13,8 +13,9 @@ It does not estimate barometer bias or drift. The ULog converter currently subtr
 valid barometric altitude and assigns a fixed `1 m^2` variance.
 
 No airspeed, pitot, sideslip, drag, or wind state exists in the core, public API, native replay
-runner, or automated tests. Existing GNSS-outage scores therefore contain no airspeed/barometer
-improvement claim.
+runner, or automated tests. Existing general navigation-outage scores contain no airspeed benefit;
+barometer benefit is now isolated in the separate four-arm study and must not be backfilled into
+older results.
 
 ## Measurement models
 
@@ -35,7 +36,10 @@ b_baro_dot = random_walk
 
 Before adding a barometer-bias state, the adapter layer can safely own pressure-to-height
 conversion, startup datum, GNSS/barometer datum alignment, quality checks, and a frozen datum during
-GNSS outage. It must detect jumps, frozen output, source reset, thermal drift, and stale data.
+GNSS outage. The current experimental source supervisor covers physical time, jump, quantization-
+aware freeze, latch, two-stage fused-baseline commit, and externally authorized return-to-baseline
+recovery. Thermal
+drift, pressure conversion, redundant-source voting, and real full-state failover remain open.
 
 ### Airspeed and wind
 
@@ -55,6 +59,13 @@ h(x) = sqrt((v_N - w_N)^2 + (v_E - w_E)^2 + v_D^2)
 The first estimator candidate should add horizontal wind states `w_N,w_E`, producing a 17-error-
 state experimental branch. It should not estimate pitot bias initially. IAS/CAS conversion to TAS,
 including static pressure and temperature, remains an upstream sensor-adapter responsibility.
+
+This scalar model assumes zero vertical wind and an ideal, calibrated true-airspeed magnitude. A
+real pitot system measures probe-axis dynamic pressure and is sensitive to density, probe alignment,
+angle of attack, sideslip, blockage/icing, and rotor/propeller wash. Before a 17-state wind branch is
+accepted, negative controls must inject vertical wind, AoA/sideslip, installation misalignment,
+scale/offset error, and VTOL transition/rotor-wash invalidity. These conditions require explicit
+source-validity gates rather than being silently absorbed into the wind states.
 
 An optional no-sideslip pseudo-observation is:
 
@@ -82,6 +93,10 @@ transition regimes.
 - Compare IMU-only and IMU+barometer with identical truth/noise across 5/10/30/60/120 s GNSS
   outages.
 - Add a barometer-bias state only if the external datum model cannot meet the frozen vertical gates.
+
+The first hardware-free A/B exposed the need for source supervision and an uncontaminated shadow
+lane. Results, rejected threshold experiments, and the current capability boundary are retained in
+[the barometer supervision study](barometer-supervision-study.md).
 
 ### A2: airspeed upper bound and wind observability
 
@@ -123,4 +138,3 @@ flight and can extend useful degraded operation. Neither supplies absolute horiz
 absolute yaw. Wind change, sideslip, airspeed bias, and model mismatch still produce growing
 position error during a long GNSS outage. The intended claim is longer controlled degradation and
 better fault handling, not indefinite accurate GNSS-denied navigation.
-

@@ -432,6 +432,9 @@ static void test_eskf_timestamped_aiding_integrity(void)
     check_true(aerakia_eskf_update_barometer_observation(&filter, &barometer)
                    == AERAKIA_STATUS_TIMESTAMP_ERROR,
                "duplicate barometer observation is rejected");
+    aerakia_eskf_get_estimate(&filter, &estimate);
+    check_true(!estimate.barometer_accepted,
+               "rejected duplicate clears per-call barometer acceptance");
     check_true(eskf_core_unchanged(&filter, &before),
                "duplicate aiding observations leave state and covariance unchanged");
 
@@ -1215,6 +1218,11 @@ static void test_eskf_heading_and_vertical_validity(void)
                    && near(estimate.vertical_position_aiding_age_s, 0.0f, 1.0e-6f)
                    && near(estimate.vertical_velocity_aiding_age_s, 0.0f, 1.0e-6f),
                "continuous aiding ages report the physical observation epoch");
+
+    aerakia_eskf_note_barometer_rejection(&filter);
+    aerakia_eskf_get_estimate(&filter, &estimate);
+    check_true(!estimate.barometer_accepted && estimate.vertical_position_valid,
+               "prefilter rejection clears only per-attempt barometer acceptance");
 
     sample.timestamp_us = 70000U;
     (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);

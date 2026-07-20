@@ -5,6 +5,7 @@
 
 #include <aerakia/eskf_adapter.h>
 #include <aerakia/mahony.h>
+#include <aerakia/barometer_supervisor.h>
 
 #include "eskf_joint_covariance.h"
 
@@ -43,7 +44,7 @@ typedef struct {
     int heading_valid, heading_update, heading, heading_variance, heading_fault;
     int course_valid, course_update, course, course_variance, ground_speed;
     int gsf_yaw_valid, gsf_yaw_update, gsf_yaw, gsf_yaw_variance;
-    int baro_update, baro_height, baro_variance, static_hint;
+    int baro_update, baro_timestamp, baro_height, baro_variance, static_hint;
     int reset_counter, reset_event;
     int reset_q_w, reset_q_x, reset_q_y, reset_q_z;
     int truth_accel_bias_x, truth_accel_bias_y, truth_accel_bias_z;
@@ -113,7 +114,8 @@ static int load_column_map(char *header, ColumnMap *map)
     MAP(gsf_yaw_valid, "px4_gsf_yaw_valid"); MAP(gsf_yaw_update, "px4_gsf_yaw_update");
     MAP(gsf_yaw, "px4_gsf_yaw_rad");
     MAP(gsf_yaw_variance, "px4_gsf_yaw_variance_rad2");
-    MAP(baro_update, "baro_update"); MAP(baro_height, "baro_height_up_m");
+    MAP(baro_update, "baro_update"); MAP(baro_timestamp, "baro_timestamp_us");
+    MAP(baro_height, "baro_height_up_m");
     MAP(baro_variance, "baro_variance_m2"); MAP(static_hint, "static_hint");
     MAP(reset_counter, "ref_attitude_reset_counter"); MAP(reset_event, "ref_attitude_reset_event");
     MAP(reset_q_w, "ref_delta_q_reset_w"); MAP(reset_q_x, "ref_delta_q_reset_x");
@@ -205,17 +207,6 @@ static void normalized_quaternion(char *columns[], int count, const ColumnMap *m
     q[0] /= norm; q[1] /= norm; q[2] /= norm; q[3] /= norm;
 }
 
-static void body_to_ned(const double q[4], AerakiaVec3f body, double ned[3])
-{
-    const double w = q[0], x = q[1], y = q[2], z = q[3];
-    ned[0] = (1.0 - 2.0 * (y * y + z * z)) * body.x
-        + 2.0 * (x * y - w * z) * body.y + 2.0 * (x * z + w * y) * body.z;
-    ned[1] = 2.0 * (x * y + w * z) * body.x
-        + (1.0 - 2.0 * (x * x + z * z)) * body.y + 2.0 * (y * z - w * x) * body.z;
-    ned[2] = 2.0 * (x * z - w * y) * body.x + 2.0 * (y * z + w * x) * body.y
-        + (1.0 - 2.0 * (x * x + y * y)) * body.z;
-}
-
 static float radians_to_degrees(float radians)
 {
     return radians * (180.0f / AERAKIA_PI_F);
@@ -301,6 +292,9 @@ int main(int argc, char *argv[])
     AerakiaMahonyConfig standard_config, robust_config;
     AerakiaEskf eskf;
     AerakiaEskfConfig eskf_config;
+    AerakiaBarometerSupervisor barometer_supervisor;
+    AerakiaBarometerSupervisorConfig barometer_supervisor_config;
+    AerakiaBarometerSupervisorDecision last_barometer_decision;
     AerakiaAttitudeEstimate standard_estimate, robust_estimate;
     AerakiaNavigationEstimate eskf_estimate;
     eskf_float_t tilt_accel_bias_covariance
@@ -310,6 +304,7 @@ int main(int argc, char *argv[])
     int eskf_initialized = 0, mag_reference_initialized = 0, mahony_reference_seeded = 0;
     int cold_start = 0;
     int reference_attitude_init = 0;
+    int supervise_barometer = 0;
     float stationary_gyro_threshold_rad_s = -1.0f;
     int input_argument;
     int output_argument;
@@ -320,6 +315,7 @@ int main(int argc, char *argv[])
         fprintf(stderr,
                 "Usage: %s [--cold-start|--reference-attitude-init] "
                 "[--stationary-gyro-threshold-rad-s VALUE] "
+                "[--supervise-barometer] "
                 "INPUT_REPLAY_CSV OUTPUT_RESULTS_CSV\n",
                 argv[0]);
         return 2;
@@ -346,6 +342,8 @@ int main(int argc, char *argv[])
                 return 2;
             }
             stationary_gyro_threshold_rad_s = (float)value;
+        } else if (strcmp(argv[argument], "--supervise-barometer") == 0) {
+            supervise_barometer = 1;
         } else {
             fprintf(stderr, "Unknown option: %s\n", argv[argument]);
             return 2;
@@ -373,6 +371,13 @@ int main(int argc, char *argv[])
     aerakia_mahony_default_config(&robust_config);
     aerakia_mahony_init(&robust, &robust_config);
     aerakia_eskf_default_config(&eskf_config);
+    aerakia_barometer_supervisor_default_config(&barometer_supervisor_config);
+    aerakia_barometer_supervisor_init(&barometer_supervisor, &barometer_supervisor_config);
+    memset(&last_barometer_decision, 0, sizeof(last_barometer_decision));
+    last_barometer_decision.sample_age_s = INFINITY;
+    last_barometer_decision.increment_residual_m = NAN;
+    last_barometer_decision.jump_threshold_m = NAN;
+    last_barometer_decision.freeze_duration_s = NAN;
     if (stationary_gyro_threshold_rad_s > 0.0f) {
         eskf_config.stationary_gyro_threshold_rad_s = stationary_gyro_threshold_rad_s;
     }
@@ -405,6 +410,13 @@ int main(int argc, char *argv[])
         "eskf_position_n_m,eskf_position_e_m,eskf_position_d_m,"
         "eskf_velocity_n_m_s,eskf_velocity_e_m_s,eskf_velocity_d_m_s,"
         "eskf_position_nis,eskf_velocity_nis,eskf_navigation_nees,"
+        "input_baro_update,input_baro_timestamp_us,input_baro_age_s,input_baro_status,"
+        "baro_supervisor_enabled,baro_supervisor_accepted,baro_supervisor_fault_flags,"
+        "baro_supervisor_latched,baro_supervisor_probationary,"
+        "baro_supervisor_increment_residual_m,baro_supervisor_jump_threshold_m,"
+        "baro_supervisor_freeze_duration_s,"
+        "eskf_baro_accepted,eskf_baro_innovation_m,"
+        "eskf_baro_innovation_variance_m2,eskf_baro_nis,eskf_baro_test_ratio,"
         "truth_q_w,truth_q_x,truth_q_y,truth_q_z,"
         "mahony_standard_q_w,mahony_standard_q_x,mahony_standard_q_y,mahony_standard_q_z,"
         "mahony_robust_q_w,mahony_robust_q_x,mahony_robust_q_y,mahony_robust_q_z,"
@@ -495,6 +507,9 @@ int main(int argc, char *argv[])
             columns, count, map.gsf_yaw_variance, 1.0, &ok
         );
         const int static_hint = (int)parse_double(columns, count, map.static_hint, 0.0, &ok) != 0;
+        const int baro_update = (int)parse_double(
+            columns, count, map.baro_update, 0.0, &ok
+        ) != 0;
         const int position_ref_valid = (int)parse_double(
             columns, count, map.position_ref_valid, 0.0, &ok
         ) != 0;
@@ -506,6 +521,15 @@ int main(int argc, char *argv[])
         );
         double reference_q[4];
         AerakiaImuSample sample;
+        AerakiaBarometerSupervisorDecision barometer_decision;
+        AerakiaStatus baro_status = AERAKIA_STATUS_NOT_READY;
+        uint64_t baro_timestamp_us = timestamp_us;
+
+        barometer_decision = last_barometer_decision;
+        barometer_decision.accepted = false;
+        barometer_decision.increment_residual_m = NAN;
+        barometer_decision.jump_threshold_m = NAN;
+        barometer_decision.freeze_duration_s = NAN;
 
         normalized_quaternion(
             columns, count, &map, truth_roll * AERAKIA_PI_F / 180.0,
@@ -522,24 +546,10 @@ int main(int argc, char *argv[])
         if (mag_valid && mag_update) sample.flags |= AERAKIA_SAMPLE_MAG_VALID;
         if (static_hint) sample.flags |= AERAKIA_SAMPLE_STATIONARY;
 
-        if (cold_start && !mag_reference_initialized) {
+        if (!mag_reference_initialized) {
             eskf_config.magnetic_reference_ned[0] = (float)cos(magnetic_declination_rad);
             eskf_config.magnetic_reference_ned[1] = (float)sin(magnetic_declination_rad);
             eskf_config.magnetic_reference_ned[2] = 0.0f;
-            mag_reference_initialized = 1;
-        }
-        if (!cold_start && !mag_reference_initialized && mag_valid && mag_update) {
-            double reference_ned[3];
-            body_to_ned(reference_q, magnetic, reference_ned);
-            eskf_config.magnetic_reference_ned[0] = (float)reference_ned[0];
-            eskf_config.magnetic_reference_ned[1] = (float)reference_ned[1];
-            eskf_config.magnetic_reference_ned[2] = (float)reference_ned[2];
-            if (eskf_initialized) {
-                eskf_float_t core_reference[3] = {
-                    reference_ned[0], reference_ned[1], reference_ned[2]
-                };
-                eskf_set_mag_reference(&eskf.core, core_reference);
-            }
             mag_reference_initialized = 1;
         }
         if (!eskf_initialized) {
@@ -625,16 +635,54 @@ int main(int argc, char *argv[])
                 heading_updates++;
             }
         }
-        if ((int)parse_double(columns, count, map.baro_update, 0.0, &ok) != 0) {
+        if (baro_update) {
             AerakiaBarometerObservation observation;
-            observation.timestamp_us = sample.timestamp_us;
+            int supervisor_accepts = 1;
+            if (map.baro_timestamp >= 0) {
+                baro_timestamp_us = parse_uint64(columns, count, map.baro_timestamp, &ok);
+            }
+            observation.timestamp_us = baro_timestamp_us;
             observation.height_up_m = (float)parse_double(
                 columns, count, map.baro_height, 0.0, &ok
             );
             observation.variance_m2 = (float)parse_double(
                 columns, count, map.baro_variance, 1.0, &ok
             );
-            if (ok) (void)aerakia_eskf_update_barometer_observation(&eskf, &observation);
+            if (ok && supervise_barometer) {
+                AerakiaBarometerSupervisorObservation supervised_observation;
+                memset(&supervised_observation, 0, sizeof(supervised_observation));
+                aerakia_eskf_get_estimate(&eskf, &eskf_estimate);
+                supervised_observation.sample_timestamp_us = observation.timestamp_us;
+                supervised_observation.evaluation_timestamp_us = sample.timestamp_us;
+                supervised_observation.height_up_m = observation.height_up_m;
+                supervised_observation.variance_m2 = observation.variance_m2;
+                supervised_observation.predicted_height_up_m =
+                    -eskf_estimate.position_ned_m.z;
+                supervised_observation.predicted_vertical_velocity_up_m_s =
+                    -eskf_estimate.velocity_ned_m_s.z;
+                barometer_decision = aerakia_barometer_supervisor_evaluate(
+                    &barometer_supervisor, &supervised_observation
+                );
+                supervisor_accepts = barometer_decision.accepted ? 1 : 0;
+            }
+            if (ok) {
+                if (supervisor_accepts) {
+                    baro_status = aerakia_eskf_update_barometer_observation(
+                        &eskf, &observation
+                    );
+                    if (supervise_barometer) {
+                        aerakia_barometer_supervisor_commit(
+                            &barometer_supervisor,
+                            baro_status == AERAKIA_STATUS_OK && eskf.barometer_accepted,
+                            &barometer_decision
+                        );
+                    }
+                } else {
+                    baro_status = AERAKIA_STATUS_RECOVERY_REJECTED;
+                    aerakia_eskf_note_barometer_rejection(&eskf);
+                }
+            }
+            last_barometer_decision = barometer_decision;
         }
         aerakia_eskf_get_estimate(&eskf, &eskf_estimate);
         aerakia_validation_extract_tilt_accel_bias_covariance(
@@ -651,7 +699,8 @@ int main(int argc, char *argv[])
             "%d,%d,%d,%d,%.0f,%.0f,%.9f,%.9f,%.9f,%.9f,"
             "%d,%d,%.9f,%d,%.9f,%.9f,%d,%d,%d,%.9f,%.9f,%.9f,%d,%d,%.9f,%.9f,"
             "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,"
-            "%.9f,%.9f,%.9f,"
+            "%.9f,%.9f,%.9f,%d,%llu,%.9f,%d,%d,%d,%u,%d,%d,"
+            "%.9f,%.9f,%.9f,%d,%.9f,%.9f,%.9f,%.9f,"
             "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,"
             "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,"
             "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,"
@@ -709,6 +758,29 @@ int main(int argc, char *argv[])
             velocity_update ? eskf_estimate.last_velocity_innovation.nis : NAN,
             (position_update || velocity_update) && position_ref_valid
                 ? navigation_nees(&eskf, reference_position, reference_velocity) : NAN,
+            baro_update,
+            (unsigned long long)baro_timestamp_us,
+            baro_update && sample.timestamp_us >= baro_timestamp_us
+                ? (double)(sample.timestamp_us - baro_timestamp_us) * 1.0e-6 : NAN,
+            (int)baro_status,
+            supervise_barometer,
+            supervise_barometer && barometer_decision.accepted ? 1 : 0,
+            barometer_decision.fault_flags,
+            barometer_decision.fault_latched ? 1 : 0,
+            barometer_decision.recovery_probationary ? 1 : 0,
+            barometer_decision.increment_residual_m,
+            barometer_decision.jump_threshold_m,
+            barometer_decision.freeze_duration_s,
+            baro_update && baro_status == AERAKIA_STATUS_OK
+                && eskf_estimate.barometer_accepted ? 1 : 0,
+            baro_update && baro_status == AERAKIA_STATUS_OK
+                ? eskf_estimate.last_barometer_innovation.innovation[0] : NAN,
+            baro_update && baro_status == AERAKIA_STATUS_OK
+                ? eskf_estimate.last_barometer_innovation.innov_var[0] : NAN,
+            baro_update && baro_status == AERAKIA_STATUS_OK
+                ? eskf_estimate.last_barometer_innovation.nis : NAN,
+            baro_update && baro_status == AERAKIA_STATUS_OK
+                ? eskf_estimate.last_barometer_innovation.test_ratio : NAN,
             reference_q[0], reference_q[1], reference_q[2], reference_q[3],
             standard_estimate.quaternion_wxyz[0], standard_estimate.quaternion_wxyz[1],
             standard_estimate.quaternion_wxyz[2], standard_estimate.quaternion_wxyz[3],

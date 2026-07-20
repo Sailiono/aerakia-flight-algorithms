@@ -112,6 +112,29 @@ heading_status = aerakia_eskf_update_heading_observation(&navigation_filter, &he
 barometer_status = aerakia_eskf_update_barometer_observation(&navigation_filter, &barometer);
 ```
 
+The barometer ESKF update is intentionally a measurement model, not a complete physical-source
+monitor. The optional hardware-neutral `AerakiaBarometerSupervisor` can be called before fusion
+with the physical sample timestamp and the ESKF's pre-update height/vertical-velocity prediction.
+It reports stale, jump, freeze, latch, and recovery diagnostics. Its current default thresholds are
+PC-validation candidates, not FCOne flight constants.
+
+The call is a two-stage transaction: `evaluate()` decides whether the source sample may reach the
+core, then `commit(core_accepted)` advances the fused residual baseline only if the ESKF also
+accepted it. Timestamp, freeze, and fault-classification history is updated by `evaluate()`. A
+supervisor pass followed by core NIS rejection must not become the next trusted source baseline.
+Freeze recovery can use sequential normal samples; jump-latch recovery requires an external
+authorization bound to source identity, generation, quality snapshot, and time. The private adapter
+must derive that authorization from an independent vertical reference, not from the same barometer.
+The current contract cannot rebase a persistent new datum; the input must first return or be
+externally realigned to the previous residual basin.
+
+Fault detection alone does not remove measurements already fused before a latch. FCOne must keep an
+uncontaminated synchronized ESKF shadow (or an independently aided redundant lane) before using a
+barometer fault to switch flight outputs. The private supervisor owns lane selection, source
+generation, reset deltas, controller handoff, and failsafe. Do not copy or blend a contaminated
+lane's state/covariance into the shadow. See the
+[barometer supervision study](barometer-supervision-study.md).
+
 If the receiver publishes position and velocity independently, use the source-specific contracts:
 
 ```c
