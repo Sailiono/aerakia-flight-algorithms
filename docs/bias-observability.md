@@ -131,6 +131,83 @@ The preferred estimator candidate is a sliding-window GNSS-velocity/IMU-preinteg
 returns a joint five-dimensional correction and full covariance for injection. It must first pass
 causal analyzer-only tests before estimator source changes are allowed.
 
+### Analyzer-only implementation status
+
+`validation/analyze_bias_excitation_information.py` now reconstructs the current 15-state local
+transition from estimated attitude/bias, IMU samples, and actually accepted position/velocity
+observations. It whitens the observation design, projects out the ten nuisance-state directions,
+and scores the five-dimensional tilt/accelerometer-bias structural information subspace. The
+analyzer itself never reads truth, trajectory identity, commanded motion, or future samples. Its
+CLI additionally binds the exact input/output files, replay generator, estimator runner, command,
+and Git commit, and rejects known truth-initialization options. This makes the claim auditable but
+does not prove the semantics of an arbitrary runner binary; the causal fields remain explicit
+producer assertions.
+
+Focused controls produce the intended classification: static/fixed-attitude constant velocity and
+yaw-only are rank deficient; a single-direction trajectory remains incomplete; attitude/rate-
+consistent multi-direction structural motion reaches `5/5`; and all-rejected aiding contributes
+rank `0/5`. Static and fixed-attitude constant velocity deliberately expose identical IMU channels,
+which is the inertial indistinguishability being tested rather than a second measured trajectory.
+Stale aiding fails freshness,
+paired position/velocity updates count as one aiding epoch, the window-start post-update
+observation is not double counted, and changing future samples leaves a closed historical window
+bit-for-bit unchanged. A minimum five-second window prevents a short full-rank result from being
+called structurally ready.
+
+This remains an analyzer, not an estimator feature or product gate. The present defaults are not
+frozen, ESKF error-reset Jacobians and process-noise/preintegration covariance are not reconstructed
+in the window, and structural readiness has not yet been shown to predict bias convergence across
+clean train/tune splits. No coupled tilt/bias correction is enabled.
+
+The analyzer report uses schema `2`. Its deliberately narrow status and result fields are
+`structural_analyzer_only_not_estimator_gate`,
+`structural_information_ready_analyzer_only`, and
+`first_structural_information_ready_time_s_analyzer_only`. The old generic
+`information_ready` name is not emitted because rank and conditioning in this reduced structural
+model are neither an estimator covariance statement nor a product release decision. Information
+magnitude also depends on the aiding rate and declared variance; the current calculation omits IMU
+process noise, bias random walk, preintegration covariance, aiding correlation, and reset
+Jacobians.
+
+The CLI fails closed unless `--provenance-manifest` binds the exact replay and results files,
+generator, runner, command, and commit, and asserts that the results came from a forward-only online
+filter with causal initialization and no truth-derived stationarity. The manifest schema is:
+
+```json
+{
+  "schema_version": 2,
+  "sources": {
+    "replay": {"sha256": "<64 hex>", "bytes": 123},
+    "results": {"sha256": "<64 hex>", "bytes": 456}
+  },
+  "execution": {
+    "artifacts": {
+      "replay_generator": {"path": "<path>", "sha256": "<64 hex>", "bytes": 789},
+      "estimator_runner": {"path": "<path>", "sha256": "<64 hex>", "bytes": 1011}
+    },
+    "command": ["<runner>", "<replay>", "<results>"],
+    "git_commit": "<40 lowercase hex>"
+  },
+  "causal_estimator_output": {
+    "online_forward_filter": true,
+    "future_samples_used": false,
+    "initialization_source": "causal_sensor_alignment",
+    "truth_seeded_initialization": false,
+    "stationarity_source": "causal_detector",
+    "truth_derived_stationarity": false
+  }
+}
+```
+
+`initialization_source` may instead be `causal_external_runtime_seed_without_truth`, and
+`stationarity_source` may be `not_used`. All hashes and byte counts must match exactly, and known
+truth-initialization command options are rejected. This is artifact binding plus checked causal
+assertions, not cryptographic attestation that the runner implementation never read truth. Existing
+historical bias-convergence replays used trajectory-truth static hints, so their
+reported `5.0 s` structural result remains a diagnostic development observation. It cannot be
+promoted under this causal contract; the v2 input campaign must regenerate the track with a causal
+stationarity detector.
+
 ### Required positive and negative controls
 
 - Static, fixed-attitude translation, yaw-only rotation, stale/rejected aiding, and incomplete
