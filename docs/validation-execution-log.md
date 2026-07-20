@@ -1675,10 +1675,32 @@ limit: slow persistent magnetic heading error with nearly constant norm cannot b
 yaw drift using IMU plus magnetometer alone; independent heading or a stronger source constraint is
 required.
 
+### Causal feature screen
+
+The diagnostic was extended with two features that do not consume reference attitude, estimator
+error, future data, or sequence identity in their calculation. The first gyro-propagates the previous
+valid body-frame magnetic direction using the preceding physical gyro samples, then measures its
+angle to the next valid magnetic direction. The calibration/development residual P95 is
+`1.172/1.188 deg`, and its correlation with absolute magnetometer-on-minus-off yaw impact is
+`-0.014/-0.106`. It therefore does not identify the slow failure, although it remains appropriate
+for a future abrupt direction-step synthetic fault family.
+
+The second feature is an inclination proxy from the angle between raw magnetic field and raw specific
+force, evaluated only under the already public static-alignment contract: acceleration norm within
+`0.20 g` of gravity and gyro norm at most `0.05 rad/s`. It yields 3,352 calibration and 1,653
+development samples. Its offline physical-inclination correlation is `0.779/0.480`, but its
+correlation with absolute yaw impact reverses from `-0.339` to `+0.332`. That cross-window
+instability rejects it as a candidate source-quality policy.
+
+No runtime C path, magnetic tuning, or magnetic fusion default changed after either negative result.
+The public default remains `fuse_magnetometer = false`. The retained conclusion is that these
+causal features can detect only subsets of physical faults; they cannot resolve a slow persistent
+magnetic datum error without independent heading, calibration, or environmental evidence.
+
 ### Verification at this checkpoint
 
-The magnetic-source diagnostic unit suite passes `3/3`, including paired-flag and off-arm acceptance
-fail-closed controls. The complete Python discovery passes `132/132`, strict C99 CTest passes
+The magnetic-source diagnostic unit suite passes `5/5`, including paired-flag and off-arm acceptance,
+gyro-propagation sign, and gravity-proxy controls. The complete Python discovery passes `134/134`, strict C99 CTest passes
 `10/10`, and `validation/run_host_regression.py` passes. The Python public-dataset suite reports its
 expected `blocked` status for the optional PX4 comparison because `--px4-source` was not supplied;
 it is not a test failure and no network download was attempted. `git diff --check` and strict JSON

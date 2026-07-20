@@ -8,6 +8,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import numpy as np
+
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "validation"))
@@ -84,6 +86,49 @@ def write_fixture(replay_path: Path, on_path: Path, off_path: Path) -> None:
 
 
 class MagneticSourceAbTests(unittest.TestCase):
+    def test_gyro_propagated_direction_matches_constant_navigation_field(self) -> None:
+        timestamp_us = np.asarray((0.0, 10000.0, 20000.0), dtype=np.float64)
+        yaw_step_rad = 0.01
+        raw_magnetic_ut = np.asarray([
+            (50.0, 0.0, 0.0),
+            (50.0 * math.cos(-yaw_step_rad), 50.0 * math.sin(-yaw_step_rad), 0.0),
+            (50.0 * math.cos(-2.0 * yaw_step_rad), 50.0 * math.sin(-2.0 * yaw_step_rad), 0.0),
+        ])
+        raw_angular_rate_rad_s = np.asarray([
+            (0.0, 0.0, 1.0),
+            (0.0, 0.0, 1.0),
+            (0.0, 0.0, 1.0),
+        ])
+        residual_deg, interval_s = diagnostic._gyro_propagated_direction_residual_deg(
+            timestamp_us,
+            raw_magnetic_ut,
+            raw_angular_rate_rad_s,
+            np.asarray((True, True, True)),
+        )
+        self.assertTrue(math.isnan(float(residual_deg[0])))
+        self.assertAlmostEqual(float(residual_deg[1]), 0.0, delta=1.0e-5)
+        self.assertAlmostEqual(float(residual_deg[2]), 0.0, delta=1.0e-5)
+        self.assertAlmostEqual(float(interval_s[1]), 0.01, delta=1.0e-9)
+        self.assertAlmostEqual(float(interval_s[2]), 0.01, delta=1.0e-9)
+
+    def test_gravity_conditioned_inclination_is_yaw_independent(self) -> None:
+        inclination_rad = math.radians(60.0)
+        raw_magnetic_ut = np.asarray([(
+            50.0 * math.cos(inclination_rad), 0.0, 50.0 * math.sin(inclination_rad)
+        )])
+        proxy_deg, condition, acceleration_norm, gyro_norm = (
+            diagnostic._gravity_conditioned_inclination_proxy_deg(
+                raw_magnetic_ut,
+                np.asarray(((0.0, 0.0, -1000.0),)),
+                np.asarray(((0.0, 0.0, 0.0),)),
+                np.asarray((True,)),
+            )
+        )
+        self.assertTrue(bool(condition[0]))
+        self.assertAlmostEqual(float(proxy_deg[0]), 60.0, delta=1.0e-5)
+        self.assertAlmostEqual(float(acceleration_norm[0]), diagnostic.GRAVITY_M_S2, delta=1.0e-5)
+        self.assertAlmostEqual(float(gyro_norm[0]), 0.0, delta=1.0e-12)
+
     def test_reports_physical_residual_and_paired_effect(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)

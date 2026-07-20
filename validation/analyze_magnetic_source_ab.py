@@ -37,6 +37,10 @@ RESIDUAL_BINS_DEG = (
     ("5_to_15_deg", 5.0, 15.0),
     ("at_least_15_deg", 15.0, math.inf),
 )
+MDPS_TO_RAD_S = math.pi / 180000.0
+GRAVITY_M_S2 = 9.80665
+STATIC_ACCELERATION_TOLERANCE_G = 0.20
+STATIC_GYRO_THRESHOLD_RAD_S = 0.05
 
 
 def sha256_file(path: Path) -> str:
@@ -90,6 +94,10 @@ def _summary(values: np.ndarray) -> dict[str, float]:
     }
 
 
+def _optional_summary(values: np.ndarray) -> dict[str, float] | None:
+    return None if values.size == 0 else _summary(values)
+
+
 def _normalized_quaternions(values: np.ndarray, label: str) -> np.ndarray:
     norms = np.linalg.norm(values, axis=1)
     if np.any(~np.isfinite(norms) | (norms <= 1.0e-9)):
@@ -111,6 +119,102 @@ def _rotate_body_to_ned(quaternion: np.ndarray, vector: np.ndarray) -> np.ndarra
         + 2.0 * (y_value * z_value + w_value * x_value) * vy
         + (1.0 - 2.0 * (x_value * x_value + y_value * y_value)) * vz,
     ))
+
+
+def _rotate_by_rotation_vector(vector: np.ndarray, rotation_vector: np.ndarray) -> np.ndarray:
+    angle = float(np.linalg.norm(rotation_vector))
+    if angle <= 1.0e-12:
+        return vector.copy()
+    axis = rotation_vector / angle
+    return (
+        vector * math.cos(angle)
+        + np.cross(axis, vector) * math.sin(angle)
+        + axis * float(np.dot(axis, vector)) * (1.0 - math.cos(angle))
+    )
+
+
+def _gyro_propagated_direction_residual_deg(
+    timestamp_us: np.ndarray,
+    raw_magnetic_ut: np.ndarray,
+    raw_angular_rate_rad_s: np.ndarray,
+    magnetometer_update: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Measure causal consecutive magnetic direction mismatch in the body frame.
+
+    A locally constant navigation-frame magnetic vector evolves in body coordinates as
+    ``m_b(t + dt) = Exp(-omega_b * dt) m_b(t)``. The comparison propagates every IMU row
+    after the prior valid magnetic sample, never using a reference attitude or future sample.
+    """
+
+    residual_deg = np.full(len(timestamp_us), np.nan, dtype=np.float64)
+    interval_s = np.full(len(timestamp_us), np.nan, dtype=np.float64)
+    propagated_direction: np.ndarray | None = None
+    last_magnetometer_timestamp_us: float | None = None
+    for index in range(len(timestamp_us)):
+        if propagated_direction is not None and index > 0:
+            dt_s = (timestamp_us[index] - timestamp_us[index - 1]) * 1.0e-6
+            if not math.isfinite(float(dt_s)) or dt_s <= 0.0:
+                raise ValueError("replay timestamps must be strictly increasing")
+            propagated_direction = _rotate_by_rotation_vector(
+                propagated_direction, -raw_angular_rate_rad_s[index - 1] * dt_s
+            )
+            propagated_norm = float(np.linalg.norm(propagated_direction))
+            if propagated_norm <= 1.0e-9 or not math.isfinite(propagated_norm):
+                raise ValueError("gyro propagation produced an invalid magnetic direction")
+            propagated_direction /= propagated_norm
+        if not magnetometer_update[index]:
+            continue
+        measured_norm = float(np.linalg.norm(raw_magnetic_ut[index]))
+        if measured_norm <= 1.0e-9 or not math.isfinite(measured_norm):
+            raise ValueError("physical magnetometer update has zero norm")
+        measured_direction = raw_magnetic_ut[index] / measured_norm
+        if propagated_direction is not None and last_magnetometer_timestamp_us is not None:
+            cosine = float(np.clip(np.dot(propagated_direction, measured_direction), -1.0, 1.0))
+            residual_deg[index] = math.degrees(math.acos(cosine))
+            interval_s[index] = (timestamp_us[index] - last_magnetometer_timestamp_us) * 1.0e-6
+        propagated_direction = measured_direction
+        last_magnetometer_timestamp_us = timestamp_us[index]
+    return residual_deg, interval_s
+
+
+def _gravity_conditioned_inclination_proxy_deg(
+    raw_magnetic_ut: np.ndarray,
+    raw_acceleration_mg: np.ndarray,
+    raw_angular_rate_rad_s: np.ndarray,
+    magnetometer_update: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Return a yaw-independent magnetic-inclination proxy on stationary-contract samples.
+
+    Under low linear acceleration, the specific-force direction is opposite gravity. The angle
+    between it and the physical field is invariant to yaw and uses only the contemporaneous IMU.
+    The condition exactly reuses the public static-alignment acceleration and gyro limits; it is
+    not asserted to be valid while the vehicle is maneuvering.
+    """
+
+    acceleration_norm_m_s2 = np.linalg.norm(raw_acceleration_mg, axis=1) * GRAVITY_M_S2 / 1000.0
+    gyro_norm_rad_s = np.linalg.norm(raw_angular_rate_rad_s, axis=1)
+    valid_acceleration = acceleration_norm_m_s2 > 1.0e-9
+    valid_magnetic = np.linalg.norm(raw_magnetic_ut, axis=1) > 1.0e-9
+    condition = (
+        magnetometer_update
+        & valid_acceleration
+        & valid_magnetic
+        & (np.abs(acceleration_norm_m_s2 / GRAVITY_M_S2 - 1.0)
+           <= STATIC_ACCELERATION_TOLERANCE_G)
+        & (gyro_norm_rad_s <= STATIC_GYRO_THRESHOLD_RAD_S)
+    )
+    inclination_proxy_deg = np.full(len(raw_magnetic_ut), np.nan, dtype=np.float64)
+    if np.any(condition):
+        magnetic_unit = raw_magnetic_ut[condition] / np.linalg.norm(
+            raw_magnetic_ut[condition], axis=1
+        )[:, None]
+        acceleration_unit = raw_acceleration_mg[condition] / np.linalg.norm(
+            raw_acceleration_mg[condition], axis=1
+        )[:, None]
+        inclination_proxy_deg[condition] = np.degrees(np.arcsin(np.clip(
+            -np.sum(magnetic_unit * acceleration_unit, axis=1), -1.0, 1.0
+        )))
+    return inclination_proxy_deg, condition, acceleration_norm_m_s2, gyro_norm_rad_s
 
 
 def _tilt_error_deg(reference_q: np.ndarray, estimate_q: np.ndarray) -> np.ndarray:
@@ -196,6 +300,12 @@ def analyze_magnetic_source_ab(
     raw_magnetic_ut = 0.01 * np.column_stack([
         _float_column(replay_rows, f"raw_mag_cuT_{axis}") for axis in "xyz"
     ])
+    raw_acceleration_mg = np.column_stack([
+        _float_column(replay_rows, f"raw_acc_mg_{axis}") for axis in "xyz"
+    ])
+    raw_angular_rate_rad_s = (MDPS_TO_RAD_S * np.column_stack([
+        _float_column(replay_rows, f"raw_gyro_mdps_{axis}") for axis in "xyz"
+    ]))
     magnetic_norm_ut = np.linalg.norm(raw_magnetic_ut, axis=1)
     if np.any(magnetic_norm_ut[magnetometer_update] <= 1.0e-9):
         raise ValueError("physical magnetometer update has zero norm")
@@ -206,6 +316,17 @@ def analyze_magnetic_source_ab(
     physical_heading_deg = np.degrees(np.arctan2(magnetic_ned_ut[:, 1], magnetic_ned_ut[:, 0]))
     datum_residual_deg = _wrap_degrees(physical_heading_deg - np.degrees(datum_rad[0]))
     inclination_deg = np.degrees(np.arctan2(magnetic_ned_ut[:, 2], horizontal_norm_ut))
+    direction_residual_deg, direction_interval_s = _gyro_propagated_direction_residual_deg(
+        timestamp_us, raw_magnetic_ut, raw_angular_rate_rad_s, magnetometer_update
+    )
+    gravity_inclination_proxy_deg, gravity_conditioned, acceleration_norm_m_s2, gyro_norm_rad_s = (
+        _gravity_conditioned_inclination_proxy_deg(
+            raw_magnetic_ut,
+            raw_acceleration_mg,
+            raw_angular_rate_rad_s,
+            magnetometer_update,
+        )
+    )
 
     truth_yaw = _float_column(on_rows, "truth_yaw_deg")
     on_yaw_error = _wrap_degrees(_float_column(on_rows, "eskf_yaw_deg") - truth_yaw)
@@ -225,6 +346,8 @@ def analyze_magnetic_source_ab(
     accepted = on_accepted
 
     selected = magnetometer_update
+    causal_direction_selected = selected & np.isfinite(direction_residual_deg)
+    gravity_selected = selected & gravity_conditioned
     absolute_residual = np.abs(datum_residual_deg)
     bins: dict[str, Any] = {}
     for label, lower, upper in RESIDUAL_BINS_DEG:
@@ -276,6 +399,25 @@ def analyze_magnetic_source_ab(
             "field_norm_ut": _summary(magnetic_norm_ut[selected]),
             "inclination_deg_positive_down": _summary(inclination_deg[selected]),
         },
+        "causal_source_features": {
+            "gyro_propagated_direction_comparisons": int(np.count_nonzero(causal_direction_selected)),
+            "gyro_propagated_direction_interval_s": _optional_summary(
+                direction_interval_s[causal_direction_selected]
+            ),
+            "gyro_propagated_direction_residual_deg": _optional_summary(
+                direction_residual_deg[causal_direction_selected]
+            ),
+            "gravity_conditioned_inclination_samples": int(np.count_nonzero(gravity_selected)),
+            "gravity_conditioned_acceleration_norm_error_g": _optional_summary(
+                np.abs(acceleration_norm_m_s2[gravity_selected] / GRAVITY_M_S2 - 1.0)
+            ),
+            "gravity_conditioned_gyro_norm_rad_s": _optional_summary(
+                gyro_norm_rad_s[gravity_selected]
+            ),
+            "gravity_conditioned_inclination_proxy_deg_positive_down": _optional_summary(
+                gravity_inclination_proxy_deg[gravity_selected]
+            ),
+        },
         "paired_estimator_effect": {
             "magnetometer_innovation_deg": _summary(innovation_deg[selected]),
             "magnetometer_test_ratio": _summary(innovation_ratio[selected]),
@@ -301,6 +443,26 @@ def analyze_magnetic_source_ab(
             ),
             "absolute_physical_heading_residual_vs_on_minus_off_tilt_pearson": _pearson(
                 absolute_residual[selected], on_tilt_error[selected] - off_tilt_error[selected]
+            ),
+            "gyro_propagated_direction_residual_vs_absolute_physical_heading_residual_pearson": _pearson(
+                direction_residual_deg[causal_direction_selected],
+                absolute_residual[causal_direction_selected],
+            ),
+            "gyro_propagated_direction_residual_vs_absolute_on_minus_off_yaw_pearson": _pearson(
+                direction_residual_deg[causal_direction_selected],
+                np.abs(_wrap_degrees(
+                    on_yaw_error[causal_direction_selected]
+                    - off_yaw_error[causal_direction_selected]
+                )),
+            ),
+            "gravity_conditioned_inclination_proxy_vs_physical_inclination_pearson": _pearson(
+                gravity_inclination_proxy_deg[gravity_selected], inclination_deg[gravity_selected]
+            ),
+            "gravity_conditioned_inclination_proxy_vs_absolute_on_minus_off_yaw_pearson": _pearson(
+                gravity_inclination_proxy_deg[gravity_selected],
+                np.abs(_wrap_degrees(
+                    on_yaw_error[gravity_selected] - off_yaw_error[gravity_selected]
+                )),
             ),
         },
         "predeclared_residual_bins": bins,
@@ -332,10 +494,25 @@ def write_report(report: dict[str, Any], output_directory: Path) -> None:
     )
     effect = report["paired_estimator_effect"]
     source = report["physical_magnetic_source"]
+    causal = report["causal_source_features"]
+    direction_summary = causal["gyro_propagated_direction_residual_deg"]
+    direction_p95 = "n/a" if direction_summary is None else f"{direction_summary['p95']:.6f}"
+    direction_rmse = "n/a" if direction_summary is None else f"{direction_summary['rmse']:.6f}"
+    inclination_summary = causal["gravity_conditioned_inclination_proxy_deg_positive_down"]
+    inclination_p95 = "n/a" if inclination_summary is None else f"{inclination_summary['p95']:.6f}"
     lines = [
         "# Magnetic source A/B diagnostic", "",
         "This is an offline truth-scored source diagnostic, not a runtime rejection policy.", "",
         f"Physical magnetometer updates: **{source['updates']}**.", "",
+        "| Causal physical feature | Value |",
+        "| --- | ---: |",
+        f"| Gyro-propagated direction comparisons | {causal['gyro_propagated_direction_comparisons']} |",
+        f"| Direction residual P95 (deg) | {direction_p95} |",
+        f"| Direction residual RMSE (deg) | {direction_rmse} |",
+        f"| Gravity-conditioned inclination samples | "
+        f"{causal['gravity_conditioned_inclination_samples']} |",
+        f"| Gravity-conditioned inclination proxy P95 (deg) | {inclination_p95} |",
+        "",
         "| Metric | Magnetometer on | Magnetometer off |",
         "| --- | ---: | ---: |",
         f"| ESKF yaw-error RMSE (deg) | {effect['eskf_on_yaw_error_deg']['rmse']:.6f} | "

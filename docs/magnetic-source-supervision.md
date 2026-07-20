@@ -65,6 +65,30 @@ python3 validation/analyze_magnetic_source_ab.py \
   --out-dir <output-directory>
 ```
 
+## Causal feature screening
+
+Two causal candidate features were screened before any runtime policy was written. The results are
+negative for this specific slow magnetic-source failure and are retained to prevent an attractive but
+unsupported fix from entering the estimator.
+
+| Feature | Calibration result | Development result | Decision |
+| --- | --- | --- | --- |
+| Existing field-norm EMA plus yaw pseudo-NIS | all 8,788 updates accepted while fusion is harmful | all 8,782 updates accepted while fusion is harmful | insufficient |
+| Gyro-propagated consecutive body-field direction residual | P95 `1.172 deg`; correlation with absolute on-minus-off yaw effect `-0.014` | P95 `1.188 deg`; correlation `-0.106` | useful for an abrupt direction fault family, but does not identify this slow failure |
+| Low-dynamic magnetic inclination proxy relative to raw specific force | 3,352 samples; proxy-to-physical-inclination correlation `0.779`; yaw-effect correlation `-0.339` | 1,653 samples; correlations `0.480` and `+0.332` | not stable enough to select as a source supervisor |
+
+The direction residual integrates the preceding physical gyro samples only and compares the result
+to the next physical magnetometer direction. The inclination proxy only evaluates samples satisfying
+the existing static-alignment bounds: acceleration norm within `0.20 g` of gravity and gyro norm at
+most `0.05 rad/s`. Its reference-attitude correlation is reported only to quantify the proxy offline;
+reference attitude is not an allowed runtime input.
+
+Consequently, this branch deliberately enables no new runtime magnetometer supervisor and changes no
+magnetic tuning value. `fuse_magnetometer` remains false in the public ESKF default configuration.
+The practical current policy is to treat unqualified magnetic yaw as unavailable, use an explicitly
+qualified trusted-heading source when one exists, and keep the source-quality work separate from the
+primary navigation estimator.
+
 ## Causal supervisor boundary
 
 Any future opt-in source supervisor may use only causal physical information:

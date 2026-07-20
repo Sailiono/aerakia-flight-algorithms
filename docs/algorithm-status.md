@@ -64,6 +64,11 @@ shows that detection without an uncontaminated ESKF shadow cannot undo state/cov
    `indoor_2`/`indoor_3` remain sealed validation/replication tracks. The new offline A/B source
    diagnostic confirms the adverse effect already exists in both design windows, so a supervisor
    must be justified by causal features rather than another holdout-specific threshold.
+   The first two causal feature screens are negative for the observed slow failure: gyro-propagated
+   consecutive magnetic direction has near-zero relationship to the harmful yaw effect, while the
+   low-dynamic magnetic-inclination proxy changes relationship across calibration and development.
+   No new runtime gate is enabled; the public ESKF's default remains magnetometer fusion disabled
+   until a source policy passes its frozen release procedure.
 2. Keep heading geometry, source validity, variance, baseline quality, and freshness explicit.
    Validate the exact FCOne receiver status semantics before flight use.
 3. Keep the implemented transport delay, reordering, sample loss, malformed-value, and aiding-age
