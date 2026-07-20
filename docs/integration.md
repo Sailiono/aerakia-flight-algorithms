@@ -28,6 +28,11 @@ void estimator_init(void)
 }
 ```
 
+`magnetic_reference_ned` must be finite and retain a non-zero North/East component. A malformed
+reference fails closed at adapter initialization: magnetic fusion is disabled and the core retains
+its safe default datum. This protects configuration integrity only; it does not make a physically
+disturbed magnetometer trustworthy.
+
 The ESKF is the primary navigation estimator. Configure the Mahony instance with the reviewed
 robust profile and run it as a separate attitude fallback/cross-monitor. Standard Mahony is a
 validation baseline, not the intended product fallback. The FCOne application owns mode selection,

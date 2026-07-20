@@ -486,7 +486,14 @@ void aerakia_eskf_init(
     reference[0] = filter->config.magnetic_reference_ned[0];
     reference[1] = filter->config.magnetic_reference_ned[1];
     reference[2] = filter->config.magnetic_reference_ned[2];
-    eskf_set_mag_reference(&filter->core, reference);
+    if (!eskf_set_mag_reference(&filter->core, reference)) {
+        /* A malformed yaw datum must not silently enable magnetic fusion. */
+        filter->config.fuse_magnetometer = false;
+        filter->config.gate_magnetometer = false;
+        filter->config.magnetic_reference_ned[0] = defaults.magnetic_reference_ned[0];
+        filter->config.magnetic_reference_ned[1] = defaults.magnetic_reference_ned[1];
+        filter->config.magnetic_reference_ned[2] = defaults.magnetic_reference_ned[2];
+    }
 }
 
 AerakiaStatus aerakia_eskf_process_imu(

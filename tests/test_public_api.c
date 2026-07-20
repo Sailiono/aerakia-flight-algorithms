@@ -386,6 +386,45 @@ static void test_eskf_process_noise_profile(void)
     }
 }
 
+static void test_eskf_magnetic_reference_validation(void)
+{
+    AerakiaEskf filter;
+    AerakiaEskfConfig config;
+    AerakiaEskfConfig defaults;
+    const float invalid_references[][3] = {
+        {0.0f, 0.0f, 0.0f},
+        {0.0f, 0.0f, 1.0f},
+        {NAN, 0.0f, 0.0f},
+        {1.0f, INFINITY, 0.0f},
+    };
+    size_t index;
+
+    aerakia_eskf_default_config(&defaults);
+    for (index = 0U; index < sizeof(invalid_references) / sizeof(invalid_references[0]); ++index) {
+        config = defaults;
+        config.fuse_magnetometer = true;
+        config.magnetic_reference_ned[0] = invalid_references[index][0];
+        config.magnetic_reference_ned[1] = invalid_references[index][1];
+        config.magnetic_reference_ned[2] = invalid_references[index][2];
+        aerakia_eskf_init(&filter, &config, NULL, NULL);
+        check_true(!filter.config.fuse_magnetometer,
+                   "invalid magnetic reference disables magnetic fusion at initialization");
+        check_true(!filter.config.gate_magnetometer,
+                   "invalid magnetic reference disables the magnetic gate path");
+        check_true(near_double(filter.core.mag_ref[0], 1.0, 1.0e-15)
+                       && near_double(filter.core.mag_ref[1], 0.0, 1.0e-15)
+                       && near_double(filter.core.mag_ref[2], 0.0, 1.0e-15),
+                   "invalid magnetic reference leaves the core's safe default datum intact");
+    }
+
+    eskf_init(&filter.core, NULL, NULL);
+    check_true(!eskf_set_mag_reference(&filter.core, (const double[3]){0.0, 0.0, 1.0}),
+               "core rejects a vertical magnetic reference with no yaw datum");
+    check_true(near_double(filter.core.mag_ref[0], 1.0, 1.0e-15)
+                   && near_double(filter.core.mag_ref[1], 0.0, 1.0e-15),
+               "rejected core magnetic reference leaves the prior datum unchanged");
+}
+
 static void test_eskf_timestamped_aiding_integrity(void)
 {
     AerakiaEskf filter;
@@ -1243,6 +1282,7 @@ int main(void)
     test_mahony_adaptive_weight_and_timestamp();
     test_mahony_input_integrity();
     test_eskf_process_noise_profile();
+    test_eskf_magnetic_reference_validation();
     test_eskf_input_integrity();
     test_eskf_timestamped_aiding_integrity();
     test_eskf_independent_navigation_observations();

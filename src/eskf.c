@@ -493,10 +493,25 @@ void eskf_set_config(ESKF_Handle *h, const ESKF_Config *cfg) {
     h->cfg = *cfg;
 }
 
-void eskf_set_mag_reference(ESKF_Handle *h, const eskf_float_t mag_ref[3]) {
-    if (!h || !mag_ref) return;
+bool eskf_set_mag_reference(ESKF_Handle *h, const eskf_float_t mag_ref[3]) {
+    const eskf_float_t horizontal_norm_squared = mag_ref != NULL
+        ? mag_ref[0] * mag_ref[0] + mag_ref[1] * mag_ref[1]
+        : 0.0;
+    const eskf_float_t norm_squared = mag_ref != NULL
+        ? horizontal_norm_squared + mag_ref[2] * mag_ref[2]
+        : 0.0;
+
+    /* A yaw observation has no defined datum for a vertical or malformed field. */
+    if (h == NULL || mag_ref == NULL
+        || !isfinite(mag_ref[0]) || !isfinite(mag_ref[1]) || !isfinite(mag_ref[2])
+        || !isfinite(horizontal_norm_squared) || !isfinite(norm_squared)
+        || horizontal_norm_squared <= ESKF_EPSILON * ESKF_EPSILON
+        || norm_squared <= ESKF_EPSILON * ESKF_EPSILON) {
+        return false;
+    }
     eskf_vec3_copy(mag_ref, h->mag_ref);
     eskf_vec3_normalize(h->mag_ref);
+    return true;
 }
 
 /* ============================================================================

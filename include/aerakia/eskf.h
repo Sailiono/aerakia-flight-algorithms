@@ -51,9 +51,12 @@ void eskf_set_config(ESKF_Handle *h, const ESKF_Config *cfg);
  * @brief Set magnetic field reference vector
  *
  * @param h         Pointer to filter handle
- * @param mag_ref   Magnetic field reference in NED frame (normalized)
+ * @param mag_ref   Magnetic field reference in NED frame. It must be finite and
+ *                  retain a non-zero horizontal North/East component.
+ * @return true when the reference was accepted; false leaves the prior
+ *         reference unchanged.
  */
-void eskf_set_mag_reference(ESKF_Handle *h, const eskf_float_t mag_ref[3]);
+bool eskf_set_mag_reference(ESKF_Handle *h, const eskf_float_t mag_ref[3]);
 
 /* ============================================================================
  * Prediction Step
