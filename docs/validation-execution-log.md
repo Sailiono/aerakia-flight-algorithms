@@ -1697,6 +1697,34 @@ The public default remains `fuse_magnetometer = false`. The retained conclusion 
 causal features can detect only subsets of physical faults; they cannot resolve a slow persistent
 magnetic datum error without independent heading, calibration, or environmental evidence.
 
+## 2026-07-21 — Full process-noise discretization audit
+
+The former Q evidence proved the declared reduced continuous model exactly, but did not quantify
+the real higher-order terms omitted when new gyro noise, bias random walk, specific force, and
+angular rate interact during a single IMU interval. The production Q was therefore correctly
+described as a high-rate approximation, but the remaining `full Qd` item had not been measured.
+
+The C model campaign now constructs the independent frozen-coefficient continuous first-order
+matrix `A` and white-noise spectral-density matrix `W` for the complete 15-error-state model, then
+integrates `dQ/dt = A Q + Q A^T + W` with RK4. It verifies the independently constructed `A`
+against the production transition derivative, requires the omitted coupling to be nonzero, checks
+the oracle for finiteness/symmetry/PSD, and checks 20 versus 40 RK4 steps. The production runtime
+path is unchanged.
+
+In a fixed-seed 1,000-case 100--1000 Hz synthetic stress campaign (1--10 ms IMU periods, each
+specific-force component bounded by 25 m/s^2, each angular-rate component bounded by 6 rad/s, and
+the documented high-noise profile `0.37/0.018/0.004/0.0007` in SI density units), the maximum
+relative Frobenius defect was `5.01673511e-04` (`0.0502%`). RK4 step refinement differed by at
+most `1.35308431e-16`; the transition-derivative comparison differed by at most
+`3.51718654e-06`. The predeclared one-percent high-rate bound passes.
+
+This closes the bounded host-model question: a production full coupled Qd is not mathematically
+required for the declared high-rate stress envelope. It does **not** authorize an unrestricted Qd
+claim. Scheduler gaps over 10 ms, motion outside the envelope, colored/correlated sensor noise,
+STM32H7 precision behavior, or target NIS/NEES inconsistency reopen the work. The exact model,
+omitted terms, executable limits, and re-open conditions are in
+[process-noise-discretization.md](process-noise-discretization.md).
+
 ### Verification at this checkpoint
 
 The magnetic-source diagnostic unit suite passes `5/5`, including paired-flag and off-arm acceptance,

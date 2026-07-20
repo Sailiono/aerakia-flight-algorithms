@@ -137,10 +137,11 @@ The statistical result assumes each calibrated startup residual-bias component l
 hardware characterization must confirm or replace that input contract. G0 does not close G1
 physical-truth volume, G2 same-input PX4 non-inferiority, or G3 FCOne target evidence.
 
-The current Q discretization is also explicitly a high-rate reduced-model approximation. Its
-100--1000 Hz accuracy/consistency invariance passes, but a full coupled continuous-model Qd oracle
-remains a mathematical hardening item before claiming unrestricted transition/high-dynamic
-statistical consistency.
+The current Q discretization remains explicitly a high-rate reduced-model approximation. Its
+100--1000 Hz accuracy/consistency invariance and full frozen-coefficient Qd oracle now pass within
+a declared stress envelope; this closes the bounded host claim, not unrestricted
+transition/high-dynamic/target statistical consistency. The remaining boundaries and re-open
+conditions are recorded in [process-noise discretization](process-noise-discretization.md).
 
 ### 2026-07-20 — G0 static-prior A/B decision
 

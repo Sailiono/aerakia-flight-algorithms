@@ -25,7 +25,7 @@ shows that detection without an uncontaminated ESKF shadow cannot undo state/cov
 
 | Area | Evidence | Status |
 | --- | --- | --- |
-| Error-state math | 15-dimensional error state, exact discrete SO(3) attitude transition, position `dt²/2` coupling, quaternion injection/reset Jacobian, and Joseph-form scalar/vector updates | 10,000-case F and complete raw-heading Jacobian campaigns pass below `1.7e-7` / `1.2e-8`; all 225 Q entries, PSD, and the declared reduced continuous model pass, while full coupled Qd remains open |
+| Error-state math | 15-dimensional error state, exact discrete SO(3) attitude transition, position `dt²/2` coupling, quaternion injection/reset Jacobian, and Joseph-form scalar/vector updates | 10,000-case F and complete raw-heading Jacobian campaigns pass below `1.7e-7` / `1.2e-8`; all 225 Q entries, PSD, the reduced continuous model, and a full frozen-coefficient Qd oracle pass. The reduced Q defect is bounded to `0.0502%` in its declared 100--1000 Hz stress envelope; unrestricted/target Qd coverage remains open. See [process-noise discretization](process-noise-discretization.md). |
 | Covariance health | Long mixed predict/update sequence checked for finite, symmetric, positive-semidefinite covariance | Passing |
 | Measurement integrity | Dimension-aware NIS gates, latched magnetic rejection, and source/generation/quality-snapshot/time-window-bound, multi-sample, bounded, application-authorized probationary navigation recovery | Passing deterministic regressions; stale, source-switched, and standalone observations cannot force re-anchor |
 | Heading semantics | Magnetometer, trusted heading, GNSS course, and PX4 GSF are separate paths; course is never silently treated as body yaw | Implemented |
@@ -158,7 +158,7 @@ This document is an engineering maturity statement, not an airworthiness claim.
   non-finite axes, and zero state/covariance invariant or health failures.
 - Numerical robustness is strong on the host: strict C build, long covariance checks, Joseph-form
   updates, finite-difference transition/raw-heading geometry, full Q structure and reduced-
-  continuous-model process-noise oracles,
+  continuous-model process-noise oracles, a bounded high-rate full frozen-coefficient Qd oracle,
   and the full million-attempt campaign under ASan+UBSan.
 - The new 1,000-seed confirmation has 100% healthy output, zero unexpected navigation recovery,
   zero hard/distribution/consistency/bootstrap failures, and a 95% zero-failure probability upper
@@ -204,7 +204,7 @@ This document is an engineering maturity statement, not an airworthiness claim.
 
 | Scope | Current judgment | Reason |
 | --- | ---: | --- |
-| Portable algorithm/math implementation | 88–91% | Exact SO(3) F, raw trusted-heading Jacobian, scoped magnetic yaw correction, dimension-aware NIS, source/time-bound recovery, independent validity, covariance handling, and cold start pass; full coupled Qd, delayed fusion, and physical heading evidence remain open |
+| Portable algorithm/math implementation | 89–92% | Exact SO(3) F, raw trusted-heading Jacobian, scoped magnetic yaw correction, dimension-aware NIS, source/time-bound recovery, independent validity, covariance handling, cold start, and bounded high-rate Qd evidence pass; delayed fusion, physical heading evidence, and target-profile Qd coverage remain open |
 | Host-side software robustness | 95–97% | Million-attempt malformed/timing campaign, two disclosed 1,000-seed confirmations, bootstrap bounds, sanitizers, 7.13 million audited PX4 IMU samples, and 1.63 million native-C physical replays are retained |
 | Heading robustness | 70–74% | Continuous validity, real-motion fault/recovery, and physical dual-RTK input pass; independent physical yaw truth and GNSS-velocity GSF fallback remain open |
 | Navigation robustness | 76–80% | Source/time-bound recovery, probation, independent position/velocity validity, recorded outage/reacquisition, fixed-wing replay, and aerial position reference pass; real delay/receiver-velocity modeling remain open |

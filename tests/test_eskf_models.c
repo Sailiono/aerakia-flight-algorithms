@@ -247,10 +247,10 @@ static void expected_process_noise(const ESKF_Config *config,
     }
 }
 
-static void reduced_covariance_derivative(double Q[15][15],
-                                          double A[15][15],
-                                          double W[15][15],
-                                          double derivative[15][15])
+static void continuous_covariance_derivative(double Q[15][15],
+                                             double A[15][15],
+                                             double W[15][15],
+                                             double derivative[15][15])
 {
     int row;
     int column;
@@ -267,23 +267,63 @@ static void reduced_covariance_derivative(double Q[15][15],
     }
 }
 
-static void numerical_reduced_process_noise(const ESKF_Config *config,
-                                            double dt,
-                                            double Q[15][15])
+static void numerical_constant_process_noise(double A[15][15],
+                                             double W[15][15],
+                                             double dt,
+                                             int integration_steps,
+                                             double Q[15][15])
 {
-    const int integration_steps = 20;
     const double step = dt / (double)integration_steps;
-    double A[15][15] = {{0.0}};
-    double W[15][15] = {{0.0}};
     double k1[15][15];
     double k2[15][15];
     double k3[15][15];
     double k4[15][15];
     double stage[15][15];
-    int axis;
     int iteration;
     int row;
     int column;
+
+    for (row = 0; row < 15; ++row) {
+        for (column = 0; column < 15; ++column) Q[row][column] = 0.0;
+    }
+    for (iteration = 0; iteration < integration_steps; ++iteration) {
+        continuous_covariance_derivative(Q, A, W, k1);
+        for (row = 0; row < 15; ++row) {
+            for (column = 0; column < 15; ++column) {
+                stage[row][column] = Q[row][column] + 0.5 * step * k1[row][column];
+            }
+        }
+        continuous_covariance_derivative(stage, A, W, k2);
+        for (row = 0; row < 15; ++row) {
+            for (column = 0; column < 15; ++column) {
+                stage[row][column] = Q[row][column] + 0.5 * step * k2[row][column];
+            }
+        }
+        continuous_covariance_derivative(stage, A, W, k3);
+        for (row = 0; row < 15; ++row) {
+            for (column = 0; column < 15; ++column) {
+                stage[row][column] = Q[row][column] + step * k3[row][column];
+            }
+        }
+        continuous_covariance_derivative(stage, A, W, k4);
+        for (row = 0; row < 15; ++row) {
+            for (column = 0; column < 15; ++column) {
+                Q[row][column] += step * (
+                    k1[row][column] + 2.0 * k2[row][column]
+                    + 2.0 * k3[row][column] + k4[row][column]
+                ) / 6.0;
+            }
+        }
+    }
+}
+
+static void numerical_reduced_process_noise(const ESKF_Config *config,
+                                            double dt,
+                                            double Q[15][15])
+{
+    double A[15][15] = {{0.0}};
+    double W[15][15] = {{0.0}};
+    int axis;
 
     for (axis = 0; axis < 3; ++axis) {
         A[ESKF_IDX_DP + axis][ESKF_IDX_DV + axis] = 1.0;
@@ -296,37 +336,85 @@ static void numerical_reduced_process_noise(const ESKF_Config *config,
         W[ESKF_IDX_DGB + axis][ESKF_IDX_DGB + axis]
             = config->sigma_gyr_bias * config->sigma_gyr_bias;
     }
+    numerical_constant_process_noise(A, W, dt, 20, Q);
+}
+
+static void quaternion_to_rotation_matrix(const double q[4], double R[3][3])
+{
+    const double w = q[0];
+    const double x = q[1];
+    const double y = q[2];
+    const double z = q[3];
+
+    R[0][0] = 1.0 - 2.0 * (y * y + z * z);
+    R[0][1] = 2.0 * (x * y - w * z);
+    R[0][2] = 2.0 * (x * z + w * y);
+    R[1][0] = 2.0 * (x * y + w * z);
+    R[1][1] = 1.0 - 2.0 * (x * x + z * z);
+    R[1][2] = 2.0 * (y * z - w * x);
+    R[2][0] = 2.0 * (x * z - w * y);
+    R[2][1] = 2.0 * (y * z + w * x);
+    R[2][2] = 1.0 - 2.0 * (x * x + y * y);
+}
+
+static void full_continuous_process_noise_model(const ESKF_Config *config,
+                                                const double q[4],
+                                                const double acceleration_body[3],
+                                                const double angular_rate_body[3],
+                                                double A[15][15],
+                                                double W[15][15])
+{
+    double R[3][3];
+    double acceleration_skew[3][3];
+    int row;
+    int column;
+    int inner;
+
     for (row = 0; row < 15; ++row) {
-        for (column = 0; column < 15; ++column) Q[row][column] = 0.0;
+        for (column = 0; column < 15; ++column) {
+            A[row][column] = 0.0;
+            W[row][column] = 0.0;
+        }
     }
-    for (iteration = 0; iteration < integration_steps; ++iteration) {
-        reduced_covariance_derivative(Q, A, W, k1);
-        for (row = 0; row < 15; ++row) {
-            for (column = 0; column < 15; ++column) {
-                stage[row][column] = Q[row][column] + 0.5 * step * k1[row][column];
+    quaternion_to_rotation_matrix(q, R);
+    acceleration_skew[0][0] = 0.0;
+    acceleration_skew[0][1] = -acceleration_body[2];
+    acceleration_skew[0][2] = acceleration_body[1];
+    acceleration_skew[1][0] = acceleration_body[2];
+    acceleration_skew[1][1] = 0.0;
+    acceleration_skew[1][2] = -acceleration_body[0];
+    acceleration_skew[2][0] = -acceleration_body[1];
+    acceleration_skew[2][1] = acceleration_body[0];
+    acceleration_skew[2][2] = 0.0;
+
+    for (row = 0; row < 3; ++row) {
+        for (column = 0; column < 3; ++column) {
+            const double angular_skew = row == 0 && column == 1 ? -angular_rate_body[2]
+                : row == 0 && column == 2 ? angular_rate_body[1]
+                : row == 1 && column == 0 ? angular_rate_body[2]
+                : row == 1 && column == 2 ? -angular_rate_body[0]
+                : row == 2 && column == 0 ? -angular_rate_body[1]
+                : row == 2 && column == 1 ? angular_rate_body[0] : 0.0;
+            double rotated_acceleration_skew = 0.0;
+            for (inner = 0; inner < 3; ++inner) {
+                rotated_acceleration_skew += R[row][inner] * acceleration_skew[inner][column];
             }
+            A[ESKF_IDX_DTHETA + row][ESKF_IDX_DTHETA + column] = -angular_skew;
+            A[ESKF_IDX_DV + row][ESKF_IDX_DTHETA + column] = -rotated_acceleration_skew;
+            A[ESKF_IDX_DV + row][ESKF_IDX_DAB + column] = -R[row][column];
+            W[ESKF_IDX_DV + row][ESKF_IDX_DV + column] =
+                config->sigma_acc * config->sigma_acc
+                * (R[row][0] * R[column][0] + R[row][1] * R[column][1]
+                   + R[row][2] * R[column][2]);
         }
-        reduced_covariance_derivative(stage, A, W, k2);
-        for (row = 0; row < 15; ++row) {
-            for (column = 0; column < 15; ++column) {
-                stage[row][column] = Q[row][column] + 0.5 * step * k2[row][column];
-            }
-        }
-        reduced_covariance_derivative(stage, A, W, k3);
-        for (row = 0; row < 15; ++row) {
-            for (column = 0; column < 15; ++column) {
-                stage[row][column] = Q[row][column] + step * k3[row][column];
-            }
-        }
-        reduced_covariance_derivative(stage, A, W, k4);
-        for (row = 0; row < 15; ++row) {
-            for (column = 0; column < 15; ++column) {
-                Q[row][column] += step * (
-                    k1[row][column] + 2.0 * k2[row][column]
-                    + 2.0 * k3[row][column] + k4[row][column]
-                ) / 6.0;
-            }
-        }
+        A[ESKF_IDX_DTHETA + row][ESKF_IDX_DGB + row] = -1.0;
+        A[ESKF_IDX_DP + row][ESKF_IDX_DV + row] = 1.0;
+        W[ESKF_IDX_DTHETA + row][ESKF_IDX_DTHETA + row]
+            = config->sigma_gyr * config->sigma_gyr;
+        W[ESKF_IDX_DAB + row][ESKF_IDX_DAB + row]
+            = config->sigma_acc_bias * config->sigma_acc_bias;
+        W[ESKF_IDX_DGB + row][ESKF_IDX_DGB + row]
+            = config->sigma_gyr_bias * config->sigma_gyr_bias;
     }
 }
 
@@ -419,6 +507,95 @@ static void test_process_noise_continuous_model_oracle(void)
     check_true(maximum_error < 1.0e-12,
                "process noise matches independent continuous reduced-model integration");
     printf("continuous reduced-model Q maximum absolute error: %.9g\n", maximum_error);
+}
+
+static void test_full_process_noise_high_rate_defect(void)
+{
+    const ESKF_Config config = {0.37, 0.018, 0.004, 0.0007};
+    const uint32_t cases = 1000U;
+    double maximum_relative_defect = 0.0;
+    double maximum_integration_error = 0.0;
+    double maximum_linearization_error = 0.0;
+    int all_full_matrices_finite_symmetric = 1;
+    int all_full_matrices_psd = 1;
+    int omitted_coupling_observed = 0;
+    uint32_t case_index;
+
+    for (case_index = 0U; case_index < cases; ++case_index) {
+        double q[4];
+        double acceleration_body[3];
+        double angular_rate_body[3];
+        double A[15][15];
+        double W[15][15];
+        double full[15][15];
+        double refined[15][15];
+        double production[15][15];
+        double transition[15][15];
+        double defect_squared = 0.0;
+        double full_squared = 0.0;
+        const double dt = uniform(0.001, 0.01);
+        int row;
+        int column;
+
+        euler_quaternion(
+            uniform(-ESKF_PI, ESKF_PI), uniform(-1.35, 1.35),
+            uniform(-ESKF_PI, ESKF_PI), q
+        );
+        for (row = 0; row < 3; ++row) {
+            acceleration_body[row] = uniform(-25.0, 25.0);
+            angular_rate_body[row] = uniform(-6.0, 6.0);
+        }
+        full_continuous_process_noise_model(
+            &config, q, acceleration_body, angular_rate_body, A, W
+        );
+        numerical_constant_process_noise(A, W, dt, 20, full);
+        numerical_constant_process_noise(A, W, dt, 40, refined);
+        eskf_model_process_noise(&config, dt, production);
+        eskf_model_transition(q, acceleration_body, angular_rate_body, 1.0e-7, transition);
+        all_full_matrices_psd = all_full_matrices_psd && matrix15_is_positive_semidefinite(full);
+        for (row = 0; row < 15; ++row) {
+            for (column = 0; column < 15; ++column) {
+                const double defect = full[row][column] - production[row][column];
+                const double integration_error = fabs(full[row][column] - refined[row][column]);
+                const double linearization_error = fabs(
+                    (transition[row][column] - (row == column ? 1.0 : 0.0)) / 1.0e-7
+                    - A[row][column]
+                );
+                defect_squared += defect * defect;
+                full_squared += full[row][column] * full[row][column];
+                all_full_matrices_finite_symmetric = all_full_matrices_finite_symmetric
+                    && isfinite(full[row][column])
+                    && fabs(full[row][column] - full[column][row]) < 1.0e-12;
+                if (integration_error > maximum_integration_error) {
+                    maximum_integration_error = integration_error;
+                }
+                if (linearization_error > maximum_linearization_error) {
+                    maximum_linearization_error = linearization_error;
+                }
+            }
+        }
+        if (sqrt(defect_squared) > 1.0e-14) omitted_coupling_observed = 1;
+        if (sqrt(defect_squared) / sqrt(full_squared) > maximum_relative_defect) {
+            maximum_relative_defect = sqrt(defect_squared) / sqrt(full_squared);
+        }
+    }
+    check_true(all_full_matrices_finite_symmetric,
+               "full continuous-model Q oracle remains finite and symmetric");
+    check_true(all_full_matrices_psd,
+               "full continuous-model Q oracle remains positive semidefinite");
+    check_true(maximum_integration_error < 1.0e-13,
+               "full continuous-model Q oracle converges under step refinement");
+    check_true(maximum_linearization_error < 1.0e-5,
+               "full continuous-model Q oracle matches the production transition derivative");
+    check_true(omitted_coupling_observed,
+               "full continuous-model oracle exposes nonzero omitted within-step coupling");
+    check_true(maximum_relative_defect < 0.01,
+               "reduced Q defect remains below one percent in the declared high-rate stress envelope");
+    printf("full-model Q high-rate maximum relative defect: %.9g\n", maximum_relative_defect);
+    printf("full-model Q oracle step-refinement maximum absolute error: %.9g\n",
+           maximum_integration_error);
+    printf("full-model Q transition-derivative maximum absolute error: %.9g\n",
+           maximum_linearization_error);
 }
 
 static void test_randomized_heading_models(void)
@@ -620,6 +797,7 @@ int main(void)
     test_randomized_prediction_transition();
     test_randomized_process_noise_mapping();
     test_process_noise_continuous_model_oracle();
+    test_full_process_noise_high_rate_defect();
     test_randomized_heading_models();
     test_heading_observability_boundaries();
     test_dimension_aware_nis_limits();

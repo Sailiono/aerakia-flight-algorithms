@@ -53,12 +53,12 @@ Metrics: attitude/velocity/position RMSE, bias error, innovation acceptance, NIS
 
 The internal numerical gate validates all 15 columns of the discrete transition against finite
 differences. All 225 process-noise entries are checked by a complete structure oracle, full-Q
-finiteness/symmetry/positive-semidefiniteness, and an independent numerical integration of the
-declared reduced continuous model. That reduced model includes direct IMU/bias white noise and
-velocity-to-position integration; it does not yet include every within-step higher-order coupling
-from attitude, specific force, angular rate, and bias random walk. Multi-rate NIS/NEES evidence
-supports the approximation at 100--1000 Hz, but a full coupled Van Loan or equivalent oracle remains
-open.
+finiteness/symmetry/positive-semidefiniteness, and independent numerical integration of both the
+declared reduced continuous model and a full frozen-coefficient first-order model. The latter
+explicitly shows the nonzero omitted within-step couplings and bounds the reduced mapping's
+Frobenius defect to `0.0502%` within a declared 100--1000 Hz synthetic stress envelope. Multi-rate
+NIS/NEES evidence supports that bounded host claim; lower-rate, uncharacterized target, and
+unrestricted-motion Qd claims remain open. See [process-noise discretization](process-noise-discretization.md).
 
 Trusted physical heading uses the complete right-error Jacobian of raw body-X `atan2` heading and
 is checked per axis over 10,000 attitudes. Magnetometer fusion is deliberately a separate,

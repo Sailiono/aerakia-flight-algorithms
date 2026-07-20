@@ -95,7 +95,8 @@ trials for consistency intervals. Exact numerical derivative tolerances are froz
 finite-difference step size and conditioning audit are documented.
 
 Current G0 evidence includes a 225-element structure oracle/PSD test plus independent numerical
-integration of the declared reduced continuous Q model, source/generation/quality-
+integration of the declared reduced continuous Q model and a bounded full frozen-coefficient Qd
+oracle, source/generation/quality-
 snapshot and time-window-bound recovery, independent horizontal position/velocity validity, and a
 new 1,000-seed calibrated-input confirmation with 10,000-resample 99% bootstrap bounds. The prior
 unbounded-bias confirmation is retained with its one hard failure. G0 therefore applies only to the
