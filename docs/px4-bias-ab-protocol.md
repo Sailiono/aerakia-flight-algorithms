@@ -98,6 +98,67 @@ M0 freezes the comparison before either exporter is accepted:
   compares only outputs aligned at the same delayed fusion horizon;
 - `tests/test_px4_bias_ab_m0.py` locks the fail-closed behavior and the first comparison metrics.
 
+The PX4 half is now an executable host-side producer rather than a conceptual placeholder:
+
+- `validation/build_px4_bias_ab_host.py` checks the frozen PX4 commit and file digests, then configures
+  an out-of-tree standalone official `ecl_EKF` build. It never fetches, checks out, patches, or writes
+  inside the supplied PX4 source tree.
+- `validation/px4_bias_ab_host/CMakeLists.txt` is a small, standalone CMake project that selects
+  the official frozen `ecl_EKF` source files for the declared GNSS/barometer/heading-magnetometer
+  profile and exports the same feature definitions to the runner because they determine the official
+  `Ekf` C++ layout. It avoids configuring the full PX4 flight stack, which would otherwise fetch unrelated
+  simulation and transport submodules. The executable and all objects remain in the build directory,
+  never in the PX4 checkout.
+- `validation/px4_bias_ab_host_runner.cpp` consumes the canonical event CSV and writes the existing
+  PX4 output schema. It reads no `truth_*` field. It exports `Ekf::state()` and
+  `Ekf::time_delayed_us()`, which are the official public delayed-fusion-horizon accessors, not PX4's
+  latest output predictor. During delayed-buffer fill, repeated horizon timestamps are not exported;
+  a horizon regression is a hard error.
+
+Build a verified host runner with:
+
+```bash
+python3 validation/build_px4_bias_ab_host.py \
+  --px4-source /absolute/path/to/PX4-Autopilot \
+  --build-dir /tmp/aerakia-px4-bias-ab-host
+```
+
+The build manifest records the pinned source digest, the standalone build-project digest, the runner source
+digest, the exact `empy` version used by PX4's unmodified uORB header generator, and the executable digest.
+A source mismatch, dirty source tree, unavailable CMake/Ninja/`empy`, or build failure produces no parity
+result. The script does not fall back to the FCOne v1 PX4 snapshot.
+
+The PX4 runner maps the common M0 contract as follows:
+
+| Canonical event | Official PX4 host input |
+| --- | --- |
+| FRD delta angle/velocity and per-axis clipping | `imuSample` |
+| `at_rest`, `in_air`, transition flag | `systemFlagUpdate` |
+| local-NED GNSS position and velocity | one `gnssSample`, reprojected from an explicitly supplied WGS-84 origin |
+| barometric height-up | `baroSample` relative to that same origin altitude |
+| magnetic field in microtesla | heading-only `magSample` in Gauss |
+
+PX4's `gnssSample` carries position and velocity together. Therefore M0 version 1 rejects a row that
+marks only one of position or velocity as updated; accepting it would silently give PX4 a different
+measurement event from Aerakia. The current runner accepts a declared `--origin-lat-deg`,
+`--origin-lon-deg`, and `--origin-alt-m`; synthetic fixtures may use the documented default, while a
+physical track must record its actual local-NED origin in the run provenance. It intentionally does
+not synthesize dual-GNSS yaw, external vision, wind, or truth-derived observations.
+
+This does **not** complete M0 by itself. Aerakia must still gain a matching canonical producer that
+emits the same delayed-horizon schedule from the immutable event sequence. The scorer will remain
+fail-closed until both outputs, their metadata sidecars, and exact horizon timestamps are available.
+No PX4/Aerakia numeric ratio is claimed before that point.
+
+### Current execution blocker
+
+The M0 build intentionally validates only the official source files compiled by its standalone
+`ecl_EKF` project. Unrelated PX4 board, simulation, DDS, and MAVLink submodules are not an algorithm
+dependency and are not fetched. The frozen PX4 commit, clean worktree, five audited EKF-file hashes,
+and every compiled EKF support path remain mandatory. A source mismatch, missing required core file,
+compile failure, or absent canonical Aerakia export still produces no parity result; the harness never
+substitutes the FCOne v1 snapshot, patches PX4, or emits invented PX4 CSV output.
+
 The runner has no clone, fetch, download, or fallback-estimator path. A normal invocation is:
 
 ```bash
