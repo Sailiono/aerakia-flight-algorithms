@@ -62,7 +62,7 @@ class BiasObservabilityComparisonTests(unittest.TestCase):
         joint_nees: float = 5.0,
         censored: bool = False,
         failed: bool = False,
-        input_sha: str = "i" * 64,
+        input_sha: str = "1" * 64,
     ) -> dict[str, object]:
         directory = f"trials/{split}/traj-a/{vector}/seed-{seed:05d}"
         return {
@@ -185,9 +185,34 @@ class BiasObservabilityComparisonTests(unittest.TestCase):
         self.assertTrue(any("dirty" in f for f in result["failures"]))
         self.assertTrue(any("generator_sha256 mismatch" in f for f in result["failures"]))
         result = self._compare(candidate_kwargs={"extra": {"trials": [
-            self._trial("train", "zero", 1, primary=0.1, input_sha="x" * 64),
+            self._trial("train", "zero", 1, primary=0.1, input_sha="2" * 64),
         ]}})
         self.assertTrue(any("input SHA-256 mismatch" in f for f in result["failures"]))
+
+    def test_declared_input_sha_must_match_present_input_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            baseline, baseline_path = self._campaign(root / "baseline")
+            candidate, candidate_path = self._campaign(root / "candidate", candidate=True)
+            trial = baseline["trials"][0]
+            input_path = root / "baseline" / trial["trial_dir"] / "input.csv"
+            input_path.write_text("different bytes\n", encoding="utf-8")
+            result = comparison.compare_campaigns(
+                baseline, candidate, copy.deepcopy(self.policy),
+                baseline_path=baseline_path, candidate_path=candidate_path,
+            )
+            self.assertTrue(any("does not match input.csv bytes" in f for f in result["failures"]))
+
+    def test_invalid_declared_input_sha_is_rejected(self) -> None:
+        result = self._compare(candidate_kwargs={
+            "extra": {"trials": [
+                self._trial("train", "zero", 1, primary=0.1, input_sha="not-a-sha"),
+                self._trial("train", "x_pos", 2, primary=0.35),
+                self._trial("tune", "zero", 3, primary=0.15),
+                self._trial("tune", "x_pos", 4, primary=0.35),
+            ]}
+        })
+        self.assertTrue(any("not a 64-hex digest" in f for f in result["failures"]))
 
     def test_zero_bias_regression_and_censoring_transition(self) -> None:
         result = self._compare(candidate_kwargs={

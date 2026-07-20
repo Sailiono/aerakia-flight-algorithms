@@ -389,6 +389,7 @@ def run_trial(
         "runtime_s": time.monotonic() - started,
         "initialization": "cold_start_only",
         "truth_assisted_initialization": False,
+        "input_sha256": file_sha256(input_csv),
         "commands": {
             "generator": generator_command,
             "filter": filter_command,

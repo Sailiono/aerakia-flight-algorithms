@@ -125,11 +125,30 @@ def declared_input_sha(trial: dict[str, object]) -> str | None:
 
 
 def input_sha(summary_path: Path, trial: dict[str, object]) -> str | None:
+    evidence, _ = input_sha_evidence(summary_path, trial)
+    return evidence
+
+
+def input_sha_evidence(
+    summary_path: Path, trial: dict[str, object]
+) -> tuple[str | None, list[str]]:
+    """Return the trusted input digest and any provenance failures.
+
+    A declared digest is not accepted blindly: when a compacted trial still
+    contains ``input.csv``, its bytes must hash to the declared value.  This
+    prevents a stale or hand-edited summary from making unequal inputs appear
+    paired.  Digest strings are required to be canonical SHA-256 values.
+    """
+    failures: list[str] = []
     declared = declared_input_sha(trial)
-    if declared is not None:
-        return declared
+    if declared is not None and not re.fullmatch(r"[0-9a-fA-F]{64}", declared):
+        failures.append("declared input SHA-256 is not a 64-hex digest")
+        declared = None
     input_path = trial_directory(summary_path, trial) / "input.csv"
-    return file_sha256(input_path) if input_path.is_file() else None
+    local = file_sha256(input_path) if input_path.is_file() else None
+    if declared is not None and local is not None and declared.lower() != local:
+        failures.append("declared input SHA-256 does not match input.csv bytes")
+    return (declared or local), failures
 
 
 def analyzer_sha(campaign: dict[str, object], summary_path: Path) -> str | None:
@@ -205,12 +224,14 @@ def extract_metrics(
         ),
     }
     extracted = {name: finite_float(raw.get(name)) for name in metric_specs}
+    input_digest, input_failures = input_sha_evidence(summary_path, trial)
     metadata = {
         "passed": not bool(trial.get("gate_failures")),
         "gate_failures": list(trial.get("gate_failures", [])),
         "right_censored": bool(horizontal.get("right_censored")),
         "acceleration_bias_m_s2": trial.get("acceleration_bias_m_s2"),
-        "input_sha256": input_sha(summary_path, trial),
+        "input_sha256": input_digest,
+        "input_integrity_failures": input_failures,
     }
     return extracted, metadata
 
@@ -600,6 +621,9 @@ def compare_campaigns(
         )
         baseline_input = baseline_meta["input_sha256"]
         candidate_input = candidate_meta["input_sha256"]
+        for label, metadata in (("baseline", baseline_meta), ("candidate", candidate_meta)):
+            for failure in metadata.get("input_integrity_failures", []):
+                failures.append(f"{label} {failure}: {key_label(key)}")
         if baseline_input is None or candidate_input is None:
             failures.append(f"input SHA-256 missing: {key_label(key)}")
         elif baseline_input != candidate_input:
