@@ -1599,6 +1599,12 @@ datum bias remains unobservable. The earlier `2 sigma` threshold candidate remai
 it switched all 20 nominal training trials. Source-generation reset and authorized recovery remain
 unit-test-only; the four-arm campaign does not exercise them end to end.
 
+After the three implementation/evidence commits, the same 12 trials were regenerated from clean
+commit `dcc002c1317a9eb3fac4a1f1f60126dfc14797b0`. The report records an empty Git status and all
+12 machine-derived shadow input/command audits pass. Summary SHA-256 is
+`94b7f9e20a37787e074e8057f1c3470a4302a2f80df24fe7dbc1ad5c0777cbce`; report SHA-256 is
+`1b141fab857dbd67e263a217c31f65c2d8216c273ee0816eaca021e8de9d3a8b`.
+
 ### Verification at this checkpoint
 
 G0 focused tests pass `16/16`; barometer focused Python tests pass `10/10`; the new INSANE

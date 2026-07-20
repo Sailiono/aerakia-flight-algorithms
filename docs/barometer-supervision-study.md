@@ -73,8 +73,11 @@ The offline hot-shadow mux demonstrates the required architecture direction:
 | Frozen output | `1.8075 m` | `0.4600 m` | `0.4695 m` |
 | Weather step | `0.4522 m` | `0.4348 m` | `0.4695 m` |
 
-This final current-tree smoke used two seeds and is not promotion evidence. Constant datum bias remained undetected and
-retained the approximately `1.02 m` failure because a single relative-height source cannot
+This final smoke used two seeds and is not promotion evidence. It was regenerated from clean commit
+`dcc002c1317a9eb3fac4a1f1f60126dfc14797b0`; the summary SHA-256 is
+`94b7f9e20a37787e074e8057f1c3470a4302a2f80df24fe7dbc1ad5c0777cbce`, and all 12 shadow
+input/command audits passed. Constant datum bias remained undetected and retained the approximately
+`1.02 m` failure because a single relative-height source cannot
 distinguish an unknown datum offset from real height without an independent vertical reference.
 
 Freeze recovery may use sequential normal samples after the original source value changes again.
