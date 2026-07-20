@@ -145,6 +145,10 @@ gate can be reproduced and recorded with:
 python validation/run_host_regression.py
 ```
 
+The reviewed decision for what is closed before FCOne v2 hardware arrives, what may enter shadow
+integration, and what still prohibits sole control authority is recorded in
+[FCOne v2 pre-hardware algorithm closure](docs/fcone-v2-algorithm-closure.md).
+
 Private PX4 ULogs can be normalized without exporting absolute coordinates or hardware identifiers:
 
 ```bash

@@ -10,6 +10,8 @@ The scoped definition of PX4-class capability, evidence grades, anti-overfitting
 acceptance gates are defined in the [PX4-class validation plan](px4-class-validation-plan.md).
 The eVTOL flight-regime profiles and public/private source-of-truth loop are defined in
 [FCOne/eVTOL target profiles and repository flow](vehicle-target-and-repository-flow.md).
+The consolidated pre-hardware entry decision, state-dimension policy, and shadow-integration
+boundary are defined in [FCOne v2 algorithm closure](fcone-v2-algorithm-closure.md).
 
 ## Current baseline
 
