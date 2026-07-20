@@ -145,18 +145,38 @@ measurement event from Aerakia. The current runner accepts a declared `--origin-
 physical track must record its actual local-NED origin in the run provenance. It intentionally does
 not synthesize dual-GNSS yaw, external vision, wind, or truth-derived observations.
 
-This does **not** complete M0 by itself. Aerakia must still gain a matching canonical producer that
-emits the same delayed-horizon schedule from the immutable event sequence. The scorer will remain
-fail-closed until both outputs, their metadata sidecars, and exact horizon timestamps are available.
-No PX4/Aerakia numeric ratio is claimed before that point.
+The complementary Aerakia producer is `validation/aerakia_px4_bias_ab_host_runner.c`.
+`validation/run_px4_bias_ab_m0_synthetic.py` creates the immutable event CSV, builds both native
+producers from clean sources, runs PX4 first, and replays Aerakia against PX4's strictly advancing
+delayed-fusion-horizon schedule. The scorer fails closed unless the canonical input hash, sidecars,
+profile fingerprint, source commits, row counts, and every exported horizon agree.
 
-### Current execution blocker
+### Completed M0 transport baseline
+
+On 2026-07-21, the fixed 65 s / 100 Hz no-delay hover-first track completed from clean sources.
+It supplied 6,501 IMU rows and produced 6,489 aligned, strictly increasing delayed-horizon samples
+from pinned PX4 `de8158101c96ad6b04170dc91f087148104c58eb` and the Aerakia commit under test.
+The PX4 header generator used official dependency `empy 3.3.4`; all audited PX4 file hashes passed.
+
+| Metric | Aerakia | PX4 |
+| --- | ---: | ---: |
+| Accelerometer-bias RMSE | `0.113687 m/s²` | `0.122453 m/s²` |
+| Terminal accelerometer-bias error | `0.092103 m/s²` | `0.122432 m/s²` |
+| Numerical-health ratio | `100%` | `100%` |
+| Absolute 35 s convergence budget | Not met | Not met |
+
+This is deliberately a **transport, frame, delayed-horizon, and provenance sanity result**. The
+single fixed-bias synthetic case is not a PX4-equivalence, superiority, non-inferiority, or
+flight-readiness claim. It proves that future bias experiments can expose a real same-input
+comparison instead of comparing unrelated logs. The 137-case bias box, matched-discrete-Q track,
+recorded delay scans, independent-truth tracks, target CPU/memory, and sealed evaluation remain
+required for a G2 conclusion.
 
 The M0 build intentionally validates only the official source files compiled by its standalone
 `ecl_EKF` project. Unrelated PX4 board, simulation, DDS, and MAVLink submodules are not an algorithm
 dependency and are not fetched. The frozen PX4 commit, clean worktree, five audited EKF-file hashes,
 and every compiled EKF support path remain mandatory. A source mismatch, missing required core file,
-compile failure, or absent canonical Aerakia export still produces no parity result; the harness never
+compile failure, or absent canonical Aerakia export produces no result; the harness never
 substitutes the FCOne v1 snapshot, patches PX4, or emits invented PX4 CSV output.
 
 The runner has no clone, fetch, download, or fallback-estimator path. A normal invocation is:
@@ -184,6 +204,6 @@ use only samples with `accel_bias_valid=1` and strictly positive reported varian
 settling interval fails if any sample marks the bias invalid, even when the numerical bias value is
 inside the error threshold.
 
-At this milestone the canonical Aerakia and PX4 exporters are still an explicit blocked dependency.
-Until both produce the declared CSV and provenance sidecar from the same input, no numerical PX4
-result is reported.
+The canonical Aerakia and PX4 exporters now produce the declared CSV and provenance sidecars from
+the same M0 input. This removes the host transport blocker only; every broader comparison remains
+subject to the frozen protocol and its independent evidence requirements.

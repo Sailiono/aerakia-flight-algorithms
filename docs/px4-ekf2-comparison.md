@@ -95,7 +95,8 @@ sensor stream and scoring reference. The planned gate is:
    recovery time, CPU time, and memory;
 6. retain failures and use an evaluation track that is not used to tune either filter.
 
-Until that gate runs, the defensible overall judgment is:
+The narrow M0 same-input transport baseline now runs, but the broader gate above has not. The
+defensible overall judgment is therefore still:
 
 - PX4 EKF2 is much more complete as a flight-navigation system and is the stronger operational
   benchmark.
@@ -111,4 +112,3 @@ Until that gate runs, the defensible overall judgment is:
 - [PX4 position-loss failsafe](https://docs.px4.io/main/en/config/safety#position-loss-failsafe)
 - [Pinned PX4 generated EKF state definition](https://github.com/PX4/PX4-Autopilot/blob/de8158101c96ad6b04170dc91f087148104c58eb/src/modules/ekf2/EKF/python/ekf_derivation/generated/state.h)
 - [Pinned PX4 EKF2 parameter definition](https://github.com/PX4/PX4-Autopilot/blob/de8158101c96ad6b04170dc91f087148104c58eb/src/modules/ekf2/module.yaml)
-

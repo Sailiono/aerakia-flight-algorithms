@@ -26,6 +26,7 @@ without confusing PC confidence with in-air safety.
 | Input transport robustness | Required-IMU non-finite checks, timestamp disorder/gaps, optional-source isolation, delayed/stale aiding, and burst loss through 100 samples | Closed for public input contract |
 | Synthetic fault and consistency | 1,000 calibrated-bias seeds pass stated health, NIS/NEES, recovery, and bootstrap gates; deterministic residual-bias box retains a documented direction-sensitive 35 s convergence defect | Closed as a known boundary, not a universal bias claim |
 | Independent truth replays | EuRoC, Blackbird, UrbanNav, electrical-infrastructure UAV RTK track, physical-magnetometer INSANE tracks, and private PX4 ULog replays are separately scoped in `algorithm-status.md` | Closed as evidence, not pooled into one accuracy claim |
+| Same-input PX4 baseline | Pinned official `ecl_EKF` and Aerakia use one immutable 65 s / 100 Hz synthetic stream and identical delayed fusion horizons | Closed as host transport/provenance evidence; both filters remain healthy but neither meets the absolute bias-settling gate, so G2 non-inferiority is still open |
 | Magnetic fail-safe behavior | Invalid references are rejected; bad magnetic data can be isolated; magnetometer fusion remains disabled by default after physical slow-datum failures | Closed fail-safe policy; source-quality promotion remains open |
 | State choice | Current `p,v,q,b_a,b_g` model is documented, tested, and matched to VTOL-hover shadow work | Closed for first v2 shadow profile |
 

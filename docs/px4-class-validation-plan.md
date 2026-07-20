@@ -138,6 +138,12 @@ The first runner links the official host `ecl_EKF` library directly rather than 
 module. It records the PX4 SHA, configuration, runner patch hash, compiler, input hash, event counts,
 and output-time semantics. No PX4 estimator source file may be modified.
 
+The M0 transport baseline has completed one 65 s / 100 Hz fixed-bias synthetic event stream. It
+generated 6,489 exact delayed-horizon pairs with 100% numerical health in both estimators, while
+both missed the protocol's 35 s absolute bias-convergence gate. This establishes the executable
+same-input/export path only; it does not satisfy the full G2 conditions below and cannot be used as
+a PX4 superiority, parity, or non-inferiority result.
+
 Two comparisons remain separate:
 
 - **Common-sensor math/product core:** both receive only IMU, GNSS position/velocity, heading-only

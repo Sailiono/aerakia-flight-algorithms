@@ -1733,3 +1733,28 @@ gyro-propagation sign, and gravity-proxy controls. The complete Python discovery
 expected `blocked` status for the optional PX4 comparison because `--px4-source` was not supplied;
 it is not a test failure and no network download was attempted. `git diff --check` and strict JSON
 validation of the protocol pass. No estimator parameter, runtime C path, or threshold was changed.
+
+## 2026-07-21 — official PX4 same-input M0 transport baseline
+
+The first executable same-input comparison now builds a read-only out-of-tree host library from
+official PX4 commit `de8158101c96ad6b04170dc91f087148104c58eb`. The standalone project compiles
+only the required official `ecl_EKF` and support translation units, uses PX4's unmodified uORB
+header generator (`empy 3.3.4`), and records the pinned source hashes. It neither modifies the PX4
+checkout nor uses the FCOne v1 snapshot.
+
+The deterministic no-delay, 65 s / 100 Hz hover-first input contains 6,501 IMU events. PX4 exports
+6,489 strictly advancing delayed-fusion horizons; Aerakia emits only at those exact horizons. Both
+canonical sidecars, input/output SHA-256 values, source commits, profiles, and protocol fingerprints
+are validated by the fail-closed scorer.
+
+| Metric | Aerakia | PX4 |
+| --- | ---: | ---: |
+| Bias RMSE | `0.113687 m/s²` | `0.122453 m/s²` |
+| Terminal bias error | `0.092103 m/s²` | `0.122432 m/s²` |
+| Numerical-health ratio | `100%` | `100%` |
+| 35 s absolute convergence gate | Fail | Fail |
+
+The result is intentionally not interpreted as a performance win, parity result, or flight-readiness
+claim: this is one deterministic fixed-bias case with no measurement delay. Its value is that it
+closes the event/frame/time/provenance path needed for future fair tests. The broader matched-Q,
+multi-bias, delay, fault, independent-truth, CPU/memory, and blind G2 tracks remain open.

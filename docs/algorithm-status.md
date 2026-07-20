@@ -16,6 +16,9 @@ opened `transition_1` sequence is retained as a failed cross-sequence yaw-datum 
 IDF-DS adds a 9.92-hour, 13-ULog PX4 schema/coverage audit and 1,608,985 selected fixed-wing native
 replay samples. The electrical-infrastructure UAV set adds physical DJI position aiding and a
 separately recorded RTK position/velocity reference over 16,560 replay samples.
+The official-PX4 same-input M0 harness now adds a clean, pinned 65 s synthetic event stream with
+6,489 exact delayed-horizon pairings; it is retained as a narrow transport/provenance baseline, not
+as a PX4 parity or flight-readiness result.
 The new magnetometer/OptiTrack tracks establish local-magnetic-datum tracking evidence, but not
 surveyed true-North accuracy, causal cold start, or flight safety. The causal tilt/bias information analyzer and experimental barometer source
 supervisor are implemented, but neither is a promoted product gate. Barometer fault injection also
@@ -40,6 +43,7 @@ shows that detection without an uncontaminated ESKF shadow cannot undo state/cov
 | UrbanNav public replay | 314,185 recorded IMU samples, 655 checksum/quality-screened F9P positions, SPAN truth, and one 131 s recorded outage | Position-only API and recovery pass with 100% numerical health; horizontal navigation is valid for 83.90% of samples and explicitly expires after five unaided seconds; 6.52 m nominal aided RMSE and first-update reacquisition are retained alongside severe unaided drift and inconsistent NIS/NEES |
 | IDF-DS fixed-wing volume | 13 raw PX4 ULogs, 7,128,090 audited IMU samples over 9.92 h; rotation, speed, and clipping tracks selected before scoring | 1,608,985 native replay samples remain healthy; 3.24–5.82° agreement with PX4 attitude and 2.07–3.62 m with PX4 position, but high NIS and 26–80 recoveries retain real delay/noise-model gaps |
 | Aerial GPS/RTK reference | 16,560 physical DJI IMU samples, 2,070 physical GPS position updates, and separately recorded 5 Hz RTK position/velocity | 100% health; 0.179 m position and 0.263 m/s velocity RMSE against RTK reference; no receiver-velocity aiding or independent attitude/absolute truth claim |
+| Same-input PX4 M0 | Official pinned `ecl_EKF` and Aerakia run on one immutable 65 s / 100 Hz synthetic event CSV, with PX4 delayed-fusion horizons driving Aerakia export | 6,489 exact horizons, 100% numerical health each; bias RMSE `0.113687/0.122453 m/s²` (Aerakia/PX4), and neither meets the 35 s absolute convergence gate. This validates transport/fairness plumbing only; it is not parity, non-inferiority, or flight-readiness evidence. |
 | Host regression | Strict C99 warnings-as-errors build, public API tests, deterministic synthetic fault suite | Passing reviewed thresholds |
 | Input/transport integrity | Exhaustive required-IMU non-finite checks; timestamp order/gap behavior; optional-mag isolation; timestamped GNSS/heading/barometer freshness and recovery | Passing 100 seeds, 1,020,000 IMU attempts, 2,100 aiding attempts, and burst lengths through 100 with zero invariant/health failures |
 | Barometer degraded navigation | Four-arm IMU-only/raw/supervised/shadow-failover synthetic study with physical timestamp, innovation/NIS, two-stage source commit, quantization-aware freeze handling, step/delay and reset-delta diagnostics | Nominal height improves 30 s vertical RMSE from 0.4695 m to 0.0997 m; shadow failover gives 0.4600 m under freeze and 0.4348 m under a weather step, but datum bias is unobservable and the mux remains a partial-state offline upper bound |
