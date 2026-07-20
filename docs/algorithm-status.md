@@ -9,13 +9,17 @@ long-run covariance health, synthetic cold start, private PX4-referenced replay 
 EuRoC external-reference sequences. Blackbird adds 270.1 s of independent motion-capture truth with
 aggressive angular motion. UrbanNav adds 785.5 s of recorded 400 Hz IMU, physical F9P position
 aiding, independent SPAN-CPT postprocessed truth, and a real 131 s GNSS outage. Vicon-derived
-heading tests yaw alignment and faults under recorded
-motion, and INSANE exercises the same production path with 1,378 physical dual-RTK observations.
+heading tests yaw alignment and faults under recorded motion. INSANE adds a disjoint-window
+`indoor_1` physical-magnetometer holdout against external raw OptiTrack attitude, with local yaw
+datum aligned from the separate calibration-window magnetometer. A separately
+opened `transition_1` sequence is retained as a failed cross-sequence yaw-datum transfer audit.
 IDF-DS adds a 9.92-hour, 13-ULog PX4 schema/coverage audit and 1,608,985 selected fixed-wing native
 replay samples. The electrical-infrastructure UAV set adds physical DJI position aiding and a
 separately recorded RTK position/velocity reference over 16,560 replay samples.
-Neither derived/shared-source heading track establishes independent absolute heading accuracy or
-flight safety.
+The new magnetometer/OptiTrack tracks establish local-magnetic-datum tracking evidence, but not
+surveyed true-North accuracy, causal cold start, or flight safety. The causal tilt/bias information analyzer and experimental barometer source
+supervisor are implemented, but neither is a promoted product gate. Barometer fault injection also
+shows that detection without an uncontaminated ESKF shadow cannot undo state/covariance pollution.
 
 ## Evidence completed
 
@@ -26,7 +30,9 @@ flight safety.
 | Measurement integrity | Dimension-aware NIS gates, latched magnetic rejection, and source/generation/quality-snapshot/time-window-bound, multi-sample, bounded, application-authorized probationary navigation recovery | Passing deterministic regressions; stale, source-switched, and standalone observations cannot force re-anchor |
 | Heading semantics | Magnetometer, trusted heading, GNSS course, and PX4 GSF are separate paths; course is never silently treated as body yaw | Implemented |
 | Trusted-heading fault behavior | Cold-start completion, normal fusion, four-second dropout, two 90° outliers, rejection, geometry validity, and recovery with magnetometer disabled | Passing deterministic synthetic and Vicon-derived fault gates; INSANE physical dual-RTK path passes 1,378 updates, but shares its yaw reference |
+| Physical magnetometer yaw | Raw PX4 magnetometer input scored against external raw OptiTrack orientation with calibration/development/holdout isolation | `indoor_1` local-datum adverse result: mag-off/on ESKF yaw RMSE `0.270°/12.528°`, robust Mahony `0.316°/7.599°`; `transition_1` is rejected as accuracy evidence because its initial field differs from the frozen datum by `49.298°` |
 | Online IMU bias behavior | Static gyro initialization plus motion/GNSS-aided accelerometer-bias convergence, with truth error and settling time reported separately | Passing deterministic multi-axis synthetic gate; single-pose accelerometer observability limit and hardware thermal behavior remain explicit |
+| Tilt/bias excitation information | Causal local information matrix for five-dimensional tilt and accelerometer-bias subspace using estimated state, IMU, and accepted aiding only | Analyzer controls classify static/yaw/single-direction/all-rejected cases as insufficient and multi-direction as full rank; thresholds and estimator correction remain unpromoted |
 | Cold-start alignment | Static accelerometer tilt, magnetic heading with explicit declination, IMU-bias initialization, and covariance reset at the new linearization point; no PX4 attitude seed | Passing unit/noisy synthetic checks and direct-Vicon tilt (0.862° post-alignment RMSE); external yaw truth still pending |
 | Navigation consistency | GNSS position/velocity NIS and posterior 6-state navigation NEES through a five-second outage and reacquisition | The 1,000-seed calibrated-bias distribution passes hard, bootstrap, consistency, health, and recovery gates; deterministic bias-box coverage retains a direction-sensitive 35 s convergence failure, and the preceding unbounded-prior confirmation retains one 4-sigma tail failure |
 | EuRoC public replay | 36,381-sample Leica/IMU `MH_01_easy` and 20,932-sample direct-pose `V1_03_difficult`; raw, cold-start, derived-heading, and reference-bias tracks retained | Navigation NIS/NEES consistent; direct Vicon pose passes high-dynamic replay; derived heading is not a recorded heading sensor |
@@ -36,6 +42,7 @@ flight safety.
 | Aerial GPS/RTK reference | 16,560 physical DJI IMU samples, 2,070 physical GPS position updates, and separately recorded 5 Hz RTK position/velocity | 100% health; 0.179 m position and 0.263 m/s velocity RMSE against RTK reference; no receiver-velocity aiding or independent attitude/absolute truth claim |
 | Host regression | Strict C99 warnings-as-errors build, public API tests, deterministic synthetic fault suite | Passing reviewed thresholds |
 | Input/transport integrity | Exhaustive required-IMU non-finite checks; timestamp order/gap behavior; optional-mag isolation; timestamped GNSS/heading/barometer freshness and recovery | Passing 100 seeds, 1,020,000 IMU attempts, 2,100 aiding attempts, and burst lengths through 100 with zero invariant/health failures |
+| Barometer degraded navigation | Four-arm IMU-only/raw/supervised/shadow-failover synthetic study with physical timestamp, innovation/NIS, two-stage source commit, quantization-aware freeze handling, step/delay and reset-delta diagnostics | Nominal height improves 30 s vertical RMSE from 0.4695 m to 0.0997 m; shadow failover gives 0.4600 m under freeze and 0.4348 m under a weather step, but datum bias is unobservable and the mux remains a partial-state offline upper bound |
 | Estimator supervision | ESKF-primary startup, hard-invalid immediate response, soft observability hysteresis, continuity-gated and time-bounded Mahony attitude-only degradation, navigation invalidation, continuity-gated recovery, and transition evidence | Passing executable public contract; private FCOne policy and actuator interaction remain open |
 | Output qualification | Numerical health is distinct from independently aged horizontal position/velocity, heading, vertical-position, and vertical-velocity validity; only accepted applicable constraints refresh each age | Passing public API and UrbanNav outage gates; position-only, velocity-only, and ZUPT semantics are explicit, and startup alignment is not treated as continuing observability |
 | FCOne-neutral adapter | Physical timestamp preservation, FRD sentinel axes, g/deg/s/gauss conversion, independent validity bits, missing data, duplicate/gap recovery, and future/stale aiding | Passing executable mock-publication contract; exact v2 message and scheduler remain open |
@@ -43,9 +50,14 @@ flight safety.
 
 ## P0 work before hardware flight tests
 
-1. Add a second physical heading track with independent yaw truth, such as dual-antenna GNSS plus
-   motion capture/rate table. INSANE closes the recorded dual-RTK software path but shares its yaw
-   reference and cannot establish absolute sensor accuracy.
+1. Close physical absolute heading beyond the current INSANE same-sequence local-magnetic-datum
+   candidate: add surveyed true-North or independently surveyed dual-antenna heading, causal cold
+   start, magnetic fault/recovery coverage, and more aircraft regimes. Do not hide the valid
+   `indoor_1` ESKF `12.528°` yaw RMSE or substitute Mahony's `7.599°` result for the primary
+   estimator; do not use the rejected transition transfer as an accuracy claim.
+   Before opening another holdout, pre-register a magnetic source-quality/supervision candidate on
+   calibration/development data. Magnitude plus the current pseudo-NIS is insufficient because it
+   accepted every `indoor_1` update while materially degrading attitude.
 2. Keep heading geometry, source validity, variance, baseline quality, and freshness explicit.
    Validate the exact FCOne receiver status semantics before flight use.
 3. Keep the implemented transport delay, reordering, sample loss, malformed-value, and aiding-age
@@ -58,6 +70,9 @@ flight safety.
    has no receiver velocity, heading, magnetometer, or aircraft motion. The UAV electrical survey
    adds aircraft position aiding and an RTK velocity reference, but still does not expose physical
    drone-GPS velocity as estimator input.
+6. Replace the diagnostic offline barometer shadow mux with an executable synchronized multi-lane
+   state/reset contract, then pre-register a sequential step detector before running the 5--120 s,
+   100-seed barometer train/tune campaign. Do not tune a single residual threshold further.
 
 ## P1 work when the new hardware is available
 

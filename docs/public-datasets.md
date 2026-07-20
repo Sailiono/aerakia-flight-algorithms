@@ -44,6 +44,52 @@ Before a sequence is scored:
 - Absence of magnetometer or dual-antenna heading must remain explicit; course over ground is never
   relabeled as body heading.
 
+## Independent physical-magnetometer intake: INSANE `indoor_1`
+
+The raw PX4 magnetometer is an estimator input and the raw OptiTrack/VRPN vehicle pose is the
+independent scoring reference. Generated INSANE `ground_truth` products are forbidden because the
+outdoor product consumes RTK and magnetometer data. Raw archives and derived replays remain outside
+Git under the dataset's BSD-2-Clause plus non-commercial/no-patent-license terms.
+
+The `indoor_1` common overlap is split before scoring: calibration `[10,110) s`, development
+`[110,210) s`, and holdout `[210,310) s`. The calibration-only robust SO(3)/Wahba solve uses 6,732
+excited samples, estimates `0 ms` mocap offset with a `[-6,+2] ms` one-percent cost interval, and
+gives `0.0629 rad/s` weighted angular residual. The frozen holdout contains 19,642 IMU and 8,776
+physical magnetometer updates over 99.995 s; angular-rate correlation/RMSE are `0.911/0.0733 rad/s`
+and gravity direction median/P95 errors are `6.13°/12.57°`.
+
+Tracking uses one declared reference-attitude initialization because neither scored split starts
+with a causal static interval. This is not a cold-start claim. The final runner uses the manifest's
+declared magnetic datum. An earlier version derived the magnetic reference from the holdout's first
+truth attitude and physical magnetometer sample; that truth-coupled self-calibration was removed and
+the results were regenerated.
+
+| Frozen holdout algorithm | Geodesic RMSE | Tilt RMSE | Yaw RMSE / P95 / max |
+| --- | ---: | ---: | ---: |
+| Robust Mahony | `7.653°` | `0.912°` | `7.599° / 11.243° / 11.835°` |
+| Standard Mahony | `8.045°` | `1.237°` | `7.951° / 12.139° / 12.603°` |
+| ESKF | `14.092°` | `6.737°` | `12.528° / 23.922° / 28.113°` |
+
+ESKF numerical health is 100%, but no horizontal navigation output is valid because this replay
+contains no accepted position/velocity aiding. A paired A/B changes only `mag_valid` and
+`mag_update`: ESKF geodesic/tilt/yaw RMSE is `0.718/0.666/0.270°` with magnetometer disabled and
+`14.092/6.737/12.528°` with 8,776 physical updates enabled. Robust Mahony yaw similarly changes
+from `0.316°` to `7.599°`. The ESKF accepts all 8,776 updates while its outer field gate passes
+99.989%, so missing translational aiding is a boundary but not the main observed cause of this
+degradation. The unresolved fault lies in the physical field/datum, 3D magnetic observation, or its
+attitude/bias coupling. Mahony remains an attitude-only fallback with no navigation covariance.
+
+The frozen `indoor_1` calibration was also tried on raw `transition_1` as a separate-sequence
+holdout. Its 38.131 s overlap passes relative angular-rate and gravity audits, but the first physical
+field direction disagrees with the declared local yaw datum by `49.298°`. Those audits cannot detect
+a constant mocap-world yaw rotation. `transition_1` is therefore retained as a failed yaw-datum
+transfer diagnostic, not absolute-heading accuracy evidence. Its generated stitched truth remains
+excluded, and no cold start is run because the valid overlap begins in motion.
+
+The portable converter, calibration tool, anti-overlap tests, and paired magnetometer on/off
+diagnostic are committed. The exact aggregate record is
+[`validation/public/insane_indoor_heading_study.json`](../validation/public/insane_indoor_heading_study.json).
+
 ## Completed physical-heading intake: INSANE `outdoor_1_sensors`
 
 The official sensor-only archive and calibration package were downloaded without the image data.

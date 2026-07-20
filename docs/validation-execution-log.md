@@ -1447,3 +1447,165 @@ including new information-marker mismatch and missing-metric fail-closed cases. 
 tests, the 1,020,000-attempt input-integrity campaign, all deterministic scenarios, and every frozen
 threshold completed without failure. The generated manifest records GCC 15.2.0, CMake 4.2.3,
 Python 3.14.4, commands, timings, current commit, and the intentionally dirty documentation branch.
+
+## 2026-07-20 — causal G0 information analyzer and barometer fault study
+
+### G0 information analyzer
+
+The fixed trajectory-time information marker was not promoted. A new analyzer reconstructs the
+current 15-state local transition using estimated attitude/bias, IMU samples, and only actually
+accepted position/velocity observations. After whitening, it projects out ten nuisance-state
+directions and scores `[tilt_x, tilt_y, accel_bias_x, accel_bias_y, accel_bias_z]`.
+
+Sixteen focused controls initially passed. Static/fixed-attitude constant velocity, yaw-only, and
+single-direction controls remain below full rank; attitude/rate-consistent multi-direction motion
+reaches `5/5`; rejected aiding contributes rank `0/5`. Static and constant velocity deliberately
+have identical observable IMU channels; this records inertial indistinguishability rather than two
+independent measured tracks.
+stale aiding, too few unique epochs, and a less-than-five-second window cannot report structural
+readiness; the post-update observation at the start of a window is excluded; and future-sample
+changes do not alter a closed past window. A subsequent provenance audit found that exact
+replay/result hashes alone could not prove the producer's causal semantics. Schema v2 therefore
+also binds the replay generator, runner, command, and Git commit and rejects known truth-init
+options. The remaining causal fields are explicitly producer assertions, not attested proof. The existing
+bias-convergence replay first met the diagnostic checks at `5.0 s`, but its historical
+truth-derived static hint prevents promotion under the new causal provenance contract.
+
+The report schema is now `2`; generic `information_ready` names were removed in favor of explicit
+`*_analyzer_only` fields. This is analyzer-only evidence: thresholds are not frozen, process
+noise, bias random walk, preintegration covariance, aiding correlation, and error-reset Jacobians
+are not included, and no estimator correction is enabled.
+
+### Barometer instrumentation and paired study
+
+The replay runner now preserves optional physical `baro_timestamp_us` and exports adapter status,
+age, innovation, variance, NIS, test ratio, supervisor decisions, fault flags, and latch state. A
+rejected timestamp/value call clears per-call acceptance. With correct timestamps, all `0.60 s`
+delayed samples were rejected before fusion by the existing age gate.
+
+The first 2-seed, 5/30-second smoke contained 20 paired fault/outage trials. At 30 seconds, nominal
+barometer aiding reduced vertical-position RMSE from `0.4695 m` to `0.1004 m`. Constant datum bias,
+weather step, and freeze worsened it to `1.0155 m`, `1.3552 m`, and `2.9543 m`, while numerical
+health remained 100%. Core NIS alone therefore does not establish source trust.
+
+A causal source supervisor was added as an opt-in module, leaving the production ESKF default
+unchanged. It detects exact frozen output in about `0.15 s`, but the three pre-latch updates already
+alter position, vertical velocity, accelerometer bias, and covariance. A single supervised lane
+therefore remained worse than IMU-only. An offline hot-shadow output mux restored the 30-second
+freeze RMSE to `0.4600 m` and weather-step RMSE to `0.4348 m`, close to the `0.4695 m` IMU-only
+baseline. This is an architecture upper bound, not a real-time FCOne implementation.
+
+An exploratory `2 sigma` jump threshold then ran 60 train trials: 10 seeds, 5/30-second outages,
+and nominal/weather-step/freeze groups. It switched on all 20 weather-step trials but also all 20
+nominal trials; 30-second nominal supervised acceptance fell to about 25%. The candidate was
+rejected and the source restored to `3 sigma`. Persistent datum bias remains unobservable without
+an independent height reference. Full 5--120-second, 100-seed train/tune campaigns are deferred
+until a sequential detector and real multi-lane state policy are implemented.
+
+### Verification at this checkpoint
+
+The strict GCC 15.2/C99 build passes all 10 CTest targets, including the new barometer-supervisor
+unit target and the 1,020,000-attempt input-integrity campaign. After the causal-provenance audit,
+focused G0 tests pass `16/16`; the full Python suite passes `121/121`; `py_compile` and
+`git diff --check` pass. Generated reports and raw dataset files remain outside Git, while methods,
+negative results, code, tests, and capability limits are retained.
+
+## 2026-07-20 — independent magnetic-yaw intake and post-review hardening
+
+### Purpose and anti-leakage protocol
+
+INSANE `indoor_1` was selected because it records a physical PX4 magnetometer and an independent
+raw OptiTrack vehicle pose. Generated INSANE `ground_truth` products were excluded. The common raw
+overlap was frozen into calibration `[10,110) s`, development `[110,210) s`, and holdout
+`[210,310) s`. Calibration estimated time offset, rigid IMU/mocap rotation, and a local magnetic yaw
+datum. Development and holdout never updated those values.
+
+An independent review found that reference-attitude tracking in the generic runner still generated
+the ESKF magnetic reference from the first scored truth attitude and physical magnetometer sample.
+That truth-coupled holdout self-calibration was removed. The runner now uses only the replay's
+declared magnetic datum in both cold-start and reference-attitude-init modes. All retained metrics
+below were regenerated after the correction.
+
+### Calibration and data coverage
+
+The calibration uses 6,732 excited angular samples. Its robust angular-rate residual is
+`0.0629 rad/s`, norm correlation `0.951`, three-axis excitation singular-value ratio `0.388`, and
+time-offset one-percent cost interval `[-6,+2] ms`. The protected `indoor_1` holdout contains 19,642
+IMU samples and 8,776 physical magnetometer updates over 99.995 s. Frozen frame/time audit gives
+angular-rate correlation/RMSE `0.911/0.0733 rad/s` and gravity-direction median/P95
+`6.13°/12.57°`. The split begins in motion, so only one-time reference-attitude initialization is
+scored; no cold-start claim is made.
+
+| Frozen `indoor_1` holdout | Geodesic RMSE | Tilt RMSE | Yaw RMSE / P95 / max |
+| --- | ---: | ---: | ---: |
+| Robust Mahony | `7.653°` | `0.912°` | `7.599° / 11.243° / 11.835°` |
+| Standard Mahony | `8.045°` | `1.237°` | `7.951° / 12.139° / 12.603°` |
+| ESKF | `14.092°` | `6.737°` | `12.528° / 23.922° / 28.113°` |
+
+ESKF health remains 100%. The outer magnetic-field gate passes 99.989%, and the innovation stage
+accepts all 8,776 updates. A paired input changes only `mag_valid` and `mag_update`: ESKF
+geodesic/tilt/yaw RMSE is `0.718/0.666/0.270°` with magnetometer disabled versus
+`14.092/6.737/12.528°` with it enabled. Robust Mahony yaw similarly changes from `0.316°` to
+`7.599°`. Missing position/velocity aiding remains a navigation boundary, but the A/B demonstrates
+that physical magnetic fusion is the main observed degradation on this track. Field/datum quality,
+the 3D observation model, and attitude/bias coupling remain under investigation.
+
+The frozen calibration was opened once on raw `transition_1`. Relative angular-rate and gravity
+audits passed over 7,520 IMU and 3,358 magnetometer updates in 38.131 s, but the first physical field
+direction differed from the declared datum by `-49.298°` (`49.298°` magnitude). The separately
+reported `49.359°` value is rejected-heading innovation P95, not the initial field residual.
+Relative-motion and gravity audits cannot detect a constant mocap-world yaw rotation. This sequence
+is therefore rejected as cross-sequence absolute-heading accuracy evidence. Its metrics and a paired magnetometer on/off diagnostic are
+retained only for root-cause analysis; generated stitched truth remains unused.
+
+### G0 analyzer post-review changes
+
+The causal excitation tool now emits schema 2 fields explicitly named
+`structural_information_ready_analyzer_only`. It excludes the window-start post-update observation,
+counts paired position/velocity at one timestamp as one aiding epoch, and adds fixed-attitude
+constant-velocity inertial-indistinguishability, stale-aiding, attitude/rate-consistent structural,
+rejected-aiding, and future-isolation controls. Schema v2 binds exact replay/results, generator,
+runner, command, and Git commit and rejects known truth-init command options. It still cannot attest
+the semantics of an arbitrary producer binary, so the causal fields remain explicit assertions.
+Process noise, preintegration covariance, aiding correlation, and ESKF reset Jacobians remain
+omitted, so no estimator gate or coupled bias correction is enabled.
+
+### Barometer post-review changes and final smoke
+
+The supervisor now separates evaluation from commit: the fused residual baseline advances only
+after ESKF core acceptance, while timestamp/freeze/fault classification history advances during
+evaluation. Freeze recovery is sequential, while jump-latch return-to-baseline recovery requires an
+application authorization bound to source, generation, quality, and time. The current contract
+cannot adopt a persistent new datum. Quantized slow climb/descent negative
+controls, persistent non-baro-row latch logging, stale acceptance clearing, strict JSON, and
+fail-closed shadow preconditions were added.
+
+The final two-seed, 30-second, six-fault smoke completed 12 matched four-arm trials:
+
+| Fault | IMU only | Raw baro | Supervised | Shadow mux |
+| --- | ---: | ---: | ---: | ---: |
+| Nominal | `0.4695 m` | `0.1004 m` | `0.0997 m` | `0.0997 m` |
+| Random walk | `0.4695 m` | `0.1517 m` | `0.1514 m` | `0.1514 m` |
+| Constant datum bias | `0.4695 m` | `1.0155 m` | `1.0147 m` | `1.0147 m` |
+| Weather step | `0.4695 m` | `1.3552 m` | `0.4522 m` | `0.4348 m` |
+| Frozen output | `0.4695 m` | `2.9543 m` | `1.8075 m` | `0.4600 m` |
+| `0.60 s` delay | `0.4695 m` | `0.4695 m` | `0.4695 m` | `0.4695 m` |
+
+The shadow input audit now compares every CSV field and permits only the declared `baro_update`
+difference; the command audit derives common runner/mode configuration instead of hard-coding two
+truth values. The shadow result is explicitly a partial-output offline upper bound: full nominal
+state, covariance, source generation, reset counter, and controller handoff are not verified. Constant
+datum bias remains unobservable. The earlier `2 sigma` threshold candidate remains rejected because
+it switched all 20 nominal training trials. Source-generation reset and authorized recovery remain
+unit-test-only; the four-arm campaign does not exercise them end to end.
+
+### Verification at this checkpoint
+
+G0 focused tests pass `16/16`; barometer focused Python tests pass `10/10`; the new INSANE
+calibration/converter/A-B tests pass `14/14`. The complete Python discovery passes `129/129` and a
+fresh strict C99 CTest passes `10/10`. The complete host regression also passes all 129 Python tests,
+all 10 CTest targets, the 1,020,000-attempt input-integrity campaign, every deterministic scenario,
+and every frozen threshold. A fresh ASan/UBSan build passes `10/10`; its input campaign takes
+`145.85 s` and the complete sanitizer suite `155.41 s`, with no sanitizer findings. Raw archives,
+replays, and detailed result CSVs remain ignored build artifacts; aggregate JSON, code, tests,
+methods, and negative decisions are committed together at this checkpoint.

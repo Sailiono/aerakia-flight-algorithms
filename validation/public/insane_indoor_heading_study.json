@@ -1,0 +1,167 @@
+{
+  "schema_version": "aerakia.insane_indoor_heading_study.v1",
+  "date_utc": "2026-07-20",
+  "status": "completed_with_retained_negative_results",
+  "claim": {
+    "accepted": "Physical PX4 magnetometer tracking scored against external raw OptiTrack attitude in a magnetometer-calibrated same-sequence local yaw datum.",
+    "evidence_class": "adverse_A_candidate_calibrated_local_magnetic_yaw",
+    "not_claimed": [
+      "surveyed true-North accuracy",
+      "causal cold-start absolute heading",
+      "cross-sequence yaw-datum portability",
+      "flight readiness",
+      "PX4-class estimator parity"
+    ]
+  },
+  "source": {
+    "dataset": "INSANE",
+    "sequence": "indoor_1",
+    "sensor_zip_sha256": "76636eaf81bde5302a3b510d652dfaed4461f63425b00de422275435bd86d4b0",
+    "raw_stream_sha256": {
+      "px4_imu.csv": "2b6eb02e5ce4ce66eef0890853fefbe67546d6e2c354aa5291c062949f76adb8",
+      "px4_mag.csv": "93b8e7a57adf9ac274557e7141941cfd9bcb16ac18c2a4ca3c6e1b0bc5cfba9a",
+      "mocap_vehicle_data.csv": "2f1ff352fc2cc776767df8816869192ca5deb6ee7f5a117fac4bc9e6c11b6019"
+    },
+    "source_independence": {
+      "estimator_input": "recorded raw physical PX4 magnetometer",
+      "scoring_reference": "recorded raw external OptiTrack/VRPN vehicle pose",
+      "generated_ground_truth_used": false,
+      "gnss_heading_used": false
+    },
+    "terms_boundary": "BSD-2-Clause plus dataset non-commercial-use and no-patent-license conditions; raw and derived data remain outside Git."
+  },
+  "split_protocol": {
+    "units": "seconds from common raw-stream overlap",
+    "calibration": [10.0, 110.0],
+    "development": [110.0, 210.0],
+    "holdout": [210.0, 310.0],
+    "holdout_opened_after_calibration_frozen": true,
+    "parameters_changed_after_holdout_open": false,
+    "initialization": "reference attitude used once for tracking; no causal static interval at scored split start",
+    "cold_start_scored": false
+  },
+  "calibration_only": {
+    "excited_samples": 6732,
+    "mocap_time_offset_s": 0.0,
+    "time_offset_one_percent_cost_interval_s": [-0.006, 0.002],
+    "angular_rate_norm_correlation": 0.951246703943348,
+    "weighted_angular_rate_rmse_rad_s": 0.06291358389211384,
+    "excitation_minimum_to_maximum_singular_value_ratio": 0.3876837358430572,
+    "rotation_block_uncertainty_p95_deg": 4.46086034164452,
+    "gravity_direction_dispersion_p95_deg": 12.248562632928744,
+    "magnetic_direction_dispersion_p95_deg": 16.83874033610327,
+    "yaw_datum": "calibrated local magnetic reference, not surveyed North"
+  },
+  "frozen_holdout_audit": {
+    "duration_s": 99.994752,
+    "imu_samples": 19642,
+    "physical_magnetometer_updates": 8776,
+    "angular_rate_norm_correlation": 0.91132,
+    "angular_rate_rmse_rad_s": 0.07329,
+    "gravity_direction_error_median_deg": 6.129,
+    "gravity_direction_error_p95_deg": 12.57,
+    "replay_sha256": "35364c37cb0c92a66ec2f9eceb809ee044a4b39c9ebffd1d5ba8af6839055309"
+  },
+  "frozen_holdout_tracking": {
+    "runner_mode": "reference_attitude_init_with_declared_magnetic_reference",
+    "algorithms": {
+      "mahony_robust": {
+        "geodesic_rmse_deg": 7.653440261301222,
+        "tilt_rmse_deg": 0.9115597263997594,
+        "yaw_rmse_deg": 7.599362224924973,
+        "yaw_abs_p95_deg": 11.243339538550003,
+        "yaw_abs_max_deg": 11.835285034000009
+      },
+      "mahony_standard": {
+        "geodesic_rmse_deg": 8.045009592813214,
+        "tilt_rmse_deg": 1.2368042867900493,
+        "yaw_rmse_deg": 7.951498995438486,
+        "yaw_abs_p95_deg": 12.138677145549996,
+        "yaw_abs_max_deg": 12.60336102299999
+      },
+      "eskf": {
+        "geodesic_rmse_deg": 14.091694754136153,
+        "tilt_rmse_deg": 6.7372102996062715,
+        "yaw_rmse_deg": 12.52800742782619,
+        "yaw_abs_p95_deg": 23.92248487540001,
+        "yaw_abs_max_deg": 28.113193230000007,
+        "healthy_ratio": 1.0,
+        "magnetometer_innovation_acceptance_ratio": 1.0,
+        "magnetometer_outer_gate_pass_ratio": 0.9998860528714676,
+        "horizontal_navigation_valid_ratio": 0.0
+      }
+    },
+    "results_sha256": "39e987ecf0cf0d42156fc14b6e6bcfc692507def7a18e75a4d61c1047f2b2e99",
+    "metrics_sha256": "6638003a1cae635547e23efc84031d02a85f579bd4e7ca7a2cde03242751649e"
+  },
+  "paired_magnetometer_ab": {
+    "truth_usage": "The same reference attitude initializes both arms once; it is used only for offline scoring afterward. This is tracking robustness, not cold-start evidence.",
+    "mechanical_pair_invariant": "Only mag_valid and mag_update differ; all other CSV fields are text-identical.",
+    "physical_magnetometer_updates": 8776,
+    "field_minus_declared_datum_deg": {
+      "initial": 21.04132113036556,
+      "median": 3.3152549365969577,
+      "p95_absolute": 16.55994099127998,
+      "minimum": -12.120038610749134,
+      "maximum": 26.316282825085096
+    },
+    "magnetometer_off": {
+      "eskf_geodesic_rmse_deg": 0.7181056085382935,
+      "eskf_tilt_rmse_deg": 0.6659896583689824,
+      "eskf_yaw_rmse_deg": 0.26962568971939394,
+      "mahony_robust_yaw_rmse_deg": 0.31554894371255865,
+      "replay_sha256": "26f94d14873373813c886ea9ecc53e230fe5806392160431c186992401c58e75",
+      "results_sha256": "b7fa499c42a5c8c6ed846e456e27d3115e1a485190b3eee853173238f2889876",
+      "metrics_sha256": "7ec4a640a097d36a48476814b65828f1d9b1b32c4b0f8a35e50b12f418d9f016"
+    },
+    "magnetometer_on": {
+      "eskf_geodesic_rmse_deg": 14.091694754136153,
+      "eskf_tilt_rmse_deg": 6.7372102996062715,
+      "eskf_yaw_rmse_deg": 12.52800742782619,
+      "mahony_robust_yaw_rmse_deg": 7.599362224924973,
+      "innovation_acceptance_ratio": 1.0,
+      "outer_gate_pass_ratio": 0.9998860528714676,
+      "replay_sha256": "35364c37cb0c92a66ec2f9eceb809ee044a4b39c9ebffd1d5ba8af6839055309",
+      "results_sha256": "39e987ecf0cf0d42156fc14b6e6bcfc692507def7a18e75a4d61c1047f2b2e99",
+      "metrics_sha256": "6638003a1cae635547e23efc84031d02a85f579bd4e7ca7a2cde03242751649e"
+    },
+    "summary_sha256": "2d7a1e71f223aa7145a888d5b3dd567e03cb32121491eabbb7465e011f586de5",
+    "ab_script_sha256": "1b77ad4d363a3f3f6546d7df5e59553ad2fbc234d3025184846ca2e47f1d0c27",
+    "conclusion": "Accepted physical magnetometer updates materially degrade this track; current field-magnitude and innovation gates are insufficient. Root cause remains open."
+  },
+  "cross_sequence_transfer_negative": {
+    "sequence": "transition_1",
+    "sensor_zip_sha256": "9df4235bd22eb192aa31a8502bf56daa5ed627d03e2f213229cfb308f3eaa501",
+    "duration_s": 38.131177,
+    "imu_samples": 7520,
+    "physical_magnetometer_updates": 3358,
+    "initial_declared_datum_residual_deg": -49.29775864559264,
+    "rejected_heading_innovation_p95_deg": 49.35917821898735,
+    "decision": "Rejected as cross-sequence absolute-yaw accuracy evidence because relative angular/gravity audits cannot qualify a constant mocap-world yaw transfer.",
+    "diagnostic_eskf_yaw_rmse_deg": 15.183734215468323,
+    "diagnostic_mahony_robust_yaw_rmse_deg": 4.036871472399484,
+    "cold_start_scored": false,
+    "generated_stitched_truth_used": false,
+    "magnetometer_on_results_sha256": "83e956223da618b473de1b7d66b8ec3c4bf846ec3cc0275363862f510c7cfe71",
+    "magnetometer_on_metrics_sha256": "e3afe80cf1f5aa4fade9859db18d460bc40bc3712fe665c6b241037de7fdc330",
+    "magnetometer_off_eskf_yaw_rmse_deg": 1.631460046478141,
+    "magnetometer_off_results_sha256": "0482677a4453db9c15b70026e4c51eb57295e42072f4cd17d2f142bc8cf16c2c",
+    "magnetometer_off_metrics_sha256": "a90177335bb4316342f20a8f110b1432a5da436fd409b8edfeb1a07e21849879",
+    "ab_summary_sha256": "f0d411d57beff19a1cecc984593b5560c3e82dde4cc9340014c886c35aaab349",
+    "decision_metrics_sha256": "e3afe80cf1f5aa4fade9859db18d460bc40bc3712fe665c6b241037de7fdc330"
+  },
+  "truth_leakage_correction": {
+    "problem": "Reference-attitude tracking previously constructed the ESKF magnetic reference from the first scored truth attitude and magnetometer sample.",
+    "resolution": "The runner now always initializes magnetic yaw reference from the replay's declared magnetic datum; all retained metrics were regenerated.",
+    "validation_runner_source_sha256": "6fbad6854db5d6a76d1fd7775a7f3b25eed477cea50ebb4f0c7fb5c46b794037",
+    "native_runner_sha256": "fb1d41451e125c31e722730e3f2529ab70a6079e498f4a100ffe2173803743fc"
+  },
+  "tool_sha256": {
+    "calibrate_insane_mocap.py": "55a009f6a9c6cd2f6aff2653ba25f0c0a75a9c21a6239c8f03ff77b1bfe960f9",
+    "convert_insane_mocap_to_replay.py": "948edf2ef4f8749ff27a3499c64ac198740ad605db184c231825b56ae0f5d8a9",
+    "run_insane_magnetometer_ab.py": "1b77ad4d363a3f3f6546d7df5e59553ad2fbc234d3025184846ca2e47f1d0c27",
+    "analyze_results.py": "d47e3016ba862f4396d838811baf2cd027ef0d4b961c0b191202ec5998f779dd"
+  },
+  "source_commit_before_local_changes": "1f6768108494fd3dd62003ea001995d9ee8bd7c5",
+  "raw_or_generated_data_committed": false
+}
