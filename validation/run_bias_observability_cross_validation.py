@@ -22,9 +22,150 @@ def file_sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def input_csv_provenance(path: Path) -> dict[str, object]:
+    """Capture immutable input evidence before compact mode removes the CSV."""
+
+    with path.open("r", encoding="utf-8", newline="") as stream:
+        reader = csv.reader(stream)
+        try:
+            next(reader)
+        except StopIteration as error:
+            raise ValueError("input CSV is empty") from error
+        row_count = sum(1 for row in reader if row)
+    return {
+        "input_csv_sha256": file_sha256(path),
+        "input_csv_bytes": path.stat().st_size,
+        "input_csv_rows": row_count,
+    }
+
+
 def canonical_sha256(value: object) -> str:
     encoded = json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+INFORMATION_STATES = (
+    "excitation_not_achieved",
+    "right_censored_after_excitation",
+    "converged_after_excitation",
+    "converged_before_information_ready",
+)
+
+
+def validate_information_markers(
+    manifest: dict[str, object], protocol: dict[str, object]
+) -> dict[str, object]:
+    """Validate the analyzer-only excitation marker manifest.
+
+    This is intentionally separate from :func:`validate_protocol`: the frozen v1
+    protocol remains immutable while the marker manifest can evolve independently.
+    """
+
+    failures: list[str] = []
+    if manifest.get("schema_version") != 1:
+        failures.append("information marker schema_version must be 1")
+    if manifest.get("protocol_id") != protocol.get("protocol_id"):
+        failures.append("information marker protocol_id does not match protocol")
+    if manifest.get("status") not in ("draft", "frozen"):
+        failures.append("information marker status must be draft or frozen")
+    declared_states = manifest.get("states")
+    if declared_states != list(INFORMATION_STATES):
+        failures.append("information marker states do not match the v1 classifier")
+    markers = manifest.get("markers")
+    if not isinstance(markers, dict):
+        failures.append("information marker manifest requires a markers object")
+        markers = {}
+    expected_ids = {
+        str(item.get("id"))
+        for item in protocol.get("trajectories", [])
+        if isinstance(item, dict) and item.get("split") != "holdout"
+    }
+    actual_ids = set(str(key) for key in markers)
+    missing = sorted(expected_ids - actual_ids)
+    unexpected = sorted(actual_ids - expected_ids)
+    if missing:
+        failures.append(f"missing information markers: {missing}")
+    if unexpected:
+        failures.append(f"unexpected information markers: {unexpected}")
+    for trajectory_id, marker in markers.items():
+        if not isinstance(marker, dict):
+            failures.append(f"marker {trajectory_id} must be an object")
+            continue
+        value = marker.get("information_ready_time_s")
+        if not isinstance(value, (int, float)) or not np.isfinite(float(value)) or float(value) < 0.0:
+            failures.append(f"marker {trajectory_id} has invalid information_ready_time_s")
+        if not str(marker.get("reason", "")).strip():
+            failures.append(f"marker {trajectory_id} must include a reason")
+        if not str(marker.get("source", "")).strip():
+            failures.append(f"marker {trajectory_id} must include a source")
+    return {"passed": not failures, "failures": failures}
+
+
+def classify_information_state(
+    *,
+    alignment_time_s: float,
+    settling_time_s: float | None,
+    scenario_end_time_s: float,
+    information_ready_time_s: float,
+) -> dict[str, object]:
+    """Classify convergence relative to a pre-declared excitation milestone.
+
+    The filter output is the only input besides scenario timing; truth is never
+    consulted. ``settling_time_s`` is relative to alignment, whereas all marker
+    and convergence timestamps are absolute scenario time.
+    """
+
+    alignment = float(alignment_time_s)
+    end = float(scenario_end_time_s)
+    ready = float(information_ready_time_s)
+    convergence = None if settling_time_s is None else alignment + float(settling_time_s)
+    time_to_ready = ready - alignment
+    time_from_ready = None if convergence is None else convergence - ready
+    epsilon = 1.0e-9
+    if end + epsilon < ready:
+        state = "excitation_not_achieved"
+    elif convergence is None:
+        state = "right_censored_after_excitation"
+    elif convergence < ready - epsilon:
+        state = "converged_before_information_ready"
+    else:
+        state = "converged_after_excitation"
+    return {
+        "information_ready_time_s": ready,
+        "time_to_information_ready_s": time_to_ready,
+        "convergence_time_s": convergence,
+        "time_from_information_ready_to_convergence_s": time_from_ready,
+        "information_state": state,
+    }
+
+
+def information_marker_for_trajectory(
+    trajectory: dict[str, object], information_markers: dict[str, object]
+) -> dict[str, object]:
+    """Resolve analyzer-only excitation metadata without opening sealed holdout.
+
+    The public v1 marker manifest intentionally covers train/tune trajectories
+    only.  Release holdout trials still run the estimator, metrics, and gates,
+    but they cannot receive an excitation-aware interpretation until a protected
+    holdout manifest supplies one.  Missing train/tune markers remain a hard
+    configuration error.
+    """
+
+    trajectory_id = str(trajectory["id"])
+    marker = information_markers.get(trajectory_id)
+    if isinstance(marker, dict):
+        return {
+            "available": True,
+            "status": "available",
+            "information_ready_time_s": float(marker["information_ready_time_s"]),
+        }
+    if trajectory.get("split") == "holdout":
+        return {
+            "available": False,
+            "status": "unavailable_sealed_holdout",
+            "information_ready_time_s": None,
+        }
+    raise RuntimeError(f"no information marker for trajectory {trajectory_id}")
 
 
 def seed_values(split: dict[str, object]) -> list[int]:
@@ -139,6 +280,7 @@ def read_columns(path: Path, names: tuple[str, ...]) -> dict[str, np.ndarray]:
 def horizontal_bias_metrics(
     results_csv: Path,
     metric_config: dict[str, object],
+    information_ready_time_s: float | None = None,
 ) -> dict[str, object]:
     names = (
         "ts_us", "eskf_static_aligned",
@@ -185,7 +327,7 @@ def horizontal_bias_metrics(
         )
     terminal_window_s = float(metric_config["terminal_window_s"])
     terminal = valid & (time_s >= last_time - terminal_window_s)
-    return {
+    result: dict[str, object] = {
         "alignment_time_s": float(time_s[first]),
         "settling_time_s": settling_time_s,
         "right_censored": settling_time_s is None,
@@ -203,6 +345,14 @@ def horizontal_bias_metrics(
         "final_horizontal_error_m_s2": float(horizontal_error[int(indices[-1])]),
         "horizontal_error_rmse_m_s2": float(np.sqrt(np.mean(horizontal_error[valid] ** 2))),
     }
+    if information_ready_time_s is not None:
+        result.update(classify_information_state(
+            alignment_time_s=float(time_s[first]),
+            settling_time_s=settling_time_s,
+            scenario_end_time_s=last_time,
+            information_ready_time_s=float(information_ready_time_s),
+        ))
+    return result
 
 
 def extract_general_metrics(metrics: dict[str, object]) -> dict[str, float | int]:
@@ -295,6 +445,7 @@ def run_trial(
     native_runner: Path,
     out_dir: Path,
     protocol: dict[str, object],
+    information_markers: dict[str, object],
     timeout_s: float,
     compact: bool,
 ) -> dict[str, object]:
@@ -376,9 +527,17 @@ def run_trial(
     ]:
         raise RuntimeError("generator acceleration time semantics do not match protocol")
     metrics = json.loads((trial_dir / "metrics.json").read_text(encoding="utf-8"))
-    horizontal = horizontal_bias_metrics(results_csv, protocol["metrics"])
+    information_marker = information_marker_for_trajectory(
+        trajectory, information_markers
+    )
+    horizontal = horizontal_bias_metrics(
+        results_csv,
+        protocol["metrics"],
+        information_marker["information_ready_time_s"],
+    )
     general = extract_general_metrics(metrics)
     failures = gate_failures(horizontal, general, protocol["gates"])
+    artifact_provenance = input_csv_provenance(input_csv)
     result: dict[str, object] = {
         "trajectory_id": trajectory["id"],
         "motion": trajectory["motion"],
@@ -389,7 +548,11 @@ def run_trial(
         "runtime_s": time.monotonic() - started,
         "initialization": "cold_start_only",
         "truth_assisted_initialization": False,
-        "input_sha256": file_sha256(input_csv),
+        # Preserve the historical key for consumers of v1 reports.  The
+        # structured provenance record is authoritative for new campaigns.
+        "input_sha256": artifact_provenance["input_csv_sha256"],
+        "provenance": artifact_provenance,
+        "information_marker": information_marker,
         "commands": {
             "generator": generator_command,
             "filter": filter_command,
@@ -443,6 +606,8 @@ def metric_failures_are_fatal(mode: str) -> bool:
 
 def summarize(results: list[dict[str, object]]) -> dict[str, object]:
     groups: dict[str, dict[str, int]] = {}
+    information_states = {state: 0 for state in INFORMATION_STATES}
+    information_marker_unavailable_count = 0
     for result in results:
         key = f"{result['split']}/{result['trajectory_id']}/{result['bias_vector_id']}"
         group = groups.setdefault(key, {"trials": 0, "passed": 0, "failed": 0, "censored": 0})
@@ -451,6 +616,12 @@ def summarize(results: list[dict[str, object]]) -> dict[str, object]:
         group["failed" if failed else "passed"] += 1
         if result["horizontal_bias"]["right_censored"]:
             group["censored"] += 1
+        state = result["horizontal_bias"].get("information_state")
+        if state in information_states:
+            information_states[str(state)] += 1
+        marker = result.get("information_marker")
+        if isinstance(marker, dict) and not marker.get("available", False):
+            information_marker_unavailable_count += 1
     return {
         "trial_count": len(results),
         "passed_count": sum(not result["gate_failures"] for result in results),
@@ -458,6 +629,8 @@ def summarize(results: list[dict[str, object]]) -> dict[str, object]:
         "right_censored_count": sum(
             bool(result["horizontal_bias"]["right_censored"]) for result in results
         ),
+        "information_state_counts": information_states,
+        "information_marker_unavailable_count": information_marker_unavailable_count,
         "groups": groups,
     }
 
@@ -476,6 +649,11 @@ def main() -> None:
     parser.add_argument(
         "--protocol", type=Path,
         default=Path("validation/bias_observability_protocol_v1.json"),
+    )
+    parser.add_argument(
+        "--information-markers", type=Path,
+        default=Path("validation/bias_observability_information_markers_v1.json"),
+        help="analyzer-only excitation milestone manifest for non-holdout trajectories",
     )
     parser.add_argument("--out-dir", type=Path, default=Path("build/bias-observability-v1"))
     parser.add_argument(
@@ -502,11 +680,28 @@ def main() -> None:
 
     root = Path(__file__).resolve().parents[1]
     protocol_path = args.protocol if args.protocol.is_absolute() else root / args.protocol
+    information_markers_path = (
+        args.information_markers
+        if args.information_markers.is_absolute()
+        else root / args.information_markers
+    )
     out_dir = args.out_dir if args.out_dir.is_absolute() else root / args.out_dir
     protocol = json.loads(protocol_path.read_text(encoding="utf-8"))
     protocol_validation = validate_protocol(protocol)
     if not protocol_validation["passed"]:
         raise SystemExit("invalid protocol: " + "; ".join(protocol_validation["failures"]))
+    information_marker_manifest = json.loads(
+        information_markers_path.read_text(encoding="utf-8")
+    )
+    information_marker_validation = validate_information_markers(
+        information_marker_manifest, protocol
+    )
+    if not information_marker_validation["passed"]:
+        raise SystemExit(
+            "invalid information markers: "
+            + "; ".join(information_marker_validation["failures"])
+        )
+    information_markers = information_marker_manifest["markers"]
     native_runner = args.runner.resolve()
     trials = build_trials(protocol, args.mode)
     if args.mode == "smoke":
@@ -540,6 +735,7 @@ def main() -> None:
                 native_runner=native_runner,
                 out_dir=out_dir,
                 protocol=protocol,
+                information_markers=information_markers,
                 timeout_s=args.timeout_s,
                 compact=args.compact,
             ): trial
@@ -591,6 +787,13 @@ def main() -> None:
             "file_sha256": file_sha256(protocol_path),
             "semantic_sha256": canonical_sha256(protocol),
             "validation": protocol_validation,
+        },
+        "information_markers": {
+            "id": information_marker_manifest["marker_id"],
+            "path": str(information_markers_path),
+            "file_sha256": file_sha256(information_markers_path),
+            "semantic_sha256": canonical_sha256(information_marker_manifest),
+            "validation": information_marker_validation,
         },
         "provenance": {
             "git_commit": capture(["git", "rev-parse", "HEAD"], root),

@@ -1345,3 +1345,59 @@ joint NEES mean was `0.768` (expected 5), with terminal-five-second mean `0.278`
 covariance. The track converged in `28.5 s`, but this individual pass does not override the failed
 multi-trajectory train/tune study or authorize a release claim. Any future release claim must use
 the sealed v2 holdout plan after the candidate, thresholds, and immutable inputs are fixed.
+
+## 2026-07-20 — G0 static-prior paired A/B study and provenance hardening
+
+### Research question
+
+The retained G0 failure is direction-sensitive convergence of horizontal accelerometer bias after
+cold-start tilt alignment. The question was whether a physically motivated static-prior change could
+reduce the coupled tilt/bias error without changing estimator equations, widening gates, or using
+truth-assisted initialization.
+
+### Frozen protocol and scale
+
+The paired comparison used the frozen v1 train/tune trajectory and bias-vector definitions, identical
+inputs and seeds per pair, and no holdout access. Each arm executed `576` trials (`1,152` total):
+three train/tune trajectories, disjoint split seeds, and the complete declared residual-bias set.
+Right-censored non-convergence remained a capability failure. Execution success and capability gates
+were reported separately.
+
+### Results
+
+| Arm | Executed | Passed | Failed | Right-censored | Execution failures |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Frozen baseline | 576 | 175 | 401 | 390 | 0 |
+| Static-prior candidate | 576 | 231 | 345 | 341 | 0 |
+
+The candidate moved `49` paired trials from right-censored to settled and produced zero
+baseline-pass-to-candidate-fail regressions. The improvement was tune-only: non-zero-bias train
+passes remained `0/16` in both arms, while zero-bias train passes remained `16/16` in both arms.
+The candidate was rejected and no scalar static-prior or process-noise adjustment was promoted to
+the estimator or FCOne configuration.
+
+### Interpretation and negative conclusion
+
+The evidence is consistent with unresolved tilt--horizontal-accelerometer-bias observability
+coupling under the current excitation and covariance model. It does not prove universal
+mathematical unobservability, and it does not justify widening accuracy/settling gates. The next
+experiment must be a materially different, pre-registered excitation-aware estimator hypothesis
+under a clean v2 protocol; repeated scalar P/Q tuning is not an accepted closure path.
+
+### Publication and sealing limits
+
+This A/B study is diagnostic rather than publication-grade blind evidence. The historical runs used
+compact mode from a dirty tree; their summaries predated per-trial input SHA-256, byte count, and
+row-count provenance; and the v1 smoke had exposed seed `30000` from both holdout trajectory
+families. No missing historical SHA values were fabricated. The public aggregate record is
+[`validation/public/g0_static_prior_ab_study.json`](../validation/public/g0_static_prior_ab_study.json).
+
+The runner now captures input SHA-256, byte count, and data rows before compact mode deletes
+`input.csv`/`results.csv`, retains historical `input_sha256` compatibility, and fingerprints the
+protocol plus information-marker manifest. The marker manifest is still `draft` and analyzer-only;
+it is not an observability proof, rank test, estimator input, or truth-assisted initializer.
+
+A sealed release holdout without a public marker continues to execute ordinary metrics and gates and
+is classified as `unavailable_sealed_holdout`. It is not an execution failure and is not assigned a
+public information-state label. Any future v2 protected marker manifest must live in a separate
+protected-CI path.

@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import numpy as np
 
@@ -151,6 +152,92 @@ class BiasObservabilityCrossValidationTests(unittest.TestCase):
             "seed_start": 30000, "seed_stop": 30064,
         })
 
+    def test_information_markers_validate_without_mutating_frozen_protocol(self) -> None:
+        marker_path = ROOT / "validation" / "bias_observability_information_markers_v1.json"
+        markers = json.loads(marker_path.read_text(encoding="utf-8"))
+        before = cross_validation.canonical_sha256(self.protocol)
+        validation = cross_validation.validate_information_markers(markers, self.protocol)
+        self.assertTrue(validation["passed"], validation["failures"])
+        self.assertEqual(before, cross_validation.canonical_sha256(self.protocol))
+        self.assertEqual(
+            set(markers["markers"]),
+            {"hover_axis_pulses", "takeoff_box_land", "yaw_quadrant_hover"},
+        )
+
+    def test_information_state_classifier_covers_all_boundaries(self) -> None:
+        cases = (
+            (1.0, None, 20.0, 23.0, "excitation_not_achieved"),
+            (1.0, None, 32.0, 23.0, "right_censored_after_excitation"),
+            (1.0, 10.0, 32.0, 23.0, "converged_before_information_ready"),
+            (1.0, 25.0, 32.0, 23.0, "converged_after_excitation"),
+        )
+        for alignment, settling, end, ready, expected in cases:
+            with self.subTest(expected=expected):
+                result = cross_validation.classify_information_state(
+                    alignment_time_s=alignment,
+                    settling_time_s=settling,
+                    scenario_end_time_s=end,
+                    information_ready_time_s=ready,
+                )
+                self.assertEqual(result["information_state"], expected)
+        early = cross_validation.classify_information_state(
+            alignment_time_s=1.0,
+            settling_time_s=10.0,
+            scenario_end_time_s=32.0,
+            information_ready_time_s=23.0,
+        )
+        self.assertEqual(early["convergence_time_s"], 11.0)
+        self.assertEqual(early["time_from_information_ready_to_convergence_s"], -12.0)
+        late = cross_validation.classify_information_state(
+            alignment_time_s=1.0,
+            settling_time_s=25.0,
+            scenario_end_time_s=32.0,
+            information_ready_time_s=23.0,
+        )
+        self.assertEqual(late["time_from_information_ready_to_convergence_s"], 3.0)
+
+    def test_sealed_holdout_has_no_public_information_marker(self) -> None:
+        markers = json.loads(
+            (ROOT / "validation" / "bias_observability_information_markers_v1.json")
+            .read_text(encoding="utf-8")
+        )["markers"]
+        holdout = next(
+            item for item in self.protocol["trajectories"]
+            if item["split"] == "holdout"
+        )
+        resolved = cross_validation.information_marker_for_trajectory(holdout, markers)
+        self.assertFalse(resolved["available"])
+        self.assertEqual(resolved["status"], "unavailable_sealed_holdout")
+        self.assertIsNone(resolved["information_ready_time_s"])
+
+    def test_non_holdout_missing_information_marker_is_configuration_error(self) -> None:
+        train = next(
+            item for item in self.protocol["trajectories"]
+            if item["split"] == "train"
+        )
+        with self.assertRaisesRegex(RuntimeError, "no information marker"):
+            cross_validation.information_marker_for_trajectory(train, {})
+
+    def test_summary_counts_unavailable_holdout_markers_separately(self) -> None:
+        results = [
+            {
+                "split": "holdout",
+                "trajectory_id": "sealed",
+                "bias_vector_id": "zero",
+                "seed": 30000,
+                "gate_failures": [],
+                "horizontal_bias": {"right_censored": False},
+                "information_marker": {
+                    "available": False,
+                    "status": "unavailable_sealed_holdout",
+                    "information_ready_time_s": None,
+                },
+            }
+        ]
+        summary = cross_validation.summarize(results)
+        self.assertEqual(summary["information_marker_unavailable_count"], 1)
+        self.assertEqual(sum(summary["information_state_counts"].values()), 0)
+
     def test_smoke_train_tune_and_release_selection_are_deterministic(self) -> None:
         smoke = cross_validation.build_trials(self.protocol, "smoke")
         train_tune = cross_validation.build_trials(self.protocol, "train-tune")
@@ -217,6 +304,83 @@ class BiasObservabilityCrossValidationTests(unittest.TestCase):
         self.assertEqual(summary["passed_count"], 1)
         self.assertEqual(summary["failed_count"], 1)
         self.assertEqual(summary["right_censored_count"], 1)
+
+    def test_compact_trial_preserves_input_provenance_before_deletion(self) -> None:
+        protocol = json.loads(json.dumps(self.protocol))
+        trial = cross_validation.build_trials(protocol, "smoke")[0]
+        horizontal = {
+            "alignment_time_s": 1.0,
+            "settling_time_s": None,
+            "right_censored": True,
+        }
+        general = {
+            "post_alignment_attitude_rmse_deg": 0.1,
+            "position_rmse_m": 0.2,
+            "velocity_rmse_m_s": 0.1,
+            "navigation_nees_mean": 5.0,
+            "healthy_ratio": 1.0,
+            "navigation_recoveries": 0,
+        }
+
+        def fake_run_logged(command, *, log_path, **_kwargs):
+            log_path.write_text("ok\n", encoding="utf-8")
+            if log_path.name == "01-generator.log":
+                input_path = Path(command[command.index("--out") + 1])
+                metadata_path = Path(command[command.index("--metadata") + 1])
+                input_path.write_text("ts_us,value\n0,1\n10000,2\n", encoding="utf-8")
+                metadata_path.write_text(json.dumps({
+                    "acceleration_bias_source": "explicit_vector",
+                    "motion": trial["trajectory"]["motion"],
+                    "acceleration_time_semantics": protocol["coordinate_contract"][
+                        "acceleration_time_semantics"
+                    ],
+                }), encoding="utf-8")
+            elif log_path.name == "02-filter.log":
+                Path(command[-1]).write_text("placeholder\n", encoding="utf-8")
+            elif log_path.name == "03-analyzer.log":
+                (log_path.parent / "metrics.json").write_text("{}\n", encoding="utf-8")
+
+        with tempfile.TemporaryDirectory() as temp_directory:
+            out_dir = Path(temp_directory)
+            information_markers = json.loads(
+                (
+                    ROOT
+                    / "validation"
+                    / "bias_observability_information_markers_v1.json"
+                ).read_text(encoding="utf-8")
+            )["markers"]
+            with (
+                mock.patch.object(cross_validation, "run_logged", side_effect=fake_run_logged),
+                mock.patch.object(
+                    cross_validation, "horizontal_bias_metrics", return_value=horizontal
+                ),
+                mock.patch.object(
+                    cross_validation, "extract_general_metrics", return_value=general
+                ),
+                mock.patch.object(cross_validation, "gate_failures", return_value=[]),
+            ):
+                result = cross_validation.run_trial(
+                    trial,
+                    root=ROOT,
+                    native_runner=Path("/tmp/aerakia-runner"),
+                    out_dir=out_dir,
+                    protocol=protocol,
+                    information_markers=information_markers,
+                    timeout_s=1.0,
+                    compact=True,
+                )
+
+            trial_dir = next((out_dir / "trials").rglob("cross-validation-metrics.json")).parent
+            stored = json.loads(
+                (trial_dir / "cross-validation-metrics.json").read_text(encoding="utf-8")
+            )
+            self.assertFalse((trial_dir / "input.csv").exists())
+            self.assertFalse((trial_dir / "results.csv").exists())
+            self.assertEqual(result["provenance"], stored["provenance"])
+            self.assertEqual(result["input_sha256"], result["provenance"]["input_csv_sha256"])
+            self.assertRegex(result["provenance"]["input_csv_sha256"], r"^[0-9a-f]{64}$")
+            self.assertEqual(result["provenance"]["input_csv_bytes"], 24)
+            self.assertEqual(result["provenance"]["input_csv_rows"], 2)
 
     def test_five_profiles_are_bounded_distinct_and_have_static_boundaries(self) -> None:
         fingerprints: set[bytes] = set()

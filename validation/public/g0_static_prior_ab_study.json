@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "study_id": "aerakia-g0-static-prior-ab-v1",
+  "study_date": "2026-07-20",
+  "status": "candidate_rejected_g0_open",
+  "purpose": "Public aggregate record of the frozen train/tune paired A/B diagnostic for horizontal accelerometer-bias observability.",
+  "protocol": {
+    "id": "aerakia-horizontal-accelerometer-bias-observability-v1",
+    "source_boundary": "synthetic_cold_start_only",
+    "truth_assisted_initialization": false,
+    "splits_executed": ["train", "tune"],
+    "holdout_executed": false,
+    "trial_count_per_arm": 576,
+    "total_trial_count": 1152,
+    "execution_failures": 0,
+    "execution_success_count": 1152,
+    "metric_gates_enforced": true,
+    "right_censoring_is_failure": true
+  },
+  "arms": {
+    "baseline": {
+      "label": "frozen_baseline",
+      "passed": 175,
+      "failed": 401,
+      "right_censored": 390,
+      "execution_failures": 0
+    },
+    "candidate": {
+      "label": "static_prior_candidate",
+      "passed": 231,
+      "failed": 345,
+      "right_censored": 341,
+      "execution_failures": 0
+    }
+  },
+  "paired_decision": {
+    "candidate_improved_tune_only": true,
+    "candidate_generalized_to_train": false,
+    "train_nonzero_bias_passes": {
+      "baseline": "0/16",
+      "candidate": "0/16"
+    },
+    "zero_bias_train_passes": {
+      "baseline": "16/16",
+      "candidate": "16/16"
+    },
+    "right_censored_to_settled": 49,
+    "pass_to_fail": 0,
+    "candidate_accepted": false,
+    "decision_reason": "The candidate reduced some tune failures but did not close the non-zero-bias train boundary or demonstrate generalization. Scalar prior/P/Q changes are not accepted as a product fix."
+  },
+  "interpretation": {
+    "primary_hypothesis": "Tilt and horizontal accelerometer-bias observability remain coupled under the declared excitation and covariance model.",
+    "negative_conclusions": [
+      "The result does not justify widening accuracy or settling gates.",
+      "The result does not prove that the ESKF is mathematically unobservable in all trajectories.",
+      "The result does not establish non-inferiority to PX4.",
+      "The result does not support long-duration GNSS-denied inertial navigation claims.",
+      "The result does not establish FCOne v2 flight readiness."
+    ],
+    "next_protocol": "Create a clean v2 train/tune campaign with a pre-registered excitation-aware estimator hypothesis, then execute a protected sealed holdout exactly once after source and gates are frozen."
+  },
+  "information_markers": {
+    "manifest": "validation/bias_observability_information_markers_v1.json",
+    "status": "draft",
+    "purpose": "Analyzer-only timing classification relative to pre-declared motion milestones.",
+    "limitations": [
+      "Markers are not an observability proof or rank test.",
+      "Markers do not enter the estimator and do not use truth initialization.",
+      "Release holdout trajectories intentionally have no public marker and are classified as unavailable_sealed_holdout rather than assigned a public information state."
+    ]
+  },
+  "provenance_limitations": [
+    "The historical A/B runs used compact output and were launched from a dirty working tree.",
+    "Historical summaries did not retain per-trial input CSV SHA-256, byte count, or row count; no missing SHA values were fabricated retroactively.",
+    "The historical v1 smoke selector exposed seed 30000 from both holdout trajectories, so v1 holdout evidence is diagnostic only and not a blind release result.",
+    "The new runner captures input CSV SHA-256, bytes, and data rows before compact mode deletes the input, and records protocol/marker fingerprints in each campaign summary."
+  ],
+  "exit_code_semantics": {
+    "comparator_return_code_1": "policy or capability failure after a valid comparison result; it is not a program crash",
+    "execution_failure": "a trial could not produce a valid result and is reported separately"
+  },
+  "publication_boundary": {
+    "included": ["aggregate counts", "decision rationale", "limitations", "protocol identifiers"],
+    "excluded": ["raw input CSV", "per-trial private logs", "sealed holdout seeds", "hardware identifiers"]
+  }
+}

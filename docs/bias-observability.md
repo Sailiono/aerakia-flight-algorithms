@@ -50,8 +50,9 @@ time/symmetry complete, so it cannot be the only tuning or release track.
    and continuous-five-second convergence.
 5. Compare current independent startup covariance with a physically derived tilt/bias-correlated
    initialization only after the data-contract audit.
-6. Evaluate a small predeclared process-noise/prior grid on train/tune data, select one candidate,
-   and execute a newly sealed holdout once.
+6. Only after the data-contract audit, pre-register a materially different excitation-aware
+   estimator hypothesis, evaluate it on clean train/tune data, and execute a newly sealed holdout
+   once. Do not continue scalar P/Q tuning after the rejected static-prior study below.
 
 The frozen cross-validation protocol is
 [`validation/bias_observability_protocol_v1.json`](../validation/bias_observability_protocol_v1.json).
@@ -71,3 +72,39 @@ The replacement one-shot design is recorded in
 [`validation/bias_observability_protocol_v2_plan.json`](../validation/bias_observability_protocol_v2_plan.json):
 its concrete holdout seeds and trajectory parameters must remain in an external protected-CI
 manifest until clean baseline and candidate commits, gates, and regression tolerances are frozen.
+
+## 2026-07-20 — static-prior A/B candidate rejected
+
+The frozen paired study in
+[`validation/public/g0_static_prior_ab_study.json`](../validation/public/g0_static_prior_ab_study.json)
+ran `576` train/tune trials for each arm, with `1,152/1,152` successful executions and zero
+execution failures. The frozen baseline passed `175/576` trials and had `390` right-censored
+trials. The static-prior candidate passed `231/576` and had `341` right-censored trials.
+
+The candidate improved tune-only outcomes: `49` paired trials moved from right-censored to settled
+and there were zero baseline-pass-to-candidate-fail regressions. It did not generalize to train:
+both arms remained at `0/16` non-zero-bias train passes, while both retained `16/16` zero-bias
+train passes. The candidate was rejected and was not copied into the estimator or FCOne product
+configuration.
+
+The negative conclusion is intentionally narrow. The study does not prove universal mathematical
+unobservability, and it does not justify widening convergence/accuracy gates. It indicates that
+the present tilt--horizontal-bias coupling cannot be closed safely by a scalar static-prior or
+process-noise adjustment. The next experiment must change the pre-registered excitation or
+estimator hypothesis under a clean v2 protocol.
+
+### Evidence and sealing limits
+
+The A/B runs are diagnostic, not blind release evidence. They used compact output from a dirty tree;
+historical summaries did not retain per-trial input CSV SHA-256, byte count, or row count; and the
+v1 smoke had already exposed seed `30000` in both holdout trajectory families. No missing historical
+SHA was fabricated. The runner now records input SHA-256, byte count, and data-row count before
+compact deletion and fingerprints the protocol plus marker manifest.
+
+The marker manifest
+[`validation/bias_observability_information_markers_v1.json`](../validation/bias_observability_information_markers_v1.json)
+is still `draft` and is analyzer-only: it is not an observability proof, rank test, estimator input,
+or truth-assisted initializer. A sealed release holdout without a public marker still executes
+ordinary metrics and gates and is reported as `unavailable_sealed_holdout`; it is not an execution
+failure and must not receive a public information-state label. A future v2 protected-marker path
+must remain separate from this public manifest.

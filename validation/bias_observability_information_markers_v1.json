@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "marker_id": "aerakia-horizontal-accelerometer-bias-information-markers-v1",
+  "status": "draft",
+  "purpose": "Independent, analyzer-only markers for when each frozen v1 bias-observability trajectory has delivered enough motion excitation to interpret convergence or right-censoring.",
+  "protocol_id": "aerakia-horizontal-accelerometer-bias-observability-v1",
+  "time_contract": {
+    "units": "s",
+    "origin": "scenario_time_zero",
+    "alignment_time_semantics": "absolute scenario time",
+    "settling_time_semantics": "relative to alignment_time_s",
+    "convergence_time_semantics": "alignment_time_s + settling_time_s"
+  },
+  "states": [
+    "excitation_not_achieved",
+    "right_censored_after_excitation",
+    "converged_after_excitation",
+    "converged_before_information_ready"
+  ],
+  "markers": {
+    "hover_axis_pulses": {
+      "information_ready_time_s": 23.0,
+      "reason": "The X, Y, and diagonal minimum-jerk corrections have completed, leaving a terminal observation window in the fixed-yaw hover profile.",
+      "source": "trajectory_definition_and_review_2026-07-20"
+    },
+    "takeoff_box_land": {
+      "information_ready_time_s": 23.0,
+      "reason": "The takeoff and N/E/S/W hover box have completed; the remaining descent, touchdown, and static dwell are retained for post-excitation observation.",
+      "source": "trajectory_definition_and_review_2026-07-20"
+    },
+    "yaw_quadrant_hover": {
+      "information_ready_time_s": 27.0,
+      "reason": "All four yaw quadrants have received the planned NED hover corrections; the final segment remains available for convergence observation.",
+      "source": "trajectory_definition_and_review_2026-07-20"
+    }
+  },
+  "negative_boundary": "These markers do not prove observability, identify a unique excitation rank, or use truth to initialize the estimator. They only classify whether a measured convergence event occurred before or after a pre-declared motion milestone."
+}

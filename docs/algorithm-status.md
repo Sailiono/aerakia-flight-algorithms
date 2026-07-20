@@ -351,3 +351,31 @@ The adapter now exposes one explicit `process_noise` profile and applies it atom
 Named VTOL/transition/fixed-wing profiles belong to the private FCOne product configuration and
 must be linked to evidence; the public library does not silently auto-tune by vehicle or copy PX4
 parameter values with different discrete-Q semantics.
+
+## 2026-07-20 — G0 static-prior A/B decision
+
+The latest frozen paired study is recorded in
+[`validation/public/g0_static_prior_ab_study.json`](../validation/public/g0_static_prior_ab_study.json).
+It executed `576` train/tune trials for the frozen baseline and `576` for the static-prior candidate:
+`1,152/1,152` trials completed with zero execution failures. Baseline passed `175/576` and had
+`390` right-censored trials; the candidate passed `231/576` and had `341` right-censored trials.
+
+The candidate improved tune-only outcomes (`49` paired trials moved from right-censored to settled,
+with zero baseline-pass-to-candidate-fail regressions) but did not generalize. Non-zero-bias train
+passes remained `0/16` in both arms, while zero-bias train passes remained `16/16` in both arms.
+The candidate was rejected and no static-prior or scalar process-noise change was promoted into the
+estimator or FCOne product configuration.
+
+This leaves accelerometer-bias observability as an active G0 blocker. The evidence points to
+unresolved tilt--horizontal-bias coupling under the current excitation and covariance model; it does
+not prove universal unobservability, justify widening gates, establish PX4 non-inferiority, or imply
+FCOne v2 flight readiness. The next experiment must be a materially different, pre-registered
+excitation-aware estimator hypothesis under a clean v2 protocol, not another scalar tuning sweep.
+
+The A/B evidence is diagnostic only: the historical runs used a dirty tree and compact output that
+predated per-trial input provenance, and the v1 smoke exposed seed `30000` from both holdout
+trajectory families. No historical SHA values were fabricated. New compact campaigns now retain
+input SHA-256, byte count, and data-row count before deleting CSVs and record protocol/marker
+fingerprints. The public marker manifest remains `draft`; sealed holdouts without a public marker
+continue to run metrics/gates and are classified as `unavailable_sealed_holdout` rather than as
+execution failures or public information states.

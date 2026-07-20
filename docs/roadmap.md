@@ -117,9 +117,13 @@ executed, all five zero-bias tracks passed, and all ten boundary-bias tracks fai
 convergence. Audit found that this smoke also opened seed `30000` in both v1 holdout trajectories,
 so v1 remains diagnostic evidence but cannot provide a blind release result. A 324-run train/tune
 study subsequently rejected both a broader scalar bias prior and a larger bias random walk:
-neither fixed the non-zero train cases and both left worse tail behavior. The next G0 work is an
-excitation-aware tilt/bias candidate evaluated on train/tune only, followed by a new sealed v2
-holdout executed once in protected CI after candidate and gates are frozen.
+neither fixed the non-zero train cases and both left worse tail behavior. A subsequent frozen
+576+576 paired train/tune A/B study tested a static-prior candidate and rejected it: the candidate
+improved tune-only counts but left both non-zero-bias train directions at `0/16` and did not
+generalize. The next G0 work is therefore a materially different, pre-registered excitation-aware
+estimator hypothesis under a clean v2 protocol, followed by a new sealed holdout executed once in
+protected CI after source, immutable inputs, and gates are frozen. Repeated scalar P/Q tuning is
+not an accepted path.
 
 The statistical result assumes each calibrated startup residual-bias component lies within three sigma
 (`0.15 m/s²` accelerometer and `0.6 deg/s` gyroscope under the current provisional prior). FCOne
@@ -130,6 +134,34 @@ The current Q discretization is also explicitly a high-rate reduced-model approx
 100--1000 Hz accuracy/consistency invariance passes, but a full coupled continuous-model Qd oracle
 remains a mathematical hardening item before claiming unrestricted transition/high-dynamic
 statistical consistency.
+
+### 2026-07-20 — G0 static-prior A/B decision
+
+The paired study recorded in
+[`validation/public/g0_static_prior_ab_study.json`](../validation/public/g0_static_prior_ab_study.json)
+completed `576` train/tune trials for the frozen baseline and `576` for the static-prior candidate
+(`1,152/1,152` execution success, zero execution failures). The baseline passed `175/576` with
+`390` right-censored trials; the candidate passed `231/576` with `341` right-censored trials.
+
+The candidate moved `49` paired trials from right-censored to settled and produced zero
+baseline-pass-to-candidate-fail regressions, but the improvement was tune-only. Both arms retained
+`0/16` passes for the non-zero-bias train directions while both retained `16/16` zero-bias train
+passes. The candidate was rejected and no estimator-core or product configuration change was
+accepted. The evidence supports unresolved tilt--horizontal-accelerometer-bias observability
+coupling, not a safely solvable scalar prior/process-noise setting.
+
+This historical study is diagnostic rather than publication-grade blind evidence: compact mode
+deleted raw per-trial CSVs, summaries predated per-trial input SHA/byte/row provenance, the runs
+started from a dirty tree, and the v1 smoke had exposed seed `30000` from both holdout families.
+No old SHA values were reconstructed or fabricated. New compact campaigns now seal input SHA-256,
+byte count, and data-row count before deleting CSVs, and record protocol and marker-manifest
+fingerprints.
+
+The public information-marker manifest remains `draft` and analyzer-only. A protected release
+holdout without a public marker continues to run ordinary metrics and gates but is classified as
+`unavailable_sealed_holdout`; it must not be treated as an execution failure or given a public
+information-state label. A future v2 protected marker path must be separate from the public
+manifest.
 
 ## P1 — FCOne v2 integration before hardware arrival
 
