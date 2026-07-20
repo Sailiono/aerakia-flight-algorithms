@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "plan_id": "aerakia-airspeed-barometer-aiding-v1",
+  "status": "planned",
+  "created_date": "2026-07-20",
+  "production_baseline": "15-error-state ESKF without airspeed or wind states",
+  "paired_arms": [
+    "imu_only",
+    "imu_baro",
+    "imu_tas_known_wind",
+    "imu_tas_estimated_horizontal_wind",
+    "imu_baro_tas_estimated_horizontal_wind"
+  ],
+  "gnss_outage_durations_s": [5, 10, 30, 60, 120],
+  "flight_regimes": [
+    "hover",
+    "vtol_transition",
+    "fixed_wing_straight",
+    "fixed_wing_turn",
+    "fixed_wing_climb",
+    "fixed_wing_descent"
+  ],
+  "wind_profiles": [
+    "still",
+    "headwind",
+    "tailwind",
+    "crosswind",
+    "gust",
+    "wind_shear"
+  ],
+  "barometer_faults": [
+    "constant_bias",
+    "random_walk",
+    "weather_step",
+    "thermal_drift",
+    "freeze",
+    "delay",
+    "source_reset"
+  ],
+  "airspeed_faults": [
+    "constant_bias",
+    "scale_error",
+    "noise",
+    "delay",
+    "dropout",
+    "blocked_pitot",
+    "low_airspeed",
+    "sideslip_assumption_violation"
+  ],
+  "required_metrics": [
+    "vertical_position_error",
+    "vertical_velocity_error",
+    "horizontal_position_error",
+    "horizontal_velocity_error",
+    "yaw_error",
+    "horizontal_wind_error",
+    "measurement_nis",
+    "observable_state_nees",
+    "validity_timeout",
+    "false_acceptance_rate",
+    "fault_detection_delay",
+    "recovery_time",
+    "recovery_state_jump"
+  ],
+  "anti_overfit_rules": [
+    "Use identical truth, sensor-error draws, initialization, and outage windows for every paired arm.",
+    "Freeze train and tune thresholds before opening a separate holdout.",
+    "Do not treat IAS or CAS as TAS without a declared conversion.",
+    "Do not treat airspeed as ground speed or assume zero wind implicitly.",
+    "Do not enable the no-sideslip observation outside a declared qualified flight regime.",
+    "Retain negative controls, failed trials, and right-censored recovery results."
+  ],
+  "promotion_blockers": [
+    "Implement hardware-neutral barometer and TAS source contracts.",
+    "Implement paired synthetic generator and scorer.",
+    "Freeze quantitative train/tune gates before candidate scoring.",
+    "Demonstrate causal wind observability before adding airspeed-bias states.",
+    "Run a newly sealed holdout exactly once after source and gates are frozen."
+  ]
+}

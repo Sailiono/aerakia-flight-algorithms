@@ -125,12 +125,13 @@ class BiasObservabilityComparisonTests(unittest.TestCase):
             "execution_status": "passed",
             "execution_failures": [],
             "protocol": {"semantic_sha256": "p" * 64},
+            "information_markers": {"semantic_sha256": "m" * 64},
             "provenance": {
                 "git_commit": "a" * 40,
                 "git_status_short": [],
                 "generator_sha256": "g" * 64,
                 "campaign_runner_sha256": "r" * 64,
-                "analyzer_sha256": "z" * 64,
+                "analyzer_sha256": "d" * 64,
             },
             "trials": trials,
         }
@@ -202,6 +203,33 @@ class BiasObservabilityComparisonTests(unittest.TestCase):
                 baseline_path=baseline_path, candidate_path=candidate_path,
             )
             self.assertTrue(any("does not match input.csv bytes" in f for f in result["failures"]))
+
+    def test_information_marker_mismatch_is_rejected(self) -> None:
+        result = self._compare(candidate_kwargs={
+            "extra": {"information_markers": {"semantic_sha256": "n" * 64}}
+        })
+        self.assertTrue(any("information-marker" in failure for failure in result["failures"]))
+
+    def test_missing_zero_and_global_metrics_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            baseline, baseline_path = self._campaign(root / "baseline")
+            candidate, candidate_path = self._campaign(root / "candidate", candidate=True)
+            candidate["trials"][0]["horizontal_bias"][
+                "terminal_horizontal_error_p95_m_s2"
+            ] = None
+            metrics_path = (
+                root / "candidate" / candidate["trials"][1]["trial_dir"] / "metrics.json"
+            )
+            metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+            del metrics["eskf_consistency"]["position_nis"]
+            metrics_path.write_text(json.dumps(metrics), encoding="utf-8")
+            result = comparison.compare_campaigns(
+                baseline, candidate, copy.deepcopy(self.policy),
+                baseline_path=baseline_path, candidate_path=candidate_path,
+            )
+            self.assertTrue(any("zero-bias metric" in f for f in result["failures"]))
+            self.assertTrue(any("global metric position_nis_mean" in f for f in result["failures"]))
 
     def test_invalid_declared_input_sha_is_rejected(self) -> None:
         result = self._compare(candidate_kwargs={

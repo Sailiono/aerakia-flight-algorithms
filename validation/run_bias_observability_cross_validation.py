@@ -801,6 +801,7 @@ def main() -> None:
             "runner_path": str(native_runner),
             "runner_sha256": file_sha256(native_runner),
             "generator_sha256": file_sha256(root / "simulation/tools/generate_synthetic_imu.py"),
+            "analyzer_sha256": file_sha256(root / "validation/analyze_results.py"),
             "campaign_runner_sha256": file_sha256(Path(__file__).resolve()),
             "runtime_s": time.monotonic() - started,
         },

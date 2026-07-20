@@ -108,3 +108,56 @@ or truth-assisted initializer. A sealed release holdout without a public marker 
 ordinary metrics and gates and is reported as `unavailable_sealed_holdout`; it is not an execution
 failure and must not receive a public information-state label. A future v2 protected-marker path
 must remain separate from this public manifest.
+
+## Pre-registered direction for an excitation-aware candidate
+
+The next candidate is not allowed to use trajectory time or commanded motion as proof that bias is
+observable. It must form a causal sliding-window information score from the estimated trajectory,
+state-transition matrices, and actually accepted velocity/position observations. The intended local
+information matrix is:
+
+```text
+G = sum(Phi^T H^T R^-1 H Phi)
+```
+
+After marginalizing nuisance states, the score targets
+`[tilt_x, tilt_y, accel_bias_x, accel_bias_y, accel_bias_z]`. Effective rank, minimum eigenvalue,
+condition number, per-direction information, accepted-aiding coverage, and freshness must all meet
+frozen thresholds before the estimator may declare the bias observable or apply a coupled
+tilt/bias correction. Until then it retains baseline propagation and a conservative unresolved
+state. The existing fixed `information_ready_time_s` remains report-only.
+
+The preferred estimator candidate is a sliding-window GNSS-velocity/IMU-preintegration solve that
+returns a joint five-dimensional correction and full covariance for injection. It must first pass
+causal analyzer-only tests before estimator source changes are allowed.
+
+### Required positive and negative controls
+
+- Static, fixed-attitude translation, yaw-only rotation, stale/rejected aiding, and incomplete
+  directional motion must not declare full excitation.
+- At least 95% of predeclared full-rank train/tune trajectories must declare information ready in
+  the allowed window.
+- The classifier may use no truth, future samples, trajectory identifier, or commanded motion.
+- Train and tune must each improve terminal horizontal-bias P95 by at least `0.005 m/s2`; at least
+  75% of nonzero signed-vector groups must improve.
+- The existing `35 s` settling and `0.05 m/s2` terminal-P95 limits remain hard gates, and the P95
+  time from information-ready to convergence must be no more than `10 s`.
+- Numerical health must remain 100%, navigation recovery must remain zero, and covariance must stay
+  finite, symmetric, and positive semidefinite with absolute 5D joint-NEES confidence bounds.
+
+### Input-contract audit before v2
+
+The v1 generator is better specified than the original multisine track, but it is not yet a
+physical IMU contract. Acceleration is shifted as interval-start NED ZOH while body specific force
+is evaluated at the row attitude; angular rate is an interval-average quaternion increment. During
+rotation these are not a strictly common interval-average measurement. Static hints come directly
+from trajectory truth, GNSS is idealized at 10 Hz with zero delay and lever arm, noise is expressed
+per sample instead of as rate-independent density, and the campaign is fixed at 100 Hz. It omits
+quantization, saturation, thermal drift, bias random walk, installation error, timing offset, and
+real transition aerodynamics.
+
+The v2 contract must use delta-angle/delta-velocity inputs or rigorously matched interval-average
+specific force, replace truth-derived stationarity with a causal detector track, cover at least
+50/100/200/400 Hz, and add delay, lever arm, quantization, random walk, and thermal profiles. These
+changes require new train/tune inputs and a new sealed holdout; historical v1 trials remain evidence
+and are not regenerated.

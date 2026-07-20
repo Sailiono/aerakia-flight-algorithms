@@ -1401,3 +1401,49 @@ A sealed release holdout without a public marker continues to execute ordinary m
 is classified as `unavailable_sealed_holdout`. It is not an execution failure and is not assigned a
 public information-state label. Any future v2 protected marker manifest must live in a separate
 protected-CI path.
+
+## 2026-07-20 — heading, excitation, and degraded-navigation design audit
+
+### Research questions
+
+The audit asked whether the existing public corpus contains independent absolute-yaw evidence,
+whether the G0 information marker is a product-usable excitation detector, and whether FCOne v2
+barometer/airspeed inputs can improve GNSS-denied navigation.
+
+### Findings
+
+The corpus contains independent motion-capture yaw truth and a physical dual-RTK heading input, but
+not yet a completed end-to-end track where a physical heading observation is scored against an
+independent yaw truth. EuRoC/Blackbird are Class B propagation evidence, Vicon-derived heading is
+Class C fusion-path evidence, and INSANE is Class D shared-source physical-input evidence. PX4
+attitude and course over ground remain diagnostic references only. The evidence classes and Class A
+intake requirements are recorded in `docs/absolute-heading-evidence.md`.
+
+The G0 `information_ready_time_s` marker is a predeclared trajectory milestone, not a rank or
+observability test. A product candidate must use a causal sliding-window local information matrix
+for the tilt/accelerometer-bias subspace, pass negative controls, and report unresolved status when
+directional excitation or accepted aiding is insufficient. The input audit also retained the
+interval-semantics, truth-derived-stationarity, idealized-GNSS, sample-noise, single-rate, and
+missing-physical-error limitations. No estimator candidate was promoted.
+
+The A/B evidence pipeline was hardened before further candidate work. New campaigns explicitly
+record the analyzer SHA-256. The comparator now requires identical information-marker semantic
+hashes and fails closed when zero-bias or global regression evidence is missing, instead of treating
+missing values as no regression. Historical missing provenance is not fabricated.
+
+Barometer support currently provides only timestamped scalar relative-height fusion. Airspeed and
+wind states do not exist in the core or runner, so no existing outage result includes their benefit.
+The planned paired study covers IMU-only, barometer, TAS with known wind, TAS with estimated wind,
+and the combined configuration across 5/10/30/60/120-second outages and declared VTOL/fixed-wing
+regimes. The plan is recorded in `docs/airspeed-barometer-plan.md` and
+`validation/airspeed_barometer_validation_plan_v1.json`. It does not claim long-duration
+GNSS-independent position.
+
+### Verification
+
+`python3 -m unittest tests.test_bias_observability_comparison` completed 11 tests successfully,
+including new information-marker mismatch and missing-metric fail-closed cases. The complete
+`python3 validation/run_host_regression.py` gate then passed: all 9 CTest targets, all 89 Python
+tests, the 1,020,000-attempt input-integrity campaign, all deterministic scenarios, and every frozen
+threshold completed without failure. The generated manifest records GCC 15.2.0, CMake 4.2.3,
+Python 3.14.4, commands, timings, current commit, and the intentionally dirty documentation branch.

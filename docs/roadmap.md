@@ -27,7 +27,9 @@ The eVTOL flight-regime profiles and public/private source-of-truth loop are def
 | One-command host regression | Configure, build, C tests, Python tests, deterministic scenarios, threshold checks, logs, and environment manifest complete from one command | Implemented by `validation/run_host_regression.py`; keep it passing |
 | Monte Carlo consistency | Reviewed seed set covers IMU bias/noise, timestamp jitter, aiding loss, and recovery; aggregate NIS/NEES confidence bounds and failure seeds are reported | Constant three-axis bias, monotonic timestamp jitter, measurement noise, and five-second aiding loss implemented; thermal drift and transport faults pending |
 | Trusted-heading behavior | Controlled heading covers cold-start yaw, geometry validity, normal updates, dropout, outliers, rejection, and recovery without treating GNSS course as body yaw | Synthetic/Vicon-derived fault gates and INSANE physical dual-RTK input implemented; independent physical yaw truth remains P2 evidence |
+| Independent absolute heading | A physical magnetometer or dual-antenna heading input is scored against an independent six-degree-of-freedom truth source with audited time/frame/source lineage | Evidence classes and Class A intake protocol documented; current tracks are Class B-D, so end-to-end Class A remains open |
 | Bias convergence | Gyroscope and accelerometer bias error, convergence time, and steady-state uncertainty are reported separately; batch reference-bias correction is not counted as online convergence | Multi-axis synthetic gate implemented; thermal and physical characterization remain P2 evidence |
+| Airspeed/barometer degraded navigation | Paired IMU-only, barometer, known-wind TAS, estimated-wind TAS, and combined arms cover fixed-wing/VTOL regimes and 5-120 s GNSS outages | Barometer has basic 1D height aiding; airspeed/wind is not implemented; phased validation plan is recorded as planned work |
 | Timing and malformed input | Duplicate, stale, out-of-order, delayed, missing, non-finite, and implausible samples have explicit deterministic behavior and tests | Implemented deterministic matrix plus 1,020,000-attempt, 100-seed campaign; retain as a host gate |
 | Public dataset runner | Dataset manifest records source, hash, frame transform, time offset, command, code commit, and output summary; selected datasets reproduce with one command | Implemented for 6 EuRoC, 3 Blackbird, and 2 UrbanNav tracks; 398,493 unique external-reference IMU samples and 865,845 replay attempts; keep all reviewed baseline gates passing |
 | High-volume PX4 compatibility | Audit current PX4 schemas at corpus scale, select stress tracks before scoring, and retain resets/clipping/innovation failures without treating PX4 estimates as truth | IDF-DS audit complete: 13 raw ULogs, 7.13 million IMU samples over 9.92 h; three selected native replays total 1.61 million samples and expose high NIS/recovery counts |
@@ -57,6 +59,11 @@ This phase deliberately reports empirical P05/P95 ranges across seeds. It covers
 three-axis IMU biases and monotonic timestamp jitter. Transport gaps, reordering, malformed values,
 burst loss, and aiding freshness are now covered by the separate input-integrity campaign; thermal
 drift remains hardware-required evidence.
+
+Absolute-heading source independence and the airspeed/barometer model boundaries are defined in
+[Absolute-heading evidence](absolute-heading-evidence.md) and
+[Airspeed and barometer aiding plan](airspeed-barometer-plan.md). The machine-readable paired plan
+is [`validation/airspeed_barometer_validation_plan_v1.json`](../validation/airspeed_barometer_validation_plan_v1.json).
 
 ### Newly audited G0 blockers
 

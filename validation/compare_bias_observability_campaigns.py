@@ -152,26 +152,13 @@ def input_sha_evidence(
 
 
 def analyzer_sha(campaign: dict[str, object], summary_path: Path) -> str | None:
+    del summary_path
     provenance = campaign.get("provenance")
     if isinstance(provenance, dict):
         for name in ("analyzer_sha256", "analysis_sha256"):
             value = provenance.get(name)
-            if isinstance(value, str) and value:
-                return value
-    trials = campaign.get("trials")
-    if not isinstance(trials, list):
-        return None
-    for trial in trials:
-        if not isinstance(trial, dict):
-            continue
-        command = nested(trial, "commands", "analyzer")
-        if not isinstance(command, list) or len(command) < 2:
-            continue
-        path = Path(str(command[1]))
-        if not path.is_absolute():
-            path = summary_path.parent / path
-        if path.is_file():
-            return file_sha256(path)
+            if isinstance(value, str) and re.fullmatch(r"[0-9a-fA-F]{64}", value):
+                return value.lower()
     return None
 
 
@@ -436,6 +423,10 @@ def provenance_failures(
     candidate_protocol = nested(candidate, "protocol", "semantic_sha256")
     if not baseline_protocol or baseline_protocol != candidate_protocol:
         failures.append("protocol semantic SHA-256 mismatch or missing")
+    baseline_markers = nested(baseline, "information_markers", "semantic_sha256")
+    candidate_markers = nested(candidate, "information_markers", "semantic_sha256")
+    if not baseline_markers or baseline_markers != candidate_markers:
+        failures.append("information-marker semantic SHA-256 mismatch or missing")
 
     for label, campaign in (("baseline", baseline), ("candidate", candidate)):
         commit = nested(campaign, "provenance", "git_commit")
@@ -490,6 +481,11 @@ def acceptance_failures(
             continue
         for name in policy.get("zero_bias_regression_metrics", []):
             spec = metric_specs.get(name)
+            baseline_value = nested(row, "metrics", str(name), "baseline")
+            candidate_value = nested(row, "metrics", str(name), "candidate")
+            if finite_float(baseline_value) is None or finite_float(candidate_value) is None:
+                failures.append(f"zero-bias metric {name} missing: {row['key']}")
+                continue
             score_delta = nested(row, "metrics", str(name), "regression_score_delta")
             if isinstance(spec, dict) and material_regression(
                 finite_float(score_delta), spec
@@ -540,7 +536,18 @@ def acceptance_failures(
 
     for name in policy.get("global_regression_metrics", []):
         spec = metric_specs.get(name)
-        score_delta = nested(groups["overall"], "all", "metrics", str(name), "regression_score_delta")
+        overall_metric = nested(groups["overall"], "all", "metrics", str(name))
+        paired_count = nested(overall_metric, "paired_sample_count")
+        baseline_mean = nested(overall_metric, "baseline_mean")
+        candidate_mean = nested(overall_metric, "candidate_mean")
+        if (
+            finite_float(baseline_mean) is None
+            or finite_float(candidate_mean) is None
+            or paired_count != len(rows)
+        ):
+            failures.append(f"global metric {name} evidence is incomplete")
+            continue
+        score_delta = nested(overall_metric, "regression_score_delta")
         if isinstance(spec, dict) and material_regression(finite_float(score_delta), spec):
             failures.append(f"material global regression: {name}")
 
