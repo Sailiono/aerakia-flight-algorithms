@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "protocol_id": "aerakia-horizontal-accelerometer-bias-observability-v2-plan",
+  "status": "planned",
+  "created_date": "2026-07-20",
+  "reason": "Protocol v1 holdout trajectories were included in an exploratory smoke run and are retained only as historical diagnostic evidence.",
+  "public_train_tune": {
+    "required_trajectory_families": 3,
+    "required_bias_vectors": 9,
+    "smoke_allowed_splits": ["train", "tune"],
+    "smoke_seed_selection": "execution.smoke_seed_offset selects one seed inside each eligible split",
+    "acceptance": [
+      "No zero-bias regression.",
+      "Improvement is required independently on train and tune trajectories.",
+      "No previously passing trajectory and exact bias-vector group may become failing.",
+      "Signed mirror-pair asymmetry must not worsen.",
+      "Attitude, navigation, NIS/NEES, health, recovery, and covariance checks must remain within predeclared tolerances."
+    ]
+  },
+  "sealed_holdout": {
+    "access": "external_manifest_in_protected_ci",
+    "trajectory_families": 2,
+    "seeds_per_trajectory": 64,
+    "bias_vectors": 9,
+    "planned_trial_count": 1152,
+    "public_seed_range": null,
+    "public_trajectory_parameters": null,
+    "requirements": [
+      "Use new trajectory variants and seed values that were not executed or inspected during v1 work.",
+      "Keep the concrete seed and trajectory manifest outside the tuning branch until candidate freeze.",
+      "Record the sealed manifest SHA-256 before execution.",
+      "Freeze the candidate source commit, runner binary, compiler flags, protocol, gates, and material-regression tolerances before execution.",
+      "Execute the holdout once; any subsequent estimator tuning requires protocol v3 while retaining v2 evidence."
+    ]
+  },
+  "baseline_candidate_pairing": {
+    "required": true,
+    "same_input_csv_sha256": true,
+    "clean_source_commits_required": true,
+    "missing_or_timed_out_trials_are_failures": true,
+    "report_groups": [
+      "split",
+      "trajectory",
+      "exact_bias_vector",
+      "seed",
+      "signed_mirror_pair",
+      "zero_bias"
+    ]
+  },
+  "freeze_blockers": [
+    "Implement and review the new holdout trajectory variants.",
+    "Predeclare paired-delta material-regression tolerances.",
+    "Select clean immutable baseline and candidate commits from train/tune evidence only.",
+    "Install the sealed manifest and one-shot execution control in protected CI."
+  ]
+}

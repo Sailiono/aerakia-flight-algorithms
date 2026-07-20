@@ -1179,9 +1179,11 @@ were `2.9560 / 2.5318 / 4.9758`. The protocol semantic SHA-256 is
 `4b335a794546866e8dbc8e5787723ad0b23cc78e088cc966d6af4a0bc8e10789`, and the committed summary
 records the protocol-file and result-file hashes.
 
-This is a navigation-outage Monte Carlo confirmation, not a substitute for the frozen VTOL
-bias-observability holdout. The latter remains unopened until a candidate fixes or explicitly
-re-budgets the retained boundary-bias convergence failure.
+This is a navigation-outage Monte Carlo confirmation, not a substitute for blind VTOL
+bias-observability holdout evidence. A later protocol audit found that the historical v1 smoke
+selector had already opened seed `30000` in both v1 holdout trajectory families. V1 therefore
+remains diagnostic evidence only. Final evidence requires the replacement sealed v2 holdout after
+a candidate and its gates are frozen.
 
 ### Post-confirmation audit closures
 
@@ -1247,10 +1249,10 @@ zero malformed samples or recovery and produced joint NEES mean `0.768`, termina
 `0.278`, and zero invalid covariance samples. The low score confirms conservative covariance but
 does not remove the retained convergence failure.
 
-A new frozen protocol then replaced reliance on the old multisine with five minimum-jerk VTOL
+A new v1 protocol then replaced reliance on the old multisine with five minimum-jerk VTOL
 profiles: hover axis pulses, takeoff-box-land, yaw-quadrant hover, early-transition S-curve, and
 landing gust recovery. It freezes nine horizontal bias vectors, train seeds 0--15, tune seeds
-1000--1031, and previously unopened holdout seeds 30000--30063, totaling 1,728 release trials. It
+1000--1031, and designated holdout seeds 30000--30063, totaling 1,728 release trials. It
 uses interval-start ZOH acceleration/truth, sensor-only cold start, protocol/source/binary hashes,
 and per-trajectory/vector gates.
 
@@ -1258,7 +1260,10 @@ The 15-trial smoke completed with zero execution failures. Capability failed on 
 bias trials and passed on all five zero-bias trials. Boundary terminal horizontal-bias P95 ranged
 from `0.0595` to `0.2154 m/s²`; all ten were right-censored. The report status was changed from a
 potentially misleading generic pass to separate `execution=passed` and `capability=failed` fields.
-No release holdout was opened.
+No `release` campaign was run. However, the original smoke selector sampled seed `30000` from every
+trajectory, including both v1 holdout trajectory families. Six holdout-family trials were therefore
+inspected during smoke. This contamination was discovered later; it invalidates v1 as blind final
+holdout evidence even though the explicit release mode remained unused.
 
 The high-level adapter also gained one explicit, validated `process_noise` profile so private
 FCOne VTOL/transition/fixed-wing configurations can be named and pinned without forking algorithm
@@ -1275,8 +1280,9 @@ covariance (`0.09`), and that broader covariance with `sigma_acc_bias` increased
 candidate changed the estimator core or became a product configuration.
 
 All 324 scheduled runs completed: three train/tune trajectories, four frozen seeds per split, nine
-bias vectors, and three candidates. The frozen holdout seeds 30000--30063 were neither scheduled nor
-opened. Baseline passed 23/108 with 81 right-censored trials. The broader covariance passed 33/108
+bias vectors, and three candidates. This candidate study did not schedule or access holdout trials,
+but seed `30000` in both v1 holdout trajectory families had already been exposed by the historical
+smoke. Baseline passed 23/108 with 81 right-censored trials. The broader covariance passed 33/108
 with 73 right-censored trials, but all 64 non-zero train trials still failed and remained censored;
 its terminal horizontal-error P95 tail and maximum worsened from `0.21698 / 0.22511` to
 `0.22070 / 0.23479 m/s²`, and maximum attitude RMSE rose from `2.336°` to `2.396°`. The larger
@@ -1337,4 +1343,5 @@ A final focused seed-7 bias replay after rebuilding the runner completed all 4,0
 zero malformed samples and zero navigation recovery. Its five-dimensional tilt/accelerometer-bias
 joint NEES mean was `0.768` (expected 5), with terminal-five-second mean `0.278` and no invalid
 covariance. The track converged in `28.5 s`, but this individual pass does not override the failed
-multi-trajectory train/tune study or authorize opening the frozen holdout.
+multi-trajectory train/tune study or authorize a release claim. Any future release claim must use
+the sealed v2 holdout plan after the candidate, thresholds, and immutable inputs are fixed.

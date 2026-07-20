@@ -151,17 +151,48 @@ class BiasObservabilityCrossValidationTests(unittest.TestCase):
             "seed_start": 30000, "seed_stop": 30064,
         })
 
-    def test_smoke_and_release_selection_are_deterministic(self) -> None:
+    def test_smoke_train_tune_and_release_selection_are_deterministic(self) -> None:
         smoke = cross_validation.build_trials(self.protocol, "smoke")
+        train_tune = cross_validation.build_trials(self.protocol, "train-tune")
         release = cross_validation.build_trials(self.protocol, "release")
-        self.assertEqual(len(smoke), 15)
+        self.assertEqual(len(smoke), 9)
+        self.assertEqual(len(train_tune), 576)
         self.assertEqual(len(release), 1728)
+        self.assertTrue(all(trial["trajectory"]["split"] != "holdout" for trial in smoke))
+        self.assertTrue(all(trial["trajectory"]["split"] != "holdout" for trial in train_tune))
         self.assertEqual(
             cross_validation.canonical_sha256(self.protocol),
             cross_validation.canonical_sha256(
                 json.loads(self.protocol_path.read_text(encoding="utf-8"))
             ),
         )
+
+    def test_smoke_honors_seed_offset_without_opening_holdout(self) -> None:
+        protocol = json.loads(json.dumps(self.protocol))
+        protocol["execution"]["smoke_seed_offset"] = 2
+        validation = cross_validation.validate_protocol(protocol)
+        self.assertTrue(validation["passed"], validation["failures"])
+        smoke = cross_validation.build_trials(protocol, "smoke")
+        self.assertEqual(
+            {(trial["trajectory"]["split"], trial["seed"]) for trial in smoke},
+            {("train", 2), ("tune", 1002)},
+        )
+
+    def test_report_only_cannot_mask_train_tune_or_release_failure(self) -> None:
+        self.assertFalse(cross_validation.metric_failures_are_fatal("smoke"))
+        self.assertTrue(cross_validation.metric_failures_are_fatal("train-tune"))
+        self.assertTrue(cross_validation.metric_failures_are_fatal("release"))
+
+    def test_v2_plan_keeps_holdout_manifest_sealed(self) -> None:
+        plan = json.loads(
+            (ROOT / "validation" / "bias_observability_protocol_v2_plan.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(plan["status"], "planned")
+        self.assertEqual(plan["sealed_holdout"]["access"], "external_manifest_in_protected_ci")
+        self.assertIsNone(plan["sealed_holdout"]["public_seed_range"])
+        self.assertIsNone(plan["sealed_holdout"]["public_trajectory_parameters"])
 
     def test_summary_never_hides_capability_failures(self) -> None:
         results = [

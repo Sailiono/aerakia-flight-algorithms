@@ -99,6 +99,20 @@ def validate_protocol(protocol: dict[str, object]) -> dict[str, object]:
     initialization = protocol.get("coordinate_contract", {}).get("initialization")
     if initialization != "cold_start_from_sensor_stream_and_static_hint_only":
         failures.append("protocol initialization must prohibit truth-assisted initialization")
+    smoke_seed_offset = protocol.get("execution", {}).get("smoke_seed_offset")
+    if not isinstance(smoke_seed_offset, int) or smoke_seed_offset < 0:
+        failures.append("execution.smoke_seed_offset must be a non-negative integer")
+    else:
+        smoke_splits = {
+            str(item["split"])
+            for item in trajectories
+            if isinstance(item, dict) and item.get("split") != "holdout"
+        }
+        for split_name in smoke_splits:
+            if smoke_seed_offset >= len(split_seeds.get(split_name, set())):
+                failures.append(
+                    f"smoke_seed_offset {smoke_seed_offset} is outside {split_name} split"
+                )
     return {
         "passed": not failures,
         "failures": failures,
@@ -401,12 +415,15 @@ def build_trials(protocol: dict[str, object], mode: str) -> list[dict[str, objec
     assert isinstance(vectors, list)
     assert isinstance(splits, dict)
     smoke_vectors = set(protocol["execution"]["smoke_vectors"])
+    smoke_seed_offset = int(protocol["execution"]["smoke_seed_offset"])
     trials: list[dict[str, object]] = []
     for trajectory in trajectories:
         assert isinstance(trajectory, dict)
+        if mode in ("smoke", "train-tune") and trajectory["split"] == "holdout":
+            continue
         split = splits[str(trajectory["split"])]
         seeds = seed_values(split)
-        selected_seeds = seeds[:1] if mode == "smoke" else seeds
+        selected_seeds = [seeds[smoke_seed_offset]] if mode == "smoke" else seeds
         selected_vectors = (
             [vector for vector in vectors if vector["id"] in smoke_vectors]
             if mode == "smoke" else vectors
@@ -415,6 +432,12 @@ def build_trials(protocol: dict[str, object], mode: str) -> list[dict[str, objec
             for vector in selected_vectors:
                 trials.append({"trajectory": trajectory, "vector": vector, "seed": seed})
     return trials
+
+
+def metric_failures_are_fatal(mode: str) -> bool:
+    """Return whether a completed campaign must fail on capability gates."""
+
+    return mode in ("train-tune", "release")
 
 
 def summarize(results: list[dict[str, object]]) -> dict[str, object]:
@@ -454,13 +477,23 @@ def main() -> None:
         default=Path("validation/bias_observability_protocol_v1.json"),
     )
     parser.add_argument("--out-dir", type=Path, default=Path("build/bias-observability-v1"))
-    parser.add_argument("--mode", choices=("smoke", "release"), default="smoke")
+    parser.add_argument(
+        "--mode", choices=("smoke", "train-tune", "release"), default="smoke",
+        help=(
+            "smoke runs one offset-selected seed and three vectors per non-holdout trajectory; "
+            "train-tune runs every non-holdout trial; release is the only mode that opens "
+            "the frozen holdout"
+        ),
+    )
     parser.add_argument("--jobs", type=int, default=4)
     parser.add_argument("--timeout-s", type=float, default=180.0)
     parser.add_argument("--compact", action="store_true")
     parser.add_argument(
         "--report-only", action="store_true",
-        help="do not fail a release invocation on metric gates; execution failures still fail",
+        help=(
+            "deprecated compatibility flag; reports are always written before exit and "
+            "train-tune/release capability failures still return non-zero"
+        ),
     )
     args = parser.parse_args()
     if args.jobs < 1 or args.timeout_s <= 0.0:
@@ -475,9 +508,21 @@ def main() -> None:
         raise SystemExit("invalid protocol: " + "; ".join(protocol_validation["failures"]))
     native_runner = args.runner.resolve()
     trials = build_trials(protocol, args.mode)
-    expected_trials = 15 if args.mode == "smoke" else int(
-        protocol["execution"]["release_trial_count"]
-    )
+    if args.mode == "smoke":
+        expected_trials = sum(
+            len(protocol["execution"]["smoke_vectors"])
+            for trajectory in protocol["trajectories"]
+            if trajectory["split"] != "holdout"
+        )
+    elif args.mode == "train-tune":
+        expected_trials = sum(
+            len(seed_values(protocol["splits"][str(trajectory["split"])]))
+            * len(protocol["residual_bias_contract"]["vectors"])
+            for trajectory in protocol["trajectories"]
+            if trajectory["split"] != "holdout"
+        )
+    else:
+        expected_trials = int(protocol["execution"]["release_trial_count"])
     if len(trials) != expected_trials:
         raise SystemExit(f"trial selection produced {len(trials)}, expected {expected_trials}")
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -522,7 +567,7 @@ def main() -> None:
         str(item["bias_vector_id"]), int(item["seed"]),
     ))
     summary = summarize(results)
-    metric_gate_enforced = args.mode == "release" and not args.report_only
+    metric_gate_enforced = metric_failures_are_fatal(args.mode)
     execution_status = "passed" if not execution_failures else "failed"
     capability_status = "passed" if summary["failed_count"] == 0 else "failed"
     if execution_failures:
@@ -538,6 +583,7 @@ def main() -> None:
         "capability_status": capability_status,
         "mode": args.mode,
         "metric_gate_enforced": metric_gate_enforced,
+        "report_only_requested": args.report_only,
         "protocol": {
             "id": protocol["protocol_id"],
             "path": str(protocol_path),
@@ -589,14 +635,16 @@ def main() -> None:
         "",
         "The filter was started only with `--cold-start`; truth columns were consumed by the "
         "post-run analyzers and were not supplied as an initialization argument. Smoke mode "
-        "reports metric failures without enforcing them; release mode enforces every trial gate.",
+        "uses only train/tune trajectories and reports metric failures without enforcing them; "
+        "train-tune and release modes enforce every trial gate. Reports are written before a "
+        "non-zero capability exit.",
     ])
     (out_dir / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"cross-validation report: {out_dir / 'report.md'}")
     if execution_failures:
         raise SystemExit(f"{len(execution_failures)} cross-validation trial(s) did not execute")
     if metric_gate_enforced and summary["failed_count"]:
-        raise SystemExit(f"{summary['failed_count']} release metric gate(s) failed")
+        raise SystemExit(f"{summary['failed_count']} capability metric gate(s) failed")
 
 
 if __name__ == "__main__":

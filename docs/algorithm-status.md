@@ -314,15 +314,17 @@ new validated estimator design; the host threshold is not silently widened.
 
 The legacy `bias_convergence` multisine is no longer the only bias evidence. A frozen v1 protocol
 defines five independent minimum-jerk VTOL trajectories, nine exact horizontal residual-bias
-vectors, disjoint train/tune/holdout seeds, and 1,728 release trials. Holdout uses previously
-unopened seeds 30000--30063. The protocol uses explicit interval-start ZOH acceleration semantics,
-sensor-only cold start, per-trajectory/vector gates, and right-censored non-convergence.
+vectors, disjoint train/tune/holdout seeds, and 1,728 release trials. The protocol uses explicit
+interval-start ZOH acceleration semantics, sensor-only cold start, per-trajectory/vector gates, and
+right-censored non-convergence.
 
 The first 15-trial smoke completed every execution but failed capability on all 10 boundary-bias
 trials; all five zero-bias trials passed. Terminal horizontal-bias P95 ranged from `0.0595` to
 `0.2154 m/s²` for the tested boundary cases, and every boundary case was right-censored without a
 stable five-second pass. This is a genuine retained G0 failure, not a smoke-infrastructure failure.
-It shows that the previous single-trajectory convergence result does not generalize yet.
+It shows that the previous single-trajectory convergence result does not generalize yet. The
+historical smoke unintentionally included seed `30000` from both v1 holdout trajectories, so v1 is
+no longer eligible as blind final evidence. It remains useful diagnostic evidence only.
 
 Bias reporting now exports each 3x3 bias covariance block and the complete 5x5 marginal covariance
 for right-error tilt x/y plus accelerometer bias. It calculates their joint NEES with all cross
@@ -333,14 +335,16 @@ review with explicit `+0.15/-0.15 m/s²` horizontal bias gives 5D joint NEES mea
 expected `5`, with zero invalid covariance samples. The covariance is clearly conservative, yet
 that fact does not by itself make the physical bias converge.
 
-A source-fixed train/tune study at commit `5109568` completed 324/324 runs without opening the
-frozen holdout. Broadening post-alignment accelerometer-bias covariance from `0.04` to `0.09`
+A source-fixed train/tune study at commit `5109568` completed 324/324 runs without further opening
+v1 holdout trials. Broadening post-alignment accelerometer-bias covariance from `0.04` to `0.09`
 increased passes from 23/108 to 33/108 and reduced right-censoring from 81/108 to 73/108, but all
 64 non-zero train trials still failed and remained censored; terminal and attitude tails also
 worsened. Raising `sigma_acc_bias` from `0.001` to `0.003 m/s3/sqrt(Hz)` added no material benefit.
 Both temporary-wrapper candidates were rejected and were not implemented. G0 therefore remains
-open on tilt--horizontal-bias observability; the frozen holdout remains unopened. The compact
-candidate evidence is retained in
+open on tilt--horizontal-bias observability. The runner now keeps smoke/train-tune away from
+holdout and fails train-tune/release automation on capability failures even when the deprecated
+`--report-only` flag is supplied. A v2 plan requires a new sealed holdout manifest in protected CI;
+any final v1 release claim is prohibited. The compact candidate evidence is retained in
 [`validation/public/g0_bias_candidate_study.json`](../validation/public/g0_bias_candidate_study.json).
 
 The adapter now exposes one explicit `process_noise` profile and applies it atomically to the core.

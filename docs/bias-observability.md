@@ -51,15 +51,23 @@ time/symmetry complete, so it cannot be the only tuning or release track.
 5. Compare current independent startup covariance with a physically derived tilt/bias-correlated
    initialization only after the data-contract audit.
 6. Evaluate a small predeclared process-noise/prior grid on train/tune data, select one candidate,
-   and open a frozen holdout once.
+   and execute a newly sealed holdout once.
 
 The frozen cross-validation protocol is
 [`validation/bias_observability_protocol_v1.json`](../validation/bias_observability_protocol_v1.json).
 It is synthetic evidence, not a substitute for multi-pose calibration, temperature/vibration tests,
 dual-antenna or motion-capture truth, or FCOne flight logs.
 
-Its first 15-trial smoke separates execution from capability: all 15 pipelines executed, all five
-zero-bias tracks passed, and all ten `+X` / `+X,-Y` boundary tracks failed stable convergence and
-were right-censored. Terminal horizontal-bias P95 ranged from `0.0595` to `0.2154 m/s²`. The smoke
-therefore has `execution_status=passed` and `capability_status=failed`; the 1,152-trial holdout stays
-closed until a candidate design is selected from the train/tune experiment matrix.
+Its historical first 15-trial smoke separates execution from capability: all 15 pipelines executed,
+all five zero-bias tracks passed, and all ten `+X` / `+X,-Y` boundary tracks failed stable
+convergence and were right-censored. Terminal horizontal-bias P95 ranged from `0.0595` to
+`0.2154 m/s²`.
+
+That smoke also exposed seed `30000` for both v1 holdout trajectories because the original selector
+applied smoke to every trajectory. V1 is therefore retained as diagnostic evidence but is not a
+blind final holdout. The selector now excludes holdout trajectories in both `smoke` and
+`train-tune`, honors `execution.smoke_seed_offset`, and reserves holdout access for `release` only.
+The replacement one-shot design is recorded in
+[`validation/bias_observability_protocol_v2_plan.json`](../validation/bias_observability_protocol_v2_plan.json):
+its concrete holdout seeds and trajectory parameters must remain in an external protected-CI
+manifest until clean baseline and candidate commits, gates, and regression tolerances are frozen.

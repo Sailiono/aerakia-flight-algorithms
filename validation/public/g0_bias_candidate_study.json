@@ -31,7 +31,8 @@
     "candidate_count": 3,
     "executed_trial_count": 324
   },
-  "holdout_accessed": false,
+  "holdout_accessed_by_candidate_study": false,
+  "holdout_previously_accessed_by_v1_smoke": true,
   "holdout_seed_range_half_open": [30000, 30064],
   "method": {
     "temporary_wrapper_only": true,
@@ -210,6 +211,6 @@
       "The broader covariance worsens the terminal-error and attitude-error tails and raises zero-bias terminal error on every trajectory.",
       "Increasing sigma_acc_bias from 0.001 to 0.003 m/s3/sqrt(Hz) provides no material additional gain."
     ],
-    "next_research_direction": "Address tilt-horizontal-bias observability coupling with an excitation-aware prior or update, then select only on train and tune before opening the frozen holdout once."
+    "next_research_direction": "Address tilt-horizontal-bias observability coupling with an excitation-aware prior or update, select only on train and tune, then execute a newly sealed v2 holdout once in protected CI after candidate and gates are frozen."
   }
 }
