@@ -129,10 +129,15 @@ study subsequently rejected both a broader scalar bias prior and a larger bias r
 neither fixed the non-zero train cases and both left worse tail behavior. A subsequent frozen
 576+576 paired train/tune A/B study tested a static-prior candidate and rejected it: the candidate
 improved tune-only counts but left both non-zero-bias train directions at `0/16` and did not
-generalize. The next G0 work is therefore a materially different, pre-registered excitation-aware
-estimator hypothesis under a clean v2 protocol, followed by a new sealed holdout executed once in
-protected CI after source, immutable inputs, and gates are frozen. Repeated scalar P/Q tuning is
-not an accepted path.
+generalize. The final generic host-only variant, a physically correlated static
+tilt/accelerometer-bias startup prior, was also rejected after a paired 576+576 train/tune campaign:
+aggregate improvement came with 22 zero-bias and five mirror-symmetry regressions. Its complete
+result is [`g0_correlated_static_prior_rejection.json`](../validation/public/g0_correlated_static_prior_rejection.json).
+The next G0 work is therefore a materially different, pre-registered causal fixed-lag
+excitation-aware joint correction under a clean v2 protocol, followed by a new sealed holdout
+executed once in protected CI after source, immutable inputs, and gates are frozen. It requires the
+private FCOne v2 physical IMU interval, timestamp, causal-stationarity, and source-quality
+contract; repeated static-prior or scalar P/Q tuning is not an accepted path.
 
 The statistical result assumes each calibrated startup residual-bias component lies within three sigma
 (`0.15 m/s²` accelerometer and `0.6 deg/s` gyroscope under the current provisional prior). FCOne

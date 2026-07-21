@@ -409,3 +409,20 @@ input SHA-256, byte count, and data-row count before deleting CSVs and record pr
 fingerprints. The public marker manifest remains `draft`; sealed holdouts without a public marker
 continue to run metrics/gates and are classified as `unavailable_sealed_holdout` rather than as
 execution failures or public information states.
+
+## 2026-07-21 — final generic host-only G0 decision
+
+A second, physically motivated static-alignment candidate preserved the local right-tilt to
+accelerometer-bias covariance after one-pose alignment. It completed the same 576 train/tune keys
+as the baseline (`1,152/1,152` executions, zero execution failures). Although the candidate raised
+the aggregate pass count from `175` to `231` and moved 49 right-censored trials to settled, it
+caused 22 material zero-bias regressions and five mirror-symmetry regressions. It is rejected; the
+experimental runtime initializer was removed and no public API, default profile, or FCOne product
+configuration changed.
+
+This closes generic static-prior and scalar P/Q exploration. The retained boundary is not a claim
+that bias observability is impossible: correcting it safely needs a causal fixed-lag joint tilt/bias
+method based on actual accepted GNSS position/velocity observations and correct replay covariance.
+That method is intentionally deferred until FCOne v2 provides a physical interval-IMU, timestamp,
+stationarity, and source-quality contract. The complete diagnostic boundary and results are in
+[G0 correlated static-prior rejection](g0-correlated-static-prior.md).

@@ -571,6 +571,62 @@ def run_trial(
     return result
 
 
+def load_resumable_trial(
+    trial: dict[str, object],
+    *,
+    out_dir: Path,
+) -> dict[str, object] | None:
+    """Return a completed trial only when it matches this exact campaign arm.
+
+    Compacted campaigns intentionally remove large replay CSVs, so the durable
+    per-trial record is ``cross-validation-metrics.json``.  Validate the
+    identity and runner mode before reusing it; a stale result must be rerun
+    rather than silently mixed into an A/B campaign.
+    """
+    trajectory = trial["trajectory"]
+    vector = trial["vector"]
+    assert isinstance(trajectory, dict)
+    assert isinstance(vector, dict)
+    record_path = (
+        out_dir / "trials" / str(trajectory["split"]) / str(trajectory["id"])
+        / str(vector["id"]) / f"seed-{int(trial['seed']):05d}"
+        / "cross-validation-metrics.json"
+    )
+    if not record_path.is_file():
+        return None
+    try:
+        result = json.loads(record_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(result, dict):
+        return None
+    expected = {
+        "trajectory_id": trajectory["id"],
+        "motion": trajectory["motion"],
+        "split": trajectory["split"],
+        "bias_vector_id": vector["id"],
+        "seed": trial["seed"],
+    }
+    if any(result.get(key) != value for key, value in expected.items()):
+        return None
+    commands = result.get("commands")
+    filter_command = commands.get("filter") if isinstance(commands, dict) else None
+    if not isinstance(filter_command, list):
+        return None
+    if "--experimental-static-tilt-accel-bias-correlation" in filter_command:
+        return None
+    input_sha256 = result.get("input_sha256")
+    if not isinstance(input_sha256, str) or len(input_sha256) != 64 or any(
+        character not in "0123456789abcdef" for character in input_sha256.lower()
+    ):
+        return None
+    if not isinstance(result.get("horizontal_bias"), dict) or not isinstance(
+        result.get("general"), dict
+    ):
+        return None
+    return result
+
+
 def build_trials(protocol: dict[str, object], mode: str) -> list[dict[str, object]]:
     trajectories = protocol["trajectories"]
     vectors = protocol["residual_bias_contract"]["vectors"]
@@ -668,6 +724,14 @@ def main() -> None:
     parser.add_argument("--timeout-s", type=float, default=180.0)
     parser.add_argument("--compact", action="store_true")
     parser.add_argument(
+        "--resume",
+        action="store_true",
+        help=(
+            "reuse only identity-checked completed trials from OUT_DIR and execute the "
+            "remaining trial keys"
+        ),
+    )
+    parser.add_argument(
         "--report-only", action="store_true",
         help=(
             "deprecated compatibility flag; reports are always written before exit and "
@@ -725,6 +789,23 @@ def main() -> None:
 
     started = time.monotonic()
     results: list[dict[str, object]] = []
+    remaining_trials = trials
+    resumed_trial_count = 0
+    if args.resume:
+        resumed_results: list[dict[str, object]] = []
+        remaining_trials = []
+        for trial in trials:
+            prior = load_resumable_trial(
+                trial,
+                out_dir=out_dir,
+            )
+            if prior is None:
+                remaining_trials.append(trial)
+            else:
+                resumed_results.append(prior)
+        results.extend(resumed_results)
+        resumed_trial_count = len(resumed_results)
+        print(f"resumed {len(resumed_results)}/{len(trials)} validated trial records")
     execution_failures: list[dict[str, object]] = []
     with ThreadPoolExecutor(max_workers=args.jobs) as executor:
         futures = {
@@ -739,9 +820,9 @@ def main() -> None:
                 timeout_s=args.timeout_s,
                 compact=args.compact,
             ): trial
-            for trial in trials
+            for trial in remaining_trials
         }
-        completed_count = 0
+        completed_count = len(results)
         for future in as_completed(futures):
             trial = futures[future]
             try:
@@ -804,6 +885,7 @@ def main() -> None:
             "analyzer_sha256": file_sha256(root / "validation/analyze_results.py"),
             "campaign_runner_sha256": file_sha256(Path(__file__).resolve()),
             "runtime_s": time.monotonic() - started,
+            "resumed_trial_count": resumed_trial_count,
         },
         "truth_boundary": {
             "initialization": "cold_start_only",

@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "study_id": "g0-correlated-static-tilt-accelerometer-bias-prior-v1",
+  "date": "2026-07-21",
+  "status": "rejected_diagnostic_candidate",
+  "candidate": {
+    "description": "After one-pose static alignment, seed the physical right-tilt/accelerometer-bias covariance from b_accel = [R_nb^T g]x dtheta.",
+    "production_default_changed": false,
+    "runtime_code_retained": false
+  },
+  "scope": {
+    "protocol": "validation/bias_observability_protocol_v1.json",
+    "arms": 2,
+    "trials_per_arm": 576,
+    "total_executions": 1152,
+    "splits": ["train", "tune"],
+    "holdout_opened": false,
+    "execution_failures": 0,
+    "historical_limitations": [
+      "The v1 generator uses a trajectory-truth static hint.",
+      "Both arms were run from a dirty source tree, so this is diagnostic evidence only.",
+      "The v1 historical holdout had already been exposed by an earlier smoke run."
+    ]
+  },
+  "results": {
+    "baseline": {
+      "passed_trials": 175,
+      "right_censored_trials": 390
+    },
+    "candidate": {
+      "passed_trials": 231,
+      "right_censored_trials": 341,
+      "censored_to_settled_trials": 49,
+      "settled_to_censored_trials": 0
+    },
+    "terminal_horizontal_bias_p95_mean_m_s2": {
+      "train": {
+        "baseline": 0.16189720576117805,
+        "candidate": 0.16121856797993908,
+        "candidate_minus_baseline": -0.0006786377812389721
+      },
+      "tune": {
+        "baseline": 0.041748760873898144,
+        "candidate": 0.036497672364927014,
+        "candidate_minus_baseline": -0.00525108850897113
+      }
+    }
+  },
+  "rejection_reasons": {
+    "zero_bias_material_regressions": 22,
+    "mirror_asymmetry_regressions": 5,
+    "policy_result": "The candidate violates the pre-registered zero-bias and mirror-symmetry protections despite aggregate improvement."
+  },
+  "artifacts": {
+    "baseline_summary": "build/g0-correlated-static-prior-baseline-train-tune-final/summary.json",
+    "candidate_summary": "build/g0-correlated-static-prior-candidate-train-tune-final/summary.json",
+    "comparison_summary": "build/g0-correlated-static-prior-train-tune-comparison/summary.json"
+  },
+  "next_step": "Do not continue scalar or static-prior tuning. Use a causal fixed-lag excitation-aware joint correction only after the FCOne v2 physical IMU/timestamp/stationarity contract exists."
+}

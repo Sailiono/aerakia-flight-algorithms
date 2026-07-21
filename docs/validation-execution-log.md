@@ -1758,3 +1758,42 @@ The result is intentionally not interpreted as a performance win, parity result,
 claim: this is one deterministic fixed-bias case with no measurement delay. Its value is that it
 closes the event/frame/time/provenance path needed for future fair tests. The broader matched-Q,
 multi-bias, delay, fault, independent-truth, CPU/memory, and blind G2 tracks remain open.
+
+## 2026-07-21 — G0 correlated static-prior rejection and host-only closure
+
+The last remaining generic host-only G0 tuning hypothesis was whether a one-pose stationary
+alignment should retain the physical local correlation between right tilt error and accelerometer
+bias, rather than initialize them as independent. The candidate changed only startup covariance; it
+did not add state, consume truth/commands/future samples in the filter, or alter the public default
+path.
+
+A frozen paired campaign ran the same 576 train/tune trial keys for baseline and candidate, for
+1,152 completed executions with zero execution failures. The candidate improved the aggregate pass
+count from `175/576` to `231/576` and converted 49 right-censored trials to settled trials. That is
+not sufficient to promote it: it produced 22 material zero-bias regressions and five
+mirror-symmetry regressions. The candidate was therefore rejected and its runtime initializer
+removed.
+
+The study is diagnostic rather than release evidence: the v1 generator still uses a trajectory-truth
+static hint, both arms were executed from a dirty source tree, and the historical v1 holdout was
+already exposed and was not reopened. The durable public result is
+[`g0_correlated_static_prior_rejection.json`](../validation/public/g0_correlated_static_prior_rejection.json);
+the method and decision are in
+[G0 correlated static-prior rejection](g0-correlated-static-prior.md).
+
+Because the full campaign can exceed short execution-session limits, the cross-validation runner now
+has an identity-checked `--resume` mode. It reuses only records whose trajectory, motion, split,
+bias vector, seed, input SHA-256, result shape, and normal runner mode all match; stale records or
+records containing the removed experiment switch are rerun. The resume tests exercise exact reuse
+and every rejection path.
+
+The complete current host regression passed after candidate removal: strict C99 CTest `10/10`,
+Python discovery `145/145`, the input-integrity campaign, the deterministic synthetic suite, and all
+frozen thresholds. This confirms no default regression; it is not a flight-readiness or physical
+sensor validation claim.
+
+The correct next estimator hypothesis is not another static prior or scalar P/Q sweep. It is a
+causal fixed-lag, excitation-aware joint tilt/accelerometer-bias correction using actual accepted
+GNSS position/velocity observations, correct covariance/repropagation, and a physical IMU interval,
+timestamp, stationarity, and source-quality contract. That contract belongs to the private FCOne v2
+adapter and is deferred until the hardware integration inputs exist.
