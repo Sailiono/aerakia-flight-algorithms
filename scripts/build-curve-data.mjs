@@ -35,15 +35,35 @@ async function readRows(relativePath) {
       truthRoll: Number(values[index.truth_roll_deg]),
       truthPitch: Number(values[index.truth_pitch_deg]),
       truthYaw: Number(values[index.truth_yaw_deg]),
+      truthQ: ["w", "x", "y", "z"].map((axis) => Number(values[index[`truth_q_${axis}`]])),
+      eskfQ: ["w", "x", "y", "z"].map((axis) => Number(values[index[`eskf_q_${axis}`]])),
     };
   });
 }
 
-function rmse(rows, fields) {
-  const values = rows.map((row) =>
-    fields.reduce((sum, [estimate, truth]) => sum + (row[estimate] - row[truth]) ** 2, 0),
-  );
-  return Math.sqrt(values.reduce((sum, value) => sum + value, 0) / values.length / fields.length);
+function wrapAngleDeg(value) {
+  return ((value + 180) % 360 + 360) % 360 - 180;
+}
+
+function circularRmse(rows, estimate, truth) {
+  const sum = rows.reduce((total, row) => total + wrapAngleDeg(row[estimate] - row[truth]) ** 2, 0);
+  return Math.sqrt(sum / rows.length);
+}
+
+function normalizeQuaternion(q) {
+  const norm = Math.hypot(...q);
+  return norm > 0 ? q.map((value) => value / norm) : [1, 0, 0, 0];
+}
+
+function geodesicRmse(rows) {
+  const sum = rows.reduce((total, row) => {
+    const truth = normalizeQuaternion(row.truthQ);
+    const estimate = normalizeQuaternion(row.eskfQ);
+    const dot = Math.min(1, Math.max(-1, Math.abs(truth.reduce((acc, value, i) => acc + value * estimate[i], 0))));
+    const angleDeg = (2 * Math.acos(dot) * 180) / Math.PI;
+    return total + angleDeg ** 2;
+  }, 0);
+  return Math.sqrt(sum / rows.length);
 }
 
 const curves = [];
@@ -55,25 +75,40 @@ for (const pair of pairs) {
     pitch: [row.truthPitch, row.pitch, after[index].pitch].map((value) => Number(value.toFixed(5))),
     yaw: [row.truthYaw, row.yaw, after[index].yaw].map((value) => Number(value.toFixed(5))),
   }));
-  const beforeRmse = rmse(before, [
-    ["roll", "truthRoll"],
-    ["pitch", "truthPitch"],
-    ["yaw", "truthYaw"],
-  ]);
-  const afterRmse = rmse(after, [
-    ["roll", "truthRoll"],
-    ["pitch", "truthPitch"],
-    ["yaw", "truthYaw"],
-  ]);
+  const axisRmse = Object.fromEntries(
+    [
+      ["roll", "truthRoll"],
+      ["pitch", "truthPitch"],
+      ["yaw", "truthYaw"],
+    ].map(([axis, truth]) => {
+      const beforeValue = circularRmse(before, axis, truth);
+      const afterValue = circularRmse(after, axis, truth);
+      return [axis, {
+        before: Number(beforeValue.toFixed(4)),
+        after: Number(afterValue.toFixed(4)),
+        reductionPct: Number((((beforeValue - afterValue) / beforeValue) * 100).toFixed(2)),
+      }];
+    }),
+  );
+  const beforeEulerRmse = Math.sqrt(Object.values(axisRmse).reduce((sum, metric) => sum + metric.before ** 2, 0) / 3);
+  const afterEulerRmse = Math.sqrt(Object.values(axisRmse).reduce((sum, metric) => sum + metric.after ** 2, 0) / 3);
+  const geodesicBefore = geodesicRmse(before);
+  const geodesicAfter = geodesicRmse(after);
   curves.push({
     ...pair,
     duration: Number(rows.at(-1).t.toFixed(3)),
     samplePeriodMs: 5,
     samples: rows.length,
+    axisRmse,
     attitudeEulerRmse: {
-      before: Number(beforeRmse.toFixed(4)),
-      after: Number(afterRmse.toFixed(4)),
-      reductionPct: Number((((beforeRmse - afterRmse) / beforeRmse) * 100).toFixed(2)),
+      before: Number(beforeEulerRmse.toFixed(4)),
+      after: Number(afterEulerRmse.toFixed(4)),
+      reductionPct: Number((((beforeEulerRmse - afterEulerRmse) / beforeEulerRmse) * 100).toFixed(2)),
+    },
+    attitudeGeodesicRmse: {
+      before: Number(geodesicBefore.toFixed(4)),
+      after: Number(geodesicAfter.toFixed(4)),
+      reductionPct: Number((((geodesicBefore - geodesicAfter) / geodesicBefore) * 100).toFixed(2)),
     },
     rows,
   });
