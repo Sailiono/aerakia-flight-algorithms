@@ -55,13 +55,16 @@ function normalizeQuaternion(q) {
   return norm > 0 ? q.map((value) => value / norm) : [1, 0, 0, 0];
 }
 
+function geodesicErrorDeg(estimate, truth) {
+  const normalizedTruth = normalizeQuaternion(truth);
+  const normalizedEstimate = normalizeQuaternion(estimate);
+  const dot = Math.min(1, Math.max(-1, Math.abs(normalizedTruth.reduce((acc, value, i) => acc + value * normalizedEstimate[i], 0))));
+  return (2 * Math.acos(dot) * 180) / Math.PI;
+}
+
 function geodesicRmse(rows) {
   const sum = rows.reduce((total, row) => {
-    const truth = normalizeQuaternion(row.truthQ);
-    const estimate = normalizeQuaternion(row.eskfQ);
-    const dot = Math.min(1, Math.max(-1, Math.abs(truth.reduce((acc, value, i) => acc + value * estimate[i], 0))));
-    const angleDeg = (2 * Math.acos(dot) * 180) / Math.PI;
-    return total + angleDeg ** 2;
+    return total + geodesicErrorDeg(row.eskfQ, row.truthQ) ** 2;
   }, 0);
   return Math.sqrt(sum / rows.length);
 }
@@ -74,6 +77,7 @@ for (const pair of pairs) {
     roll: [row.truthRoll, row.roll, after[index].roll].map((value) => Number(value.toFixed(5))),
     pitch: [row.truthPitch, row.pitch, after[index].pitch].map((value) => Number(value.toFixed(5))),
     yaw: [row.truthYaw, row.yaw, after[index].yaw].map((value) => Number(value.toFixed(5))),
+    geo: [0, geodesicErrorDeg(row.eskfQ, row.truthQ), geodesicErrorDeg(after[index].eskfQ, row.truthQ)].map((value) => Number(value.toFixed(5))),
   }));
   const axisRmse = Object.fromEntries(
     [
