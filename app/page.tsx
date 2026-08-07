@@ -19,7 +19,7 @@ type Dataset = {
   limitations: string[];
 };
 type Data = {
-  schemaVersion: number; generatedAt: string; algorithmCommit: string; repositoryDirty: boolean;
+  schemaVersion: number; generatedAt: string; algorithmCommit: string; repositoryDirty: boolean | null;
   evidenceGrades: Record<string, string>; overview: { datasetCount: number; curveCount: number; totalSamples: number; independentTruthCount: number; physicalHeadingCount: number; syntheticTrialCount: number | null };
   datasets: Dataset[]; curves: Curve[];
 };

@@ -2,7 +2,6 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { createHash } from "node:crypto";
-import { execFileSync } from "node:child_process";
 
 const scriptDir = path.dirname(new URL(import.meta.url).pathname);
 const defaultRepoRoot = path.resolve(scriptDir, "../../..");
@@ -55,11 +54,22 @@ async function readJson(relativePath) {
   return { value: JSON.parse(buffer.toString("utf8")), sha256: sha256(buffer) };
 }
 
-function gitValue(args, fallback) {
+async function readGitCommit() {
+  let gitDir = path.join(repoRoot, ".git");
   try {
-    return execFileSync("git", ["-C", repoRoot, ...args], { encoding: "utf8" }).trim();
+    const marker = await fs.readFile(gitDir, "utf8");
+    const match = marker.match(/^gitdir:\s*(.+)\s*$/m);
+    if (match) gitDir = path.resolve(repoRoot, match[1]);
   } catch {
-    return fallback;
+    // Normal repositories use a .git directory; worktrees use the marker above.
+  }
+  try {
+    const head = (await fs.readFile(path.join(gitDir, "HEAD"), "utf8")).trim();
+    if (!head.startsWith("ref: ")) return head;
+    const ref = head.slice(5);
+    try { return (await fs.readFile(path.join(gitDir, ref), "utf8")).trim(); } catch { return "unknown"; }
+  } catch {
+    return "unknown";
   }
 }
 
@@ -286,8 +296,8 @@ export async function buildValidationData() {
       throw error;
     }
   }
-  const gitCommit = gitValue(["rev-parse", "HEAD"], "unknown");
-  const dirty = gitValue(["status", "--porcelain"], "").length > 0;
+  const gitCommit = await readGitCommit();
+  const dirty = null;
   return {
     schemaVersion: 2,
     generatedAt: new Date().toISOString(),
