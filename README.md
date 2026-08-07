@@ -1,8 +1,8 @@
-# vinext-starter
+# Aerakia Validation Workstation
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
-Drizzle support.
+An auditable local viewer for Aerakia replay results. It is intentionally a
+diagnostic workstation, not a flight-readiness dashboard: every dataset keeps
+its evidence grade, source hash, truth boundary, and limitations.
 
 ## Prerequisites
 
@@ -12,20 +12,27 @@ Drizzle support.
 
 ```bash
 npm install
+npm run data:build
 npm run dev
 npm run build
+npm test
 ```
 
-This starter does not use `wrangler.jsonc`.
+`data:build` reads the existing algorithm repository build outputs and writes
+`public/data/validation-data.json`. It fails closed if required CSV columns,
+finite values, or strictly increasing timestamps are missing.
 
-## Included Shape
+## Views
 
-- edit site code under `app/`
-- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
-- `vite.config.ts` simulates declared bindings for local development
-- `db/schema.ts` starts intentionally empty
-- `examples/d1/` contains an optional D1 example surface
-- `drizzle.config.ts` supports local migration generation when needed
+- `曲线诊断`: raw EuRoC sample curves, quaternion geodesic error, wrapped Euler
+  diagnostics, RMSE and consistency metrics.
+- `覆盖矩阵`: evidence grade, sample volume, truth/source class, heading/GNSS
+  coverage, and explicit limitations for EuRoC, Blackbird, UrbanNav, INSANE,
+  IDF-DS, electrical UAV, and synthetic campaigns.
+
+The generated artifact records the algorithm commit and SHA-256 hashes of the
+input summaries and replay result files. Raw ULogs, public dataset archives,
+and generated replay CSVs remain outside the frontend.
 
 ## Workspace Auth Headers
 
@@ -88,8 +95,9 @@ actions tied to the current ChatGPT user. Leave public content anonymous.
 ## Useful Commands
 
 - `npm run dev`: start local development
+- `npm run data:build`: rebuild the compact validation data catalog
 - `npm run build`: verify the vinext build output
-- `npm test`: build the starter and verify its rendered loading skeleton
+- `npm test`: rebuild data, build the site, and run rendering/data integrity tests
 - `npm run db:generate`: generate Drizzle migrations after schema changes
 
 ## Learn More

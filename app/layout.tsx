@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Aerakia Optimization Explorer",
-  description: "Interactive evidence browser for Aerakia attitude optimization validation.",
+  title: "Aerakia Validation Workstation",
+  description: "Auditable data catalog, coverage matrix, and interactive replay curves for Aerakia validation.",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
