@@ -44,6 +44,9 @@ case or board-level verification.
   [G0 correlated static-prior rejection](g0-correlated-static-prior.md): the
   retained cold-start horizontal accelerometer-bias boundary and rejected
   shortcut.
+- [G0 v2 input contract](bias-observability-v2-input-contract.md): causal
+  stationarity and interval delta semantics that precede the next estimator
+  hypothesis.
 - [Barometer source supervision](barometer-supervision-study.md) and
   [airspeed/barometer plan](airspeed-barometer-plan.md): vertical-aiding
   evidence, limits, and follow-up architecture.

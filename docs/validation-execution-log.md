@@ -1797,3 +1797,21 @@ causal fixed-lag, excitation-aware joint tilt/accelerometer-bias correction usin
 GNSS position/velocity observations, correct covariance/repropagation, and a physical IMU interval,
 timestamp, stationarity, and source-quality contract. That contract belongs to the private FCOne v2
 adapter and is deferred until the hardware integration inputs exist.
+
+## 2026-08-07 — G0 v2 input-contract smoke
+
+The first pre-candidate G0 step replaced the ambiguous v1 synthetic input assumptions with a
+versioned validation contract. The generator now integrates body specific force over each physical
+IMU interval, emits auditable delta-angle/delta-velocity fields alongside the existing public rate
+fields, defines white noise by density rather than per-sample standard deviation, and computes the
+static indication from a one-second past-only window over the quantized IMU stream. The causal
+detector is explicitly not a complete stationarity policy because constant-velocity translation is
+inertially indistinguishable from rest.
+
+The initial four-rate smoke is implemented by
+`validation/run_bias_observability_input_contract_v2.py` for 50/100/200/400 Hz. It checks timestamp
+and delta-field identity, rejects truth-derived stationarity metadata, and runs the unchanged native
+ESKF host runner at every rate. This smoke is an input/integrity gate only; it does not promote an
+estimator correction or close the 35-second horizontal-bias convergence defect. Timestamp delay,
+jitter, quantization/saturation stress, random walk, thermal drift, lever arm, and the protected
+fixed-lag holdout remain deferred.

@@ -14,6 +14,16 @@ import numpy as np
 
 GRAVITY_M_S2 = 9.80665
 
+# The public replay CSV continues to publish calibrated rate/specific-force
+# samples for the current ESKF API.  The v2 validation contract additionally
+# records the equivalent interval deltas, so a private driver adapter can be
+# audited without changing the portable public API prematurely.
+MEASUREMENT_CONTRACT_LEGACY = "legacy_rate_sample_v1"
+MEASUREMENT_CONTRACT_DELTA_INTERVAL = "delta_interval_v2"
+STATIONARITY_SOURCE_LEGACY_PROFILE = "legacy_profile_truth"
+STATIONARITY_SOURCE_CAUSAL_IMU = "causal_imu_window"
+STATIONARITY_SOURCE_NONE = "none"
+
 BIAS_OBSERVABILITY_TRAJECTORY_DURATIONS_S = {
     "bias_cv_hover_axis_pulses": 32.0,
     "bias_cv_takeoff_box_land": 38.0,
@@ -390,6 +400,59 @@ def quaternion_multiply(left: np.ndarray, right: np.ndarray) -> np.ndarray:
     ))
 
 
+def quaternion_to_body_to_ned_matrix(quaternion_wxyz: np.ndarray) -> np.ndarray:
+    """Return the body-to-NED rotation for one scalar-first quaternion."""
+    quaternion = np.asarray(quaternion_wxyz, dtype=np.float64)
+    norm = float(np.linalg.norm(quaternion))
+    if not math.isfinite(norm) or norm <= 1.0e-15:
+        raise ValueError("quaternion must be finite and nonzero")
+    w_value, x_value, y_value, z_value = quaternion / norm
+    return np.array(
+        [
+            [
+                1.0 - 2.0 * (y_value * y_value + z_value * z_value),
+                2.0 * (x_value * y_value - z_value * w_value),
+                2.0 * (x_value * z_value + y_value * w_value),
+            ],
+            [
+                2.0 * (x_value * y_value + z_value * w_value),
+                1.0 - 2.0 * (x_value * x_value + z_value * z_value),
+                2.0 * (y_value * z_value - x_value * w_value),
+            ],
+            [
+                2.0 * (x_value * z_value - y_value * w_value),
+                2.0 * (y_value * z_value + x_value * w_value),
+                1.0 - 2.0 * (x_value * x_value + y_value * y_value),
+            ],
+        ],
+        dtype=np.float64,
+    )
+
+
+def quaternion_slerp(
+    first_wxyz: np.ndarray, second_wxyz: np.ndarray, fraction: float
+) -> np.ndarray:
+    """Interpolate two body-to-NED attitudes along the shortest rotation."""
+    first = np.asarray(first_wxyz, dtype=np.float64)
+    second = np.asarray(second_wxyz, dtype=np.float64)
+    first /= np.linalg.norm(first)
+    second /= np.linalg.norm(second)
+    dot_product = float(np.dot(first, second))
+    if dot_product < 0.0:
+        second = -second
+        dot_product = -dot_product
+    if dot_product > 0.9995:
+        result = first + fraction * (second - first)
+        return result / np.linalg.norm(result)
+    angle = math.acos(np.clip(dot_product, -1.0, 1.0))
+    sine = math.sin(angle)
+    result = (
+        math.sin((1.0 - fraction) * angle) / sine * first
+        + math.sin(fraction * angle) / sine * second
+    )
+    return result / np.linalg.norm(result)
+
+
 def interval_average_body_rate(
     time_s: np.ndarray, roll_rad: np.ndarray, pitch_rad: np.ndarray, yaw_rad: np.ndarray
 ) -> np.ndarray:
@@ -417,6 +480,49 @@ def interval_average_body_rate(
     return rates
 
 
+def interval_average_body_specific_force(
+    time_s: np.ndarray,
+    roll_deg: np.ndarray,
+    pitch_deg: np.ndarray,
+    yaw_deg: np.ndarray,
+    interval_acceleration_ned_m_s2: np.ndarray,
+) -> np.ndarray:
+    """Integrate body specific force over each timestamped IMU interval.
+
+    ``interval_acceleration_ned_m_s2[i]`` is held on ``(t[i-1], t[i]]``.  The
+    body attitude is reconstructed from the two endpoint quaternions and
+    integrated with five-point Gauss-Legendre quadrature.  This makes the
+    generated delta-velocity semantic explicit and avoids mixing an endpoint
+    NED acceleration with a different endpoint body attitude.
+    """
+    time = np.asarray(time_s, dtype=np.float64)
+    acceleration_ned = np.asarray(interval_acceleration_ned_m_s2, dtype=np.float64)
+    if acceleration_ned.shape != (len(time), 3):
+        raise ValueError("interval acceleration must have one NED vector per timestamp")
+    quaternions = euler_to_quaternion(
+        np.radians(roll_deg), np.radians(pitch_deg), np.radians(yaw_deg)
+    )
+    result = np.empty_like(acceleration_ned)
+    gravity_ned = np.array((0.0, 0.0, GRAVITY_M_S2), dtype=np.float64)
+    result[0] = quaternion_to_body_to_ned_matrix(quaternions[0]).T @ (
+        acceleration_ned[0] - gravity_ned
+    )
+    quadrature_x, quadrature_w = np.polynomial.legendre.leggauss(5)
+    fractions = 0.5 * (quadrature_x + 1.0)
+    weights = 0.5 * quadrature_w
+    for index in range(1, len(time)):
+        if time[index] <= time[index - 1]:
+            raise ValueError("timestamps must be strictly increasing")
+        sample = np.zeros(3, dtype=np.float64)
+        for fraction, weight in zip(fractions, weights):
+            rotation = quaternion_to_body_to_ned_matrix(
+                quaternion_slerp(quaternions[index - 1], quaternions[index], float(fraction))
+            )
+            sample += weight * (rotation.T @ (acceleration_ned[index] - gravity_ned))
+        result[index] = sample
+    return result
+
+
 def synthesize_measurements(
     time_s: np.ndarray,
     roll_deg: np.ndarray,
@@ -427,6 +533,7 @@ def synthesize_measurements(
     gyro_noise_deg_s: float,
     mag_noise_ut: float,
     acceleration_ned_m_s2: np.ndarray | None = None,
+    measurement_contract: str = MEASUREMENT_CONTRACT_LEGACY,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     roll_rad = np.radians(roll_deg)
     pitch_rad = np.radians(pitch_deg)
@@ -438,19 +545,117 @@ def synthesize_measurements(
 
     if acceleration_ned_m_s2 is None:
         acceleration_ned_m_s2 = np.zeros((len(time_s), 3), dtype=np.float64)
-    gravity_ned = np.array([0.0, 0.0, GRAVITY_M_S2])
     magnetic_field_ned_ut = np.array([22.0, 0.0, 44.0])
-    ideal_accel = np.empty((len(time_s), 3), dtype=np.float64)
     ideal_mag = np.empty((len(time_s), 3), dtype=np.float64)
+    if measurement_contract == MEASUREMENT_CONTRACT_LEGACY:
+        gravity_ned = np.array([0.0, 0.0, GRAVITY_M_S2])
+        ideal_accel = np.empty((len(time_s), 3), dtype=np.float64)
+        for index in range(len(time_s)):
+            rotation = body_to_ned_matrix(roll_rad[index], pitch_rad[index], yaw_rad[index])
+            ideal_accel[index] = rotation.T @ (acceleration_ned_m_s2[index] - gravity_ned)
+    elif measurement_contract == MEASUREMENT_CONTRACT_DELTA_INTERVAL:
+        ideal_accel = interval_average_body_specific_force(
+            time_s,
+            roll_deg,
+            pitch_deg,
+            yaw_deg,
+            acceleration_ned_m_s2,
+        )
+    else:
+        raise ValueError(f"unsupported measurement contract: {measurement_contract}")
+
     for index in range(len(time_s)):
         rotation = body_to_ned_matrix(roll_rad[index], pitch_rad[index], yaw_rad[index])
-        ideal_accel[index] = rotation.T @ (acceleration_ned_m_s2[index] - gravity_ned)
         ideal_mag[index] = rotation.T @ magnetic_field_ned_ut
 
     measured_accel = ideal_accel + rng.normal(0.0, accel_noise_m_s2, ideal_accel.shape)
     measured_gyro = np.degrees(gyro_rad_s) + rng.normal(0.0, gyro_noise_deg_s, gyro_rad_s.shape)
     measured_mag = ideal_mag + rng.normal(0.0, mag_noise_ut, ideal_mag.shape)
     return measured_accel, measured_gyro, measured_mag, ideal_accel
+
+
+def quantize_replay_measurements(
+    acceleration_m_s2: np.ndarray,
+    angular_rate_deg_s: np.ndarray,
+    magnetic_field_ut: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Quantize exactly as the CSV transport and reconstruct its SI values."""
+    acceleration = (
+        np.rint(np.asarray(acceleration_m_s2, dtype=np.float64) / GRAVITY_M_S2 * 1000.0)
+        * GRAVITY_M_S2 / 1000.0
+    )
+    angular_rate = np.rint(np.asarray(angular_rate_deg_s, dtype=np.float64) * 1000.0) / 1000.0
+    magnetic_field = np.rint(np.asarray(magnetic_field_ut, dtype=np.float64) * 100.0) / 100.0
+    return acceleration, angular_rate, magnetic_field
+
+
+def causal_imu_stationarity_flags(
+    timestamp_us: np.ndarray,
+    acceleration_m_s2: np.ndarray,
+    angular_rate_deg_s: np.ndarray,
+    *,
+    window_s: float,
+    gyro_threshold_rad_s: float,
+    acceleration_tolerance_m_s2: float,
+) -> np.ndarray:
+    """Return a past-only IMU stationarity indication for validation adapters.
+
+    The detector deliberately sees only the same quantized IMU stream published
+    to the replay CSV.  It cannot distinguish rest from constant-velocity
+    translation; FCOne must combine its private armed/vehicle-state policy with
+    this signal before using it for alignment or ZUPT.
+    """
+    timestamp = np.asarray(timestamp_us, dtype=np.int64)
+    acceleration = np.asarray(acceleration_m_s2, dtype=np.float64)
+    angular_rate = np.asarray(angular_rate_deg_s, dtype=np.float64)
+    if len(timestamp) == 0 or acceleration.shape != (len(timestamp), 3) \
+            or angular_rate.shape != (len(timestamp), 3):
+        raise ValueError("stationarity inputs must contain equally sized timestamped vectors")
+    if window_s <= 0.0 or gyro_threshold_rad_s <= 0.0 or acceleration_tolerance_m_s2 <= 0.0:
+        raise ValueError("stationarity thresholds must be positive")
+    if len(timestamp) > 1 and np.any(np.diff(timestamp) <= 0):
+        raise ValueError("stationarity timestamps must be strictly increasing")
+
+    gyro_norm_rad_s = np.linalg.norm(np.radians(angular_rate), axis=1)
+    acceleration_norm = np.linalg.norm(acceleration, axis=1)
+    result = np.zeros(len(timestamp), dtype=np.int64)
+    start = 0
+    for index in range(len(timestamp)):
+        minimum_timestamp = int(timestamp[index] - round(window_s * 1.0e6))
+        while start < index and timestamp[start] < minimum_timestamp:
+            start += 1
+        if timestamp[index] - timestamp[start] < int(round(window_s * 1.0e6)):
+            continue
+        gyro_window = gyro_norm_rad_s[start:index + 1]
+        acceleration_window = acceleration_norm[start:index + 1]
+        if (np.percentile(gyro_window, 95) <= gyro_threshold_rad_s
+                and abs(float(np.mean(acceleration_window)) - GRAVITY_M_S2)
+                <= acceleration_tolerance_m_s2):
+            result[index] = 1
+    return result
+
+
+def interval_deltas_from_published_rates(
+    timestamp_us: np.ndarray,
+    acceleration_m_s2: np.ndarray,
+    angular_rate_deg_s: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Return delta angle/velocity implied by published interval-average rates."""
+    timestamp = np.asarray(timestamp_us, dtype=np.int64)
+    acceleration = np.asarray(acceleration_m_s2, dtype=np.float64)
+    angular_rate = np.asarray(angular_rate_deg_s, dtype=np.float64)
+    if len(timestamp) < 1 or acceleration.shape != (len(timestamp), 3) \
+            or angular_rate.shape != (len(timestamp), 3):
+        raise ValueError("delta inputs must contain equally sized timestamped vectors")
+    interval_us = np.zeros(len(timestamp), dtype=np.int64)
+    if len(timestamp) > 1:
+        interval_us[1:] = np.diff(timestamp)
+        if np.any(interval_us[1:] <= 0):
+            raise ValueError("delta timestamps must be strictly increasing")
+    interval_s = interval_us.astype(np.float64) * 1.0e-6
+    delta_velocity = acceleration * interval_s[:, None]
+    delta_angle = np.radians(angular_rate) * interval_s[:, None]
+    return interval_us, delta_angle, delta_velocity
 
 
 def inject_magnetic_anomaly(
@@ -510,6 +715,9 @@ def write_golden_csv(
     heading_fault: np.ndarray,
     acceleration_bias_m_s2: np.ndarray,
     gyroscope_bias_deg_s: np.ndarray,
+    delta_interval_us: np.ndarray | None = None,
+    delta_angle_rad: np.ndarray | None = None,
+    delta_velocity_m_s: np.ndarray | None = None,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     nominal_dt_us = int(round(1_000_000.0 / rate_hz))
@@ -517,6 +725,8 @@ def write_golden_csv(
         "seq", "host_ts_us", "ts_us", "dt_us",
         "raw_acc_mg_x", "raw_acc_mg_y", "raw_acc_mg_z",
         "raw_gyro_mdps_x", "raw_gyro_mdps_y", "raw_gyro_mdps_z",
+        "delta_interval_us", "delta_angle_rad_x", "delta_angle_rad_y", "delta_angle_rad_z",
+        "delta_velocity_m_s_x", "delta_velocity_m_s_y", "delta_velocity_m_s_z",
         "raw_mag_cuT_x", "raw_mag_cuT_y", "raw_mag_cuT_z",
         "g_est_mg_x", "g_est_mg_y", "g_est_mg_z",
         "innov_acc_milli", "innov_mag_milli", "acc_w_milli", "acc_n_milli",
@@ -534,6 +744,19 @@ def write_golden_csv(
         "truth_gyro_bias_x_rad_s", "truth_gyro_bias_y_rad_s", "truth_gyro_bias_z_rad_s",
     ]
 
+    accel_m_s2, gyro_deg_s, magnetic_ut = quantize_replay_measurements(
+        accel_m_s2, gyro_deg_s, magnetic_ut
+    )
+
+    if delta_interval_us is None or delta_angle_rad is None or delta_velocity_m_s is None:
+        delta_interval_us, delta_angle_rad, delta_velocity_m_s = (
+            interval_deltas_from_published_rates(timestamp_us, accel_m_s2, gyro_deg_s)
+        )
+    if (np.asarray(delta_interval_us).shape != (len(time_s),)
+            or np.asarray(delta_angle_rad).shape != (len(time_s), 3)
+            or np.asarray(delta_velocity_m_s).shape != (len(time_s), 3)):
+        raise ValueError("delta fields must have exactly one interval/vector per timestamp")
+
     with path.open("w", newline="", encoding="utf-8") as stream:
         writer = csv.writer(stream)
         writer.writerow(header)
@@ -546,6 +769,8 @@ def write_golden_csv(
                     index, ts_us, ts_us, dt_us,
                     *np.rint(accel_m_s2[index] / GRAVITY_M_S2 * 1000.0).astype(int),
                     *np.rint(gyro_deg_s[index] * 1000.0).astype(int),
+                    int(delta_interval_us[index]),
+                    *delta_angle_rad[index], *delta_velocity_m_s[index],
                     *np.rint(magnetic_ut[index] * 100.0).astype(int),
                     *np.rint(ideal_accel_m_s2[index] / GRAVITY_M_S2 * 1000.0).astype(int),
                     0, 0, 1000, 1000,
@@ -725,12 +950,29 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--measurement-contract",
+        choices=(MEASUREMENT_CONTRACT_LEGACY, MEASUREMENT_CONTRACT_DELTA_INTERVAL),
+        default=MEASUREMENT_CONTRACT_LEGACY,
+        help=(
+            "legacy publishes endpoint rate/specific-force semantics; delta_interval_v2 "
+            "publishes interval-average rates plus auditable delta-angle/delta-velocity fields"
+        ),
+    )
+    parser.add_argument(
         "--accel-noise-m-s2", type=float, default=0.02,
         help="per-sample accelerometer noise standard deviation",
     )
     parser.add_argument(
         "--gyro-noise-deg-s", type=float, default=0.05,
         help="per-sample gyroscope noise standard deviation",
+    )
+    parser.add_argument(
+        "--accel-noise-density-m-s2-sqrt-hz", type=float,
+        help="continuous accelerometer white-noise density for delta_interval_v2",
+    )
+    parser.add_argument(
+        "--gyro-noise-density-rad-s-sqrt-hz", type=float,
+        help="continuous gyroscope white-noise density for delta_interval_v2",
     )
     parser.add_argument(
         "--mag-noise-ut", type=float, default=0.20,
@@ -754,6 +996,32 @@ def main() -> None:
             "draw GNSS noise only at its fixed-rate update epochs so the same seed "
             "represents the same aiding stream at different IMU rates"
         ),
+    )
+    parser.add_argument(
+        "--stationarity-source",
+        choices=(
+            STATIONARITY_SOURCE_LEGACY_PROFILE,
+            STATIONARITY_SOURCE_CAUSAL_IMU,
+            STATIONARITY_SOURCE_NONE,
+        ),
+        default=STATIONARITY_SOURCE_LEGACY_PROFILE,
+        help=(
+            "source for static_hint: legacy profile truth for historical data, "
+            "or a past-only quantized-IMU window for v2 validation"
+        ),
+    )
+    parser.add_argument(
+        "--stationarity-window-s", type=float, default=1.0,
+        help="past-only IMU window used by causal_imu_window stationarity",
+    )
+    parser.add_argument(
+        "--stationarity-gyro-threshold-rad-s", type=float, default=0.05,
+        help="95th-percentile gyroscope norm limit for causal_imu_window stationarity",
+    )
+    parser.add_argument(
+        "--stationarity-acceleration-tolerance-m-s2", type=float,
+        default=0.20 * GRAVITY_M_S2,
+        help="mean acceleration-norm gravity tolerance for causal_imu_window stationarity",
     )
     parser.add_argument("--metadata", type=Path, help="optional JSON generation manifest")
     parser.add_argument(
@@ -785,6 +1053,27 @@ def main() -> None:
         args.mag_rate_hz <= 0.0 or args.mag_rate_hz > args.rate
     ):
         parser.error("--mag-rate-hz must be positive and no greater than --rate")
+    if args.stationarity_source == STATIONARITY_SOURCE_CAUSAL_IMU and not args.static_hint:
+        parser.error("causal_imu_window requires --static-hint")
+    if args.stationarity_source == STATIONARITY_SOURCE_NONE and args.static_hint:
+        parser.error("--stationarity-source none cannot be combined with --static-hint")
+    if args.measurement_contract == MEASUREMENT_CONTRACT_DELTA_INTERVAL:
+        if args.accel_time_semantics != "interval_start_zoh":
+            parser.error("delta_interval_v2 requires --accel-time-semantics interval_start_zoh")
+        if args.timestamp_jitter_std_us != 0.0:
+            parser.error("delta_interval_v2 v1 smoke keeps physical intervals exact; timestamp jitter is a later campaign")
+        if (args.accel_noise_density_m_s2_sqrt_hz is None
+                or args.gyro_noise_density_rad_s_sqrt_hz is None):
+            parser.error("delta_interval_v2 requires both IMU noise densities")
+    density_values = (
+        args.accel_noise_density_m_s2_sqrt_hz,
+        args.gyro_noise_density_rad_s_sqrt_hz,
+    )
+    if any(value is not None and value < 0.0 for value in density_values):
+        parser.error("IMU noise densities must be non-negative")
+    if (args.measurement_contract == MEASUREMENT_CONTRACT_LEGACY
+            and any(value is not None for value in density_values)):
+        parser.error("IMU noise densities are only defined for delta_interval_v2")
 
     rng = np.random.default_rng(args.seed)
     timing_rng = np.random.default_rng(args.seed ^ 0xA34A91)
@@ -823,16 +1112,25 @@ def main() -> None:
             roll_deg, pitch_deg = _vtol_attitude_from_acceleration(
                 acceleration_ned, yaw_deg
             )
+    if args.measurement_contract == MEASUREMENT_CONTRACT_DELTA_INTERVAL:
+        accel_noise_m_s2 = args.accel_noise_density_m_s2_sqrt_hz * math.sqrt(args.rate)
+        gyro_noise_deg_s = math.degrees(
+            args.gyro_noise_density_rad_s_sqrt_hz * math.sqrt(args.rate)
+        )
+    else:
+        accel_noise_m_s2 = args.accel_noise_m_s2
+        gyro_noise_deg_s = args.gyro_noise_deg_s
     accel, gyro, magnetic, ideal_accel = synthesize_measurements(
         time_s,
         roll_deg,
         pitch_deg,
         yaw_deg,
         rng,
-        accel_noise_m_s2=args.accel_noise_m_s2,
-        gyro_noise_deg_s=args.gyro_noise_deg_s,
+        accel_noise_m_s2=accel_noise_m_s2,
+        gyro_noise_deg_s=gyro_noise_deg_s,
         mag_noise_ut=args.mag_noise_ut,
         acceleration_ned_m_s2=acceleration_ned,
+        measurement_contract=args.measurement_contract,
     )
     # Preserve the historical deterministic random stream when injection is disabled.
     acceleration_bias, acceleration_bias_source = resolve_bias_vector(
@@ -859,10 +1157,20 @@ def main() -> None:
         length=max(1, int(round(args.rate * 0.5))),
         rng=rng,
     )
+    accel, gyro, magnetic = quantize_replay_measurements(accel, gyro, magnetic)
     navigation_enabled = args.motion in ("navigation_outage", "bias_excitation") \
         or bias_observability_motion
     static_flags = np.full(len(time_s), int(args.static_hint), dtype=np.int64)
-    if bias_observability_motion and args.static_hint:
+    if args.static_hint and args.stationarity_source == STATIONARITY_SOURCE_CAUSAL_IMU:
+        static_flags = causal_imu_stationarity_flags(
+            timestamp_us,
+            accel,
+            gyro,
+            window_s=args.stationarity_window_s,
+            gyro_threshold_rad_s=args.stationarity_gyro_threshold_rad_s,
+            acceleration_tolerance_m_s2=args.stationarity_acceleration_tolerance_m_s2,
+        )
+    elif bias_observability_motion and args.static_hint:
         static_flags = profile_static_flags
     elif args.motion in ("navigation_outage", "bias_excitation", "heading_recovery") \
             and args.static_hint:
@@ -944,8 +1252,20 @@ def main() -> None:
         args.metadata.write_text(
             json.dumps(
                 {
-                    "schema_version": 1,
+                    "schema_version": 2,
                     "motion": args.motion,
+                    "measurement_contract": args.measurement_contract,
+                    "delta_fields": {
+                        "interval_column": "delta_interval_us",
+                        "angle_columns": [
+                            "delta_angle_rad_x", "delta_angle_rad_y", "delta_angle_rad_z"
+                        ],
+                        "velocity_columns": [
+                            "delta_velocity_m_s_x", "delta_velocity_m_s_y",
+                            "delta_velocity_m_s_z"
+                        ],
+                        "row_zero_interval_is_zero": True,
+                    },
                     "acceleration_time_semantics": args.accel_time_semantics,
                     "truth_kinematics_time_semantics": (
                         "row_i_acceleration_held_on_previous_to_current_interval_with_matching_zoh_truth"
@@ -963,13 +1283,29 @@ def main() -> None:
                     "gyro_bias_std_deg_s": args.gyro_bias_std_deg_s,
                     "bias_sigma_limit": args.bias_sigma_limit,
                     "timestamp_jitter_std_us": args.timestamp_jitter_std_us,
-                    "accel_noise_m_s2": args.accel_noise_m_s2,
-                    "gyro_noise_deg_s": args.gyro_noise_deg_s,
+                    "accel_noise_m_s2": accel_noise_m_s2,
+                    "gyro_noise_deg_s": gyro_noise_deg_s,
+                    "accel_noise_density_m_s2_sqrt_hz": args.accel_noise_density_m_s2_sqrt_hz,
+                    "gyro_noise_density_rad_s_sqrt_hz": args.gyro_noise_density_rad_s_sqrt_hz,
                     "mag_noise_ut": args.mag_noise_ut,
                     "mag_rate_hz": mag_rate_hz,
                     "gps_position_noise_m": args.gps_position_noise_m,
                     "gps_velocity_noise_m_s": args.gps_velocity_noise_m_s,
                     "rate_invariant_streams": args.rate_invariant_streams,
+                    "stationarity_source": (
+                        args.stationarity_source if args.static_hint
+                        else STATIONARITY_SOURCE_NONE
+                    ),
+                    "truth_derived_stationarity": bool(
+                        args.static_hint
+                        and args.stationarity_source == STATIONARITY_SOURCE_LEGACY_PROFILE
+                    ),
+                    "stationarity_window_s": args.stationarity_window_s,
+                    "stationarity_gyro_threshold_rad_s": args.stationarity_gyro_threshold_rad_s,
+                    "stationarity_acceleration_tolerance_m_s2": (
+                        args.stationarity_acceleration_tolerance_m_s2
+                    ),
+                    "stationarity_flagged_samples": int(np.count_nonzero(static_flags)),
                     "timestamp_interval_min_us": int(np.min(np.diff(timestamp_us))),
                     "timestamp_interval_max_us": int(np.max(np.diff(timestamp_us))),
                     "trusted_heading_updates": int(np.count_nonzero(heading_updates)),

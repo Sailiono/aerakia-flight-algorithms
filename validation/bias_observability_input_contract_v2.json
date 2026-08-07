@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "protocol_id": "aerakia-bias-observability-input-contract-v2-smoke",
+  "status": "frozen_smoke_not_capability",
+  "purpose": "Validate the causal, interval-based synthetic input contract before opening a new estimator hypothesis.",
+  "measurement_contract": {
+    "id": "delta_interval_v2",
+    "acceleration_time_semantics": "interval_start_zoh",
+    "timestamp_semantics": "physical_sample_time",
+    "delta_angle": "integral of body angular rate over (t[i-1], t[i]]; row zero is zero",
+    "delta_velocity": "integral of body specific force over (t[i-1], t[i]]; row zero is zero",
+    "public_api_boundary": "The current public ESKF still consumes SI rate/specific-force samples; delta fields audit the private adapter contract."
+  },
+  "stationarity": {
+    "source": "causal_imu_window",
+    "window_s": 1.0,
+    "gyro_norm_p95_limit_rad_s": 0.05,
+    "acceleration_norm_mean_gravity_tolerance_m_s2": 1.96133,
+    "truth_derived": false,
+    "known_limit": "IMU-only stationarity cannot distinguish rest from constant-velocity translation; FCOne must add private armed/vehicle-state policy."
+  },
+  "noise": {
+    "definition": "continuous white-noise density; per-sample standard deviation is density times sqrt(rate_hz)",
+    "accel_density_m_s2_sqrt_hz": 0.002,
+    "gyro_density_rad_s_sqrt_hz": 0.0000872664626
+  },
+  "rates_hz": [50, 100, 200, 400],
+  "trajectory": {
+    "motion": "bias_cv_hover_axis_pulses",
+    "duration_s": 32.0,
+    "seed_start": 17
+  },
+  "acceptance": {
+    "delta_fields_reconstruct_quantized_published_rates": true,
+    "first_stationarity_flag_after_window": true,
+    "truth_derived_stationarity": false,
+    "static_alignment_completed_at_all_rates": true,
+    "healthy_ratio_min": 1.0,
+    "navigation_recoveries_max": 0
+  },
+  "deferred": [
+    "timestamp jitter and transport delay",
+    "delta quantization and saturation stress",
+    "bias random walk and thermal drift",
+    "lever-arm and asynchronous aiding",
+    "causal fixed-lag estimator correction and protected holdout"
+  ]
+}

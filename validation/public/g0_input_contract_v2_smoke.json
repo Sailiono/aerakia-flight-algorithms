@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "status": "passed",
+  "protocol_id": "aerakia-bias-observability-input-contract-v2-smoke",
+  "protocol_sha256": "a0159fd5cac7124117570d489ddd4e58139ccb64e4bf7548978971954514b1d8",
+  "measurement_contract": "delta_interval_v2",
+  "stationarity_source": "causal_imu_window",
+  "truth_derived_stationarity": false,
+  "total_rows": 24000,
+  "rates_hz": [50, 100, 200, 400],
+  "generator_sha256": "8d1aac8f3a3808b5c7803f5e7697c305de9ef4cbdd78388ae0cd560b9f595962",
+  "runner_sha256": "0eb216812feaee17017ab29930fda1e80593945b64ff0639e7b629fc4c1ad147",
+  "cases": [
+    {
+      "rate_hz": 50,
+      "seed": 17,
+      "input_sha256": "668eb26e9e4bbf9dd1788b8f2fb57add865c457b2c535706b2bdb5e7b7b149ca",
+      "rows": 1600,
+      "duration_s": 31.98,
+      "interval_us": 20000,
+      "first_stationarity_flag_sample": 50,
+      "stationarity_flagged_samples": 304,
+      "static_alignment_first_sample": 149,
+      "static_alignment_completed": true,
+      "healthy_ratio": 1.0,
+      "navigation_recoveries": 0
+    },
+    {
+      "rate_hz": 100,
+      "seed": 18,
+      "input_sha256": "9112fcf92b6bea07f4b55f74fee4db379efc7a8e828bee8d67af28221d513259",
+      "rows": 3200,
+      "duration_s": 31.99,
+      "interval_us": 10000,
+      "first_stationarity_flag_sample": 100,
+      "stationarity_flagged_samples": 610,
+      "static_alignment_first_sample": 200,
+      "static_alignment_completed": true,
+      "healthy_ratio": 1.0,
+      "navigation_recoveries": 0
+    },
+    {
+      "rate_hz": 200,
+      "seed": 19,
+      "input_sha256": "e7faab32eea11619cbb4d14730e91b49413a2e90cc25fdbac1a847866d254b71",
+      "rows": 6400,
+      "duration_s": 31.995,
+      "interval_us": 5000,
+      "first_stationarity_flag_sample": 200,
+      "stationarity_flagged_samples": 1220,
+      "static_alignment_first_sample": 400,
+      "static_alignment_completed": true,
+      "healthy_ratio": 1.0,
+      "navigation_recoveries": 0
+    },
+    {
+      "rate_hz": 400,
+      "seed": 20,
+      "input_sha256": "0662d28703098f5a3cfd0d8c2f64159b31189b3105ffef10761b5c20395b64c4",
+      "rows": 12800,
+      "duration_s": 31.9975,
+      "interval_us": 2500,
+      "first_stationarity_flag_sample": 400,
+      "stationarity_flagged_samples": 2440,
+      "static_alignment_first_sample": 800,
+      "static_alignment_completed": true,
+      "healthy_ratio": 1.0,
+      "navigation_recoveries": 0
+    }
+  ],
+  "limitations": [
+    "Input/integrity smoke only; it is not bias-convergence or flight evidence.",
+    "The current public ESKF still consumes rate/specific-force samples; delta fields audit the private adapter.",
+    "IMU-only stationarity cannot distinguish rest from constant-velocity translation.",
+    "Timestamp delay/jitter, quantization/saturation stress, random walk, thermal drift, lever arm, and protected holdout remain open."
+  ]
+}
