@@ -255,6 +255,23 @@ function compactCatalogEntry(spec, value, sourceSha256) {
 }
 
 export async function buildValidationData() {
+  const missingInputs = [];
+  for (const pair of curvePairs) {
+    for (const relativeDir of [pair.before, pair.after]) {
+      try {
+        await fs.access(path.join(repoRoot, relativeDir, "results.csv"));
+      } catch {
+        missingInputs.push(relativeDir);
+      }
+    }
+  }
+  if (missingInputs.length > 0) {
+    throw new Error(
+      "Cannot regenerate validation-data.json because required local replay outputs are absent: "
+      + `${missingInputs.join(", ")}. Restore or rerun the public dataset suite; `
+      + "the committed artifact remains valid for portable viewing and tests."
+    );
+  }
   const curves = [];
   for (const pair of curvePairs) curves.push(curveFromPair(pair, await readResults(pair.before), await readResults(pair.after)));
   const datasets = [];
