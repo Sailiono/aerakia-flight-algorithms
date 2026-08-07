@@ -68,3 +68,19 @@ test("G0 rate sensitivity entry matches its compact public evidence", async () =
   assert.equal(entry.evidenceGrade, "E");
   assert.equal(entry.highlights.healthyRatio, 1);
 });
+
+test("G0 trajectory screen and gate characterization entries match evidence", async () => {
+  const data = JSON.parse(await readFile(dataUrl, "utf8"));
+  for (const [id, file, samples] of [
+    ["g0-trajectory-screen", "g0_trajectory_screen.json", 4],
+    ["g0-gate-characterization", "g0_gate_characterization.json", null],
+  ]) {
+    const entry = data.datasets.find((item) => item.id === id);
+    assert.ok(entry);
+    const source = await readFile(new URL(`../../../validation/public/${file}`, import.meta.url));
+    const evidence = JSON.parse(source.toString("utf8"));
+    assert.equal(entry.sourceSha256, createHash("sha256").update(source).digest("hex"));
+    assert.equal(entry.evidenceGrade, "E");
+    assert.equal(entry.samples, samples ?? evidence.static_null.total_cases);
+  }
+});

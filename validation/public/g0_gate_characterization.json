@@ -1,0 +1,763 @@
+{
+  "analyzer_sha256": "73d494614d4984a63bad18b234717bc2cafd825c182bfdbb2b0296a72bdbf11a",
+  "generator_sha256": "324c927a3df2cc4fbca77e16e075fb1a8ebbaecf8c8875b5d7f529570e8fe81c",
+  "git_commit": "d8202a0db1e5d140935a3811c2cf2ba3e6deaf74",
+  "interpretation": [
+    "A stationary false-positive result is evidence against the analyzer's current gate, not proof of a safe runtime gate.",
+    "Zero-noise structural positives nominate excitation trajectories only; they do not establish noisy true-positive power or bias convergence.",
+    "The analyzer remains invalid as an estimator correction trigger until process/preintegration covariance, reset semantics, and persistence are modeled and independently calibrated."
+  ],
+  "null_definition": "32 s stationary trajectory, causal stationarity, 10 Hz GNSS P/V, continuous-density generated sensor noise",
+  "positive_control_definition": "takeoff-box and yaw-quadrant trajectories with all generated measurement noise set to zero",
+  "protocol_sha256": "a0159fd5cac7124117570d489ddd4e58139ccb64e4bf7548978971954514b1d8",
+  "rates_hz": [
+    50.0,
+    100.0,
+    200.0,
+    400.0
+  ],
+  "runner_sha256": "0eb216812feaee17017ab29930fda1e80593945b64ff0639e7b629fc4c1ad147",
+  "schema_version": 1,
+  "seed_range": [
+    0,
+    15
+  ],
+  "static_null": {
+    "cases": [
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 50.0,
+        "seed": 0,
+        "structural_ready": true
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 100.0,
+        "seed": 0,
+        "structural_ready": true
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 200.0,
+        "seed": 0,
+        "structural_ready": true
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 400.0,
+        "seed": 0,
+        "structural_ready": true
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 50.0,
+        "seed": 1,
+        "structural_ready": true
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 100.0,
+        "seed": 1,
+        "structural_ready": false
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 200.0,
+        "seed": 1,
+        "structural_ready": false
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 400.0,
+        "seed": 1,
+        "structural_ready": false
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 50.0,
+        "seed": 2,
+        "structural_ready": false
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 100.0,
+        "seed": 2,
+        "structural_ready": false
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 200.0,
+        "seed": 2,
+        "structural_ready": false
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 400.0,
+        "seed": 2,
+        "structural_ready": false
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 50.0,
+        "seed": 3,
+        "structural_ready": true
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 100.0,
+        "seed": 3,
+        "structural_ready": false
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 200.0,
+        "seed": 3,
+        "structural_ready": false
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 400.0,
+        "seed": 3,
+        "structural_ready": true
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": false,
+        "maximum_effective_rank": 4,
+        "navigation_recoveries": 0,
+        "rate_hz": 50.0,
+        "seed": 4,
+        "structural_ready": false
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 100.0,
+        "seed": 4,
+        "structural_ready": false
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 200.0,
+        "seed": 4,
+        "structural_ready": false
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 400.0,
+        "seed": 4,
+        "structural_ready": true
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 50.0,
+        "seed": 5,
+        "structural_ready": false
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 100.0,
+        "seed": 5,
+        "structural_ready": false
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 200.0,
+        "seed": 5,
+        "structural_ready": false
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 400.0,
+        "seed": 5,
+        "structural_ready": true
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 50.0,
+        "seed": 6,
+        "structural_ready": true
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 100.0,
+        "seed": 6,
+        "structural_ready": false
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 200.0,
+        "seed": 6,
+        "structural_ready": false
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 400.0,
+        "seed": 6,
+        "structural_ready": false
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": false,
+        "maximum_effective_rank": 4,
+        "navigation_recoveries": 0,
+        "rate_hz": 50.0,
+        "seed": 7,
+        "structural_ready": false
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 100.0,
+        "seed": 7,
+        "structural_ready": false
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 200.0,
+        "seed": 7,
+        "structural_ready": false
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 400.0,
+        "seed": 7,
+        "structural_ready": false
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 50.0,
+        "seed": 8,
+        "structural_ready": false
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 100.0,
+        "seed": 8,
+        "structural_ready": false
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": false,
+        "maximum_effective_rank": 4,
+        "navigation_recoveries": 0,
+        "rate_hz": 200.0,
+        "seed": 8,
+        "structural_ready": false
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 400.0,
+        "seed": 8,
+        "structural_ready": true
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 50.0,
+        "seed": 9,
+        "structural_ready": false
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 100.0,
+        "seed": 9,
+        "structural_ready": true
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 200.0,
+        "seed": 9,
+        "structural_ready": true
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 400.0,
+        "seed": 9,
+        "structural_ready": true
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 50.0,
+        "seed": 10,
+        "structural_ready": true
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 100.0,
+        "seed": 10,
+        "structural_ready": true
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 200.0,
+        "seed": 10,
+        "structural_ready": true
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 400.0,
+        "seed": 10,
+        "structural_ready": true
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 50.0,
+        "seed": 11,
+        "structural_ready": false
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 100.0,
+        "seed": 11,
+        "structural_ready": false
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 200.0,
+        "seed": 11,
+        "structural_ready": false
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 400.0,
+        "seed": 11,
+        "structural_ready": true
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 50.0,
+        "seed": 12,
+        "structural_ready": false
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": false,
+        "maximum_effective_rank": 4,
+        "navigation_recoveries": 0,
+        "rate_hz": 100.0,
+        "seed": 12,
+        "structural_ready": false
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 200.0,
+        "seed": 12,
+        "structural_ready": false
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 400.0,
+        "seed": 12,
+        "structural_ready": false
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 50.0,
+        "seed": 13,
+        "structural_ready": false
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 100.0,
+        "seed": 13,
+        "structural_ready": true
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 200.0,
+        "seed": 13,
+        "structural_ready": true
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 400.0,
+        "seed": 13,
+        "structural_ready": true
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 50.0,
+        "seed": 14,
+        "structural_ready": true
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 100.0,
+        "seed": 14,
+        "structural_ready": true
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 200.0,
+        "seed": 14,
+        "structural_ready": true
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 400.0,
+        "seed": 14,
+        "structural_ready": true
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 50.0,
+        "seed": 15,
+        "structural_ready": false
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 100.0,
+        "seed": 15,
+        "structural_ready": false
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 200.0,
+        "seed": 15,
+        "structural_ready": false
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 3,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "navigation_recoveries": 0,
+        "rate_hz": 400.0,
+        "seed": 15,
+        "structural_ready": false
+      }
+    ],
+    "effective_full_rank_cases": 60,
+    "effective_full_rank_rate": 0.9375,
+    "one_sided_95pct_upper_bound_if_zero": null,
+    "structural_ready_cases": 26,
+    "structural_ready_rate": 0.40625,
+    "total_cases": 64
+  },
+  "status": "diagnostic_only_not_estimator_gate",
+  "study_id": "g0-bias-observability-gate-characterization-v1",
+  "zero_noise_positive_controls": {
+    "cases": [
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 5,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "motion": "bias_cv_takeoff_box_land",
+        "navigation_recoveries": 0,
+        "rate_hz": 50.0,
+        "structural_ready": true
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 5,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "motion": "bias_cv_takeoff_box_land",
+        "navigation_recoveries": 0,
+        "rate_hz": 100.0,
+        "structural_ready": true
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 5,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "motion": "bias_cv_takeoff_box_land",
+        "navigation_recoveries": 0,
+        "rate_hz": 200.0,
+        "structural_ready": true
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 5,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "motion": "bias_cv_takeoff_box_land",
+        "navigation_recoveries": 0,
+        "rate_hz": 400.0,
+        "structural_ready": true
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 5,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "motion": "bias_cv_yaw_quadrant_hover",
+        "navigation_recoveries": 0,
+        "rate_hz": 50.0,
+        "structural_ready": true
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 5,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "motion": "bias_cv_yaw_quadrant_hover",
+        "navigation_recoveries": 0,
+        "rate_hz": 100.0,
+        "structural_ready": true
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 5,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "motion": "bias_cv_yaw_quadrant_hover",
+        "navigation_recoveries": 0,
+        "rate_hz": 200.0,
+        "structural_ready": true
+      },
+      {
+        "estimator_healthy_ratio": 1.0,
+        "final_effective_rank": 5,
+        "full_rank": true,
+        "maximum_effective_rank": 5,
+        "motion": "bias_cv_yaw_quadrant_hover",
+        "navigation_recoveries": 0,
+        "rate_hz": 400.0,
+        "structural_ready": true
+      }
+    ],
+    "effective_full_rank_cases": 8,
+    "structural_ready_cases": 8
+  }
+}

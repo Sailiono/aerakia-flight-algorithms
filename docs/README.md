@@ -67,6 +67,10 @@ is the stable navigation layer rather than a disruptive mass rename.
 - [G0 rate sensitivity](bias-observability-rate-sensitivity.md): controlled
   four-rate/noise study showing why the current analyzer cannot yet trigger a
   correction.
+- [G0 gate characterization](g0-gate-characterization.md): stationary-noise
+  null and zero-noise structural controls for measuring analyzer error rates.
+- [G0 trajectory screen](g0-bias-observability-trajectory-screen.md): frozen
+  maneuver geometry screen and its limits.
 - [Barometer source supervision](barometer-supervision-study.md) and
   [airspeed/barometer plan](airspeed-barometer-plan.md): vertical-aiding
   evidence, limits, and follow-up architecture.

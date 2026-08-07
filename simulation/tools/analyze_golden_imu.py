@@ -17,8 +17,16 @@ from __future__ import annotations
 import argparse
 import csv
 import math
+import os
+import tempfile
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Dict, List, Tuple
+
+if "MPLCONFIGDIR" not in os.environ:
+    matplotlib_cache = Path(tempfile.gettempdir()) / "aerakia-matplotlib"
+    matplotlib_cache.mkdir(parents=True, exist_ok=True)
+    os.environ["MPLCONFIGDIR"] = str(matplotlib_cache)
 
 import numpy as np
 import matplotlib.pyplot as plt

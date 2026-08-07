@@ -1847,3 +1847,30 @@ error-reset Jacobians. The compact result is
 No estimator code or thresholds were changed; a rate-invariant information
 model and explicit history/persistence semantics are required before a causal
 fixed-lag correction is implemented.
+
+## 2026-08-07 — G0 rate-study null-control correction
+
+The first rate-study implementation labeled a case `zero_sensor_noise` while
+only setting IMU noise to zero; magnetometer and GNSS noise were still enabled.
+That was not a valid all-measurement-zero control. The profile was renamed to
+`zero_all_measurement_noise`, regenerated, and its evidence re-read before any
+conclusion was retained.
+
+In the corrected control, all 50/100/200/400 Hz cases stayed at effective rank
+3 with zero full-rank and zero structural-ready windows. The noisy profiles can
+temporarily reach rank 5, including where the ideal control does not. This
+supports the narrower conclusion that noisy filtered-state linearization can
+manufacture apparent rank; it does not identify a safe estimator correction.
+
+The follow-up stationary-null/structural-control campaign is implemented by
+`validation/run_bias_observability_gate_characterization.py`. Its result must be
+interpreted as analyzer error-rate evidence only. No ESKF source, threshold, or
+flight policy was changed.
+
+The completed 16-seed, four-rate run produced 26/64 stationary
+structural-ready false positives and 60/64 stationary full-rank detections.
+Per-rate ready counts were 6/16 at 50 Hz, 5/16 at 100 Hz, 5/16 at 200 Hz, and
+10/16 at 400 Hz. All 64 ESKF executions remained healthy with zero navigation
+recoveries. Both zero-noise positive-control trajectories were structural-ready
+at all four rates. The current analyzer gate is therefore rejected; only the
+ideal trajectory candidates are retained for a future corrected model.

@@ -99,6 +99,56 @@ try {
 } catch (error) {
   if (error.code !== "ENOENT") throw error;
 }
+for (const spec of [
+  {
+    id: "g0-trajectory-screen",
+    label: "G0 · zero-noise trajectory screen",
+    referenceKind: "synthetic_structural_diagnostic",
+    role: "maneuver geometry candidate screen; not noisy convergence evidence",
+    file: "validation/public/g0_trajectory_screen.json",
+    samples: (evidence) => evidence.cases?.length ?? null,
+  },
+  {
+    id: "g0-gate-characterization",
+    label: "G0 · analyzer gate characterization",
+    referenceKind: "synthetic_analyzer_error_rate",
+    role: "stationary null and structural controls; not an estimator gate",
+    file: "validation/public/g0_gate_characterization.json",
+    samples: (evidence) => evidence.static_null?.total_cases ?? null,
+  },
+]) {
+  const evidencePath = path.join(repositoryRoot, spec.file);
+  try {
+    const buffer = await fs.readFile(evidencePath);
+    const evidence = JSON.parse(buffer.toString("utf8"));
+    const entry = {
+      id: spec.id,
+      label: spec.label,
+      evidenceGrade: "E",
+      referenceKind: spec.referenceKind,
+      role: spec.role,
+      sourcePath: spec.file,
+      sourceSha256: createHash("sha256").update(buffer).digest("hex"),
+      dataset: evidence.dataset ?? evidence.study_id ?? null,
+      sequence: evidence.sequence ?? evidence.null_definition ?? null,
+      samples: spec.samples(evidence),
+      durationS: evidence.duration_s ?? null,
+      coverage: { imuSamples: null, headingUpdates: null, gnssUpdates: null, outageS: null },
+      highlights: {
+        eskfAttitudeRmseDeg: null, eskfYawRmseDeg: null, tiltRmseDeg: null,
+        positionRmseM: null, outagePeakErrorM: null,
+        healthyRatio: evidence.healthy_ratio ?? null,
+        magnetometerOnYawRmseDeg: null, magnetometerOffYawRmseDeg: null,
+        navigationNeesMean: null,
+      },
+      limitations: evidence.limitations ?? evidence.interpretation ?? [],
+    };
+    artifact.datasets = (artifact.datasets ?? []).filter((item) => item.id !== entry.id);
+    artifact.datasets.push(entry);
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+}
 if (artifact.overview && Array.isArray(artifact.datasets)) {
   artifact.overview.datasetCount = artifact.datasets.length;
   artifact.overview.totalSamples = artifact.datasets.reduce(

@@ -41,6 +41,8 @@ const catalogSpecs = [
   { id: "idf-ds", label: "IDF-DS · PX4 fixed-wing corpus", grade: "D", kind: "onboard_estimator_reference", file: "validation/public/idf_ds_summary.json", role: "large PX4 compatibility and stress corpus" },
   { id: "baro-outage-v1", label: "Barometer outage campaign · v1", grade: "E", kind: "synthetic_fault_campaign", file: "validation/public/barometer_outage_campaign_v1.json", role: "relative-height source-supervision boundary" },
   { id: "g0-rate-sensitivity", label: "G0 · bias observability rate sensitivity", grade: "E", kind: "synthetic_contract_diagnostic", file: "validation/public/g0_rate_sensitivity.json", role: "rate/window/analyzer diagnostic; not an estimator gate" },
+  { id: "g0-trajectory-screen", label: "G0 · zero-noise trajectory screen", grade: "E", kind: "synthetic_structural_diagnostic", file: "validation/public/g0_trajectory_screen.json", role: "maneuver geometry candidate screen; not noisy convergence evidence" },
+  { id: "g0-gate-characterization", label: "G0 · analyzer gate characterization", grade: "E", kind: "synthetic_analyzer_error_rate", file: "validation/public/g0_gate_characterization.json", role: "stationary null and structural controls; not an estimator gate" },
 ];
 
 function relative(file) {

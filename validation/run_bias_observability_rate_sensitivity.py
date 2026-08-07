@@ -44,25 +44,38 @@ def run(command: list[str], *, cwd: Path, log_path: Path) -> None:
         subprocess.run(command, cwd=cwd, check=True, stdout=log, stderr=subprocess.STDOUT)
 
 
-def profile_density(profile: str, rate_hz: float, protocol: dict[str, object]) -> tuple[float, float]:
+def profile_settings(profile: str, rate_hz: float, protocol: dict[str, object]) -> dict[str, float]:
+    """Return the complete generated-measurement noise model for one profile."""
+
     noise = protocol["noise"]
     assert isinstance(noise, dict)
     accel_density = float(noise["accel_density_m_s2_sqrt_hz"])
     gyro_density = float(noise["gyro_density_rad_s_sqrt_hz"])
+    baseline = {
+        "accel_density": accel_density,
+        "gyro_density": gyro_density,
+        "mag_noise_ut": 0.20,
+        "gps_position_noise_m": 0.50,
+        "gps_velocity_noise_m_s": 0.10,
+    }
     if profile == "continuous_density":
-        return accel_density, gyro_density
-    if profile == "zero_sensor_noise":
-        return 0.0, 0.0
-    if profile == "fixed_sample_noise":
+        return baseline
+    if profile == "zero_all_measurement_noise":
+        return {key: 0.0 for key in baseline}
+    if profile == "fixed_sample_imu_noise":
         # Deliberately non-physical across rates: hold per-sample noise fixed
         # to expose estimator/analyzer sensitivity to this common mistake.
         accel_sample_std = 0.01
         gyro_sample_std_rad_s = math.radians(0.02)
-        return accel_sample_std / math.sqrt(rate_hz), gyro_sample_std_rad_s / math.sqrt(rate_hz)
+        return {
+            **baseline,
+            "accel_density": accel_sample_std / math.sqrt(rate_hz),
+            "gyro_density": gyro_sample_std_rad_s / math.sqrt(rate_hz),
+        }
     raise ValueError(f"unknown profile: {profile}")
 
 
-def summarize_analyzer(report: dict[str, object]) -> dict[str, object]:
+def summarize_analyzer(report: dict[str, object], static_prefix_end_s: float) -> dict[str, object]:
     evaluations = report["evaluations"]
     assert isinstance(evaluations, list)
     ready_times = [
@@ -75,6 +88,8 @@ def summarize_analyzer(report: dict[str, object]) -> dict[str, object]:
         for item in evaluations
         if int(item["effective_rank"]) == 5
     ]
+    early_full_rank_times = [time for time in full_rank_times if time <= static_prefix_end_s]
+    early_ready_times = [time for time in ready_times if time <= static_prefix_end_s]
     ranks = [int(item["effective_rank"]) for item in evaluations]
     final = evaluations[-1]
     assert isinstance(final, dict)
@@ -91,6 +106,9 @@ def summarize_analyzer(report: dict[str, object]) -> dict[str, object]:
         "effective_full_rank_time_span_s": (
             [full_rank_times[0], full_rank_times[-1]] if full_rank_times else None
         ),
+        "static_prefix_end_s": static_prefix_end_s,
+        "effective_full_rank_before_excitation_count": len(early_full_rank_times),
+        "structural_ready_before_excitation_count": len(early_ready_times),
         "maximum_effective_rank": max(ranks, default=0),
         "final_effective_rank": int(final["effective_rank"]),
         "final_minimum_eigenvalue": float(final["minimum_eigenvalue"]),
@@ -111,6 +129,7 @@ def run_case(
     protocol: dict[str, object],
     seed: int,
     keep_work: bool,
+    static_prefix_end_s: float,
 ) -> dict[str, object]:
     case_dir = work_root / profile / f"rate-{int(rate_hz):03d}hz"
     case_dir.mkdir(parents=True, exist_ok=True)
@@ -121,7 +140,7 @@ def run_case(
     report_path = case_dir / "analyzer-report.json"
     trajectory = protocol["trajectory"]
     assert isinstance(trajectory, dict)
-    accel_density, gyro_density = profile_density(profile, rate_hz, protocol)
+    settings = profile_settings(profile, rate_hz, protocol)
     generate = [
         sys.executable, str(GENERATOR),
         "--out", str(replay), "--metadata", str(metadata),
@@ -130,8 +149,11 @@ def run_case(
         "--stationarity-source", "causal_imu_window",
         "--measurement-contract", "delta_interval_v2",
         "--accel-time-semantics", "interval_start_zoh",
-        "--accel-noise-density-m-s2-sqrt-hz", str(accel_density),
-        "--gyro-noise-density-rad-s-sqrt-hz", str(gyro_density),
+        "--accel-noise-density-m-s2-sqrt-hz", str(settings["accel_density"]),
+        "--gyro-noise-density-rad-s-sqrt-hz", str(settings["gyro_density"]),
+        "--mag-noise-ut", str(settings["mag_noise_ut"]),
+        "--gps-position-noise-m", str(settings["gps_position_noise_m"]),
+        "--gps-velocity-noise-m-s", str(settings["gps_velocity_noise_m_s"]),
         "--rate-invariant-streams",
     ]
     run(generate, cwd=ROOT, log_path=case_dir / "generator.log")
@@ -192,7 +214,7 @@ def run_case(
         "input_sha256": sha256(replay),
         "estimator_healthy_ratio": sum(value > 0.5 for value in healthy_values) / len(healthy_values),
         "estimator_max_navigation_recovery_count": max(recovery_values, default=0),
-        "analyzer": summarize_analyzer(report),
+        "analyzer": summarize_analyzer(report, static_prefix_end_s),
     }
     if not keep_work:
         shutil.rmtree(case_dir)
@@ -206,6 +228,10 @@ def main() -> int:
     parser.add_argument("--work-dir", type=Path, default=Path("build/g0-rate-sensitivity"))
     parser.add_argument("--rates", default="50,100,200,400")
     parser.add_argument("--seed", type=int, default=17)
+    parser.add_argument(
+        "--static-prefix-end-s", type=float, default=3.0,
+        help="known stationary prefix end for this frozen trajectory; diagnostic only",
+    )
     parser.add_argument("--keep-work", action="store_true")
     args = parser.parse_args()
     protocol = json.loads(PROTOCOL.read_text(encoding="utf-8"))
@@ -217,9 +243,14 @@ def main() -> int:
         parser.error(f"runner does not exist: {runner}")
     work_dir = args.work_dir if args.work_dir.is_absolute() else ROOT / args.work_dir
     output = args.out if args.out.is_absolute() else ROOT / args.out
-    profiles = ("continuous_density", "zero_sensor_noise", "fixed_sample_noise")
+    if args.static_prefix_end_s < 0.0:
+        parser.error("--static-prefix-end-s must be non-negative")
+    profiles = ("continuous_density", "zero_all_measurement_noise", "fixed_sample_imu_noise")
     cases = [
-        run_case(profile, rate, runner, work_dir, protocol, args.seed, args.keep_work)
+        run_case(
+            profile, rate, runner, work_dir, protocol, args.seed, args.keep_work,
+            args.static_prefix_end_s,
+        )
         for profile in profiles
         for rate in rates
     ]

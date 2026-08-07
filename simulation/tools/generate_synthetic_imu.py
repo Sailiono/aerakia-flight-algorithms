@@ -25,6 +25,7 @@ STATIONARITY_SOURCE_CAUSAL_IMU = "causal_imu_window"
 STATIONARITY_SOURCE_NONE = "none"
 
 BIAS_OBSERVABILITY_TRAJECTORY_DURATIONS_S = {
+    "bias_cv_static_hold": 32.0,
     "bias_cv_hover_axis_pulses": 32.0,
     "bias_cv_takeoff_box_land": 38.0,
     "bias_cv_yaw_quadrant_hover": 40.0,
@@ -150,7 +151,14 @@ def generate_bias_observability_trajectory(
     time_s = np.arange(sample_count, dtype=np.float64) / rate_hz
     zero_velocity = [0.0, 0.0, 0.0]
 
-    if name == "bias_cv_hover_axis_pulses":
+    if name == "bias_cv_static_hold":
+        position_waypoints = [
+            (0.0, [0.0, 0.0, 0.0], zero_velocity),
+            (32.0, [0.0, 0.0, 0.0], zero_velocity),
+        ]
+        yaw_waypoints = [(0.0, [0.0], [0.0]), (32.0, [0.0], [0.0])]
+        static_flags = np.ones_like(time_s, dtype=np.int64)
+    elif name == "bias_cv_hover_axis_pulses":
         position_waypoints = [
             (0.0, [0.0, 0.0, 0.0], zero_velocity),
             (3.0, [0.0, 0.0, 0.0], zero_velocity),
