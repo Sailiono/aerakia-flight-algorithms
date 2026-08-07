@@ -192,7 +192,13 @@ simulation/tools/   Dataset generation, capture conversion, and analysis
 validation/         Native replay runner, reports, and regression thresholds
 tests/              Host-side unit and interface tests
 docs/               Contracts, methodology, and references
+tools/              Local validation workstations and reproducible viewers
 ```
+
+The retention and cleanup rules for generated data are documented in
+[Workspace artifact policy](docs/workspace-artifact-policy.md).
+Use the [documentation index](docs/README.md) to navigate architecture,
+validation evidence, open investigations, and visual tools.
 
 ## Public boundary
 

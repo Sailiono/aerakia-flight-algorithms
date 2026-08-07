@@ -35,10 +35,14 @@ missing. The raw source datasets, replay CSVs, and generated native-build
 products remain outside this workstation and are safe to remove after their
 compact summaries have been committed.
 
+`data:compact` uniformly decimates only the committed display rows to at most
+4,000 points per curve. It preserves full-replay RMSE/statistics and source
+hashes, and the UI labels the retained display points accordingly.
+
 ## Views
 
-- `曲线诊断`: raw EuRoC sample curves, quaternion geodesic error, wrapped Euler
-  diagnostics, RMSE and consistency metrics.
+- `曲线诊断`: retained EuRoC display samples, quaternion geodesic error, wrapped
+  Euler diagnostics, full-replay RMSE, and consistency metrics.
 - `覆盖矩阵`: evidence grade, sample volume, truth/source class, heading/GNSS
   coverage, and explicit limitations for EuRoC, Blackbird, UrbanNav, INSANE,
   IDF-DS, electrical UAV, and synthetic campaigns.
@@ -51,5 +55,6 @@ and generated replay CSVs remain outside the frontend.
 
 - `npm run dev`: start local development
 - `npm run data:build`: rebuild the compact validation data catalog
+- `npm run data:compact`: decimate committed display curves without raw replay files
 - `npm run build`: verify the vinext build output
 - `npm test`: build the site and run rendering/data-integrity tests without raw datasets

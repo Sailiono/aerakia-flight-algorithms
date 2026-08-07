@@ -51,7 +51,12 @@ def restore_metric_nans(trials: list[dict[str, Any]]) -> list[dict[str, Any]]:
             if not isinstance(values, dict):
                 continue
             for key, value in values.items():
-                if value is None and key.startswith(("outage_", "recovery_", "healthy_")):
+                # ``strict_json_value`` maps every non-finite top-level arm
+                # metric to null.  Examples include unavailable NIS percentiles
+                # and the detection delay when no switch took place.  Those are
+                # intentionally NaN to the aggregation code, not missing JSON
+                # fields. Nested metadata remains untouched.
+                if value is None:
                     values[key] = math.nan
     return restored
 
@@ -65,9 +70,34 @@ def main() -> None:
     )
     parser.add_argument("--out-dir", type=Path, required=True)
     parser.add_argument("--expected-seeds", type=int, default=None)
+    parser.add_argument(
+        "--expected-faults", default=None,
+        help="comma-separated requested fault matrix; required with --expected-seeds",
+    )
+    parser.add_argument(
+        "--expected-outages", default=None,
+        help="comma-separated requested outage durations; required with --expected-seeds",
+    )
     args = parser.parse_args()
     if args.expected_seeds is not None and args.expected_seeds <= 0:
         parser.error("--expected-seeds must be positive")
+    if args.expected_seeds is not None and (args.expected_faults is None or args.expected_outages is None):
+        parser.error("--expected-seeds requires --expected-faults and --expected-outages")
+
+    expected_faults = None
+    expected_outages = None
+    if args.expected_faults is not None:
+        expected_faults = [value.strip() for value in args.expected_faults.split(",") if value.strip()]
+        if not expected_faults or len(expected_faults) != len(set(expected_faults)):
+            parser.error("--expected-faults must be a non-empty list with no duplicates")
+    if args.expected_outages is not None:
+        try:
+            expected_outages = [float(value) for value in args.expected_outages.split(",") if value.strip()]
+        except ValueError as error:
+            parser.error(f"invalid --expected-outages: {error}")
+        if (not expected_outages or any(value <= 0.0 for value in expected_outages)
+                or len(expected_outages) != len(set(expected_outages))):
+            parser.error("--expected-outages must contain positive values with no duplicates")
 
     input_paths = list(args.input)
     for directory in args.input_dir:
@@ -80,7 +110,9 @@ def main() -> None:
         parser.error("the same shard was supplied more than once")
     loaded = [(path.resolve(), *load_summary(path.resolve())) for path in input_paths]
     first = loaded[0][1]
-    consistency_keys = ("schema_version", "scope", "faults", "outages_s", "rate_hz")
+    # Every shard deliberately contains only one fault and one outage group, so
+    # its local matrix definition must not be compared to another shard's.
+    consistency_keys = ("schema_version", "scope", "rate_hz")
     provenance_keys = (
         "runner_sha256", "script_sha256", "generator_sha256", "barometer_supervisor_sha256",
     )
@@ -102,12 +134,14 @@ def main() -> None:
             trials.append(trial)
         sources.append({"path": str(path), "sha256": digest, "trials": len(summary["trials"])})
 
+    observed_faults = sorted({str(trial["fault"]) for trial in trials})
+    observed_outages = sorted({float(trial["outage_duration_s"]) for trial in trials})
     expected: set[tuple[str, float, int]] | None = None
     if args.expected_seeds is not None:
         expected = {
             (fault, float(outage), seed)
-            for fault in first["faults"]
-            for outage in first["outages_s"]
+            for fault in expected_faults or []
+            for outage in expected_outages or []
             for seed in range(args.expected_seeds)
         }
         missing = sorted(expected - seen)
@@ -123,8 +157,8 @@ def main() -> None:
         "schema_version": 1,
         "status": "completed",
         "scope": first["scope"],
-        "outages_s": first["outages_s"],
-        "faults": first["faults"],
+        "outages_s": expected_outages if expected_outages is not None else observed_outages,
+        "faults": expected_faults if expected_faults is not None else observed_faults,
         "seeds": args.expected_seeds,
         "rate_hz": first["rate_hz"],
         "trial_count": len(trials),

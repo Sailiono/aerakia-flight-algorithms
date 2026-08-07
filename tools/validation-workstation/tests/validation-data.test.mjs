@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
@@ -6,7 +7,7 @@ const dataUrl = new URL("../public/data/validation-data.json", import.meta.url);
 
 test("validation catalog declares provenance and evidence boundaries", async () => {
   const data = JSON.parse(await readFile(dataUrl, "utf8"));
-  assert.equal(data.schemaVersion, 2);
+  assert.equal(data.schemaVersion, 3);
   assert.match(data.algorithmCommit, /^[0-9a-f]{7,40}$|^unknown$/);
   assert.ok(data.datasets.length >= 8);
   assert.ok(data.datasets.some((item) => item.evidenceGrade === "A"));
@@ -24,7 +25,12 @@ test("curve data is finite, aligned, and timestamp-monotonic", async () => {
   assert.equal(data.curves.length, 2);
   for (const curve of data.curves) {
     assert.ok(curve.samples > 0);
-    assert.equal(curve.rows.length, curve.samples);
+    assert.ok(curve.storedSamples > 0);
+    assert.equal(curve.rows.length, curve.storedSamples);
+    assert.ok(curve.storedSamples <= curve.samples);
+    assert.ok(curve.storedSamples <= 4000);
+    assert.ok(Math.abs(curve.rows[0].t) < 1e-9);
+    assert.ok(Math.abs(curve.rows.at(-1).t - curve.duration) < 0.001);
     assert.ok(curve.samplePeriodMs > 0);
     assert.match(curve.beforeSource.csvSha256, /^[0-9a-f]{64}$/);
     assert.match(curve.afterSource.csvSha256, /^[0-9a-f]{64}$/);
@@ -36,4 +42,16 @@ test("curve data is finite, aligned, and timestamp-monotonic", async () => {
       if (index > 0) assert.ok(row.t > curve.rows[index - 1].t);
     }
   }
+});
+
+test("barometer campaign entry matches its compact public evidence", async () => {
+  const data = JSON.parse(await readFile(dataUrl, "utf8"));
+  const entry = data.datasets.find((item) => item.id === "baro-outage-v1");
+  assert.ok(entry);
+  const source = await readFile(
+    new URL("../../../validation/public/barometer_outage_campaign_v1.json", import.meta.url),
+  );
+  assert.equal(entry.sourceSha256, createHash("sha256").update(source).digest("hex"));
+  assert.equal(entry.samples, 600);
+  assert.equal(entry.evidenceGrade, "E");
 });

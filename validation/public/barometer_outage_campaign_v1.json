@@ -1,0 +1,630 @@
+{
+  "campaign": {
+    "aggregate_cells": 30,
+    "arms": {
+      "imu_baro_raw": "current scalar relative-height update",
+      "imu_baro_shadow_failover": "offline, partial-output diagnostic mux only",
+      "imu_baro_supervised": "experimental causal source supervisor",
+      "imu_only": "barometer disabled"
+    },
+    "completed_trials": 600,
+    "faults": [
+      "nominal",
+      "constant_bias",
+      "random_walk",
+      "weather_step",
+      "freeze",
+      "delay"
+    ],
+    "id": "aerakia-synthetic-barometer-outage-v1",
+    "outages_s": [
+      5.0,
+      10.0,
+      30.0,
+      60.0,
+      120.0
+    ],
+    "rate_hz": 100.0,
+    "scope": "four-arm synthetic barometer aiding, source-supervision, and shadow-failover study; no promotion gates",
+    "seeds_per_cell": 20
+  },
+  "limitations": [
+    "The barometer is already converted to relative height; pressure and datum management are not tested.",
+    "The current 15-state ESKF has no barometer-bias state.",
+    "The source supervisor and thresholds are experimental PC-validation candidates, not FCOne release gates.",
+    "The shadow-failover arm is an offline timestamp-aligned output mux, not a real-time FCOne lane implementation.",
+    "The four-arm study does not exercise source-generation reset or authorized jump recovery end to end.",
+    "Constant datum bias cannot be distinguished from true relative height without an independent vertical reference.",
+    "Synthetic vertical motion and fault models are not physical FCOne qualification.",
+    "Shadow scores only recognize a 0-to-1 latch transition inside the declared GNSS-outage window.",
+    "The shadow arm switches only vertical position, velocity, and health in offline replay; it does not validate a complete state/covariance/controller handoff.",
+    "This result is diagnostic evidence, not a flight-promotion or source-supervisor release gate."
+  ],
+  "provenance": {
+    "barometer_supervisor_sha256": "c68f46787695a40a7c3d26ff2dda6ac0a833f1b4acd48a47b0fd8efeeb243984",
+    "generator_sha256": "659e78f75041e2bcefba214f81226b58b64c65715ed69b50b6808994ff08b838",
+    "runner_sha256": "0eb216812feaee17017ab29930fda1e80593945b64ff0639e7b629fc4c1ad147",
+    "single_shard_script_sha256": "150790172e15282101da49188161f59daacc5a2bc7de5d8d934f3573289495ef",
+    "source_campaign_manifest_sha256": "d961de0ad8e1c03780fc46281ca0920868331238253a983b362dea1756bd559a",
+    "source_campaign_summary_sha256": "b781e81ed0042137fd5b4cace81df02e8bb085c6ab91df6faf90030486d9762c"
+  },
+  "result": {
+    "aggregate": [
+      {
+        "fault": "constant_bias",
+        "outage_duration_s": 5.0,
+        "raw_baro_acceptance_ratio": 0.9944999999999999,
+        "shadow_failover": {
+          "detection_delay_p95_s": null,
+          "position_reset_abs_max_m": null,
+          "position_reset_abs_p95_m": null,
+          "switch_trials": 0
+        },
+        "supervised_baro_acceptance_ratio": 0.943,
+        "trials": 20,
+        "vertical_position_rmse_m": {
+          "imu_baro_raw": 0.9928793123414511,
+          "imu_baro_shadow_failover": 0.9512942569588037,
+          "imu_baro_supervised": 0.9512942569588037,
+          "imu_only": 0.184957376473593
+        }
+      },
+      {
+        "fault": "constant_bias",
+        "outage_duration_s": 10.0,
+        "raw_baro_acceptance_ratio": 0.99525,
+        "shadow_failover": {
+          "detection_delay_p95_s": null,
+          "position_reset_abs_max_m": null,
+          "position_reset_abs_p95_m": null,
+          "switch_trials": 0
+        },
+        "supervised_baro_acceptance_ratio": 0.944,
+        "trials": 20,
+        "vertical_position_rmse_m": {
+          "imu_baro_raw": 1.002711985315412,
+          "imu_baro_shadow_failover": 0.9665165255511999,
+          "imu_baro_supervised": 0.9665165255511999,
+          "imu_only": 0.3796951938305598
+        }
+      },
+      {
+        "fault": "constant_bias",
+        "outage_duration_s": 30.0,
+        "raw_baro_acceptance_ratio": 0.99575,
+        "shadow_failover": {
+          "detection_delay_p95_s": null,
+          "position_reset_abs_max_m": null,
+          "position_reset_abs_p95_m": null,
+          "switch_trials": 0
+        },
+        "supervised_baro_acceptance_ratio": 0.9449166666666666,
+        "trials": 20,
+        "vertical_position_rmse_m": {
+          "imu_baro_raw": 1.001455928808757,
+          "imu_baro_shadow_failover": 0.9925807419542807,
+          "imu_baro_supervised": 0.9925807419542807,
+          "imu_only": 1.968991860545972
+        }
+      },
+      {
+        "fault": "constant_bias",
+        "outage_duration_s": 60.0,
+        "raw_baro_acceptance_ratio": 0.9966666666666667,
+        "shadow_failover": {
+          "detection_delay_p95_s": null,
+          "position_reset_abs_max_m": null,
+          "position_reset_abs_p95_m": null,
+          "switch_trials": 0
+        },
+        "supervised_baro_acceptance_ratio": 0.9458333333333333,
+        "trials": 20,
+        "vertical_position_rmse_m": {
+          "imu_baro_raw": 1.0037145124179003,
+          "imu_baro_shadow_failover": 1.0471535485003187,
+          "imu_baro_supervised": 1.0471535485003187,
+          "imu_only": 7.488370527473494
+        }
+      },
+      {
+        "fault": "constant_bias",
+        "outage_duration_s": 120.0,
+        "raw_baro_acceptance_ratio": 0.9969166666666667,
+        "shadow_failover": {
+          "detection_delay_p95_s": 126.55,
+          "position_reset_abs_max_m": 171.046447754,
+          "position_reset_abs_p95_m": 171.046447754,
+          "switch_trials": 1
+        },
+        "supervised_baro_acceptance_ratio": 0.9454583333333333,
+        "trials": 20,
+        "vertical_position_rmse_m": {
+          "imu_baro_raw": 0.9991616828150757,
+          "imu_baro_shadow_failover": 2.031717045250497,
+          "imu_baro_supervised": 1.1305725604623584,
+          "imu_only": 41.62425506872852
+        }
+      },
+      {
+        "fault": "delay",
+        "outage_duration_s": 5.0,
+        "raw_baro_acceptance_ratio": 0.0,
+        "shadow_failover": {
+          "detection_delay_p95_s": null,
+          "position_reset_abs_max_m": null,
+          "position_reset_abs_p95_m": null,
+          "switch_trials": 0
+        },
+        "supervised_baro_acceptance_ratio": 0.0,
+        "trials": 20,
+        "vertical_position_rmse_m": {
+          "imu_baro_raw": 0.184957376473593,
+          "imu_baro_shadow_failover": 0.184957376473593,
+          "imu_baro_supervised": 0.184957376473593,
+          "imu_only": 0.184957376473593
+        }
+      },
+      {
+        "fault": "delay",
+        "outage_duration_s": 10.0,
+        "raw_baro_acceptance_ratio": 0.0,
+        "shadow_failover": {
+          "detection_delay_p95_s": null,
+          "position_reset_abs_max_m": null,
+          "position_reset_abs_p95_m": null,
+          "switch_trials": 0
+        },
+        "supervised_baro_acceptance_ratio": 0.0,
+        "trials": 20,
+        "vertical_position_rmse_m": {
+          "imu_baro_raw": 0.3796951938305598,
+          "imu_baro_shadow_failover": 0.3796951938305598,
+          "imu_baro_supervised": 0.3796951938305598,
+          "imu_only": 0.3796951938305598
+        }
+      },
+      {
+        "fault": "delay",
+        "outage_duration_s": 30.0,
+        "raw_baro_acceptance_ratio": 0.0,
+        "shadow_failover": {
+          "detection_delay_p95_s": null,
+          "position_reset_abs_max_m": null,
+          "position_reset_abs_p95_m": null,
+          "switch_trials": 0
+        },
+        "supervised_baro_acceptance_ratio": 0.0,
+        "trials": 20,
+        "vertical_position_rmse_m": {
+          "imu_baro_raw": 1.968991860545972,
+          "imu_baro_shadow_failover": 1.968991860545972,
+          "imu_baro_supervised": 1.968991860545972,
+          "imu_only": 1.968991860545972
+        }
+      },
+      {
+        "fault": "delay",
+        "outage_duration_s": 60.0,
+        "raw_baro_acceptance_ratio": 0.0,
+        "shadow_failover": {
+          "detection_delay_p95_s": null,
+          "position_reset_abs_max_m": null,
+          "position_reset_abs_p95_m": null,
+          "switch_trials": 0
+        },
+        "supervised_baro_acceptance_ratio": 0.0,
+        "trials": 20,
+        "vertical_position_rmse_m": {
+          "imu_baro_raw": 7.488370527473494,
+          "imu_baro_shadow_failover": 7.488370527473494,
+          "imu_baro_supervised": 7.488370527473494,
+          "imu_only": 7.488370527473494
+        }
+      },
+      {
+        "fault": "delay",
+        "outage_duration_s": 120.0,
+        "raw_baro_acceptance_ratio": 0.0,
+        "shadow_failover": {
+          "detection_delay_p95_s": null,
+          "position_reset_abs_max_m": null,
+          "position_reset_abs_p95_m": null,
+          "switch_trials": 0
+        },
+        "supervised_baro_acceptance_ratio": 0.0,
+        "trials": 20,
+        "vertical_position_rmse_m": {
+          "imu_baro_raw": 41.62425506872852,
+          "imu_baro_shadow_failover": 41.62425506872852,
+          "imu_baro_supervised": 41.62425506872852,
+          "imu_only": 41.62425506872852
+        }
+      },
+      {
+        "fault": "freeze",
+        "outage_duration_s": 5.0,
+        "raw_baro_acceptance_ratio": 0.9495,
+        "shadow_failover": {
+          "detection_delay_p95_s": 0.15000000000000036,
+          "position_reset_abs_max_m": 0.46237897900000013,
+          "position_reset_abs_p95_m": 0.3897651913000002,
+          "switch_trials": 20
+        },
+        "supervised_baro_acceptance_ratio": 0.413,
+        "trials": 20,
+        "vertical_position_rmse_m": {
+          "imu_baro_raw": 0.520389077152618,
+          "imu_baro_shadow_failover": 0.17935294447526437,
+          "imu_baro_supervised": 0.2159008767831334,
+          "imu_only": 0.184957376473593
+        }
+      },
+      {
+        "fault": "freeze",
+        "outage_duration_s": 10.0,
+        "raw_baro_acceptance_ratio": 0.89225,
+        "shadow_failover": {
+          "detection_delay_p95_s": 0.1675000000000006,
+          "position_reset_abs_max_m": 0.97744739,
+          "position_reset_abs_p95_m": 0.5376182852500003,
+          "switch_trials": 20
+        },
+        "supervised_baro_acceptance_ratio": 0.38725000000000004,
+        "trials": 20,
+        "vertical_position_rmse_m": {
+          "imu_baro_raw": 0.9763795662408422,
+          "imu_baro_shadow_failover": 0.3820876220709021,
+          "imu_baro_supervised": 0.6421069056906933,
+          "imu_only": 0.3796951938305598
+        }
+      },
+      {
+        "fault": "freeze",
+        "outage_duration_s": 30.0,
+        "raw_baro_acceptance_ratio": 0.7705,
+        "shadow_failover": {
+          "detection_delay_p95_s": 2.909999999999999,
+          "position_reset_abs_max_m": 2.556826591,
+          "position_reset_abs_p95_m": 1.3933647868000005,
+          "switch_trials": 20
+        },
+        "supervised_baro_acceptance_ratio": 0.28275,
+        "trials": 20,
+        "vertical_position_rmse_m": {
+          "imu_baro_raw": 2.7544583476326827,
+          "imu_baro_shadow_failover": 1.960533068097057,
+          "imu_baro_supervised": 1.974724871192903,
+          "imu_only": 1.968991860545972
+        }
+      },
+      {
+        "fault": "freeze",
+        "outage_duration_s": 60.0,
+        "raw_baro_acceptance_ratio": 0.9982916666666667,
+        "shadow_failover": {
+          "detection_delay_p95_s": 0.14999999999999858,
+          "position_reset_abs_max_m": 4.634769678,
+          "position_reset_abs_p95_m": 3.1364138842500005,
+          "switch_trials": 20
+        },
+        "supervised_baro_acceptance_ratio": 0.25154166666666666,
+        "trials": 20,
+        "vertical_position_rmse_m": {
+          "imu_baro_raw": 1.1291774774102354,
+          "imu_baro_shadow_failover": 7.478952537089462,
+          "imu_baro_supervised": 3.7758556308594344,
+          "imu_only": 7.488370527473494
+        }
+      },
+      {
+        "fault": "freeze",
+        "outage_duration_s": 120.0,
+        "raw_baro_acceptance_ratio": 0.9981041666666667,
+        "shadow_failover": {
+          "detection_delay_p95_s": 0.14999999999999858,
+          "position_reset_abs_max_m": 12.464571595,
+          "position_reset_abs_p95_m": 10.586004501300001,
+          "switch_trials": 20
+        },
+        "supervised_baro_acceptance_ratio": 0.25004166666666666,
+        "trials": 20,
+        "vertical_position_rmse_m": {
+          "imu_baro_raw": 1.182500675513132,
+          "imu_baro_shadow_failover": 41.60289907273874,
+          "imu_baro_supervised": 7.393839045664868,
+          "imu_only": 41.62425506872852
+        }
+      },
+      {
+        "fault": "nominal",
+        "outage_duration_s": 5.0,
+        "raw_baro_acceptance_ratio": 0.9975,
+        "shadow_failover": {
+          "detection_delay_p95_s": null,
+          "position_reset_abs_max_m": null,
+          "position_reset_abs_p95_m": null,
+          "switch_trials": 0
+        },
+        "supervised_baro_acceptance_ratio": 0.996,
+        "trials": 20,
+        "vertical_position_rmse_m": {
+          "imu_baro_raw": 0.08601619266410032,
+          "imu_baro_shadow_failover": 0.0864926413081475,
+          "imu_baro_supervised": 0.0864926413081475,
+          "imu_only": 0.184957376473593
+        }
+      },
+      {
+        "fault": "nominal",
+        "outage_duration_s": 10.0,
+        "raw_baro_acceptance_ratio": 0.99675,
+        "shadow_failover": {
+          "detection_delay_p95_s": null,
+          "position_reset_abs_max_m": null,
+          "position_reset_abs_p95_m": null,
+          "switch_trials": 0
+        },
+        "supervised_baro_acceptance_ratio": 0.9955,
+        "trials": 20,
+        "vertical_position_rmse_m": {
+          "imu_baro_raw": 0.10118002412477194,
+          "imu_baro_shadow_failover": 0.10201411013488718,
+          "imu_baro_supervised": 0.10201411013488718,
+          "imu_only": 0.3796951938305598
+        }
+      },
+      {
+        "fault": "nominal",
+        "outage_duration_s": 30.0,
+        "raw_baro_acceptance_ratio": 0.99625,
+        "shadow_failover": {
+          "detection_delay_p95_s": null,
+          "position_reset_abs_max_m": null,
+          "position_reset_abs_p95_m": null,
+          "switch_trials": 0
+        },
+        "supervised_baro_acceptance_ratio": 0.9951666666666666,
+        "trials": 20,
+        "vertical_position_rmse_m": {
+          "imu_baro_raw": 0.10206608951249933,
+          "imu_baro_shadow_failover": 0.10250990723861365,
+          "imu_baro_supervised": 0.10250990723861365,
+          "imu_only": 1.968991860545972
+        }
+      },
+      {
+        "fault": "nominal",
+        "outage_duration_s": 60.0,
+        "raw_baro_acceptance_ratio": 0.9969166666666667,
+        "shadow_failover": {
+          "detection_delay_p95_s": null,
+          "position_reset_abs_max_m": null,
+          "position_reset_abs_p95_m": null,
+          "switch_trials": 0
+        },
+        "supervised_baro_acceptance_ratio": 0.9959166666666667,
+        "trials": 20,
+        "vertical_position_rmse_m": {
+          "imu_baro_raw": 0.1008045008207562,
+          "imu_baro_shadow_failover": 0.10131563692548046,
+          "imu_baro_supervised": 0.10131563692548046,
+          "imu_only": 7.488370527473494
+        }
+      },
+      {
+        "fault": "nominal",
+        "outage_duration_s": 120.0,
+        "raw_baro_acceptance_ratio": 0.9970416666666667,
+        "shadow_failover": {
+          "detection_delay_p95_s": null,
+          "position_reset_abs_max_m": 170.046447277,
+          "position_reset_abs_p95_m": 170.046447277,
+          "switch_trials": 1
+        },
+        "supervised_baro_acceptance_ratio": 0.9953541666666667,
+        "trials": 20,
+        "vertical_position_rmse_m": {
+          "imu_baro_raw": 0.10083140966788931,
+          "imu_baro_shadow_failover": 1.0460494815025012,
+          "imu_baro_supervised": 0.10135802483113503,
+          "imu_only": 41.62425506872852
+        }
+      },
+      {
+        "fault": "random_walk",
+        "outage_duration_s": 5.0,
+        "raw_baro_acceptance_ratio": 0.997,
+        "shadow_failover": {
+          "detection_delay_p95_s": null,
+          "position_reset_abs_max_m": null,
+          "position_reset_abs_p95_m": null,
+          "switch_trials": 0
+        },
+        "supervised_baro_acceptance_ratio": 0.9955,
+        "trials": 20,
+        "vertical_position_rmse_m": {
+          "imu_baro_raw": 0.12575930603992383,
+          "imu_baro_shadow_failover": 0.12686580694156424,
+          "imu_baro_supervised": 0.12686580694156424,
+          "imu_only": 0.184957376473593
+        }
+      },
+      {
+        "fault": "random_walk",
+        "outage_duration_s": 10.0,
+        "raw_baro_acceptance_ratio": 0.99625,
+        "shadow_failover": {
+          "detection_delay_p95_s": null,
+          "position_reset_abs_max_m": null,
+          "position_reset_abs_p95_m": null,
+          "switch_trials": 0
+        },
+        "supervised_baro_acceptance_ratio": 0.99525,
+        "trials": 20,
+        "vertical_position_rmse_m": {
+          "imu_baro_raw": 0.12356636779724398,
+          "imu_baro_shadow_failover": 0.12447231839143363,
+          "imu_baro_supervised": 0.12447231839143363,
+          "imu_only": 0.3796951938305598
+        }
+      },
+      {
+        "fault": "random_walk",
+        "outage_duration_s": 30.0,
+        "raw_baro_acceptance_ratio": 0.9963333333333333,
+        "shadow_failover": {
+          "detection_delay_p95_s": null,
+          "position_reset_abs_max_m": null,
+          "position_reset_abs_p95_m": null,
+          "switch_trials": 0
+        },
+        "supervised_baro_acceptance_ratio": 0.9951666666666666,
+        "trials": 20,
+        "vertical_position_rmse_m": {
+          "imu_baro_raw": 0.1730325616535639,
+          "imu_baro_shadow_failover": 0.17327488357473655,
+          "imu_baro_supervised": 0.17327488357473655,
+          "imu_only": 1.968991860545972
+        }
+      },
+      {
+        "fault": "random_walk",
+        "outage_duration_s": 60.0,
+        "raw_baro_acceptance_ratio": 0.9970416666666667,
+        "shadow_failover": {
+          "detection_delay_p95_s": null,
+          "position_reset_abs_max_m": null,
+          "position_reset_abs_p95_m": null,
+          "switch_trials": 0
+        },
+        "supervised_baro_acceptance_ratio": 0.9959166666666667,
+        "trials": 20,
+        "vertical_position_rmse_m": {
+          "imu_baro_raw": 0.22189462537325888,
+          "imu_baro_shadow_failover": 0.22209327141976032,
+          "imu_baro_supervised": 0.22209327141976032,
+          "imu_only": 7.488370527473494
+        }
+      },
+      {
+        "fault": "random_walk",
+        "outage_duration_s": 120.0,
+        "raw_baro_acceptance_ratio": 0.9970833333333333,
+        "shadow_failover": {
+          "detection_delay_p95_s": null,
+          "position_reset_abs_max_m": 170.714909076,
+          "position_reset_abs_p95_m": 170.714909076,
+          "switch_trials": 1
+        },
+        "supervised_baro_acceptance_ratio": 0.9953541666666667,
+        "trials": 20,
+        "vertical_position_rmse_m": {
+          "imu_baro_raw": 0.2714773641000501,
+          "imu_baro_shadow_failover": 1.203498986872576,
+          "imu_baro_supervised": 0.2721697125207382,
+          "imu_only": 41.62425506872852
+        }
+      },
+      {
+        "fault": "weather_step",
+        "outage_duration_s": 5.0,
+        "raw_baro_acceptance_ratio": 0.713,
+        "shadow_failover": {
+          "detection_delay_p95_s": 0.16749999999999995,
+          "position_reset_abs_max_m": 0.4234681130000002,
+          "position_reset_abs_p95_m": 0.40808604955000016,
+          "switch_trials": 14
+        },
+        "supervised_baro_acceptance_ratio": 0.5725,
+        "trials": 20,
+        "vertical_position_rmse_m": {
+          "imu_baro_raw": 0.8262141589235728,
+          "imu_baro_shadow_failover": 0.37877364287127163,
+          "imu_baro_supervised": 0.36548490020482827,
+          "imu_only": 0.184957376473593
+        }
+      },
+      {
+        "fault": "weather_step",
+        "outage_duration_s": 10.0,
+        "raw_baro_acceptance_ratio": 0.845,
+        "shadow_failover": {
+          "detection_delay_p95_s": 0.39999999999999947,
+          "position_reset_abs_max_m": 0.8311145309999999,
+          "position_reset_abs_p95_m": 0.6962022779999998,
+          "switch_trials": 16
+        },
+        "supervised_baro_acceptance_ratio": 0.57875,
+        "trials": 20,
+        "vertical_position_rmse_m": {
+          "imu_baro_raw": 1.2818356804580981,
+          "imu_baro_shadow_failover": 0.5342305194130659,
+          "imu_baro_supervised": 0.4302111518604924,
+          "imu_only": 0.3796951938305598
+        }
+      },
+      {
+        "fault": "weather_step",
+        "outage_duration_s": 30.0,
+        "raw_baro_acceptance_ratio": 0.9429166666666666,
+        "shadow_failover": {
+          "detection_delay_p95_s": 0.5500000000000007,
+          "position_reset_abs_max_m": 4.7863802909999995,
+          "position_reset_abs_p95_m": 3.114712190999996,
+          "switch_trials": 19
+        },
+        "supervised_baro_acceptance_ratio": 0.5208333333333334,
+        "trials": 20,
+        "vertical_position_rmse_m": {
+          "imu_baro_raw": 1.347358345244367,
+          "imu_baro_shadow_failover": 1.7818408533655123,
+          "imu_baro_supervised": 0.5070775984853779,
+          "imu_only": 1.968991860545972
+        }
+      },
+      {
+        "fault": "weather_step",
+        "outage_duration_s": 60.0,
+        "raw_baro_acceptance_ratio": 0.9755,
+        "shadow_failover": {
+          "detection_delay_p95_s": 0.3799999999999996,
+          "position_reset_abs_max_m": 10.621577024,
+          "position_reset_abs_p95_m": 9.500871217499999,
+          "switch_trials": 15
+        },
+        "supervised_baro_acceptance_ratio": 0.6190416666666667,
+        "trials": 20,
+        "vertical_position_rmse_m": {
+          "imu_baro_raw": 1.365993290446813,
+          "imu_baro_shadow_failover": 5.3250551940444835,
+          "imu_baro_supervised": 1.049068454866758,
+          "imu_only": 7.488370527473494
+        }
+      },
+      {
+        "fault": "weather_step",
+        "outage_duration_s": 120.0,
+        "raw_baro_acceptance_ratio": 0.9862708333333333,
+        "shadow_failover": {
+          "detection_delay_p95_s": 0.42499999999999716,
+          "position_reset_abs_max_m": 64.344303012,
+          "position_reset_abs_p95_m": 47.14321514925,
+          "switch_trials": 16
+        },
+        "supervised_baro_acceptance_ratio": 0.5962500000000001,
+        "trials": 20,
+        "vertical_position_rmse_m": {
+          "imu_baro_raw": 1.3763753771566243,
+          "imu_baro_shadow_failover": 32.425550944235226,
+          "imu_baro_supervised": 14.906187274184099,
+          "imu_only": 41.62425506872852
+        }
+      }
+    ],
+    "all_arm_healthy_ratio_min": 1.0,
+    "supervisor_latch_event_during_outage_trials": 183,
+    "supervisor_latch_event_trials": 191
+  },
+  "schema_version": 1,
+  "status": "completed"
+}

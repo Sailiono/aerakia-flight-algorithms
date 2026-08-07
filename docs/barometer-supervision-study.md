@@ -135,3 +135,60 @@ Before promotion, the four-arm campaign must cover all planned outage durations,
 at least 100 frozen seeds per development split, valid hover/climb/descent/transition negative
 controls, train/tune separation, and a newly sealed holdout. Real FCOne thresholds remain blocked on
 physical sensor data.
+
+## Resumable release-candidate runner
+
+The broad synthetic matrix is now run by
+`validation/run_baro_outage_campaign.py`. It shards exact, deterministic
+fault/outage/seed combinations, records the native runner and source hashes,
+and invokes a fail-closed merger which rejects missing or duplicated matrix
+cells. The replay runner's `--compact-output` mode exports only the fields used
+by this study; it does not change estimator execution, fault injection, or
+scoring. A one-seed 120 s weather-step smoke completed in 18.34 s after this
+I/O change, versus 31.96 s with the old full diagnostic export. Its four-arm
+result retained the expected architecture boundary: raw barometer vertical
+RMSE was `1.366 m`, supervised single-lane RMSE was `7.845 m`, IMU-only was
+`6.689 m`, and offline shadow output-mux RMSE was `6.670 m`.
+
+This smoke is a performance and provenance check, not a release gate. No
+threshold or estimator parameter was changed from it.
+
+## Complete Development Matrix (v1)
+
+The complete v1 development matrix is now retained as
+[`validation/public/barometer_outage_campaign_v1.json`](../validation/public/barometer_outage_campaign_v1.json).
+It contains `600/600` exact, non-duplicated trials: six fault profiles,
+five GNSS-outage durations (`5/10/30/60/120 s`), and 20 deterministic seeds
+per cell. The compact record carries SHA-256 identities for the merged source
+summary, campaign manifest, C99 runner, generator, supervisor, and shard
+script. The full 360-shard output is deliberately disposable.
+
+Every arm retained finite state/covariance and a health ratio of `1.0` in this
+synthetic matrix. That is a numerical-integrity result, not a source-trust or
+flight-readiness result.
+
+| Representative cell | IMU only | Raw baro | Supervised lane | Offline partial shadow mux | What the number does and does not show |
+| --- | ---: | ---: | ---: | ---: | --- |
+| Nominal, 120 s | `41.6243 m` | `0.1008 m` | `0.1014 m` | `1.0460 m` | Relative height is highly valuable when its source is healthy. One late in-window false latch makes the diagnostic mux worse; it is not a valid handoff design. |
+| Physical `0.60 s` delay, 120 s | `41.6243 m` | `41.6243 m` | `41.6243 m` | `41.6243 m` | The timestamp-age gate rejected every delayed barometer update before fusion. |
+| Weather step, 30 s | `1.9690 m` | `1.3474 m` | `0.5071 m` | `1.7818 m` | The single lane can reduce this particular transient, but its shadow output cannot be read as a complete-state failover result. |
+| Weather step, 120 s | `41.6243 m` | `1.3764 m` | `14.9062 m` | `32.4256 m` | A later latch leaves a contaminated active lane and a diverged barometer-free lane; neither is a safe automated handoff. |
+| Frozen stream, 120 s | `41.6243 m` | `1.1825 m` | `7.3938 m` | `41.6029 m` | The synthetic cyclic vertical path can make a stale held value look numerically close. This is exactly why a raw RMSE alone cannot certify a source. |
+
+The scoring counts a shadow transition only on a `fault_latched` rising edge
+inside the declared GNSS-outage window. A prior latch is retained as a separate
+diagnostic event; it is not retrospectively counted as detection at the outage
+boundary. In this matrix there were 191 latch-event trials, 183 with an event
+inside the outage. The two nominal/random-walk 120-second cases with a late
+in-window latch are retained as false-positive evidence, not discarded.
+
+### Decision after v1
+
+This closes the **diagnostic campaign**, not the barometer fault-tolerance
+problem. The current public supervisor remains experimental and must not be
+promoted as an FCOne control-authority gate. A viable private FCOne solution
+needs source identity, at least a second independently qualified vertical
+reference (redundant barometer, GNSS/RTK, range/vision where applicable), and
+a complete nominal-state/covariance/controller-reset handoff. It must then be
+tested against a sealed split with actual sensor pressure, temperature,
+vibration, plumbing, and source-reset behavior.

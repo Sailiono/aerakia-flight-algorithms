@@ -18,7 +18,7 @@ flight readiness.
 
 ### Implementation
 
-- Added `reports/aerakia-optimization-explorer/scripts/build-validation-data.mjs`.
+- Added `tools/validation-workstation/scripts/build-validation-data.mjs`.
 - The generator uses repository-relative paths, checks required result columns,
   finite numeric values, strictly increasing timestamps, before/after sample
   alignment, and source/result SHA-256 hashes.
@@ -55,7 +55,7 @@ flight readiness.
 
 ### Reproduction
 
-From `reports/aerakia-optimization-explorer`:
+From `tools/validation-workstation`:
 
 ```bash
 npm run data:build
@@ -65,6 +65,32 @@ npm test
 The generated artifact is tied to the current algorithm commit and records the
 hashes of every input summary and curve source. Raw datasets remain outside the
 frontend and are restored/downloaded separately.
+
+## 2026-08-07: portability and cleanup
+
+- Decoupled `npm test` from `npm run data:build`; tests now use the committed
+  compact artifact and do not require the parent `build/` directory.
+- Added a fail-closed missing-replay diagnostic to the explicit data generator.
+- Migrated the workstation from its temporary nested Sites repository into
+  `tools/validation-workstation` in the algorithm repository.
+- Removed the unused duplicate `curve-data.json`, six legacy attitude PNGs,
+  and the unused curve-data generator. The current viewer has no references to
+  those files.
+- Removed the temporary `build/` tree (43 GB), G0 build trees, package caches,
+  raw dataset intake, replay CSVs, and local Python/Node caches. The compact
+  summaries and recovery manifests remain the durable record.
+
+## 2026-08-07: compact display artifact and barometer evidence
+
+- The committed curve artifact now retains at most 4,000 uniformly sampled
+  display points per source curve. It preserves the full replay sample count,
+  source hashes, and full-replay metrics; the UI labels the data as retained
+  display points rather than raw sample output.
+- The artifact shrank from `8.2 MB` to about `1.2 MB`. Raw replay outputs are
+  still required only for an explicit `npm run data:build` regeneration.
+- Added the complete, hashed 600-trial synthetic barometer-outage campaign to
+  the coverage catalog as Grade E diagnostic evidence. Its detailed results
+  and limits remain in `docs/barometer-supervision-study.md`.
 
 ## Next planned workstation increments
 

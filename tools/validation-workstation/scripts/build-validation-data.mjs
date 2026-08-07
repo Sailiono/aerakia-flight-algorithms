@@ -7,6 +7,7 @@ const scriptDir = path.dirname(new URL(import.meta.url).pathname);
 const defaultRepoRoot = path.resolve(scriptDir, "../../..");
 const repoRoot = path.resolve(process.env.AERAKIA_REPO_ROOT ?? defaultRepoRoot);
 const outputPath = path.resolve(scriptDir, "../public/data/validation-data.json");
+const maximumStoredCurveRows = 4000;
 
 const curvePairs = [
   {
@@ -38,6 +39,7 @@ const catalogSpecs = [
   { id: "insane-indoor", label: "INSANE · indoor_1", grade: "A-candidate", kind: "physical_heading_local_datum", file: "validation/public/insane_indoor_heading_study.json", role: "adverse physical magnetometer study" },
   { id: "insane-outdoor", label: "INSANE · outdoor_1_sensors", grade: "C", kind: "shared_physical_source", file: "validation/public/insane_outdoor1_heading_summary.json", role: "dual-RTK heading input, shared reference" },
   { id: "idf-ds", label: "IDF-DS · PX4 fixed-wing corpus", grade: "D", kind: "onboard_estimator_reference", file: "validation/public/idf_ds_summary.json", role: "large PX4 compatibility and stress corpus" },
+  { id: "baro-outage-v1", label: "Barometer outage campaign · v1", grade: "E", kind: "synthetic_fault_campaign", file: "validation/public/barometer_outage_campaign_v1.json", role: "relative-height source-supervision boundary" },
 ];
 
 function relative(file) {
@@ -164,9 +166,18 @@ function round(value, digits = 4) {
   return Number(value.toFixed(digits));
 }
 
+function evenlySampleRows(rows, maximumRows = maximumStoredCurveRows) {
+  if (rows.length <= maximumRows) return rows;
+  const sampled = [];
+  for (let index = 0; index < maximumRows; index += 1) {
+    sampled.push(rows[Math.round((index * (rows.length - 1)) / (maximumRows - 1))]);
+  }
+  return sampled;
+}
+
 function curveFromPair(pair, before, after) {
   if (before.rows.length !== after.rows.length) throw new Error(`${pair.id}: before/after sample counts differ`);
-  const rows = before.rows.map((row, index) => {
+  const allRows = before.rows.map((row, index) => {
     const corrected = after.rows[index];
     if (Math.abs(row.t - corrected.t) > 1e-9) throw new Error(`${pair.id}: before/after timestamps differ at sample ${index}`);
     return {
@@ -186,7 +197,8 @@ function curveFromPair(pair, before, after) {
   }));
   const beforeGeo = geodesicRmse(before.rows);
   const afterGeo = Math.sqrt(after.rows.reduce((sum, row, i) => sum + geodesicErrorDeg(row.eskfQ, before.rows[i].truthQ) ** 2, 0) / after.rows.length);
-  const dt = rows.slice(1).map((row, i) => row.t - rows[i].t).sort((a, b) => a - b);
+  const dt = allRows.slice(1).map((row, i) => row.t - allRows[i].t).sort((a, b) => a - b);
+  const rows = evenlySampleRows(allRows);
   return {
     id: pair.id,
     label: pair.label,
@@ -195,9 +207,10 @@ function curveFromPair(pair, before, after) {
     evidenceGrade: pair.evidenceGrade,
     beforeSource: { path: before.relativeDir, csvSha256: before.csvSha256, metricsSha256: before.metricsSha256, sourceSha256: before.sourceSha256 },
     afterSource: { path: after.relativeDir, csvSha256: after.csvSha256, metricsSha256: after.metricsSha256, sourceSha256: after.sourceSha256 },
-    duration: round(rows.at(-1).t, 3),
+    duration: round(allRows.at(-1).t, 3),
     samplePeriodMs: round((dt[Math.floor(dt.length / 2)] ?? 0) * 1000, 4),
-    samples: rows.length,
+    samples: allRows.length,
+    storedSamples: rows.length,
     axisRmse,
     attitudeGeodesicRmse: { before: round(beforeGeo), after: round(afterGeo), reductionPct: round(((beforeGeo - afterGeo) / beforeGeo) * 100, 2) },
     integrity: {
@@ -231,7 +244,7 @@ function compactCatalogEntry(spec, value, sourceSha256) {
     sourceSha256,
     dataset: value.dataset ?? null,
     sequence: value.sequence ?? value.source?.sequence ?? null,
-    samples: pick(value, ["samples", "recorded_imu_samples", "frozen_holdout_audit.imu_samples", "intake.dji_imu_samples", "corpus.imu_samples"]),
+    samples: pick(value, ["samples", "recorded_imu_samples", "frozen_holdout_audit.imu_samples", "intake.dji_imu_samples", "corpus.imu_samples", "campaign.completed_trials"]),
     durationS: pick(value, ["duration_s", "frozen_holdout_audit.duration_s", "replay.duration_s", "corpus.duration_s"]),
     coverage: {
       imuSamples: pick(value, ["samples", "recorded_imu_samples", "frozen_holdout_audit.imu_samples", "intake.dji_imu_samples", "corpus.imu_samples"]),
@@ -245,7 +258,7 @@ function compactCatalogEntry(spec, value, sourceSha256) {
       tiltRmseDeg: pick(value, ["tracks.raw_imu_trusted_attitude_init.eskf_tilt_rmse_deg", "tracks.static_reference_bias_corrected_trusted_attitude_init.eskf_tilt_rmse_deg", "tracks.recorded_position_reference_attitude_init.eskf_tilt_rmse_deg", "replay.eskf_tilt_rmse_deg_vs_onboard_attitude", "frozen_holdout_tracking.algorithms.eskf.tilt_rmse_deg"]),
       positionRmseM: pick(value, ["tracks.recorded_position_reference_attitude_init.aided_position_rmse_m", "tracks.raw_imu_trusted_attitude_init.position_rmse_m", "replay.position_rmse_m_vs_rtk", "selected_replays.0.position_rmse_m"]),
       outagePeakErrorM: pick(value, ["tracks.recorded_position_reference_attitude_init.outage_peak_position_error_m"]),
-      healthyRatio: pick(value, ["tracks.raw_imu_trusted_attitude_init.healthy_ratio", "tracks.recorded_position_reference_attitude_init.healthy_ratio", "replay.healthy_ratio", "frozen_holdout_tracking.algorithms.eskf.healthy_ratio"]),
+      healthyRatio: pick(value, ["tracks.raw_imu_trusted_attitude_init.healthy_ratio", "tracks.recorded_position_reference_attitude_init.healthy_ratio", "replay.healthy_ratio", "frozen_holdout_tracking.algorithms.eskf.healthy_ratio", "result.all_arm_healthy_ratio_min"]),
       magnetometerOnYawRmseDeg: pick(value, ["paired_magnetometer_ab.magnetometer_on.eskf_yaw_rmse_deg"]),
       magnetometerOffYawRmseDeg: pick(value, ["paired_magnetometer_ab.magnetometer_off.eskf_yaw_rmse_deg"]),
       navigationNeesMean: pick(value, ["tracks.raw_imu_trusted_attitude_init.navigation_nees_mean", "tracks.recorded_position_reference_attitude_init.navigation_nees_mean", "frozen_holdout_tracking.algorithms.eskf.navigation_nees_mean"]),
@@ -316,9 +329,9 @@ export async function buildValidationData() {
   const gitCommit = await readGitCommit();
   const dirty = null;
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     generatedAt: new Date().toISOString(),
-    generator: "reports/aerakia-optimization-explorer/scripts/build-validation-data.mjs",
+    generator: "tools/validation-workstation/scripts/build-validation-data.mjs",
     algorithmCommit: gitCommit,
     repositoryDirty: dirty,
     evidenceGrades: {

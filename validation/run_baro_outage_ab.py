@@ -404,11 +404,24 @@ def score_shadow_failover(
     if not np.array_equal(supervised["ref_velocity_d_m_s"], shadow["ref_velocity_d_m_s"]):
         raise RuntimeError("supervised and shadow velocity references differ")
     time_s = (supervised["ts_us"] - supervised["ts_us"][0]) * 1.0e-6
-    latch_indices = np.flatnonzero(supervised["baro_supervisor_latched"] > 0.5)
-    candidate_index = int(latch_indices[0]) if len(latch_indices) else None
+    outage = (time_s >= outage_start_s) & (time_s < outage_start_s + outage_duration_s)
+    recovery = (time_s >= outage_start_s + outage_duration_s) & (
+        time_s < outage_start_s + outage_duration_s + 5.0
+    )
+    latched = supervised["baro_supervisor_latched"] > 0.5
+    # The runner exports a latched *state* on every IMU row. A hot-lane
+    # transition is only meaningful on its rising edge; treating every later
+    # sample as a new event would falsely credit a pre-outage latch as fault
+    # detection at the beginning of the GNSS outage.
+    latch_indices = np.flatnonzero(latched & np.concatenate(([True], ~latched[:-1])))
+    outage_latch_indices = latch_indices[outage[latch_indices]]
+    candidate_index = int(outage_latch_indices[0]) if len(outage_latch_indices) else None
     blocked_reasons: list[str] = []
     if candidate_index is None:
-        blocked_reasons.append("no_supervisor_latch")
+        blocked_reasons.append(
+            "no_supervisor_latch_during_outage"
+            if len(latch_indices) else "no_supervisor_latch"
+        )
     else:
         if not input_provenance_equivalent:
             blocked_reasons.append("input_provenance_unverified")
@@ -439,10 +452,6 @@ def score_shadow_failover(
         use_shadow, shadow["eskf_velocity_d_m_s"], supervised["eskf_velocity_d_m_s"]
     )
     healthy = np.where(use_shadow, shadow["eskf_healthy"], supervised["eskf_healthy"])
-    outage = (time_s >= outage_start_s) & (time_s < outage_start_s + outage_duration_s)
-    recovery = (time_s >= outage_start_s + outage_duration_s) & (
-        time_s < outage_start_s + outage_duration_s + 5.0
-    )
     position_error = position - supervised["ref_position_d_m"]
     velocity_error = velocity - supervised["ref_velocity_d_m_s"]
     result = {
@@ -467,6 +476,11 @@ def score_shadow_failover(
             if switch_index is not None else 0.0
         ),
         "shadow_failover_candidate_count": 1 if candidate_index is not None else 0,
+        "shadow_supervisor_latch_count": int(len(latch_indices)),
+        "shadow_supervisor_latch_during_outage_count": int(len(outage_latch_indices)),
+        "shadow_first_supervisor_latch_time_s": (
+            float(time_s[latch_indices[0]]) if len(latch_indices) else math.nan
+        ),
         "shadow_switch_preconditions_met": not blocked_reasons,
         "shadow_switch_blocked_reasons": blocked_reasons,
         "shadow_failover_upper_bound": True,

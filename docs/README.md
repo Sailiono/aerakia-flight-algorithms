@@ -1,0 +1,68 @@
+# Documentation Index
+
+This directory records decisions, evidence, and known limits for the portable
+algorithm layer. It is not a substitute for the private FCOne product safety
+case or board-level verification.
+
+## Start Here
+
+- [Algorithm status](algorithm-status.md): current capability, quantitative
+  evidence, and blockers.
+- [Development roadmap](roadmap.md): ordered work before and after FCOne v2
+  hardware is available.
+- [FCOne v2 pre-hardware closure](fcone-v2-algorithm-closure.md): what may
+  enter shadow integration, and what still blocks sole control authority.
+
+## Architecture And Integration
+
+- [Architecture](architecture.md) and [state augmentation policy](state-augmentation-policy.md)
+  define the 16-component nominal / 15-dimensional error-state model and the
+  conditions for adding states.
+- [Integration guide](integration.md), [coordinate conventions](coordinate-conventions.md),
+  and [estimator supervision](estimator-supervision.md) define the hardware-neutral
+  API, time/frame contract, and ESKF/Mahony application roles.
+- [Vehicle and repository flow](vehicle-target-and-repository-flow.md),
+  [public boundary](public-boundary.md), and [release policy](release-policy.md)
+  define the public/private split.
+
+## Validation Evidence
+
+- [Validation method](validation.md), [validation execution log](validation-execution-log.md),
+  and [public datasets](public-datasets.md) define evidence grades, methods,
+  inputs, results, and limits.
+- [PX4-class validation plan](px4-class-validation-plan.md), [PX4 comparison](px4-ekf2-comparison.md),
+  and [PX4 bias A/B protocol](px4-bias-ab-protocol.md) keep engineering
+  comparison separate from independent truth.
+- [Timing and precision validation](timing-and-precision-validation.md),
+  [input integrity validation](input-integrity-validation.md), and
+  [golden replay contract](golden-dataset.md) record transport and numerical
+  coverage.
+
+## Focused Open Investigations
+
+- [Bias observability](bias-observability.md) and
+  [G0 correlated static-prior rejection](g0-correlated-static-prior.md): the
+  retained cold-start horizontal accelerometer-bias boundary and rejected
+  shortcut.
+- [Barometer source supervision](barometer-supervision-study.md) and
+  [airspeed/barometer plan](airspeed-barometer-plan.md): vertical-aiding
+  evidence, limits, and follow-up architecture.
+- [Magnetic source supervision](magnetic-source-supervision.md) and
+  [absolute-heading evidence](absolute-heading-evidence.md): why magnetic yaw
+  is fail-safe by default and how trusted heading is qualified.
+
+## Visual Evidence And Retention
+
+- [`../tools/validation-workstation`](../tools/validation-workstation): local,
+  reproducible evidence viewer. It visualizes compact committed artifacts and
+  never downloads or stores raw flight data.
+- [Algorithm optimization showcase](algorithm-optimization-showcase/README.md):
+  presentation source retained as a compact project artifact.
+- [Validation workstation log](validation-explorer-development-log.md): viewer
+  changes and source-data limits.
+- [Workspace artifact policy](workspace-artifact-policy.md): what belongs in
+  Git, private archive, or disposable build output.
+
+When a result changes a decision, update the focused document above and add a
+compact, hashed summary under `validation/public/`. Do not commit raw flight
+logs, dataset archives, build products, or high-rate replay CSVs.

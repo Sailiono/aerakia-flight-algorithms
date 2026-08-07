@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import json
 import math
+import os
 import sys
 import tempfile
 import unittest
@@ -14,9 +15,100 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "validation"))
 import run_baro_outage_ab as baro_ab  # noqa: E402
+import run_baro_outage_campaign as baro_campaign  # noqa: E402
+import promote_baro_outage_summary as baro_promotion  # noqa: E402
 
 
 class BarometerOutageAbTests(unittest.TestCase):
+    def test_compact_promotion_requires_and_preserves_a_complete_matrix(self) -> None:
+        arms = {
+            arm: {"healthy_ratio": 1.0}
+            for arm in (
+                "imu_only", "imu_baro_raw", "imu_baro_supervised", "imu_baro_shadow_failover"
+            )
+        }
+        arms["imu_baro_shadow_failover"].update({
+            "shadow_supervisor_latch_count": 1,
+            "shadow_supervisor_latch_during_outage_count": 1,
+        })
+        source = {
+            "status": "completed",
+            "faults": ["freeze"], "outages_s": [5.0], "seeds": 1,
+            "trial_count": 1, "rate_hz": 100.0, "scope": "test",
+            "provenance": {
+                "completeness_checked": True,
+                "shared_runner_sha256": "a" * 64,
+                "shared_generator_sha256": "b" * 64,
+                "shared_barometer_supervisor_sha256": "c" * 64,
+                "shared_campaign_script_sha256": "d" * 64,
+            },
+            "aggregate": [{
+                "fault": "freeze", "outage_duration_s": 5.0, "trials": 1,
+                "outage_vertical_position_rmse_m": {
+                    "imu_only_mean": 1.0, "imu_baro_raw_mean": 2.0,
+                    "imu_baro_supervised_mean": 3.0, "imu_baro_shadow_failover_mean": 4.0,
+                },
+                "outage_baro_acceptance_ratio": {
+                    "imu_baro_raw_mean": 0.5, "imu_baro_supervised_mean": 0.25,
+                },
+                "shadow_failover": {
+                    "switch_count": 1, "detection_delay_p95_s": 0.1,
+                    "position_reset_abs_p95_m": 0.2, "position_reset_abs_max_m": 0.3,
+                },
+            }],
+            "trials": [{"imu_only": arms["imu_only"], "imu_baro_raw": arms["imu_baro_raw"],
+                        "imu_baro_supervised": arms["imu_baro_supervised"],
+                        "imu_baro_shadow_failover": arms["imu_baro_shadow_failover"]}],
+            "limitations": ["test limit"],
+        }
+        evidence = baro_promotion.promote(source, summary_sha256="e" * 64, manifest_sha256="f" * 64)
+        self.assertEqual(evidence["campaign"]["completed_trials"], 1)
+        self.assertEqual(evidence["result"]["supervisor_latch_event_during_outage_trials"], 1)
+        self.assertEqual(evidence["result"]["aggregate"][0]["vertical_position_rmse_m"]["imu_only"], 1.0)
+        source["trial_count"] = 0
+        with self.assertRaisesRegex(ValueError, "trial count"):
+            baro_promotion.promote(source, summary_sha256="e" * 64, manifest_sha256="f" * 64)
+
+    @unittest.skipIf(os.name == "nt", "Windows byte-range locks have different same-process semantics")
+    def test_campaign_output_lock_excludes_a_second_writer(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            lock_path = Path(directory) / ".campaign.lock"
+            first = baro_campaign.CampaignLock(lock_path)
+            second = baro_campaign.CampaignLock(lock_path)
+            first.acquire()
+            try:
+                with self.assertRaisesRegex(RuntimeError, "already writing"):
+                    second.acquire()
+            finally:
+                first.release()
+            second.acquire()
+            second.release()
+
+    def test_barometer_pair_preserves_only_the_enable_flag_difference(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            base = root / "base.csv"
+            active = root / "active.csv"
+            shadow = root / "shadow.csv"
+            base.write_text("ts_us,raw_acc_mg_x\n0,1\n10000,2\n", encoding="utf-8")
+            baro_ab.write_barometer_pair(
+                base, active, shadow,
+                np.array([1, 0], dtype=np.int64),
+                np.array([0, 10000], dtype=np.int64),
+                np.array([3.0, 4.0]), np.array([0.16, 0.16]),
+            )
+            audit = baro_ab.audit_shadow_inputs(active, shadow)
+        self.assertTrue(audit["verified"])
+        self.assertEqual(audit["observed_differing_columns"], ["baro_update"])
+
+    def test_campaign_outage_groups_must_partition_the_requested_matrix(self) -> None:
+        self.assertEqual(
+            baro_campaign.parse_outage_groups("5,10/30", [5.0, 10.0, 30.0]),
+            [[5.0, 10.0], [30.0]],
+        )
+        with self.assertRaisesRegex(ValueError, "partition"):
+            baro_campaign.parse_outage_groups("5,10/10", [5.0, 10.0, 30.0])
+
     def test_shadow_input_audit_derives_allowed_difference(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
@@ -179,6 +271,65 @@ class BarometerOutageAbTests(unittest.TestCase):
         self.assertEqual(metrics["shadow_failover_candidate_count"], 1)
         self.assertEqual(metrics["shadow_failover_count"], 0)
         self.assertIn("shadow_unhealthy", metrics["shadow_switch_blocked_reasons"])
+
+    def test_shadow_failover_does_not_retroactively_switch_after_outage(self) -> None:
+        fieldnames = [
+            "ts_us", "ref_position_d_m", "ref_velocity_d_m_s",
+            "eskf_position_d_m", "eskf_velocity_d_m_s", "eskf_healthy",
+            "eskf_static_aligned", "baro_supervisor_latched",
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            supervised_path = Path(directory) / "supervised.csv"
+            shadow_path = Path(directory) / "shadow.csv"
+            for path, is_shadow in ((supervised_path, False), (shadow_path, True)):
+                with path.open("w", encoding="utf-8", newline="") as stream:
+                    writer = csv.DictWriter(stream, fieldnames=fieldnames)
+                    writer.writeheader()
+                    for index in range(30):
+                        writer.writerow({
+                            "ts_us": index * 100000,
+                            "ref_position_d_m": 0.0, "ref_velocity_d_m_s": 0.0,
+                            "eskf_position_d_m": 0.0, "eskf_velocity_d_m_s": 0.0,
+                            "eskf_healthy": 1, "eskf_static_aligned": 1,
+                            "baro_supervisor_latched": 0 if is_shadow else int(index >= 20),
+                        })
+            metrics = baro_ab.score_shadow_failover(
+                supervised_path, shadow_path, outage_start_s=0.0, outage_duration_s=1.0,
+                input_provenance_equivalent=True, configuration_equivalent=True,
+            )
+        self.assertEqual(metrics["shadow_supervisor_latch_count"], 1)
+        self.assertEqual(metrics["shadow_supervisor_latch_during_outage_count"], 0)
+        self.assertEqual(metrics["shadow_failover_count"], 0)
+        self.assertIn("no_supervisor_latch_during_outage", metrics["shadow_switch_blocked_reasons"])
+
+    def test_shadow_failover_does_not_reclassify_a_preoutage_latch_as_new(self) -> None:
+        fieldnames = [
+            "ts_us", "ref_position_d_m", "ref_velocity_d_m_s",
+            "eskf_position_d_m", "eskf_velocity_d_m_s", "eskf_healthy",
+            "eskf_static_aligned", "baro_supervisor_latched",
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            supervised_path = Path(directory) / "supervised.csv"
+            shadow_path = Path(directory) / "shadow.csv"
+            for path, is_shadow in ((supervised_path, False), (shadow_path, True)):
+                with path.open("w", encoding="utf-8", newline="") as stream:
+                    writer = csv.DictWriter(stream, fieldnames=fieldnames)
+                    writer.writeheader()
+                    for index in range(30):
+                        writer.writerow({
+                            "ts_us": index * 100000,
+                            "ref_position_d_m": 0.0, "ref_velocity_d_m_s": 0.0,
+                            "eskf_position_d_m": 0.0, "eskf_velocity_d_m_s": 0.0,
+                            "eskf_healthy": 1, "eskf_static_aligned": 1,
+                            "baro_supervisor_latched": 0 if is_shadow else 1,
+                        })
+            metrics = baro_ab.score_shadow_failover(
+                supervised_path, shadow_path, outage_start_s=1.0, outage_duration_s=1.0,
+                input_provenance_equivalent=True, configuration_equivalent=True,
+            )
+        self.assertEqual(metrics["shadow_supervisor_latch_count"], 1)
+        self.assertEqual(metrics["shadow_supervisor_latch_during_outage_count"], 0)
+        self.assertEqual(metrics["shadow_failover_count"], 0)
 
     def test_shadow_failover_requires_provenance_and_configuration_evidence(self) -> None:
         fieldnames = [

@@ -1,0 +1,140 @@
+{
+  "title": "Aerakia Algorithm Optimization Showcase",
+  "generated_at": "2026-07-28T00:00:00+08:00",
+  "scope": "Curated validation snapshot from the July 17-21 optimization campaign.",
+  "metric_definition": {
+    "attitude_rmse_deg": "ESKF quaternion geodesic attitude RMSE in degrees. Lower is better.",
+    "position_rmse_m": "Navigation position RMSE against the declared reference. Lower is better."
+  },
+  "comparable_variants": [
+    {
+      "date": "2026-07-17",
+      "dataset": "EuRoC MAV MH_01_easy",
+      "condition": "Raw IMU, seeded initialization",
+      "baseline_variant": "raw_seeded",
+      "optimized_variant": "bias_corrected_seeded",
+      "baseline_attitude_rmse_deg": 8.8043688086,
+      "optimized_attitude_rmse_deg": 3.2537933069,
+      "attitude_rmse_reduction_pct": 63.04,
+      "baseline_position_rmse_m": 0.1313964013,
+      "optimized_position_rmse_m": 0.1314272062,
+      "comparison_class": "same dataset, truth source, synthetic GNSS setup, and initialization family"
+    },
+    {
+      "date": "2026-07-18",
+      "dataset": "EuRoC MAV V1_03_difficult",
+      "condition": "Raw IMU, seeded initialization",
+      "baseline_variant": "raw_seeded",
+      "optimized_variant": "bias_corrected_seeded",
+      "baseline_attitude_rmse_deg": 4.0396409822,
+      "optimized_attitude_rmse_deg": 2.3163223351,
+      "attitude_rmse_reduction_pct": 42.66,
+      "baseline_position_rmse_m": 0.1393432606,
+      "optimized_position_rmse_m": 0.1362395215,
+      "comparison_class": "same dataset, truth source, synthetic GNSS setup, and initialization family"
+    },
+    {
+      "date": "2026-07-18",
+      "dataset": "EuRoC MAV V1_03_difficult",
+      "condition": "Vicon body-pose chain, seeded initialization",
+      "baseline_variant": "vicon_raw_seeded",
+      "optimized_variant": "vicon_bias_corrected",
+      "baseline_attitude_rmse_deg": 4.1019466241,
+      "optimized_attitude_rmse_deg": 2.4739280949,
+      "attitude_rmse_reduction_pct": 39.69,
+      "baseline_position_rmse_m": 0.1363194461,
+      "optimized_position_rmse_m": 0.1371325681,
+      "comparison_class": "same dataset, Vicon pose chain, synthetic GNSS setup, and initialization family"
+    }
+  ],
+  "campaign_milestones": [
+    {
+      "date": "2026-07-17",
+      "milestone": "Independent EuRoC attitude and navigation validation established",
+      "evidence": "MH_01_easy baseline attitude RMSE: 3.72 deg; position RMSE: 0.224 m."
+    },
+    {
+      "date": "2026-07-17",
+      "milestone": "Vicon tilt-only cold-start validation added",
+      "evidence": "V1_03_difficult post-alignment tilt RMSE: 0.860 deg; position RMSE: 0.123 m."
+    },
+    {
+      "date": "2026-07-18",
+      "milestone": "Trusted-heading recovery and bias-corrected propagation validated",
+      "evidence": "V1_03_difficult observable-yaw RMSE: 0.920 deg; heading recovery: 0.995 s."
+    },
+    {
+      "date": "2026-07-18",
+      "milestone": "Aggressive UAV, GNSS outage, and physical flight coverage expanded",
+      "evidence": "Blackbird ESKF attitude RMSE: 1.57 deg; INSANE cold-start yaw RMSE: 1.53 deg; UrbanNav health ratio: 1.0."
+    },
+    {
+      "date": "2026-07-20",
+      "milestone": "Magnetic-source supervision evidence added",
+      "evidence": "Indoor magnetic study retained negative results instead of promoting an unsupported runtime change."
+    },
+    {
+      "date": "2026-07-21",
+      "milestone": "Correlated static-prior candidate rejected",
+      "evidence": "Production default unchanged; rejected candidate was not retained in runtime code."
+    }
+  ],
+  "physical_conditions": [
+    {
+      "condition": "Blackbird aggressive UAV motion",
+      "evidence_class": "Independent motion-capture truth; synthetic GNSS",
+      "attitude_rmse_deg": 1.573371,
+      "tilt_rmse_deg": 1.131209,
+      "position_rmse_m": 0.123434,
+      "healthy_ratio": 1.0
+    },
+    {
+      "condition": "INSANE outdoor dual-RTK heading cold start",
+      "evidence_class": "Shared sensor/reference yaw evidence",
+      "attitude_rmse_deg": null,
+      "tilt_rmse_deg": null,
+      "position_rmse_m": null,
+      "healthy_ratio": 1.0,
+      "yaw_rmse_deg": 1.534377,
+      "heading_alignment_time_s": 11.492036
+    },
+    {
+      "condition": "UrbanNav Hong Kong 131 s GNSS outage",
+      "evidence_class": "Independent SPAN-CPT navigation reference",
+      "attitude_rmse_deg": 1.534085,
+      "tilt_rmse_deg": 0.772056,
+      "position_rmse_m": 6.51799,
+      "healthy_ratio": 1.0,
+      "outage_peak_position_error_m": 1471.514779
+    },
+    {
+      "condition": "IDF-DS fixed-wing maximum angular motion",
+      "evidence_class": "PX4 compatibility/stress coverage; onboard estimate reference",
+      "attitude_rmse_deg": 3.241205,
+      "tilt_rmse_deg": 2.449217,
+      "position_rmse_m": 2.072555,
+      "healthy_ratio": 1.0,
+      "navigation_recoveries": 34
+    }
+  ],
+  "attitude_image_pairs": [
+    {
+      "dataset": "EuRoC MAV MH_01_easy",
+      "condition": "Raw IMU seeded initialization",
+      "image_embedded_in_showcase": true,
+      "reproduction": "validation/run_public_dataset_suite.py"
+    },
+    {
+      "dataset": "EuRoC MAV V1_03_difficult",
+      "condition": "Raw IMU seeded initialization",
+      "image_embedded_in_showcase": true,
+      "reproduction": "validation/run_public_dataset_suite.py"
+    },
+    {
+      "dataset": "EuRoC MAV V1_03_difficult",
+      "condition": "Vicon body-pose chain, seeded initialization",
+      "image_embedded_in_showcase": true,
+      "reproduction": "validation/run_public_dataset_suite.py"
+    }
+  ]
+}

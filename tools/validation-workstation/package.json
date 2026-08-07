@@ -10,6 +10,7 @@
     "build": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext build",
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
     "data:build": "node scripts/build-validation-data.mjs",
+    "data:compact": "node scripts/compact-validation-data.mjs",
     "test": "npm run build && node --test tests/rendered-html.test.mjs tests/validation-data.test.mjs",
     "test:rebuild-data": "npm run data:build && npm test",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",

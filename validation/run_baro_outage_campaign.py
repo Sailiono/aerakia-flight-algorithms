@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures
+import contextlib
 import hashlib
 import json
 import os
@@ -18,6 +19,57 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 SINGLE_SHARD = ROOT / "validation" / "run_baro_outage_ab.py"
 MERGER = ROOT / "validation" / "merge_baro_outage_campaign.py"
+
+
+class CampaignLock:
+    """Advisory, process-lifetime lock for one campaign output directory.
+
+    A completed shard is intentionally resumable, but a shard directory is not
+    safe for two writers at once.  This lock prevents a second ``--resume``
+    process from mistaking files currently being written by the first one for
+    interrupted work.  The OS releases the lock if the process is killed, so a
+    later resume never needs manual stale-lock cleanup.
+    """
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self._stream: Any | None = None
+        self._unlock: Any | None = None
+
+    def acquire(self) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        stream = self.path.open("a+", encoding="utf-8")
+        try:
+            try:
+                import fcntl  # POSIX: Linux/macOS CI and developer hosts.
+
+                fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                self._unlock = lambda: fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
+            except ImportError:  # pragma: no cover - exercised on Windows hosts.
+                import msvcrt
+
+                stream.seek(0)
+                stream.write("0")
+                stream.flush()
+                msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
+                self._unlock = lambda: msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
+        except OSError as error:
+            stream.close()
+            raise RuntimeError(
+                f"another barometer campaign is already writing {self.path.parent}; "
+                "wait for it to finish or stop that process before resuming"
+            ) from error
+        self._stream = stream
+
+    def release(self) -> None:
+        if self._stream is None:
+            return
+        with contextlib.suppress(OSError):
+            if self._unlock is not None:
+                self._unlock()
+        self._stream.close()
+        self._stream = None
+        self._unlock = None
 
 
 def sha256(path: Path) -> str:
@@ -100,89 +152,98 @@ def main() -> None:
 
     out_dir = args.out_dir.resolve()
     shard_root = out_dir / "shards"
-    scheduled: list[tuple[list[str], Path]] = []
-    skipped = 0
-    for fault in faults:
-        for seed in range(args.seeds):
-            for group in outage_groups:
-                group_name = "-".join(f"{outage:g}" for outage in group)
-                shard_dir = shard_root / fault / f"outages-{group_name}s" / f"seed-{seed:04d}"
-                if args.resume and completed_shard(shard_dir, fault=fault, outages=group, seed=seed):
-                    skipped += 1
+    lock = CampaignLock(out_dir / ".campaign.lock")
+    lock.acquire()
+    try:
+        scheduled: list[tuple[list[str], Path]] = []
+        skipped = 0
+        for fault in faults:
+            for seed in range(args.seeds):
+                for group in outage_groups:
+                    group_name = "-".join(f"{outage:g}" for outage in group)
+                    shard_dir = shard_root / fault / f"outages-{group_name}s" / f"seed-{seed:04d}"
+                    if args.resume and completed_shard(shard_dir, fault=fault, outages=group, seed=seed):
+                        skipped += 1
+                        continue
+                    shard_dir.mkdir(parents=True, exist_ok=True)
+                    command = [
+                        sys.executable, str(SINGLE_SHARD),
+                        "--runner", str(runner),
+                        "--out-dir", str(shard_dir),
+                        "--outages", ",".join(f"{outage:g}" for outage in group),
+                        "--faults", fault,
+                        "--seeds", "1",
+                        "--seed-start", str(seed),
+                        "--rate", f"{args.rate:g}",
+                        "--compact",
+                    ]
+                    scheduled.append((command, shard_dir / "campaign-shard.log"))
+
+        started = time.monotonic()
+        failures: list[dict[str, Any]] = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as pool:
+            pending = {pool.submit(run_task, command, log): (command, log) for command, log in scheduled}
+            for future in concurrent.futures.as_completed(pending):
+                command, log = pending[future]
+                try:
+                    _, returncode, output = future.result()
+                except Exception as error:  # pragma: no cover - defensive process boundary
+                    failures.append({"command": command, "log": str(log), "error": str(error)})
                     continue
-                shard_dir.mkdir(parents=True, exist_ok=True)
-                command = [
-                    sys.executable, str(SINGLE_SHARD),
-                    "--runner", str(runner),
-                    "--out-dir", str(shard_dir),
-                    "--outages", ",".join(f"{outage:g}" for outage in group),
-                    "--faults", fault,
-                    "--seeds", "1",
-                    "--seed-start", str(seed),
-                    "--rate", f"{args.rate:g}",
-                    "--compact",
-                ]
-                scheduled.append((command, shard_dir / "campaign-shard.log"))
+                if returncode != 0:
+                    failures.append({"command": command, "log": str(log), "returncode": returncode, "output": output[-2000:]})
+        if failures:
+            (out_dir / "campaign-failures.json").write_text(
+                json.dumps(failures, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
+            raise RuntimeError(
+                f"{len(failures)} barometer shards failed; inspect {out_dir / 'campaign-failures.json'}"
+            )
 
-    started = time.monotonic()
-    failures: list[dict[str, Any]] = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as pool:
-        pending = {pool.submit(run_task, command, log): (command, log) for command, log in scheduled}
-        for future in concurrent.futures.as_completed(pending):
-            command, log = pending[future]
-            try:
-                _, returncode, output = future.result()
-            except Exception as error:  # pragma: no cover - defensive process boundary
-                failures.append({"command": command, "log": str(log), "error": str(error)})
-                continue
-            if returncode != 0:
-                failures.append({"command": command, "log": str(log), "returncode": returncode, "output": output[-2000:]})
-    if failures:
-        (out_dir / "campaign-failures.json").write_text(
-            json.dumps(failures, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        merge_command = [
+            sys.executable, str(MERGER),
+            "--input-dir", str(shard_root),
+            "--out-dir", str(out_dir),
+            "--expected-seeds", str(args.seeds),
+            "--expected-faults", ",".join(faults),
+            "--expected-outages", ",".join(f"{outage:g}" for outage in outages),
+        ]
+        merged = subprocess.run(
+            merge_command,
+            cwd=ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
         )
-        raise RuntimeError(f"{len(failures)} barometer shards failed; inspect {out_dir / 'campaign-failures.json'}")
-
-    merge_command = [
-        sys.executable, str(MERGER),
-        "--input-dir", str(shard_root),
-        "--out-dir", str(out_dir),
-        "--expected-seeds", str(args.seeds),
-    ]
-    merged = subprocess.run(
-        merge_command,
-        cwd=ROOT,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        check=False,
-    )
-    (out_dir / "merge.log").write_text(merged.stdout, encoding="utf-8")
-    if merged.returncode != 0:
-        raise RuntimeError(f"merge failed: {merged.stdout[-2000:]}")
-    manifest = {
-        "schema_version": 1,
-        "status": "completed",
-        "scope": "parallel scheduling only; each shard replays the native C99 runner independently",
-        "scheduled_shards": len(scheduled),
-        "resumed_shards": skipped,
-        "completed_trials": len(faults) * len(outages) * args.seeds,
-        "faults": faults,
-        "outages_s": outages,
-        "seeds": args.seeds,
-        "rate_hz": args.rate,
-        "jobs": args.jobs,
-        "runtime_s": time.monotonic() - started,
-        "provenance": {
-            "runner_sha256": sha256(runner),
-            "single_shard_script_sha256": sha256(SINGLE_SHARD),
-            "merger_sha256": sha256(MERGER),
-        },
-    }
-    (out_dir / "campaign-manifest.json").write_text(
-        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
-    print(f"Barometer campaign: {out_dir / 'report.md'}")
+        (out_dir / "merge.log").write_text(merged.stdout, encoding="utf-8")
+        if merged.returncode != 0:
+            raise RuntimeError(f"merge failed: {merged.stdout[-2000:]}")
+        manifest = {
+            "schema_version": 1,
+            "status": "completed",
+            "scope": "parallel scheduling only; each shard replays the native C99 runner independently",
+            "scheduled_shards": len(scheduled),
+            "resumed_shards": skipped,
+            "completed_trials": len(faults) * len(outages) * args.seeds,
+            "faults": faults,
+            "outages_s": outages,
+            "seeds": args.seeds,
+            "rate_hz": args.rate,
+            "jobs": args.jobs,
+            "runtime_s": time.monotonic() - started,
+            "provenance": {
+                "runner_sha256": sha256(runner),
+                "single_shard_script_sha256": sha256(SINGLE_SHARD),
+                "merger_sha256": sha256(MERGER),
+            },
+        }
+        (out_dir / "campaign-manifest.json").write_text(
+            json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        print(f"Barometer campaign: {out_dir / 'report.md'}")
+    finally:
+        lock.release()
 
 
 if __name__ == "__main__":
