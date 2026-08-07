@@ -1,0 +1,410 @@
+{
+  "analyzer_sha256": "73d494614d4984a63bad18b234717bc2cafd825c182bfdbb2b0296a72bdbf11a",
+  "cases": [
+    {
+      "analyzer": {
+        "effective_full_rank_time_span_s": [
+          4.0,
+          6.5
+        ],
+        "effective_full_rank_window_count": 6,
+        "evaluation_count": 64,
+        "final_condition_number": null,
+        "final_effective_rank": 3,
+        "final_failed_checks": [
+          "condition_number",
+          "full_target_rank"
+        ],
+        "final_minimum_eigenvalue": 0.00013282196744646033,
+        "final_unique_aiding_epochs": 200,
+        "final_window_ready": false,
+        "first_ready_time_s": null,
+        "maximum_effective_rank": 5,
+        "structural_ready_time_span_s": null,
+        "structural_ready_window_count": 0
+      },
+      "estimator_healthy_ratio": 1.0,
+      "estimator_max_navigation_recovery_count": 0,
+      "input_sha256": "668eb26e9e4bbf9dd1788b8f2fb57add865c457b2c535706b2bdb5e7b7b149ca",
+      "profile": "continuous_density",
+      "rate_hz": 50.0,
+      "seed": 17
+    },
+    {
+      "analyzer": {
+        "effective_full_rank_time_span_s": [
+          1.0,
+          22.5
+        ],
+        "effective_full_rank_window_count": 21,
+        "evaluation_count": 64,
+        "final_condition_number": null,
+        "final_effective_rank": 3,
+        "final_failed_checks": [
+          "condition_number",
+          "full_target_rank"
+        ],
+        "final_minimum_eigenvalue": 0.00014101313122624883,
+        "final_unique_aiding_epochs": 200,
+        "final_window_ready": false,
+        "first_ready_time_s": 7.5,
+        "maximum_effective_rank": 5,
+        "structural_ready_time_span_s": [
+          7.5,
+          22.5
+        ],
+        "structural_ready_window_count": 10
+      },
+      "estimator_healthy_ratio": 1.0,
+      "estimator_max_navigation_recovery_count": 0,
+      "input_sha256": "b37ad6ab4cfc5f7a15c5c6dcc37e0b093ef6fa3bf955c7401970b7bab38ff118",
+      "profile": "continuous_density",
+      "rate_hz": 100.0,
+      "seed": 17
+    },
+    {
+      "analyzer": {
+        "effective_full_rank_time_span_s": [
+          1.0,
+          22.0
+        ],
+        "effective_full_rank_window_count": 21,
+        "evaluation_count": 64,
+        "final_condition_number": null,
+        "final_effective_rank": 3,
+        "final_failed_checks": [
+          "condition_number",
+          "full_target_rank"
+        ],
+        "final_minimum_eigenvalue": 0.00017571649075293606,
+        "final_unique_aiding_epochs": 200,
+        "final_window_ready": false,
+        "first_ready_time_s": 7.5,
+        "maximum_effective_rank": 5,
+        "structural_ready_time_span_s": [
+          7.5,
+          22.0
+        ],
+        "structural_ready_window_count": 11
+      },
+      "estimator_healthy_ratio": 1.0,
+      "estimator_max_navigation_recovery_count": 0,
+      "input_sha256": "ff6e29a3176de42861ddc4c2d7f384669a145cb8482b4b2c41bdca34fc16d393",
+      "profile": "continuous_density",
+      "rate_hz": 200.0,
+      "seed": 17
+    },
+    {
+      "analyzer": {
+        "effective_full_rank_time_span_s": [
+          1.0,
+          22.5
+        ],
+        "effective_full_rank_window_count": 44,
+        "evaluation_count": 64,
+        "final_condition_number": null,
+        "final_effective_rank": 3,
+        "final_failed_checks": [
+          "condition_number",
+          "full_target_rank"
+        ],
+        "final_minimum_eigenvalue": 0.0005014688025459359,
+        "final_unique_aiding_epochs": 200,
+        "final_window_ready": false,
+        "first_ready_time_s": 6.0,
+        "maximum_effective_rank": 5,
+        "structural_ready_time_span_s": [
+          6.0,
+          22.5
+        ],
+        "structural_ready_window_count": 34
+      },
+      "estimator_healthy_ratio": 1.0,
+      "estimator_max_navigation_recovery_count": 0,
+      "input_sha256": "8006c28ca89aab06059547d7cd796bbd11f6470fba7cd6ef724427f1b36174ef",
+      "profile": "continuous_density",
+      "rate_hz": 400.0,
+      "seed": 17
+    },
+    {
+      "analyzer": {
+        "effective_full_rank_time_span_s": [
+          4.0,
+          6.5
+        ],
+        "effective_full_rank_window_count": 6,
+        "evaluation_count": 64,
+        "final_condition_number": null,
+        "final_effective_rank": 3,
+        "final_failed_checks": [
+          "condition_number",
+          "full_target_rank",
+          "minimum_eigenvalue"
+        ],
+        "final_minimum_eigenvalue": 6.44453654154246e-05,
+        "final_unique_aiding_epochs": 200,
+        "final_window_ready": false,
+        "first_ready_time_s": null,
+        "maximum_effective_rank": 5,
+        "structural_ready_time_span_s": null,
+        "structural_ready_window_count": 0
+      },
+      "estimator_healthy_ratio": 1.0,
+      "estimator_max_navigation_recovery_count": 0,
+      "input_sha256": "2b345634cb8c849c3210397abe1ede1de80e2a8a061d06f7c39fe1a5af87c957",
+      "profile": "zero_sensor_noise",
+      "rate_hz": 50.0,
+      "seed": 17
+    },
+    {
+      "analyzer": {
+        "effective_full_rank_time_span_s": [
+          2.5,
+          22.0
+        ],
+        "effective_full_rank_window_count": 13,
+        "evaluation_count": 64,
+        "final_condition_number": null,
+        "final_effective_rank": 3,
+        "final_failed_checks": [
+          "condition_number",
+          "full_target_rank"
+        ],
+        "final_minimum_eigenvalue": 0.0001543348216248606,
+        "final_unique_aiding_epochs": 200,
+        "final_window_ready": false,
+        "first_ready_time_s": 8.0,
+        "maximum_effective_rank": 5,
+        "structural_ready_time_span_s": [
+          8.0,
+          22.0
+        ],
+        "structural_ready_window_count": 5
+      },
+      "estimator_healthy_ratio": 1.0,
+      "estimator_max_navigation_recovery_count": 0,
+      "input_sha256": "3d37c2fe6f98c4e9a53ff4d29069f18b49d748e55a18aa048b38ffce0bca9551",
+      "profile": "zero_sensor_noise",
+      "rate_hz": 100.0,
+      "seed": 17
+    },
+    {
+      "analyzer": {
+        "effective_full_rank_time_span_s": [
+          2.5,
+          21.5
+        ],
+        "effective_full_rank_window_count": 19,
+        "evaluation_count": 64,
+        "final_condition_number": null,
+        "final_effective_rank": 3,
+        "final_failed_checks": [
+          "condition_number",
+          "full_target_rank"
+        ],
+        "final_minimum_eigenvalue": 0.00013742439910460673,
+        "final_unique_aiding_epochs": 200,
+        "final_window_ready": false,
+        "first_ready_time_s": 7.5,
+        "maximum_effective_rank": 5,
+        "structural_ready_time_span_s": [
+          7.5,
+          21.5
+        ],
+        "structural_ready_window_count": 10
+      },
+      "estimator_healthy_ratio": 1.0,
+      "estimator_max_navigation_recovery_count": 0,
+      "input_sha256": "f2baa48ac232d87e7a57eafe01b55f0ace42dcb651a99734635cfe44c37c7313",
+      "profile": "zero_sensor_noise",
+      "rate_hz": 200.0,
+      "seed": 17
+    },
+    {
+      "analyzer": {
+        "effective_full_rank_time_span_s": [
+          1.5,
+          23.0
+        ],
+        "effective_full_rank_window_count": 43,
+        "evaluation_count": 64,
+        "final_condition_number": null,
+        "final_effective_rank": 3,
+        "final_failed_checks": [
+          "condition_number",
+          "full_target_rank"
+        ],
+        "final_minimum_eigenvalue": 0.00023220899037134296,
+        "final_unique_aiding_epochs": 200,
+        "final_window_ready": false,
+        "first_ready_time_s": 6.0,
+        "maximum_effective_rank": 5,
+        "structural_ready_time_span_s": [
+          6.0,
+          23.0
+        ],
+        "structural_ready_window_count": 35
+      },
+      "estimator_healthy_ratio": 1.0,
+      "estimator_max_navigation_recovery_count": 0,
+      "input_sha256": "523a21a8ab0f02f6464ad2ea068836e2b6ba951e397704274512081330609daf",
+      "profile": "zero_sensor_noise",
+      "rate_hz": 400.0,
+      "seed": 17
+    },
+    {
+      "analyzer": {
+        "effective_full_rank_time_span_s": [
+          4.0,
+          7.0
+        ],
+        "effective_full_rank_window_count": 7,
+        "evaluation_count": 64,
+        "final_condition_number": null,
+        "final_effective_rank": 3,
+        "final_failed_checks": [
+          "condition_number",
+          "full_target_rank",
+          "minimum_eigenvalue"
+        ],
+        "final_minimum_eigenvalue": 9.86039721194173e-05,
+        "final_unique_aiding_epochs": 200,
+        "final_window_ready": false,
+        "first_ready_time_s": null,
+        "maximum_effective_rank": 5,
+        "structural_ready_time_span_s": null,
+        "structural_ready_window_count": 0
+      },
+      "estimator_healthy_ratio": 1.0,
+      "estimator_max_navigation_recovery_count": 0,
+      "input_sha256": "3aea6511fc61cbee956827202e8061035e7e710f3201d9d706aba8a053abc74d",
+      "profile": "fixed_sample_noise",
+      "rate_hz": 50.0,
+      "seed": 17
+    },
+    {
+      "analyzer": {
+        "effective_full_rank_time_span_s": [
+          2.5,
+          22.5
+        ],
+        "effective_full_rank_window_count": 18,
+        "evaluation_count": 64,
+        "final_condition_number": null,
+        "final_effective_rank": 3,
+        "final_failed_checks": [
+          "condition_number",
+          "full_target_rank"
+        ],
+        "final_minimum_eigenvalue": 0.0001508881024788683,
+        "final_unique_aiding_epochs": 200,
+        "final_window_ready": false,
+        "first_ready_time_s": 7.5,
+        "maximum_effective_rank": 5,
+        "structural_ready_time_span_s": [
+          7.5,
+          22.5
+        ],
+        "structural_ready_window_count": 9
+      },
+      "estimator_healthy_ratio": 1.0,
+      "estimator_max_navigation_recovery_count": 0,
+      "input_sha256": "ea7ae93065fe5150c17f971315434d09387dbdb66788900bc4cb5e2c485325ad",
+      "profile": "fixed_sample_noise",
+      "rate_hz": 100.0,
+      "seed": 17
+    },
+    {
+      "analyzer": {
+        "effective_full_rank_time_span_s": [
+          1.0,
+          21.5
+        ],
+        "effective_full_rank_window_count": 19,
+        "evaluation_count": 64,
+        "final_condition_number": null,
+        "final_effective_rank": 3,
+        "final_failed_checks": [
+          "condition_number",
+          "full_target_rank"
+        ],
+        "final_minimum_eigenvalue": 0.0001478544544414721,
+        "final_unique_aiding_epochs": 200,
+        "final_window_ready": false,
+        "first_ready_time_s": 7.5,
+        "maximum_effective_rank": 5,
+        "structural_ready_time_span_s": [
+          7.5,
+          21.5
+        ],
+        "structural_ready_window_count": 10
+      },
+      "estimator_healthy_ratio": 1.0,
+      "estimator_max_navigation_recovery_count": 0,
+      "input_sha256": "e2afea46f6f8ce334305cce567be2d16ecc25c92d909e4f9b619786607e78ba3",
+      "profile": "fixed_sample_noise",
+      "rate_hz": 200.0,
+      "seed": 17
+    },
+    {
+      "analyzer": {
+        "effective_full_rank_time_span_s": [
+          1.5,
+          23.0
+        ],
+        "effective_full_rank_window_count": 43,
+        "evaluation_count": 64,
+        "final_condition_number": null,
+        "final_effective_rank": 3,
+        "final_failed_checks": [
+          "condition_number",
+          "full_target_rank"
+        ],
+        "final_minimum_eigenvalue": 0.0002849264092533753,
+        "final_unique_aiding_epochs": 200,
+        "final_window_ready": false,
+        "first_ready_time_s": 6.0,
+        "maximum_effective_rank": 5,
+        "structural_ready_time_span_s": [
+          6.0,
+          23.0
+        ],
+        "structural_ready_window_count": 35
+      },
+      "estimator_healthy_ratio": 1.0,
+      "estimator_max_navigation_recovery_count": 0,
+      "input_sha256": "807cf686f5f75be3a8ce1b6af086349a60c81131f019ffb1f15a0fe646e6e8ed",
+      "profile": "fixed_sample_noise",
+      "rate_hz": 400.0,
+      "seed": 17
+    }
+  ],
+  "dataset": "G0 synthetic bias-observability rate sensitivity",
+  "duration_s": 32.0,
+  "generator_sha256": "8d1aac8f3a3808b5c7803f5e7697c305de9ef4cbdd78388ae0cd560b9f595962",
+  "healthy_ratio": 1.0,
+  "limitations": [
+    "The analyzer omits process noise, preintegration covariance, aiding correlations, and reset Jacobians.",
+    "Full-rank windows are structural diagnostics, not confidence or correction triggers.",
+    "The synthetic trajectory has finite excitation; a trailing window may correctly lose historical rank.",
+    "The estimator still consumes rate/specific-force samples; delta fields are contract evidence only."
+  ],
+  "profiles": [
+    "continuous_density",
+    "zero_sensor_noise",
+    "fixed_sample_noise"
+  ],
+  "protocol_sha256": "a0159fd5cac7124117570d489ddd4e58139ccb64e4bf7548978971954514b1d8",
+  "rates_hz": [
+    50.0,
+    100.0,
+    200.0,
+    400.0
+  ],
+  "runner_sha256": "0eb216812feaee17017ab29930fda1e80593945b64ff0639e7b629fc4c1ad147",
+  "samples": 12,
+  "schema_version": 1,
+  "sequence": "bias_cv_hover_axis_pulses; 50/100/200/400 Hz; three noise profiles",
+  "status": "diagnostic_only_not_estimator_gate",
+  "study_id": "g0-bias-observability-rate-sensitivity-v1"
+}

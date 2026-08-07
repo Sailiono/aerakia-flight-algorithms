@@ -1828,3 +1828,22 @@ the test, simulation, validation, and workstation entry points. The two G0 build
 compiler products, replay CSVs, analyzer reports, and command logs; the compact hashed result and this
 execution record are retained, while those build trees and Python bytecode caches are disposable and
 scheduled for removal after this commit.
+
+## 2026-08-07 — G0 analyzer rate sensitivity
+
+A 12-case study compared 50/100/200/400 Hz IMU input under continuous-density,
+zero-noise, and fixed-per-sample-noise profiles while holding the aiding stream
+at 10 Hz. Every case had `100%` ESKF health and zero navigation recoveries.
+Effective full-rank analyzer windows appeared only during the early excited
+portion of the trajectory; the final 20-second windows were rank `3` in all
+cases. Structural-ready counts varied from `0` to `35` by rate/profile.
+
+The zero-noise control preserves the qualitative result, so lowering sensor
+noise or changing the density conversion is not a sufficient fix. The finding
+is attributed to finite excitation leaving a trailing window, plus analyzer
+limitations around process/preintegration covariance, aiding correlation, and
+error-reset Jacobians. The compact result is
+[`g0_rate_sensitivity.json`](../validation/public/g0_rate_sensitivity.json).
+No estimator code or thresholds were changed; a rate-invariant information
+model and explicit history/persistence semantics are required before a causal
+fixed-lag correction is implemented.

@@ -40,6 +40,7 @@ const catalogSpecs = [
   { id: "insane-outdoor", label: "INSANE · outdoor_1_sensors", grade: "C", kind: "shared_physical_source", file: "validation/public/insane_outdoor1_heading_summary.json", role: "dual-RTK heading input, shared reference" },
   { id: "idf-ds", label: "IDF-DS · PX4 fixed-wing corpus", grade: "D", kind: "onboard_estimator_reference", file: "validation/public/idf_ds_summary.json", role: "large PX4 compatibility and stress corpus" },
   { id: "baro-outage-v1", label: "Barometer outage campaign · v1", grade: "E", kind: "synthetic_fault_campaign", file: "validation/public/barometer_outage_campaign_v1.json", role: "relative-height source-supervision boundary" },
+  { id: "g0-rate-sensitivity", label: "G0 · bias observability rate sensitivity", grade: "E", kind: "synthetic_contract_diagnostic", file: "validation/public/g0_rate_sensitivity.json", role: "rate/window/analyzer diagnostic; not an estimator gate" },
 ];
 
 function relative(file) {

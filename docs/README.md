@@ -64,6 +64,9 @@ is the stable navigation layer rather than a disruptive mass rename.
 - [G0 v2 input contract](bias-observability-v2-input-contract.md): causal
   stationarity and interval delta semantics that precede the next estimator
   hypothesis.
+- [G0 rate sensitivity](bias-observability-rate-sensitivity.md): controlled
+  four-rate/noise study showing why the current analyzer cannot yet trigger a
+  correction.
 - [Barometer source supervision](barometer-supervision-study.md) and
   [airspeed/barometer plan](airspeed-barometer-plan.md): vertical-aiding
   evidence, limits, and follow-up architecture.

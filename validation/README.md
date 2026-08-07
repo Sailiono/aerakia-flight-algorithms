@@ -15,6 +15,9 @@ portable C library and from FCOne-specific integration code.
 - `run_bias_observability_input_contract_v2.py`: v2 IMU interval/delta and
   causal-stationarity smoke.  Its excitation analyzer is research-only and
   cannot gate the flight estimator.
+- `run_bias_observability_rate_sensitivity.py`: four-rate, three-noise-profile
+  analyzer study; it records structural rank behavior without changing the
+  estimator.
 - `run_baro_outage_campaign.py` and `run_baro_outage_ab.py`: barometer source
   supervision experiments.
 - `run_px4_bias_ab_m0.py`: optional PX4 host comparison; it is blocked until a

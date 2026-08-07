@@ -55,3 +55,16 @@ test("barometer campaign entry matches its compact public evidence", async () =>
   assert.equal(entry.samples, 600);
   assert.equal(entry.evidenceGrade, "E");
 });
+
+test("G0 rate sensitivity entry matches its compact public evidence", async () => {
+  const data = JSON.parse(await readFile(dataUrl, "utf8"));
+  const entry = data.datasets.find((item) => item.id === "g0-rate-sensitivity");
+  assert.ok(entry);
+  const source = await readFile(
+    new URL("../../../validation/public/g0_rate_sensitivity.json", import.meta.url),
+  );
+  assert.equal(entry.sourceSha256, createHash("sha256").update(source).digest("hex"));
+  assert.equal(entry.samples, 12);
+  assert.equal(entry.evidenceGrade, "E");
+  assert.equal(entry.highlights.healthyRatio, 1);
+});

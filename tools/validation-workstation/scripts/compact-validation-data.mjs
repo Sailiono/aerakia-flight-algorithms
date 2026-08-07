@@ -67,6 +67,38 @@ try {
 } catch (error) {
   if (error.code !== "ENOENT") throw error;
 }
+const rateSensitivityPath = path.join(repositoryRoot, "validation/public/g0_rate_sensitivity.json");
+try {
+  const buffer = await fs.readFile(rateSensitivityPath);
+  const evidence = JSON.parse(buffer.toString("utf8"));
+  const sourcePath = "validation/public/g0_rate_sensitivity.json";
+  const entry = {
+    id: "g0-rate-sensitivity",
+    label: "G0 · bias observability rate sensitivity",
+    evidenceGrade: "E",
+    referenceKind: "synthetic_contract_diagnostic",
+    role: "rate/window/analyzer diagnostic; not an estimator gate",
+    sourcePath,
+    sourceSha256: createHash("sha256").update(buffer).digest("hex"),
+    dataset: evidence.dataset ?? evidence.study_id ?? null,
+    sequence: evidence.sequence ?? null,
+    samples: evidence.samples ?? evidence.cases?.length ?? null,
+    durationS: evidence.duration_s ?? null,
+    coverage: { imuSamples: null, headingUpdates: null, gnssUpdates: null, outageS: null },
+    highlights: {
+      eskfAttitudeRmseDeg: null, eskfYawRmseDeg: null, tiltRmseDeg: null,
+      positionRmseM: null, outagePeakErrorM: null,
+      healthyRatio: evidence.healthy_ratio ?? null,
+      magnetometerOnYawRmseDeg: null, magnetometerOffYawRmseDeg: null,
+      navigationNeesMean: null,
+    },
+    limitations: evidence.limitations ?? [],
+  };
+  artifact.datasets = (artifact.datasets ?? []).filter((item) => item.id !== entry.id);
+  artifact.datasets.push(entry);
+} catch (error) {
+  if (error.code !== "ENOENT") throw error;
+}
 if (artifact.overview && Array.isArray(artifact.datasets)) {
   artifact.overview.datasetCount = artifact.datasets.length;
   artifact.overview.totalSamples = artifact.datasets.reduce(
