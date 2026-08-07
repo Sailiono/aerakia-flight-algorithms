@@ -307,6 +307,7 @@ int main(int argc, char *argv[])
     int cold_start = 0;
     int reference_attitude_init = 0;
     int supervise_barometer = 0;
+    int compact_output = 0;
     float stationary_gyro_threshold_rad_s = -1.0f;
     float maximum_aiding_age_s = NAN;
     int input_argument;
@@ -320,6 +321,7 @@ int main(int argc, char *argv[])
                 "[--stationary-gyro-threshold-rad-s VALUE] "
                 "[--maximum-aiding-age-s VALUE] "
                 "[--supervise-barometer] "
+                "[--compact-output] "
                 "INPUT_REPLAY_CSV OUTPUT_RESULTS_CSV\n",
                 argv[0]);
         return 2;
@@ -363,6 +365,8 @@ int main(int argc, char *argv[])
             maximum_aiding_age_s = (float)value;
         } else if (strcmp(argv[argument], "--supervise-barometer") == 0) {
             supervise_barometer = 1;
+        } else if (strcmp(argv[argument], "--compact-output") == 0) {
+            compact_output = 1;
         } else {
             fprintf(stderr, "Unknown option: %s\n", argv[argument]);
             return 2;
@@ -405,7 +409,18 @@ int main(int argc, char *argv[])
     }
     eskf_config.fuse_magnetometer = true;
 
-    fputs(
+    if (compact_output) {
+        fputs(
+            "ts_us,ref_position_d_m,ref_velocity_d_m_s,"
+            "eskf_position_d_m,eskf_velocity_d_m_s,eskf_healthy,eskf_static_aligned,"
+            "input_baro_update,eskf_baro_accepted,eskf_baro_nis,eskf_baro_test_ratio,"
+            "input_baro_status,input_baro_age_s,baro_supervisor_enabled,"
+            "baro_supervisor_accepted,baro_supervisor_fault_flags,"
+            "baro_supervisor_latched\n",
+            output
+        );
+    } else {
+        fputs(
         "seq,ts_us,truth_roll_deg,truth_pitch_deg,truth_yaw_deg,"
         "mahony_standard_roll_deg,mahony_standard_pitch_deg,mahony_standard_yaw_deg,"
         "mahony_robust_roll_deg,mahony_robust_pitch_deg,mahony_robust_yaw_deg,"
@@ -465,6 +480,7 @@ int main(int argc, char *argv[])
         "eskf_gyro_bias_cov_yz_rad2_s2,eskf_gyro_bias_cov_zz_rad2_s2\n",
         output
     );
+    }
 
     start_clock = clock();
     while (fgets(line, sizeof(line), input) != NULL) {
@@ -723,12 +739,38 @@ int main(int argc, char *argv[])
             last_barometer_decision = barometer_decision;
         }
         aerakia_eskf_get_estimate(&eskf, &eskf_estimate);
-        aerakia_validation_extract_tilt_accel_bias_covariance(
-            &eskf.core, tilt_accel_bias_covariance
-        );
+        if (!compact_output) {
+            aerakia_validation_extract_tilt_accel_bias_covariance(
+                &eskf.core, tilt_accel_bias_covariance
+            );
+        }
         if (eskf_estimate.zero_velocity_update_applied) zupt_updates++;
 
-        fprintf(
+        if (compact_output) {
+            fprintf(
+                output,
+                "%llu,%.9f,%.9f,%.9f,%.9f,%d,%d,%d,%d,%.9f,%.9f,%d,%.9f,%d,%d,%u,%d\n",
+                (unsigned long long)sample.timestamp_us,
+                reference_position.z, reference_velocity.z,
+                eskf_estimate.position_ned_m.z, eskf_estimate.velocity_ned_m_s.z,
+                eskf_estimate.healthy ? 1 : 0, eskf_estimate.static_alignment_complete ? 1 : 0,
+                baro_update,
+                baro_update && baro_status == AERAKIA_STATUS_OK
+                    && eskf_estimate.barometer_accepted ? 1 : 0,
+                baro_update && baro_status == AERAKIA_STATUS_OK
+                    ? eskf_estimate.last_barometer_innovation.nis : NAN,
+                baro_update && baro_status == AERAKIA_STATUS_OK
+                    ? eskf_estimate.last_barometer_innovation.test_ratio : NAN,
+                (int)baro_status,
+                baro_update && sample.timestamp_us >= baro_timestamp_us
+                    ? (double)(sample.timestamp_us - baro_timestamp_us) * 1.0e-6 : NAN,
+                supervise_barometer,
+                supervise_barometer && barometer_decision.accepted ? 1 : 0,
+                barometer_decision.fault_flags,
+                barometer_decision.fault_latched ? 1 : 0
+            );
+        } else {
+            fprintf(
             output,
             "%ld,%llu,%.9f,%.9f,%.9f,"
             "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,"
@@ -870,6 +912,7 @@ int main(int argc, char *argv[])
             eskf.core.P[ESKF_IDX_DGB + 1][ESKF_IDX_DGB + 2],
             eskf.core.P[ESKF_IDX_DGB + 2][ESKF_IDX_DGB + 2]
         );
+        }
         samples++;
     }
 

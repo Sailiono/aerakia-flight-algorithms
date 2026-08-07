@@ -187,31 +187,35 @@ def write_base_input(
     return time_s, position, velocity, outage_start_s
 
 
-def add_barometer_columns(
+def write_barometer_pair(
     base_path: Path,
-    output_path: Path,
+    active_path: Path,
+    shadow_path: Path,
     updates: np.ndarray,
     timestamp_us: np.ndarray,
     height_up_m: np.ndarray,
     variance_m2: np.ndarray,
-    *,
-    enabled: bool,
 ) -> None:
     with base_path.open("r", encoding="utf-8", newline="") as source:
         reader = csv.DictReader(source)
         fieldnames = list(reader.fieldnames or []) + [
             "baro_update", "baro_timestamp_us", "baro_height_up_m", "baro_variance_m2"
         ]
-        with output_path.open("w", encoding="utf-8", newline="") as destination:
-            writer = csv.DictWriter(destination, fieldnames=fieldnames)
-            writer.writeheader()
+        with active_path.open("w", encoding="utf-8", newline="") as active_stream, \
+                shadow_path.open("w", encoding="utf-8", newline="") as shadow_stream:
+            active_writer = csv.DictWriter(active_stream, fieldnames=fieldnames)
+            shadow_writer = csv.DictWriter(shadow_stream, fieldnames=fieldnames)
+            active_writer.writeheader()
+            shadow_writer.writeheader()
             row_count = 0
             for index, row in enumerate(reader):
-                row["baro_update"] = str(int(updates[index]) if enabled else 0)
                 row["baro_timestamp_us"] = str(int(timestamp_us[index]))
                 row["baro_height_up_m"] = f"{height_up_m[index]:.9f}"
                 row["baro_variance_m2"] = f"{variance_m2[index]:.9f}"
-                writer.writerow(row)
+                row["baro_update"] = str(int(updates[index]))
+                active_writer.writerow(row)
+                row["baro_update"] = "0"
+                shadow_writer.writerow(row)
                 row_count += 1
     if row_count != len(updates):
         raise RuntimeError("barometer stream length does not match base replay")
@@ -225,7 +229,7 @@ def run_filter(
     *,
     supervise_barometer: bool,
 ) -> list[str]:
-    command = [str(runner), "--cold-start"]
+    command = [str(runner), "--cold-start", "--compact-output"]
     if supervise_barometer:
         command.append("--supervise-barometer")
     command.extend([str(input_path), str(results_path)])
@@ -569,11 +573,15 @@ def main() -> None:
     parser.add_argument("--outages", default="5,10,30,60,120")
     parser.add_argument("--faults", default=",".join(FAULTS))
     parser.add_argument("--seeds", type=int, default=20)
+    parser.add_argument(
+        "--seed-start", type=int, default=0,
+        help="first deterministic seed in this resumable campaign shard",
+    )
     parser.add_argument("--rate", type=float, default=100.0)
     parser.add_argument("--compact", action="store_true")
     args = parser.parse_args()
-    if args.seeds <= 0 or args.rate <= 0.0:
-        parser.error("--seeds and --rate must be positive")
+    if args.seeds <= 0 or args.seed_start < 0 or args.rate <= 0.0:
+        parser.error("--seeds and --rate must be positive; --seed-start must be non-negative")
     outages = [float(value) for value in args.outages.split(",") if value]
     faults = [value for value in args.faults.split(",") if value]
     if any(value <= 0.0 for value in outages):
@@ -588,7 +596,7 @@ def main() -> None:
     started = time.monotonic()
     for outage_duration_s in outages:
         for fault in faults:
-            for seed in range(args.seeds):
+            for seed in range(args.seed_start, args.seed_start + args.seeds):
                 trial_dir = out_dir / fault / f"outage-{outage_duration_s:g}s" / f"seed-{seed:04d}"
                 trial_dir.mkdir(parents=True, exist_ok=True)
                 base_path = trial_dir / "base.csv"
@@ -602,24 +610,25 @@ def main() -> None:
                 )
                 arm_metrics: dict[str, object] = {}
                 input_hashes: dict[str, str] = {}
-                generated_paths: list[Path] = []
+                generated_paths: set[Path] = set()
                 results_paths: dict[str, Path] = {}
                 input_paths: dict[str, Path] = {}
                 runner_commands: dict[str, list[str]] = {}
-                for arm, enabled, supervised in (
-                    ("imu_only", False, False),
-                    ("imu_baro_raw", True, False),
-                    ("imu_baro_supervised", True, True),
+                active_path = trial_dir / "barometer-active.csv"
+                shadow_path = trial_dir / "imu-only.csv"
+                write_barometer_pair(
+                    base_path, active_path, shadow_path, updates, baro_timestamp_us, height, variance
+                )
+                generated_paths.update((active_path, shadow_path))
+                for arm, input_path, supervised in (
+                    ("imu_only", shadow_path, False),
+                    ("imu_baro_raw", active_path, False),
+                    ("imu_baro_supervised", active_path, True),
                 ):
-                    input_path = trial_dir / f"{arm}.csv"
                     results_path = trial_dir / f"{arm}-results.csv"
-                    generated_paths.extend((input_path, results_path))
+                    generated_paths.add(results_path)
                     results_paths[arm] = results_path
                     input_paths[arm] = input_path
-                    add_barometer_columns(
-                        base_path, input_path, updates, baro_timestamp_us,
-                        height, variance, enabled=enabled
-                    )
                     input_hashes[arm] = file_sha256(input_path)
                     runner_commands[arm] = run_filter(
                         runner, input_path, results_path, trial_dir / f"{arm}.log",
@@ -665,7 +674,7 @@ def main() -> None:
                 }
                 trials.append(record)
                 if args.compact:
-                    for generated_path in generated_paths:
+                    for generated_path in sorted(generated_paths):
                         generated_path.unlink()
                     base_path.unlink()
 
@@ -676,6 +685,7 @@ def main() -> None:
         "outages_s": outages,
         "faults": faults,
         "seeds": args.seeds,
+        "seed_start": args.seed_start,
         "rate_hz": args.rate,
         "trial_count": len(trials),
         "runtime_s": time.monotonic() - started,
