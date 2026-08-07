@@ -35,6 +35,21 @@ def file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def file_fingerprint(path: Path) -> dict[str, object]:
+    return {"sha256": file_sha256(path), "bytes": path.stat().st_size}
+
+
+def current_git_commit() -> str:
+    completed = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=ROOT, check=True,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+    )
+    commit = completed.stdout.strip()
+    if len(commit) != 40:
+        raise ValueError("the input-contract run requires a full 40-character Git commit")
+    return commit
+
+
 def read_rows(path: Path) -> list[dict[str, str]]:
     with path.open("r", encoding="utf-8", newline="") as stream:
         rows = list(csv.DictReader(stream))
@@ -121,6 +136,7 @@ def run_case(
     protocol: dict[str, object],
     *,
     compact: bool,
+    analyze: bool,
 ) -> dict[str, object]:
     case_dir = out_dir / f"rate-{int(rate_hz):03d}hz"
     case_dir.mkdir(parents=True, exist_ok=True)
@@ -169,6 +185,58 @@ def run_case(
             filter_command, cwd=ROOT, check=True, text=True,
             stdout=log, stderr=subprocess.STDOUT,
         )
+    analyzer_summary: dict[str, object] | None = None
+    if analyze:
+        provenance_path = case_dir / "analyzer-provenance.json"
+        analyzer_path = case_dir / "analyzer-report.json"
+        provenance = {
+            "schema_version": 2,
+            "sources": {
+                "replay": file_fingerprint(input_path),
+                "results": file_fingerprint(results_path),
+            },
+            "execution": {
+                "artifacts": {
+                    "replay_generator": file_fingerprint(GENERATOR) | {"path": str(GENERATOR.resolve())},
+                    "estimator_runner": file_fingerprint(runner) | {"path": str(runner.resolve())},
+                },
+                "command": filter_command,
+                "git_commit": current_git_commit(),
+            },
+            "causal_estimator_output": {
+                "online_forward_filter": True,
+                "future_samples_used": False,
+                "initialization_source": "causal_sensor_alignment",
+                "truth_seeded_initialization": False,
+                "stationarity_source": "causal_detector",
+                "truth_derived_stationarity": False,
+            },
+        }
+        provenance_path.write_text(
+            json.dumps(provenance, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        analyzer_command = [
+            sys.executable, str(ROOT / "validation/analyze_bias_excitation_information.py"),
+            "--replay", str(input_path), "--results", str(results_path),
+            "--provenance-manifest", str(provenance_path), "--output", str(analyzer_path),
+        ]
+        (case_dir / "03-analyzer-command.txt").write_text(
+            " ".join(analyzer_command) + "\n", encoding="utf-8"
+        )
+        with (case_dir / "03-analyzer.log").open("w", encoding="utf-8") as log:
+            subprocess.run(
+                analyzer_command, cwd=ROOT, check=True, text=True,
+                stdout=log, stderr=subprocess.STDOUT,
+            )
+        analyzer_report = json.loads(analyzer_path.read_text(encoding="utf-8"))
+        analyzer_summary = {
+            "status": analyzer_report["status"],
+            "evaluation_count": analyzer_report["evaluation_count"],
+            "first_structural_information_ready_time_s_analyzer_only": (
+                analyzer_report["first_structural_information_ready_time_s_analyzer_only"]
+            ),
+            "provenance_validation": "passed_artifact_binding_and_causal_assertion_checks_v2",
+        }
     result_rows = read_rows(results_path)
     aligned = np.asarray([float(row["eskf_static_aligned"]) for row in result_rows]) > 0.5
     healthy = np.asarray([float(row["eskf_healthy"]) for row in result_rows]) > 0.5
@@ -194,6 +262,8 @@ def run_case(
         "navigation_recoveries": int(np.max(recoveries)),
         "result_rows": len(result_rows),
     }
+    if analyzer_summary is not None:
+        result["analyzer"] = analyzer_summary
     if not result["static_alignment_completed"] or result["healthy_ratio"] < 1.0 \
             or result["navigation_recoveries"] != 0:
         raise ValueError(f"v2 rate case failed host integrity gate: {result}")
@@ -212,6 +282,10 @@ def main() -> int:
     parser.add_argument("--rates", default=None, help="override the protocol rate list")
     parser.add_argument("--seed", type=int, default=17)
     parser.add_argument("--compact", action="store_true")
+    parser.add_argument(
+        "--analyze", action="store_true",
+        help="also run the analyzer-only causal information timeline for each rate",
+    )
     args = parser.parse_args()
     protocol_path = args.protocol if args.protocol.is_absolute() else ROOT / args.protocol
     protocol = json.loads(protocol_path.read_text(encoding="utf-8"))
@@ -229,7 +303,10 @@ def main() -> int:
     out_dir = args.out_dir if args.out_dir.is_absolute() else ROOT / args.out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     cases = [
-        run_case(rate, runner, out_dir, args.seed + index, protocol, compact=args.compact)
+        run_case(
+            rate, runner, out_dir, args.seed + index, protocol,
+            compact=args.compact, analyze=args.analyze,
+        )
         for index, rate in enumerate(rates)
     ]
     summary = {
