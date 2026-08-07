@@ -64,6 +64,15 @@ recoveries. These figures are retained with input, generator, runner, and
 protocol hashes in
 [`validation/public/g0_input_contract_v2_smoke.json`](../validation/public/g0_input_contract_v2_smoke.json).
 
+The analyzer-only timeline was also run through its provenance gate. It first
+declared structural information ready at `5.0 s` for 100 Hz and `7.5 s` for
+400 Hz; 50 Hz and 200 Hz did not declare readiness within the 32-second track.
+The readiness was transient: the final 20-second window had effective rank `3`
+and failed the condition gate at all four rates. This rate dependence and lack
+of persistence are open analyzer/model issues, not estimator failures or reasons
+to lower thresholds. The next step is to reconcile interval transition, aiding
+covariance, and resampling semantics before any correction is implemented.
+
 Passing this smoke permits the next analyzer-only experiment. It does not close
 the horizontal bias problem and does not authorize a static prior, a fixed-lag
 correction, or a flight-control integration.

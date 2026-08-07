@@ -23,7 +23,13 @@
       "static_alignment_first_sample": 149,
       "static_alignment_completed": true,
       "healthy_ratio": 1.0,
-      "navigation_recoveries": 0
+      "navigation_recoveries": 0,
+      "analyzer_status": "structural_analyzer_only_not_estimator_gate",
+      "analyzer_provenance": "passed_artifact_binding_and_causal_assertion_checks_v2",
+      "first_structural_information_ready_time_s_analyzer_only": null,
+      "structural_ready_evaluation_count": 0,
+      "last_window_effective_rank": 3,
+      "last_window_condition_gate": false
     },
     {
       "rate_hz": 100,
@@ -37,7 +43,13 @@
       "static_alignment_first_sample": 200,
       "static_alignment_completed": true,
       "healthy_ratio": 1.0,
-      "navigation_recoveries": 0
+      "navigation_recoveries": 0,
+      "analyzer_status": "structural_analyzer_only_not_estimator_gate",
+      "analyzer_provenance": "passed_artifact_binding_and_causal_assertion_checks_v2",
+      "first_structural_information_ready_time_s_analyzer_only": 5.0,
+      "structural_ready_evaluation_count": 38,
+      "last_window_effective_rank": 3,
+      "last_window_condition_gate": false
     },
     {
       "rate_hz": 200,
@@ -51,7 +63,13 @@
       "static_alignment_first_sample": 400,
       "static_alignment_completed": true,
       "healthy_ratio": 1.0,
-      "navigation_recoveries": 0
+      "navigation_recoveries": 0,
+      "analyzer_status": "structural_analyzer_only_not_estimator_gate",
+      "analyzer_provenance": "passed_artifact_binding_and_causal_assertion_checks_v2",
+      "first_structural_information_ready_time_s_analyzer_only": null,
+      "structural_ready_evaluation_count": 0,
+      "last_window_effective_rank": 3,
+      "last_window_condition_gate": false
     },
     {
       "rate_hz": 400,
@@ -65,7 +83,13 @@
       "static_alignment_first_sample": 800,
       "static_alignment_completed": true,
       "healthy_ratio": 1.0,
-      "navigation_recoveries": 0
+      "navigation_recoveries": 0,
+      "analyzer_status": "structural_analyzer_only_not_estimator_gate",
+      "analyzer_provenance": "passed_artifact_binding_and_causal_assertion_checks_v2",
+      "first_structural_information_ready_time_s_analyzer_only": 7.5,
+      "structural_ready_evaluation_count": 37,
+      "last_window_effective_rank": 3,
+      "last_window_condition_gate": false
     }
   ],
   "limitations": [

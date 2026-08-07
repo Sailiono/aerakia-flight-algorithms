@@ -13,6 +13,23 @@ case or board-level verification.
 - [FCOne v2 pre-hardware closure](fcone-v2-algorithm-closure.md): what may
   enter shadow integration, and what still blocks sole control authority.
 
+## Repository Map
+
+- [`../include`](../include) and [`../src`](../src): portable C99 public API
+  and implementation.
+- [`../tests`](../tests): deterministic unit and contract tests.
+- [`../simulation`](../simulation): synthetic and public/private replay-input
+  conversion tools.
+- [`../validation`](../validation): campaign runners, host contracts, and
+  compact reviewed evidence.
+- [`../tools/validation-workstation`](../tools/validation-workstation): local
+  viewer for committed, decimated evidence only.
+
+The directories above now each contain a short `README.md` with their entry
+points and retention boundary.  The repository stays intentionally flat within
+`docs/` because its documents cross-reference one another heavily; this index
+is the stable navigation layer rather than a disruptive mass rename.
+
 ## Architecture And Integration
 
 - [Architecture](architecture.md) and [state augmentation policy](state-augmentation-policy.md)
@@ -54,7 +71,7 @@ case or board-level verification.
   [absolute-heading evidence](absolute-heading-evidence.md): why magnetic yaw
   is fail-safe by default and how trusted heading is qualified.
 
-## Visual Evidence And Retention
+## Visual Evidence, History, And Retention
 
 - [`../tools/validation-workstation`](../tools/validation-workstation): local,
   reproducible evidence viewer. It visualizes compact committed artifacts and
@@ -63,6 +80,9 @@ case or board-level verification.
   presentation source retained as a compact project artifact.
 - [Validation workstation log](validation-explorer-development-log.md): viewer
   changes and source-data limits.
+- [Validation execution log](validation-execution-log.md): append-only
+  chronological experiment record.  Use focused documents for current policy;
+  use this log when auditing why a decision changed.
 - [Workspace artifact policy](workspace-artifact-policy.md): what belongs in
   Git, private archive, or disposable build output.
 

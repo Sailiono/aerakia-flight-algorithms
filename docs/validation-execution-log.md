@@ -1815,3 +1815,16 @@ ESKF host runner at every rate. This smoke is an input/integrity gate only; it d
 estimator correction or close the 35-second horizontal-bias convergence defect. Timestamp delay,
 jitter, quantization/saturation stress, random walk, thermal drift, lever arm, and the protected
 fixed-lag holdout remain deferred.
+
+The same run now binds the analyzer-only causal provenance manifest. Structural readiness was first
+declared at `5.0 s` at 100 Hz and `7.5 s` at 400 Hz, but not within 32 s at 50 or 200 Hz. This
+sampling-rate dependence is retained as a new diagnostic finding. The readiness was transient: the
+final 20-second window had effective rank 3 and failed the condition gate at all four rates. This
+blocks using the analyzer as a fixed-lag trigger until its transition, aiding covariance,
+resampling, and persistence semantics are made rate-consistent.
+
+The repository was then reorganized without changing source paths: directory-level READMEs now identify
+the test, simulation, validation, and workstation entry points. The two G0 build trees contained only
+compiler products, replay CSVs, analyzer reports, and command logs; the compact hashed result and this
+execution record are retained, while those build trees and Python bytecode caches are disposable and
+scheduled for removal after this commit.
