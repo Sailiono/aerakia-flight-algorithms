@@ -30,7 +30,7 @@ flight readiness.
 
 ### Current observed result
 
-- Catalog: 10 entries and 8,603,430 recorded/attempted samples as represented
+- Catalog: 10 entries and 8,623,072 recorded/attempted samples as represented
   by the source summaries; the number is coverage volume, not an accuracy
   denominator.
 - Independent physical-truth entries: 3 (EuRoC MH_01, EuRoC V1_03, Blackbird).
