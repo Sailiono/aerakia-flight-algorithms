@@ -1,7 +1,7 @@
 {
   "analyzer_sha256": "73d494614d4984a63bad18b234717bc2cafd825c182bfdbb2b0296a72bdbf11a",
   "generator_sha256": "324c927a3df2cc4fbca77e16e075fb1a8ebbaecf8c8875b5d7f529570e8fe81c",
-  "git_commit": "d8202a0db1e5d140935a3811c2cf2ba3e6deaf74",
+  "git_commit": "bf7e2c70bda5063c6ac5a4e13deabc0bea516eaf",
   "interpretation": [
     "A stationary false-positive result is evidence against the analyzer's current gate, not proof of a safe runtime gate.",
     "Zero-noise structural positives nominate excitation trajectories only; they do not establish noisy true-positive power or bias convergence.",

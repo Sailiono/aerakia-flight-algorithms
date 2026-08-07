@@ -139,8 +139,8 @@
     }
   ],
   "dataset": "G0 zero-noise trajectory structural screen",
-  "generator_sha256": "8d1aac8f3a3808b5c7803f5e7697c305de9ef4cbdd78388ae0cd560b9f595962",
-  "git_commit": "d8202a0db1e5d140935a3811c2cf2ba3e6deaf74",
+  "generator_sha256": "324c927a3df2cc4fbca77e16e075fb1a8ebbaecf8c8875b5d7f529570e8fe81c",
+  "git_commit": "bf7e2c70bda5063c6ac5a4e13deabc0bea516eaf",
   "limitations": [
     "Zero generated measurement noise is a structural control, not a physical sensor model.",
     "The analyzer omits process noise, preintegration covariance, aiding correlations, and reset Jacobians.",
