@@ -31,6 +31,24 @@ POSITIVE_MOTIONS = (
 )
 
 
+def percentiles(values: list[float], points: tuple[float, ...] = (0.5, 0.9, 0.95, 0.99)) -> dict[str, float | None]:
+    """Return deterministic linear-interpolated quantiles without SciPy."""
+
+    if not values:
+        return {f"p{int(point * 100):02d}": None for point in points}
+    ordered = sorted(float(value) for value in values)
+    result: dict[str, float] = {}
+    for point in points:
+        location = point * (len(ordered) - 1)
+        lower = int(math.floor(location))
+        upper = int(math.ceil(location))
+        fraction = location - lower
+        result[f"p{int(point * 100):02d}"] = (
+            ordered[lower] * (1.0 - fraction) + ordered[upper] * fraction
+        )
+    return result
+
+
 def frozen_protocol(motion: str) -> dict[str, object]:
     protocol = json.loads(sensitivity.PROTOCOL.read_text(encoding="utf-8"))
     duration = 32.0 if motion == STATIC_MOTION else {
@@ -73,6 +91,13 @@ def run_campaign(
             "structural_ready": bool(analyzer["structural_ready_window_count"]),
             "full_rank": bool(analyzer["effective_full_rank_window_count"]),
             "maximum_effective_rank": analyzer["maximum_effective_rank"],
+            "maximum_minimum_eigenvalue": analyzer["maximum_minimum_eigenvalue"],
+            "maximum_minimum_direction_information": (
+                analyzer["maximum_minimum_direction_information"]
+            ),
+            "minimum_full_rank_condition_number": (
+                analyzer["minimum_full_rank_condition_number"]
+            ),
             "final_effective_rank": analyzer["final_effective_rank"],
             "estimator_healthy_ratio": case["estimator_healthy_ratio"],
             "navigation_recoveries": case["estimator_max_navigation_recovery_count"],
@@ -106,6 +131,13 @@ def run_campaign(
             "structural_ready": bool(analyzer["structural_ready_window_count"]),
             "full_rank": bool(analyzer["effective_full_rank_window_count"]),
             "maximum_effective_rank": analyzer["maximum_effective_rank"],
+            "maximum_minimum_eigenvalue": analyzer["maximum_minimum_eigenvalue"],
+            "maximum_minimum_direction_information": (
+                analyzer["maximum_minimum_direction_information"]
+            ),
+            "minimum_full_rank_condition_number": (
+                analyzer["minimum_full_rank_condition_number"]
+            ),
             "final_effective_rank": analyzer["final_effective_rank"],
             "estimator_healthy_ratio": case["estimator_healthy_ratio"],
             "navigation_recoveries": case["estimator_max_navigation_recovery_count"],
@@ -136,11 +168,30 @@ def run_campaign(
             "structural_ready_rate": static_ready / static_total if static_total else None,
             "effective_full_rank_rate": static_full_rank / static_total if static_total else None,
             "one_sided_95pct_upper_bound_if_zero": upper_95 if static_ready == 0 else None,
+            "score_distribution": {
+                "maximum_minimum_eigenvalue": percentiles([
+                    float(case["maximum_minimum_eigenvalue"]) for case in static_cases
+                ]),
+                "maximum_minimum_direction_information": percentiles([
+                    float(case["maximum_minimum_direction_information"])
+                    for case in static_cases
+                ]),
+            },
         },
         "zero_noise_positive_controls": {
             "cases": positive_cases,
             "structural_ready_cases": sum(bool(case["structural_ready"]) for case in positive_cases),
             "effective_full_rank_cases": sum(bool(case["full_rank"]) for case in positive_cases),
+            "score_range": {
+                "maximum_minimum_eigenvalue": [
+                    min(float(case["maximum_minimum_eigenvalue"]) for case in positive_cases),
+                    max(float(case["maximum_minimum_eigenvalue"]) for case in positive_cases),
+                ],
+                "maximum_minimum_direction_information": [
+                    min(float(case["maximum_minimum_direction_information"]) for case in positive_cases),
+                    max(float(case["maximum_minimum_direction_information"]) for case in positive_cases),
+                ],
+            },
         },
         "interpretation": [
             "A stationary false-positive result is evidence against the analyzer's current gate, not proof of a safe runtime gate.",

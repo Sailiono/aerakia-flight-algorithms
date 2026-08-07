@@ -23,6 +23,12 @@ class GateCharacterizationTests(unittest.TestCase):
     def test_zero_static_false_positive_bound_is_defined(self) -> None:
         self.assertAlmostEqual(1.0 - 0.05 ** (1.0 / 64.0), 0.0457, places=3)
 
+    def test_percentiles_are_deterministic_and_interpolated(self) -> None:
+        self.assertEqual(study.percentiles([])["p50"], None)
+        values = study.percentiles([0.0, 10.0])
+        self.assertEqual(values["p50"], 5.0)
+        self.assertEqual(values["p90"], 9.0)
+
 
 if __name__ == "__main__":
     unittest.main()

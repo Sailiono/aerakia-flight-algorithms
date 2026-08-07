@@ -39,6 +39,11 @@ class RateSensitivityToolTests(unittest.TestCase):
                     "structural_information_ready_analyzer_only": True,
                     "minimum_eigenvalue": 0.2,
                     "condition_number": 10.0,
+                    "per_direction_information": {
+                        "tilt_x": 0.3, "tilt_y": 0.4,
+                        "accel_bias_x": 0.5, "accel_bias_y": 0.6,
+                        "accel_bias_z": 0.7,
+                    },
                     "structural_readiness_checks_analyzer_only": {
                         "full_target_rank": True,
                         "condition_number": True,
@@ -51,6 +56,11 @@ class RateSensitivityToolTests(unittest.TestCase):
                     "structural_information_ready_analyzer_only": False,
                     "minimum_eigenvalue": 0.01,
                     "condition_number": None,
+                    "per_direction_information": {
+                        "tilt_x": 0.02, "tilt_y": 0.03,
+                        "accel_bias_x": 0.04, "accel_bias_y": 0.05,
+                        "accel_bias_z": 0.06,
+                    },
                     "structural_readiness_checks_analyzer_only": {
                         "full_target_rank": False,
                         "condition_number": False,
@@ -66,6 +76,9 @@ class RateSensitivityToolTests(unittest.TestCase):
         self.assertEqual(summary["final_failed_checks"], ["condition_number", "full_target_rank"])
         self.assertEqual(summary["effective_full_rank_before_excitation_count"], 1)
         self.assertEqual(summary["structural_ready_before_excitation_count"], 1)
+        self.assertGreater(summary["maximum_minimum_eigenvalue"], 0.0)
+        self.assertGreater(summary["maximum_minimum_direction_information"], 0.0)
+        self.assertEqual(summary["minimum_full_rank_condition_number"], 10.0)
 
 
 if __name__ == "__main__":

@@ -91,6 +91,16 @@ def summarize_analyzer(report: dict[str, object], static_prefix_end_s: float) ->
     early_full_rank_times = [time for time in full_rank_times if time <= static_prefix_end_s]
     early_ready_times = [time for time in ready_times if time <= static_prefix_end_s]
     ranks = [int(item["effective_rank"]) for item in evaluations]
+    minimum_eigenvalues = [float(item["minimum_eigenvalue"]) for item in evaluations]
+    direction_minima = [
+        min(float(value) for value in item["per_direction_information"].values())
+        for item in evaluations
+    ]
+    full_rank_conditions = [
+        float(item["condition_number"])
+        for item in evaluations
+        if item["condition_number"] is not None
+    ]
     final = evaluations[-1]
     assert isinstance(final, dict)
     final_checks = final["structural_readiness_checks_analyzer_only"]
@@ -110,6 +120,11 @@ def summarize_analyzer(report: dict[str, object], static_prefix_end_s: float) ->
         "effective_full_rank_before_excitation_count": len(early_full_rank_times),
         "structural_ready_before_excitation_count": len(early_ready_times),
         "maximum_effective_rank": max(ranks, default=0),
+        "maximum_minimum_eigenvalue": max(minimum_eigenvalues, default=0.0),
+        "maximum_minimum_direction_information": max(direction_minima, default=0.0),
+        "minimum_full_rank_condition_number": (
+            min(full_rank_conditions) if full_rank_conditions else None
+        ),
         "final_effective_rank": int(final["effective_rank"]),
         "final_minimum_eigenvalue": float(final["minimum_eigenvalue"]),
         "final_condition_number": final["condition_number"],
