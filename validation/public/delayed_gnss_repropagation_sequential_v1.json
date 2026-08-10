@@ -1,0 +1,1989 @@
+{
+  "campaign_runner": {
+    "bytes": 10890,
+    "path": "validation/run_delayed_gnss_repropagation_oracle.py",
+    "sha256": "ac9f71ca44b8cf4986980f9c2d2fcb387319b38a614aaadb191f7a7af1a3a05d"
+  },
+  "case_count": 12,
+  "cases": [
+    {
+      "checks": [
+        {
+          "name": "research_only_status_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "synthetic_exact_timestamp_pv_contract_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "sequential_mode_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "sequential_mode_has_exactly_two_events",
+          "passed": true
+        },
+        {
+          "name": "second_source_is_after_first_delivery",
+          "passed": true
+        },
+        {
+          "name": "first_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "first_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "first_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "first_post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "first_post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "first_post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "second_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "second_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "second_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "second_post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "second_post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "second_post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "finite_healthy_state",
+          "passed": true
+        },
+        {
+          "name": "covariance_remains_psd",
+          "passed": true
+        },
+        {
+          "name": "native_case_gate_passed",
+          "passed": true
+        }
+      ],
+      "command": [
+        "/home/clark/DevFiles/OneDev/aerakia-flight-algorithms/build/sequential-oracle/aerakia_delayed_gnss_reprop_oracle",
+        "--rate-hz",
+        "100",
+        "--delay-ms",
+        "20",
+        "--scenario",
+        "sequential"
+      ],
+      "delay_ms": 20,
+      "passed": true,
+      "rate_hz": 100,
+      "result": {
+        "covariance_psd": true,
+        "covariance_tolerance": 1e-12,
+        "delay_ms": 20,
+        "delay_samples": 2,
+        "event_count": 2,
+        "events": [
+          {
+            "delivery_timestamp_us": 3020000,
+            "event_index": 1,
+            "post_delivery_max_covariance_difference": 0,
+            "post_delivery_max_state_difference": 0,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.0008531406847021583,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 3000000
+          },
+          {
+            "delivery_timestamp_us": 4020000,
+            "event_index": 2,
+            "post_delivery_max_covariance_difference": 0,
+            "post_delivery_max_state_difference": 0,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.0009949785906333553,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 4000000
+          }
+        ],
+        "final_max_covariance_difference": 0,
+        "final_max_state_difference": 0,
+        "final_metadata_match": true,
+        "healthy": true,
+        "history_capacity_samples": 64,
+        "input_contract": "synthetic_exact_timestamp_pv_only",
+        "limitations": [
+          "Exactly two sequential, non-overlapping delayed GNSS P/V events are replayed.",
+          "The second source timestamp is after the first delivery timestamp.",
+          "This is not a generic overlapping out-of-sequence measurement implementation.",
+          "History is a host validation ring; no production rewind API is added.",
+          "The experiment does not validate delayed heading, barometer, multi-IMU, or supervisor policy.",
+          "Truth is used only to generate the synthetic P/V observation and is not read by the replay logic."
+        ],
+        "pass": true,
+        "rate_hz": 100,
+        "scenario": "sequential_two_non_overlapping",
+        "schema_version": 1,
+        "sequential_non_overlapping": true,
+        "state_tolerance": 1e-12,
+        "status": "host_only_research_oracle_not_flight_feature"
+      },
+      "returncode": 0,
+      "scenario": "sequential"
+    },
+    {
+      "checks": [
+        {
+          "name": "research_only_status_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "synthetic_exact_timestamp_pv_contract_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "sequential_mode_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "sequential_mode_has_exactly_two_events",
+          "passed": true
+        },
+        {
+          "name": "second_source_is_after_first_delivery",
+          "passed": true
+        },
+        {
+          "name": "first_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "first_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "first_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "first_post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "first_post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "first_post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "second_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "second_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "second_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "second_post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "second_post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "second_post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "finite_healthy_state",
+          "passed": true
+        },
+        {
+          "name": "covariance_remains_psd",
+          "passed": true
+        },
+        {
+          "name": "native_case_gate_passed",
+          "passed": true
+        }
+      ],
+      "command": [
+        "/home/clark/DevFiles/OneDev/aerakia-flight-algorithms/build/sequential-oracle/aerakia_delayed_gnss_reprop_oracle",
+        "--rate-hz",
+        "100",
+        "--delay-ms",
+        "50",
+        "--scenario",
+        "sequential"
+      ],
+      "delay_ms": 50,
+      "passed": true,
+      "rate_hz": 100,
+      "result": {
+        "covariance_psd": true,
+        "covariance_tolerance": 1e-12,
+        "delay_ms": 50,
+        "delay_samples": 5,
+        "event_count": 2,
+        "events": [
+          {
+            "delivery_timestamp_us": 3050000,
+            "event_index": 1,
+            "post_delivery_max_covariance_difference": 0,
+            "post_delivery_max_state_difference": 0,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.0008676258035070772,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 3000000
+          },
+          {
+            "delivery_timestamp_us": 4050000,
+            "event_index": 2,
+            "post_delivery_max_covariance_difference": 0,
+            "post_delivery_max_state_difference": 0,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.0010162437445779826,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 4000000
+          }
+        ],
+        "final_max_covariance_difference": 0,
+        "final_max_state_difference": 0,
+        "final_metadata_match": true,
+        "healthy": true,
+        "history_capacity_samples": 64,
+        "input_contract": "synthetic_exact_timestamp_pv_only",
+        "limitations": [
+          "Exactly two sequential, non-overlapping delayed GNSS P/V events are replayed.",
+          "The second source timestamp is after the first delivery timestamp.",
+          "This is not a generic overlapping out-of-sequence measurement implementation.",
+          "History is a host validation ring; no production rewind API is added.",
+          "The experiment does not validate delayed heading, barometer, multi-IMU, or supervisor policy.",
+          "Truth is used only to generate the synthetic P/V observation and is not read by the replay logic."
+        ],
+        "pass": true,
+        "rate_hz": 100,
+        "scenario": "sequential_two_non_overlapping",
+        "schema_version": 1,
+        "sequential_non_overlapping": true,
+        "state_tolerance": 1e-12,
+        "status": "host_only_research_oracle_not_flight_feature"
+      },
+      "returncode": 0,
+      "scenario": "sequential"
+    },
+    {
+      "checks": [
+        {
+          "name": "research_only_status_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "synthetic_exact_timestamp_pv_contract_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "sequential_mode_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "sequential_mode_has_exactly_two_events",
+          "passed": true
+        },
+        {
+          "name": "second_source_is_after_first_delivery",
+          "passed": true
+        },
+        {
+          "name": "first_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "first_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "first_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "first_post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "first_post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "first_post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "second_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "second_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "second_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "second_post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "second_post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "second_post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "finite_healthy_state",
+          "passed": true
+        },
+        {
+          "name": "covariance_remains_psd",
+          "passed": true
+        },
+        {
+          "name": "native_case_gate_passed",
+          "passed": true
+        }
+      ],
+      "command": [
+        "/home/clark/DevFiles/OneDev/aerakia-flight-algorithms/build/sequential-oracle/aerakia_delayed_gnss_reprop_oracle",
+        "--rate-hz",
+        "100",
+        "--delay-ms",
+        "100",
+        "--scenario",
+        "sequential"
+      ],
+      "delay_ms": 100,
+      "passed": true,
+      "rate_hz": 100,
+      "result": {
+        "covariance_psd": true,
+        "covariance_tolerance": 1e-12,
+        "delay_ms": 100,
+        "delay_samples": 10,
+        "event_count": 2,
+        "events": [
+          {
+            "delivery_timestamp_us": 3100000,
+            "event_index": 1,
+            "post_delivery_max_covariance_difference": 0,
+            "post_delivery_max_state_difference": 0,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.000891853996997094,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 3000000
+          },
+          {
+            "delivery_timestamp_us": 4100000,
+            "event_index": 2,
+            "post_delivery_max_covariance_difference": 0,
+            "post_delivery_max_state_difference": 0,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.0010519770700614384,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 4000000
+          }
+        ],
+        "final_max_covariance_difference": 0,
+        "final_max_state_difference": 0,
+        "final_metadata_match": true,
+        "healthy": true,
+        "history_capacity_samples": 64,
+        "input_contract": "synthetic_exact_timestamp_pv_only",
+        "limitations": [
+          "Exactly two sequential, non-overlapping delayed GNSS P/V events are replayed.",
+          "The second source timestamp is after the first delivery timestamp.",
+          "This is not a generic overlapping out-of-sequence measurement implementation.",
+          "History is a host validation ring; no production rewind API is added.",
+          "The experiment does not validate delayed heading, barometer, multi-IMU, or supervisor policy.",
+          "Truth is used only to generate the synthetic P/V observation and is not read by the replay logic."
+        ],
+        "pass": true,
+        "rate_hz": 100,
+        "scenario": "sequential_two_non_overlapping",
+        "schema_version": 1,
+        "sequential_non_overlapping": true,
+        "state_tolerance": 1e-12,
+        "status": "host_only_research_oracle_not_flight_feature"
+      },
+      "returncode": 0,
+      "scenario": "sequential"
+    },
+    {
+      "checks": [
+        {
+          "name": "research_only_status_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "synthetic_exact_timestamp_pv_contract_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "sequential_mode_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "sequential_mode_has_exactly_two_events",
+          "passed": true
+        },
+        {
+          "name": "second_source_is_after_first_delivery",
+          "passed": true
+        },
+        {
+          "name": "first_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "first_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "first_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "first_post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "first_post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "first_post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "second_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "second_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "second_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "second_post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "second_post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "second_post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "finite_healthy_state",
+          "passed": true
+        },
+        {
+          "name": "covariance_remains_psd",
+          "passed": true
+        },
+        {
+          "name": "native_case_gate_passed",
+          "passed": true
+        }
+      ],
+      "command": [
+        "/home/clark/DevFiles/OneDev/aerakia-flight-algorithms/build/sequential-oracle/aerakia_delayed_gnss_reprop_oracle",
+        "--rate-hz",
+        "100",
+        "--delay-ms",
+        "150",
+        "--scenario",
+        "sequential"
+      ],
+      "delay_ms": 150,
+      "passed": true,
+      "rate_hz": 100,
+      "result": {
+        "covariance_psd": true,
+        "covariance_tolerance": 1e-12,
+        "delay_ms": 150,
+        "delay_samples": 15,
+        "event_count": 2,
+        "events": [
+          {
+            "delivery_timestamp_us": 3150000,
+            "event_index": 1,
+            "post_delivery_max_covariance_difference": 0,
+            "post_delivery_max_state_difference": 0,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.000891853996997094,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 3000000
+          },
+          {
+            "delivery_timestamp_us": 4150000,
+            "event_index": 2,
+            "post_delivery_max_covariance_difference": 0,
+            "post_delivery_max_state_difference": 0,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.0010519770700614384,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 4000000
+          }
+        ],
+        "final_max_covariance_difference": 0,
+        "final_max_state_difference": 0,
+        "final_metadata_match": true,
+        "healthy": true,
+        "history_capacity_samples": 64,
+        "input_contract": "synthetic_exact_timestamp_pv_only",
+        "limitations": [
+          "Exactly two sequential, non-overlapping delayed GNSS P/V events are replayed.",
+          "The second source timestamp is after the first delivery timestamp.",
+          "This is not a generic overlapping out-of-sequence measurement implementation.",
+          "History is a host validation ring; no production rewind API is added.",
+          "The experiment does not validate delayed heading, barometer, multi-IMU, or supervisor policy.",
+          "Truth is used only to generate the synthetic P/V observation and is not read by the replay logic."
+        ],
+        "pass": true,
+        "rate_hz": 100,
+        "scenario": "sequential_two_non_overlapping",
+        "schema_version": 1,
+        "sequential_non_overlapping": true,
+        "state_tolerance": 1e-12,
+        "status": "host_only_research_oracle_not_flight_feature"
+      },
+      "returncode": 0,
+      "scenario": "sequential"
+    },
+    {
+      "checks": [
+        {
+          "name": "research_only_status_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "synthetic_exact_timestamp_pv_contract_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "sequential_mode_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "sequential_mode_has_exactly_two_events",
+          "passed": true
+        },
+        {
+          "name": "second_source_is_after_first_delivery",
+          "passed": true
+        },
+        {
+          "name": "first_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "first_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "first_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "first_post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "first_post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "first_post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "second_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "second_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "second_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "second_post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "second_post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "second_post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "finite_healthy_state",
+          "passed": true
+        },
+        {
+          "name": "covariance_remains_psd",
+          "passed": true
+        },
+        {
+          "name": "native_case_gate_passed",
+          "passed": true
+        }
+      ],
+      "command": [
+        "/home/clark/DevFiles/OneDev/aerakia-flight-algorithms/build/sequential-oracle/aerakia_delayed_gnss_reprop_oracle",
+        "--rate-hz",
+        "200",
+        "--delay-ms",
+        "20",
+        "--scenario",
+        "sequential"
+      ],
+      "delay_ms": 20,
+      "passed": true,
+      "rate_hz": 200,
+      "result": {
+        "covariance_psd": true,
+        "covariance_tolerance": 1e-12,
+        "delay_ms": 20,
+        "delay_samples": 4,
+        "event_count": 2,
+        "events": [
+          {
+            "delivery_timestamp_us": 3020000,
+            "event_index": 1,
+            "post_delivery_max_covariance_difference": 0,
+            "post_delivery_max_state_difference": 0,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.0008557631048042857,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 3000000
+          },
+          {
+            "delivery_timestamp_us": 4020000,
+            "event_index": 2,
+            "post_delivery_max_covariance_difference": 0,
+            "post_delivery_max_state_difference": 0,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.0009983694042952074,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 4000000
+          }
+        ],
+        "final_max_covariance_difference": 0,
+        "final_max_state_difference": 0,
+        "final_metadata_match": true,
+        "healthy": true,
+        "history_capacity_samples": 64,
+        "input_contract": "synthetic_exact_timestamp_pv_only",
+        "limitations": [
+          "Exactly two sequential, non-overlapping delayed GNSS P/V events are replayed.",
+          "The second source timestamp is after the first delivery timestamp.",
+          "This is not a generic overlapping out-of-sequence measurement implementation.",
+          "History is a host validation ring; no production rewind API is added.",
+          "The experiment does not validate delayed heading, barometer, multi-IMU, or supervisor policy.",
+          "Truth is used only to generate the synthetic P/V observation and is not read by the replay logic."
+        ],
+        "pass": true,
+        "rate_hz": 200,
+        "scenario": "sequential_two_non_overlapping",
+        "schema_version": 1,
+        "sequential_non_overlapping": true,
+        "state_tolerance": 1e-12,
+        "status": "host_only_research_oracle_not_flight_feature"
+      },
+      "returncode": 0,
+      "scenario": "sequential"
+    },
+    {
+      "checks": [
+        {
+          "name": "research_only_status_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "synthetic_exact_timestamp_pv_contract_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "sequential_mode_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "sequential_mode_has_exactly_two_events",
+          "passed": true
+        },
+        {
+          "name": "second_source_is_after_first_delivery",
+          "passed": true
+        },
+        {
+          "name": "first_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "first_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "first_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "first_post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "first_post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "first_post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "second_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "second_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "second_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "second_post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "second_post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "second_post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "finite_healthy_state",
+          "passed": true
+        },
+        {
+          "name": "covariance_remains_psd",
+          "passed": true
+        },
+        {
+          "name": "native_case_gate_passed",
+          "passed": true
+        }
+      ],
+      "command": [
+        "/home/clark/DevFiles/OneDev/aerakia-flight-algorithms/build/sequential-oracle/aerakia_delayed_gnss_reprop_oracle",
+        "--rate-hz",
+        "200",
+        "--delay-ms",
+        "50",
+        "--scenario",
+        "sequential"
+      ],
+      "delay_ms": 50,
+      "passed": true,
+      "rate_hz": 200,
+      "result": {
+        "covariance_psd": true,
+        "covariance_tolerance": 1e-12,
+        "delay_ms": 50,
+        "delay_samples": 10,
+        "event_count": 2,
+        "events": [
+          {
+            "delivery_timestamp_us": 3050000,
+            "event_index": 1,
+            "post_delivery_max_covariance_difference": 0,
+            "post_delivery_max_state_difference": 0,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.0008702580965110895,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 3000000
+          },
+          {
+            "delivery_timestamp_us": 4050000,
+            "event_index": 2,
+            "post_delivery_max_covariance_difference": 0,
+            "post_delivery_max_state_difference": 0,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.0010196536250021149,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 4000000
+          }
+        ],
+        "final_max_covariance_difference": 0,
+        "final_max_state_difference": 0,
+        "final_metadata_match": true,
+        "healthy": true,
+        "history_capacity_samples": 64,
+        "input_contract": "synthetic_exact_timestamp_pv_only",
+        "limitations": [
+          "Exactly two sequential, non-overlapping delayed GNSS P/V events are replayed.",
+          "The second source timestamp is after the first delivery timestamp.",
+          "This is not a generic overlapping out-of-sequence measurement implementation.",
+          "History is a host validation ring; no production rewind API is added.",
+          "The experiment does not validate delayed heading, barometer, multi-IMU, or supervisor policy.",
+          "Truth is used only to generate the synthetic P/V observation and is not read by the replay logic."
+        ],
+        "pass": true,
+        "rate_hz": 200,
+        "scenario": "sequential_two_non_overlapping",
+        "schema_version": 1,
+        "sequential_non_overlapping": true,
+        "state_tolerance": 1e-12,
+        "status": "host_only_research_oracle_not_flight_feature"
+      },
+      "returncode": 0,
+      "scenario": "sequential"
+    },
+    {
+      "checks": [
+        {
+          "name": "research_only_status_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "synthetic_exact_timestamp_pv_contract_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "sequential_mode_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "sequential_mode_has_exactly_two_events",
+          "passed": true
+        },
+        {
+          "name": "second_source_is_after_first_delivery",
+          "passed": true
+        },
+        {
+          "name": "first_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "first_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "first_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "first_post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "first_post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "first_post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "second_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "second_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "second_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "second_post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "second_post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "second_post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "finite_healthy_state",
+          "passed": true
+        },
+        {
+          "name": "covariance_remains_psd",
+          "passed": true
+        },
+        {
+          "name": "native_case_gate_passed",
+          "passed": true
+        }
+      ],
+      "command": [
+        "/home/clark/DevFiles/OneDev/aerakia-flight-algorithms/build/sequential-oracle/aerakia_delayed_gnss_reprop_oracle",
+        "--rate-hz",
+        "200",
+        "--delay-ms",
+        "100",
+        "--scenario",
+        "sequential"
+      ],
+      "delay_ms": 100,
+      "passed": true,
+      "rate_hz": 200,
+      "result": {
+        "covariance_psd": true,
+        "covariance_tolerance": 1e-12,
+        "delay_ms": 100,
+        "delay_samples": 20,
+        "event_count": 2,
+        "events": [
+          {
+            "delivery_timestamp_us": 3100000,
+            "event_index": 1,
+            "post_delivery_max_covariance_difference": 0,
+            "post_delivery_max_state_difference": 0,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.0008945026987221549,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 3000000
+          },
+          {
+            "delivery_timestamp_us": 4100000,
+            "event_index": 2,
+            "post_delivery_max_covariance_difference": 0,
+            "post_delivery_max_state_difference": 0,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.001055418601195346,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 4000000
+          }
+        ],
+        "final_max_covariance_difference": 0,
+        "final_max_state_difference": 0,
+        "final_metadata_match": true,
+        "healthy": true,
+        "history_capacity_samples": 64,
+        "input_contract": "synthetic_exact_timestamp_pv_only",
+        "limitations": [
+          "Exactly two sequential, non-overlapping delayed GNSS P/V events are replayed.",
+          "The second source timestamp is after the first delivery timestamp.",
+          "This is not a generic overlapping out-of-sequence measurement implementation.",
+          "History is a host validation ring; no production rewind API is added.",
+          "The experiment does not validate delayed heading, barometer, multi-IMU, or supervisor policy.",
+          "Truth is used only to generate the synthetic P/V observation and is not read by the replay logic."
+        ],
+        "pass": true,
+        "rate_hz": 200,
+        "scenario": "sequential_two_non_overlapping",
+        "schema_version": 1,
+        "sequential_non_overlapping": true,
+        "state_tolerance": 1e-12,
+        "status": "host_only_research_oracle_not_flight_feature"
+      },
+      "returncode": 0,
+      "scenario": "sequential"
+    },
+    {
+      "checks": [
+        {
+          "name": "research_only_status_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "synthetic_exact_timestamp_pv_contract_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "sequential_mode_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "sequential_mode_has_exactly_two_events",
+          "passed": true
+        },
+        {
+          "name": "second_source_is_after_first_delivery",
+          "passed": true
+        },
+        {
+          "name": "first_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "first_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "first_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "first_post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "first_post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "first_post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "second_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "second_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "second_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "second_post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "second_post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "second_post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "finite_healthy_state",
+          "passed": true
+        },
+        {
+          "name": "covariance_remains_psd",
+          "passed": true
+        },
+        {
+          "name": "native_case_gate_passed",
+          "passed": true
+        }
+      ],
+      "command": [
+        "/home/clark/DevFiles/OneDev/aerakia-flight-algorithms/build/sequential-oracle/aerakia_delayed_gnss_reprop_oracle",
+        "--rate-hz",
+        "200",
+        "--delay-ms",
+        "150",
+        "--scenario",
+        "sequential"
+      ],
+      "delay_ms": 150,
+      "passed": true,
+      "rate_hz": 200,
+      "result": {
+        "covariance_psd": true,
+        "covariance_tolerance": 1e-12,
+        "delay_ms": 150,
+        "delay_samples": 30,
+        "event_count": 2,
+        "events": [
+          {
+            "delivery_timestamp_us": 3150000,
+            "event_index": 1,
+            "post_delivery_max_covariance_difference": 0,
+            "post_delivery_max_state_difference": 0,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.0008945026987221549,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 3000000
+          },
+          {
+            "delivery_timestamp_us": 4150000,
+            "event_index": 2,
+            "post_delivery_max_covariance_difference": 0,
+            "post_delivery_max_state_difference": 0,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.001055418601195346,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 4000000
+          }
+        ],
+        "final_max_covariance_difference": 0,
+        "final_max_state_difference": 0,
+        "final_metadata_match": true,
+        "healthy": true,
+        "history_capacity_samples": 64,
+        "input_contract": "synthetic_exact_timestamp_pv_only",
+        "limitations": [
+          "Exactly two sequential, non-overlapping delayed GNSS P/V events are replayed.",
+          "The second source timestamp is after the first delivery timestamp.",
+          "This is not a generic overlapping out-of-sequence measurement implementation.",
+          "History is a host validation ring; no production rewind API is added.",
+          "The experiment does not validate delayed heading, barometer, multi-IMU, or supervisor policy.",
+          "Truth is used only to generate the synthetic P/V observation and is not read by the replay logic."
+        ],
+        "pass": true,
+        "rate_hz": 200,
+        "scenario": "sequential_two_non_overlapping",
+        "schema_version": 1,
+        "sequential_non_overlapping": true,
+        "state_tolerance": 1e-12,
+        "status": "host_only_research_oracle_not_flight_feature"
+      },
+      "returncode": 0,
+      "scenario": "sequential"
+    },
+    {
+      "checks": [
+        {
+          "name": "research_only_status_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "synthetic_exact_timestamp_pv_contract_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "sequential_mode_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "sequential_mode_has_exactly_two_events",
+          "passed": true
+        },
+        {
+          "name": "second_source_is_after_first_delivery",
+          "passed": true
+        },
+        {
+          "name": "first_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "first_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "first_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "first_post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "first_post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "first_post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "second_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "second_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "second_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "second_post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "second_post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "second_post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "finite_healthy_state",
+          "passed": true
+        },
+        {
+          "name": "covariance_remains_psd",
+          "passed": true
+        },
+        {
+          "name": "native_case_gate_passed",
+          "passed": true
+        }
+      ],
+      "command": [
+        "/home/clark/DevFiles/OneDev/aerakia-flight-algorithms/build/sequential-oracle/aerakia_delayed_gnss_reprop_oracle",
+        "--rate-hz",
+        "400",
+        "--delay-ms",
+        "20",
+        "--scenario",
+        "sequential"
+      ],
+      "delay_ms": 20,
+      "passed": true,
+      "rate_hz": 400,
+      "result": {
+        "covariance_psd": true,
+        "covariance_tolerance": 1e-12,
+        "delay_ms": 20,
+        "delay_samples": 8,
+        "event_count": 2,
+        "events": [
+          {
+            "delivery_timestamp_us": 3020000,
+            "event_index": 1,
+            "post_delivery_max_covariance_difference": 0,
+            "post_delivery_max_state_difference": 0,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.0008570972513799457,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 3000000
+          },
+          {
+            "delivery_timestamp_us": 4020000,
+            "event_index": 2,
+            "post_delivery_max_covariance_difference": 0,
+            "post_delivery_max_state_difference": 0,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.0010000687756422932,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 4000000
+          }
+        ],
+        "final_max_covariance_difference": 0,
+        "final_max_state_difference": 0,
+        "final_metadata_match": true,
+        "healthy": true,
+        "history_capacity_samples": 64,
+        "input_contract": "synthetic_exact_timestamp_pv_only",
+        "limitations": [
+          "Exactly two sequential, non-overlapping delayed GNSS P/V events are replayed.",
+          "The second source timestamp is after the first delivery timestamp.",
+          "This is not a generic overlapping out-of-sequence measurement implementation.",
+          "History is a host validation ring; no production rewind API is added.",
+          "The experiment does not validate delayed heading, barometer, multi-IMU, or supervisor policy.",
+          "Truth is used only to generate the synthetic P/V observation and is not read by the replay logic."
+        ],
+        "pass": true,
+        "rate_hz": 400,
+        "scenario": "sequential_two_non_overlapping",
+        "schema_version": 1,
+        "sequential_non_overlapping": true,
+        "state_tolerance": 1e-12,
+        "status": "host_only_research_oracle_not_flight_feature"
+      },
+      "returncode": 0,
+      "scenario": "sequential"
+    },
+    {
+      "checks": [
+        {
+          "name": "research_only_status_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "synthetic_exact_timestamp_pv_contract_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "sequential_mode_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "sequential_mode_has_exactly_two_events",
+          "passed": true
+        },
+        {
+          "name": "second_source_is_after_first_delivery",
+          "passed": true
+        },
+        {
+          "name": "first_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "first_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "first_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "first_post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "first_post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "first_post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "second_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "second_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "second_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "second_post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "second_post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "second_post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "finite_healthy_state",
+          "passed": true
+        },
+        {
+          "name": "covariance_remains_psd",
+          "passed": true
+        },
+        {
+          "name": "native_case_gate_passed",
+          "passed": true
+        }
+      ],
+      "command": [
+        "/home/clark/DevFiles/OneDev/aerakia-flight-algorithms/build/sequential-oracle/aerakia_delayed_gnss_reprop_oracle",
+        "--rate-hz",
+        "400",
+        "--delay-ms",
+        "50",
+        "--scenario",
+        "sequential"
+      ],
+      "delay_ms": 50,
+      "passed": true,
+      "rate_hz": 400,
+      "result": {
+        "covariance_psd": true,
+        "covariance_tolerance": 1e-12,
+        "delay_ms": 50,
+        "delay_samples": 20,
+        "event_count": 2,
+        "events": [
+          {
+            "delivery_timestamp_us": 3050000,
+            "event_index": 1,
+            "post_delivery_max_covariance_difference": 0,
+            "post_delivery_max_state_difference": 0,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.0008715975165821677,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 3000000
+          },
+          {
+            "delivery_timestamp_us": 4050000,
+            "event_index": 2,
+            "post_delivery_max_covariance_difference": 0,
+            "post_delivery_max_state_difference": 0,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.0010213626908547324,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 4000000
+          }
+        ],
+        "final_max_covariance_difference": 0,
+        "final_max_state_difference": 0,
+        "final_metadata_match": true,
+        "healthy": true,
+        "history_capacity_samples": 64,
+        "input_contract": "synthetic_exact_timestamp_pv_only",
+        "limitations": [
+          "Exactly two sequential, non-overlapping delayed GNSS P/V events are replayed.",
+          "The second source timestamp is after the first delivery timestamp.",
+          "This is not a generic overlapping out-of-sequence measurement implementation.",
+          "History is a host validation ring; no production rewind API is added.",
+          "The experiment does not validate delayed heading, barometer, multi-IMU, or supervisor policy.",
+          "Truth is used only to generate the synthetic P/V observation and is not read by the replay logic."
+        ],
+        "pass": true,
+        "rate_hz": 400,
+        "scenario": "sequential_two_non_overlapping",
+        "schema_version": 1,
+        "sequential_non_overlapping": true,
+        "state_tolerance": 1e-12,
+        "status": "host_only_research_oracle_not_flight_feature"
+      },
+      "returncode": 0,
+      "scenario": "sequential"
+    },
+    {
+      "checks": [
+        {
+          "name": "research_only_status_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "synthetic_exact_timestamp_pv_contract_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "sequential_mode_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "sequential_mode_has_exactly_two_events",
+          "passed": true
+        },
+        {
+          "name": "second_source_is_after_first_delivery",
+          "passed": true
+        },
+        {
+          "name": "first_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "first_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "first_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "first_post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "first_post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "first_post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "second_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "second_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "second_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "second_post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "second_post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "second_post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "finite_healthy_state",
+          "passed": true
+        },
+        {
+          "name": "covariance_remains_psd",
+          "passed": true
+        },
+        {
+          "name": "native_case_gate_passed",
+          "passed": true
+        }
+      ],
+      "command": [
+        "/home/clark/DevFiles/OneDev/aerakia-flight-algorithms/build/sequential-oracle/aerakia_delayed_gnss_reprop_oracle",
+        "--rate-hz",
+        "400",
+        "--delay-ms",
+        "100",
+        "--scenario",
+        "sequential"
+      ],
+      "delay_ms": 100,
+      "passed": true,
+      "rate_hz": 400,
+      "result": {
+        "covariance_psd": true,
+        "covariance_tolerance": 1e-12,
+        "delay_ms": 100,
+        "delay_samples": 40,
+        "event_count": 2,
+        "events": [
+          {
+            "delivery_timestamp_us": 3100000,
+            "event_index": 1,
+            "post_delivery_max_covariance_difference": 0,
+            "post_delivery_max_state_difference": 0,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.0008958508867143444,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 3000000
+          },
+          {
+            "delivery_timestamp_us": 4100000,
+            "event_index": 2,
+            "post_delivery_max_covariance_difference": 0,
+            "post_delivery_max_state_difference": 0,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.0010571437641158088,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 4000000
+          }
+        ],
+        "final_max_covariance_difference": 0,
+        "final_max_state_difference": 0,
+        "final_metadata_match": true,
+        "healthy": true,
+        "history_capacity_samples": 64,
+        "input_contract": "synthetic_exact_timestamp_pv_only",
+        "limitations": [
+          "Exactly two sequential, non-overlapping delayed GNSS P/V events are replayed.",
+          "The second source timestamp is after the first delivery timestamp.",
+          "This is not a generic overlapping out-of-sequence measurement implementation.",
+          "History is a host validation ring; no production rewind API is added.",
+          "The experiment does not validate delayed heading, barometer, multi-IMU, or supervisor policy.",
+          "Truth is used only to generate the synthetic P/V observation and is not read by the replay logic."
+        ],
+        "pass": true,
+        "rate_hz": 400,
+        "scenario": "sequential_two_non_overlapping",
+        "schema_version": 1,
+        "sequential_non_overlapping": true,
+        "state_tolerance": 1e-12,
+        "status": "host_only_research_oracle_not_flight_feature"
+      },
+      "returncode": 0,
+      "scenario": "sequential"
+    },
+    {
+      "checks": [
+        {
+          "name": "research_only_status_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "synthetic_exact_timestamp_pv_contract_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "sequential_mode_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "sequential_mode_has_exactly_two_events",
+          "passed": true
+        },
+        {
+          "name": "second_source_is_after_first_delivery",
+          "passed": true
+        },
+        {
+          "name": "first_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "first_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "first_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "first_post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "first_post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "first_post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "second_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "second_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "second_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "second_post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "second_post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "second_post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "finite_healthy_state",
+          "passed": true
+        },
+        {
+          "name": "covariance_remains_psd",
+          "passed": true
+        },
+        {
+          "name": "native_case_gate_passed",
+          "passed": true
+        }
+      ],
+      "command": [
+        "/home/clark/DevFiles/OneDev/aerakia-flight-algorithms/build/sequential-oracle/aerakia_delayed_gnss_reprop_oracle",
+        "--rate-hz",
+        "400",
+        "--delay-ms",
+        "150",
+        "--scenario",
+        "sequential"
+      ],
+      "delay_ms": 150,
+      "passed": true,
+      "rate_hz": 400,
+      "result": {
+        "covariance_psd": true,
+        "covariance_tolerance": 1e-12,
+        "delay_ms": 150,
+        "delay_samples": 60,
+        "event_count": 2,
+        "events": [
+          {
+            "delivery_timestamp_us": 3150000,
+            "event_index": 1,
+            "post_delivery_max_covariance_difference": 0,
+            "post_delivery_max_state_difference": 0,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.0008958508867143444,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 3000000
+          },
+          {
+            "delivery_timestamp_us": 4150000,
+            "event_index": 2,
+            "post_delivery_max_covariance_difference": 0,
+            "post_delivery_max_state_difference": 0,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.0010571437641158088,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 4000000
+          }
+        ],
+        "final_max_covariance_difference": 0,
+        "final_max_state_difference": 0,
+        "final_metadata_match": true,
+        "healthy": true,
+        "history_capacity_samples": 64,
+        "input_contract": "synthetic_exact_timestamp_pv_only",
+        "limitations": [
+          "Exactly two sequential, non-overlapping delayed GNSS P/V events are replayed.",
+          "The second source timestamp is after the first delivery timestamp.",
+          "This is not a generic overlapping out-of-sequence measurement implementation.",
+          "History is a host validation ring; no production rewind API is added.",
+          "The experiment does not validate delayed heading, barometer, multi-IMU, or supervisor policy.",
+          "Truth is used only to generate the synthetic P/V observation and is not read by the replay logic."
+        ],
+        "pass": true,
+        "rate_hz": 400,
+        "scenario": "sequential_two_non_overlapping",
+        "schema_version": 1,
+        "sequential_non_overlapping": true,
+        "state_tolerance": 1e-12,
+        "status": "host_only_research_oracle_not_flight_feature"
+      },
+      "returncode": 0,
+      "scenario": "sequential"
+    }
+  ],
+  "delays_ms": [
+    20,
+    50,
+    100,
+    150
+  ],
+  "git_commit": "cb4281507c0b3b3947498e1651cf002f2ce532ea",
+  "input_contract": "synthetic_exact_timestamp_pv_only",
+  "limitations": [
+    "Exactly two sequential, non-overlapping delayed GNSS P/V events are replayed per case.",
+    "The ring is a host validation implementation and is not a production rewind API.",
+    "No delayed heading, barometer, multi-IMU, supervisor, sensor-delay, or controller path is covered.",
+    "The synthetic truth creates the P/V measurement only; the replay logic receives no truth fields.",
+    "Equivalence to a zero-delay reference is a replay correctness result, not flight readiness."
+  ],
+  "oracle": {
+    "bytes": 86808,
+    "path": "build/sequential-oracle/aerakia_delayed_gnss_reprop_oracle",
+    "sha256": "6c4d3c9d16f5f4bba0166d8f60097b88fd9d634d56fa9cadb9b66cb132759520"
+  },
+  "oracle_source": {
+    "bytes": 30522,
+    "path": "validation/delayed_gnss_reprop_oracle.c",
+    "sha256": "551a58ebfce75938857ffc97e360bfc7272ba3ac8a92a4def071041120207fa1"
+  },
+  "passed": true,
+  "rates_hz": [
+    100,
+    200,
+    400
+  ],
+  "scenario": "sequential",
+  "schema_version": 1,
+  "scope": "synthetic exact-timestamp sequential GNSS P/V rewind/repropagation oracle",
+  "status": "host_only_research_oracle_not_flight_feature"
+}
