@@ -235,7 +235,6 @@ def float_core_promotion_check(
     """Reject hidden double arithmetic in the float ESKF core before target work."""
     check_root = profile_root / "float-core-promotion-check"
     check_root.mkdir(parents=True, exist_ok=True)
-    objects: list[str] = []
     for source_name in FLOAT_CORE_SOURCES:
         source = ROOT / source_name
         object_path = check_root / f"{source.stem}.o"
@@ -251,11 +250,9 @@ def float_core_promotion_check(
             "-o",
             str(object_path),
         ])
-        objects.append(relative(object_path))
     return {
         "status": "passed",
         "sources": list(FLOAT_CORE_SOURCES),
-        "objects": objects,
         "flags": ["-Wdouble-promotion", "-Werror=double-promotion"],
     }
 
