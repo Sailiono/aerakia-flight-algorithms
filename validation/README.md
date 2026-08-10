@@ -32,7 +32,7 @@ portable C library and from FCOne-specific integration code.
   compact evidence, and do not treat it as an estimator implementation. It
   defaults to one worker; `--jobs` is an explicitly validated workstation
   parallelism option.
-- `run_delayed_gnss_repropagation_oracle.py`: nine-case host-only isolated
+- `run_delayed_gnss_repropagation_oracle.py`: twelve-case host-only isolated
   delayed-GNSS rewind/replay correctness campaign. It proves only exact
   state/covariance equivalence to a zero-delay reference; it is not a product
   delayed-fusion API.

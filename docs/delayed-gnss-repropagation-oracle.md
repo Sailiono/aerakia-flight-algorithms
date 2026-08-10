@@ -74,7 +74,7 @@ python3 validation/run_delayed_gnss_repropagation_oracle.py \
 ```
 
 The CTest entry runs one representative 400 Hz / 150 ms near-ring-limit case. The Python
-campaign runs the full nine-case matrix and fails closed if a native result
+campaign runs the full twelve-case matrix and fails closed if a native result
 omits the research-only status, source-contract label, divergence sensitivity,
 post-replay equivalence, health, or PSD condition.
 
