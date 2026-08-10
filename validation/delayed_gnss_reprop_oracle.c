@@ -1,0 +1,538 @@
+/**
+ * @file delayed_gnss_reprop_oracle.c
+ * @brief Host-only isolated delayed-GNSS rewind/repropagation oracle.
+ *
+ * This is a validation experiment, not a flight feature.  It keeps a bounded
+ * ring of complete AerakiaEskf snapshots and exact IMU/P-V events, rewinds one
+ * delayed GNSS observation to its source timestamp, and replays the intervening
+ * stream.  The result is compared with an otherwise identical zero-delay run.
+ *
+ * Only the timestamped P/V contract is exercised.  The experiment deliberately
+ * excludes magnetic, heading, barometer, supervisor, and multi-IMU behavior.
+ */
+
+#include <aerakia/eskf_adapter.h>
+
+#include <math.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define ORACLE_HISTORY_CAPACITY 64U
+#define ORACLE_GPS_INTERVAL_US 100000U
+#define ORACLE_SOURCE_TIMESTAMP_US 3000000U
+#define ORACLE_DURATION_US 6000000U
+#define ORACLE_MAX_DELAY_MS 100U
+
+typedef struct {
+    uint64_t sequence;
+    AerakiaImuSample sample;
+    AerakiaGpsObservation gps;
+    bool gps_update;
+    bool valid;
+    AerakiaEskf before_gps;
+} HistoryEntry;
+
+typedef struct {
+    double max_state_difference;
+    double max_covariance_difference;
+    bool metadata_match;
+} FilterDifference;
+
+typedef struct {
+    AerakiaVec3f position_ned_m;
+    AerakiaVec3f velocity_ned_m_s;
+} TruthState;
+
+static void usage(const char *program)
+{
+    fprintf(
+        stderr,
+        "Usage: %s [--rate-hz HZ] [--delay-ms MS] [--out PATH]\n",
+        program
+    );
+}
+
+static bool parse_unsigned(const char *text, unsigned *value)
+{
+    char *end = NULL;
+    unsigned long parsed;
+    if (text == NULL || value == NULL || text[0] == '\0') return false;
+    parsed = strtoul(text, &end, 10);
+    if (end == text || *end != '\0' || parsed > UINT32_MAX) return false;
+    *value = (unsigned)parsed;
+    return true;
+}
+
+static double state_component_difference(const ESKF_NominalState *first,
+                                         const ESKF_NominalState *second)
+{
+    double maximum = 0.0;
+    int axis;
+    if (first == NULL || second == NULL) return INFINITY;
+    for (axis = 0; axis < 3; ++axis) {
+        maximum = fmax(maximum, fabs(first->p[axis] - second->p[axis]));
+        maximum = fmax(maximum, fabs(first->v[axis] - second->v[axis]));
+        maximum = fmax(maximum, fabs(first->ab[axis] - second->ab[axis]));
+        maximum = fmax(maximum, fabs(first->gb[axis] - second->gb[axis]));
+    }
+    for (axis = 0; axis < 4; ++axis) {
+        maximum = fmax(maximum, fabs(first->q[axis] - second->q[axis]));
+    }
+    return maximum;
+}
+
+static FilterDifference compare_filters(const AerakiaEskf *first,
+                                        const AerakiaEskf *second)
+{
+    FilterDifference difference;
+    int row;
+    int column;
+    difference.max_state_difference = INFINITY;
+    difference.max_covariance_difference = INFINITY;
+    difference.metadata_match = false;
+    if (first == NULL || second == NULL) return difference;
+    difference.max_state_difference = state_component_difference(
+        &first->core.state, &second->core.state
+    );
+    difference.max_covariance_difference = 0.0;
+    for (row = 0; row < ESKF_ERROR_STATE_DIM; ++row) {
+        for (column = 0; column < ESKF_ERROR_STATE_DIM; ++column) {
+            difference.max_covariance_difference = fmax(
+                difference.max_covariance_difference,
+                fabs(first->core.P[row][column] - second->core.P[row][column])
+            );
+        }
+    }
+    difference.metadata_match = first->last_timestamp_us == second->last_timestamp_us
+        && first->last_gps_timestamp_us == second->last_gps_timestamp_us
+        && first->last_position_timestamp_us == second->last_position_timestamp_us
+        && first->last_velocity_timestamp_us == second->last_velocity_timestamp_us
+        && first->has_timestamp == second->has_timestamp
+        && first->has_gps_timestamp == second->has_gps_timestamp
+        && first->has_position_timestamp == second->has_position_timestamp
+        && first->has_velocity_timestamp == second->has_velocity_timestamp
+        && first->rejected_samples == second->rejected_samples
+        && first->position_accepted == second->position_accepted
+        && first->velocity_accepted == second->velocity_accepted
+        && first->navigation_recovered == second->navigation_recovered
+        && first->navigation_recovery_count == second->navigation_recovery_count
+        && first->consecutive_navigation_rejections
+            == second->consecutive_navigation_rejections
+        && first->consecutive_position_rejections == second->consecutive_position_rejections
+        && first->consecutive_velocity_rejections == second->consecutive_velocity_rejections
+        && first->navigation_recovery_probationary
+            == second->navigation_recovery_probationary
+        && first->horizontal_position_initialized == second->horizontal_position_initialized;
+    return difference;
+}
+
+static bool state_is_finite(const ESKF_NominalState *state)
+{
+    int axis;
+    if (state == NULL) return false;
+    for (axis = 0; axis < 3; ++axis) {
+        if (!isfinite(state->p[axis]) || !isfinite(state->v[axis])
+            || !isfinite(state->ab[axis]) || !isfinite(state->gb[axis])) {
+            return false;
+        }
+    }
+    for (axis = 0; axis < 4; ++axis) {
+        if (!isfinite(state->q[axis])) return false;
+    }
+    return true;
+}
+
+static bool covariance_is_symmetric_psd(eskf_float_t covariance[15][15])
+{
+    double lower[15][15] = {{0.0}};
+    int row;
+    int column;
+    int index;
+    if (covariance == NULL) return false;
+    for (row = 0; row < ESKF_ERROR_STATE_DIM; ++row) {
+        for (column = 0; column <= row; ++column) {
+            double sum = covariance[row][column];
+            if (!isfinite(sum)
+                || fabs(covariance[row][column] - covariance[column][row]) > 1.0e-9) {
+                return false;
+            }
+            for (index = 0; index < column; ++index) {
+                sum -= lower[row][index] * lower[column][index];
+            }
+            if (row == column) {
+                if (sum < -1.0e-9) return false;
+                lower[row][column] = sqrt(sum > 0.0 ? sum : 0.0);
+            } else if (lower[column][column] > 1.0e-12) {
+                lower[row][column] = sum / lower[column][column];
+            } else if (fabs(sum) > 1.0e-8) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+static void quaternion_from_euler(double roll, double pitch, double yaw, double q[4])
+{
+    const double cr = cos(0.5 * roll);
+    const double sr = sin(0.5 * roll);
+    const double cp = cos(0.5 * pitch);
+    const double sp = sin(0.5 * pitch);
+    const double cy = cos(0.5 * yaw);
+    const double sy = sin(0.5 * yaw);
+    q[0] = cr * cp * cy + sr * sp * sy;
+    q[1] = sr * cp * cy - cr * sp * sy;
+    q[2] = cr * sp * cy + sr * cp * sy;
+    q[3] = cr * cp * sy - sr * sp * cy;
+}
+
+static void true_acceleration(double time_s, AerakiaVec3f *acceleration)
+{
+    if (acceleration == NULL) return;
+    acceleration->x = (float)(0.45 * sin(0.85 * time_s) + 0.13 * cos(0.23 * time_s));
+    acceleration->y = (float)(-0.35 * cos(0.61 * time_s) + 0.08 * sin(1.15 * time_s));
+    acceleration->z = (float)(0.08 * sin(0.37 * time_s));
+}
+
+static AerakiaImuSample make_sample(uint64_t timestamp_us)
+{
+    AerakiaImuSample sample;
+    AerakiaVec3f acceleration;
+    memset(&sample, 0, sizeof(sample));
+    true_acceleration((double)timestamp_us * 1.0e-6, &acceleration);
+    sample.timestamp_us = timestamp_us;
+    sample.acceleration_m_s2 = acceleration;
+    sample.acceleration_m_s2.z -= AERAKIA_GRAVITY_M_S2;
+    sample.angular_rate_rad_s.x = 0.0f;
+    sample.angular_rate_rad_s.y = 0.0f;
+    sample.angular_rate_rad_s.z = 0.0f;
+    sample.flags = AERAKIA_SAMPLE_ACCEL_VALID | AERAKIA_SAMPLE_GYRO_VALID;
+    return sample;
+}
+
+static void advance_truth(TruthState *truth, const AerakiaVec3f acceleration, double dt_s)
+{
+    if (truth == NULL) return;
+    truth->position_ned_m.x += truth->velocity_ned_m_s.x * (float)dt_s
+        + 0.5f * acceleration.x * (float)(dt_s * dt_s);
+    truth->position_ned_m.y += truth->velocity_ned_m_s.y * (float)dt_s
+        + 0.5f * acceleration.y * (float)(dt_s * dt_s);
+    truth->position_ned_m.z += truth->velocity_ned_m_s.z * (float)dt_s
+        + 0.5f * acceleration.z * (float)(dt_s * dt_s);
+    truth->velocity_ned_m_s.x += acceleration.x * (float)dt_s;
+    truth->velocity_ned_m_s.y += acceleration.y * (float)dt_s;
+    truth->velocity_ned_m_s.z += acceleration.z * (float)dt_s;
+}
+
+static AerakiaGpsObservation make_gps_observation(
+    uint64_t timestamp_us, const TruthState *truth, uint64_t quality_sequence
+)
+{
+    AerakiaGpsObservation observation;
+    memset(&observation, 0, sizeof(observation));
+    observation.timestamp_us = timestamp_us;
+    observation.position_ned_m = truth->position_ned_m;
+    observation.velocity_ned_m_s = truth->velocity_ned_m_s;
+    observation.position_variance_m2 = 9.0f;
+    observation.velocity_variance_m2_s2 = 1.0f;
+    observation.source_id = 1U;
+    observation.source_generation = 1U;
+    observation.quality_sequence = quality_sequence;
+    return observation;
+}
+
+static bool history_store(HistoryEntry history[ORACLE_HISTORY_CAPACITY],
+                          uint64_t sequence,
+                          const AerakiaImuSample *sample,
+                          const AerakiaGpsObservation *gps,
+                          bool gps_update,
+                          const AerakiaEskf *before_gps)
+{
+    HistoryEntry *entry;
+    if (history == NULL || sample == NULL || gps == NULL || before_gps == NULL) return false;
+    entry = &history[sequence % ORACLE_HISTORY_CAPACITY];
+    entry->sequence = sequence;
+    entry->sample = *sample;
+    entry->gps = *gps;
+    entry->gps_update = gps_update;
+    entry->before_gps = *before_gps;
+    entry->valid = true;
+    return true;
+}
+
+static HistoryEntry *history_find(HistoryEntry history[ORACLE_HISTORY_CAPACITY],
+                                  uint64_t sequence)
+{
+    HistoryEntry *entry;
+    if (history == NULL) return NULL;
+    entry = &history[sequence % ORACLE_HISTORY_CAPACITY];
+    if (!entry->valid || entry->sequence != sequence) return NULL;
+    return entry;
+}
+
+static bool process_sample(AerakiaEskf *filter, const AerakiaImuSample *sample)
+{
+    AerakiaNavigationEstimate estimate;
+    AerakiaStatus status;
+    memset(&estimate, 0, sizeof(estimate));
+    status = aerakia_eskf_process_imu(filter, sample, &estimate);
+    return status == AERAKIA_STATUS_INITIALIZED || status == AERAKIA_STATUS_ALIGNING
+        || status == AERAKIA_STATUS_OK;
+}
+
+static bool apply_gps(AerakiaEskf *filter, const AerakiaGpsObservation *observation)
+{
+    return aerakia_eskf_update_gps_observation(filter, observation) == AERAKIA_STATUS_OK
+        && filter->position_accepted && filter->velocity_accepted;
+}
+
+static bool repropagate_from_source(
+    AerakiaEskf *filter,
+    HistoryEntry history[ORACLE_HISTORY_CAPACITY],
+    uint64_t source_sequence,
+    uint64_t delivery_sequence
+)
+{
+    HistoryEntry *source_entry;
+    AerakiaEskf replay;
+    uint64_t sequence;
+    if (filter == NULL || source_sequence >= delivery_sequence) return false;
+    source_entry = history_find(history, source_sequence);
+    if (source_entry == NULL || !source_entry->gps_update) return false;
+    replay = source_entry->before_gps;
+    if (!apply_gps(&replay, &source_entry->gps)) return false;
+    for (sequence = source_sequence + 1U; sequence <= delivery_sequence; ++sequence) {
+        HistoryEntry *entry = history_find(history, sequence);
+        if (entry == NULL || !process_sample(&replay, &entry->sample)) return false;
+        if (entry->gps_update && !apply_gps(&replay, &entry->gps)) return false;
+    }
+    *filter = replay;
+    return true;
+}
+
+static bool initialize_filter(AerakiaEskf *filter)
+{
+    AerakiaEskfConfig config;
+    double initial_position[3] = {2.0, -1.0, 0.5};
+    double initial_quaternion[4];
+    if (filter == NULL) return false;
+    quaternion_from_euler(0.035, -0.045, 0.01, initial_quaternion);
+    aerakia_eskf_default_config(&config);
+    config.enable_static_alignment = false;
+    config.fuse_magnetometer = false;
+    config.maximum_aiding_age_s = 0.5f;
+    aerakia_eskf_init(filter, &config, initial_position, initial_quaternion);
+    filter->core.state.v[0] = 0.10;
+    filter->core.state.v[1] = -0.05;
+    filter->core.state.v[2] = 0.02;
+    filter->core.state.ab[0] = 0.02;
+    filter->core.state.ab[1] = -0.015;
+    filter->core.state.ab[2] = 0.01;
+    filter->core.state.gb[0] = 0.0004;
+    filter->core.state.gb[1] = -0.0003;
+    filter->core.state.gb[2] = 0.0002;
+    return true;
+}
+
+static bool run_case(unsigned rate_hz, unsigned delay_ms, FILE *output)
+{
+    AerakiaEskf baseline;
+    AerakiaEskf delayed;
+    HistoryEntry history[ORACLE_HISTORY_CAPACITY] = {{0}};
+    TruthState truth;
+    const uint64_t dt_us = 1000000U / rate_hz;
+    const uint64_t delay_us = (uint64_t)delay_ms * 1000U;
+    const uint64_t delay_samples = delay_us / dt_us;
+    const uint64_t source_sequence = ORACLE_SOURCE_TIMESTAMP_US / dt_us;
+    const uint64_t duration_samples = ORACLE_DURATION_US / dt_us;
+    const uint64_t gps_interval_samples = ORACLE_GPS_INTERVAL_US / dt_us;
+    const uint64_t delivery_sequence = source_sequence + delay_samples;
+    double pre_delivery_difference = 0.0;
+    double post_delivery_state_difference = 0.0;
+    double post_delivery_covariance_difference = 0.0;
+    bool post_delivery_metadata_match = true;
+    bool source_accepted = false;
+    bool repropagated = false;
+    bool healthy = true;
+    bool covariance_psd = true;
+    uint64_t sequence;
+    memset(&truth, 0, sizeof(truth));
+    if (rate_hz == 0U || 1000000U % rate_hz != 0U || delay_ms > ORACLE_MAX_DELAY_MS
+        || delay_us == 0U || delay_us % dt_us != 0U || delay_samples + 1U > ORACLE_HISTORY_CAPACITY
+        || source_sequence >= duration_samples || delivery_sequence >= duration_samples) {
+        return false;
+    }
+    if (!initialize_filter(&baseline) || !initialize_filter(&delayed)) return false;
+
+    for (sequence = 0U; sequence < duration_samples; ++sequence) {
+        const uint64_t timestamp_us = sequence * dt_us;
+        const AerakiaImuSample sample = make_sample(timestamp_us);
+        const bool gps_update = sequence > 0U && sequence % gps_interval_samples == 0U;
+        AerakiaGpsObservation gps;
+        FilterDifference difference;
+        if (sequence > 0U) {
+            AerakiaVec3f acceleration;
+            true_acceleration((double)timestamp_us * 1.0e-6, &acceleration);
+            advance_truth(&truth, acceleration, (double)dt_us * 1.0e-6);
+        }
+        gps = make_gps_observation(timestamp_us, &truth, sequence / gps_interval_samples + 1U);
+        if (!process_sample(&baseline, &sample) || !process_sample(&delayed, &sample)) {
+            return false;
+        }
+        if (!history_store(history, sequence, &sample, &gps, gps_update, &delayed)) {
+            return false;
+        }
+        if (gps_update) {
+            if (!apply_gps(&baseline, &gps)) return false;
+            if (sequence == source_sequence) {
+                source_accepted = baseline.position_accepted && baseline.velocity_accepted;
+            }
+        }
+        if (gps_update && sequence != source_sequence && sequence != delivery_sequence) {
+            if (!apply_gps(&delayed, &gps)) return false;
+        }
+        if (sequence == delivery_sequence) {
+            if (!repropagate_from_source(
+                    &delayed, history, source_sequence, delivery_sequence
+                )) {
+                return false;
+            }
+            repropagated = true;
+        }
+        healthy = healthy && state_is_finite(&baseline.core.state)
+            && state_is_finite(&delayed.core.state)
+            && covariance_is_symmetric_psd(baseline.core.P)
+            && covariance_is_symmetric_psd(delayed.core.P);
+        covariance_psd = covariance_psd && covariance_is_symmetric_psd(baseline.core.P)
+            && covariance_is_symmetric_psd(delayed.core.P);
+        difference = compare_filters(&baseline, &delayed);
+        if (sequence > source_sequence && sequence < delivery_sequence) {
+            pre_delivery_difference = fmax(
+                pre_delivery_difference,
+                difference.max_state_difference
+            );
+        }
+        if (sequence >= delivery_sequence) {
+            post_delivery_state_difference = fmax(
+                post_delivery_state_difference,
+                difference.max_state_difference
+            );
+            post_delivery_covariance_difference = fmax(
+                post_delivery_covariance_difference,
+                difference.max_covariance_difference
+            );
+            post_delivery_metadata_match = post_delivery_metadata_match
+                && difference.metadata_match;
+        }
+    }
+
+    {
+        const double state_tolerance =
+#if defined(AERAKIA_ESKF_CORE_USE_FLOAT)
+            2.0e-5;
+#else
+            1.0e-12;
+#endif
+        const double covariance_tolerance =
+#if defined(AERAKIA_ESKF_CORE_USE_FLOAT)
+            2.0e-5;
+#else
+            1.0e-12;
+#endif
+        const bool pass = repropagated && source_accepted && healthy && covariance_psd
+            && pre_delivery_difference > state_tolerance
+            && post_delivery_state_difference <= state_tolerance
+            && post_delivery_covariance_difference <= covariance_tolerance
+            && post_delivery_metadata_match;
+        if (output != NULL) {
+            fprintf(
+                output,
+                "{\n"
+                "  \"schema_version\": 1,\n"
+                "  \"status\": \"host_only_research_oracle_not_flight_feature\",\n"
+                "  \"input_contract\": \"synthetic_v2_exact_timestamp_pv_only\",\n"
+                "  \"rate_hz\": %u,\n"
+                "  \"delay_ms\": %u,\n"
+                "  \"history_capacity_samples\": %u,\n"
+                "  \"delay_samples\": %llu,\n"
+                "  \"source_timestamp_us\": %llu,\n"
+                "  \"delivery_timestamp_us\": %llu,\n"
+                "  \"source_gps_accepted\": %s,\n"
+                "  \"repropagated\": %s,\n"
+                "  \"healthy\": %s,\n"
+                "  \"covariance_psd\": %s,\n"
+                "  \"pre_delivery_max_state_difference\": %.17g,\n"
+                "  \"post_delivery_max_state_difference\": %.17g,\n"
+                "  \"post_delivery_max_covariance_difference\": %.17g,\n"
+                "  \"post_delivery_metadata_match\": %s,\n"
+                "  \"state_tolerance\": %.17g,\n"
+                "  \"covariance_tolerance\": %.17g,\n"
+                "  \"pass\": %s,\n"
+                "  \"limitations\": [\n"
+                "    \"Only one isolated delayed GNSS P/V event is replayed.\",\n"
+                "    \"History is a host validation ring; no production rewind API is added.\",\n"
+                "    \"The experiment does not validate delayed heading, barometer, multi-IMU, or supervisor policy.\",\n"
+                "    \"Truth is used only to generate the synthetic P/V observation and is not read by the replay logic.\"\n"
+                "  ]\n"
+                "}\n",
+                rate_hz, delay_ms, ORACLE_HISTORY_CAPACITY,
+                (unsigned long long)delay_samples,
+                (unsigned long long)(source_sequence * dt_us),
+                (unsigned long long)(delivery_sequence * dt_us),
+                source_accepted ? "true" : "false",
+                repropagated ? "true" : "false",
+                healthy ? "true" : "false",
+                covariance_psd ? "true" : "false",
+                pre_delivery_difference,
+                post_delivery_state_difference,
+                post_delivery_covariance_difference,
+                post_delivery_metadata_match ? "true" : "false",
+                state_tolerance,
+                covariance_tolerance,
+                pass ? "true" : "false"
+            );
+        }
+        return pass;
+    }
+}
+
+int main(int argc, char **argv)
+{
+    unsigned rate_hz = 100U;
+    unsigned delay_ms = 50U;
+    const char *output_path = NULL;
+    FILE *output = stdout;
+    int argument;
+    bool pass;
+    for (argument = 1; argument < argc; ++argument) {
+        if (strcmp(argv[argument], "--rate-hz") == 0 && argument + 1 < argc) {
+            if (!parse_unsigned(argv[++argument], &rate_hz)) {
+                usage(argv[0]);
+                return 2;
+            }
+        } else if (strcmp(argv[argument], "--delay-ms") == 0 && argument + 1 < argc) {
+            if (!parse_unsigned(argv[++argument], &delay_ms)) {
+                usage(argv[0]);
+                return 2;
+            }
+        } else if (strcmp(argv[argument], "--out") == 0 && argument + 1 < argc) {
+            output_path = argv[++argument];
+        } else {
+            usage(argv[0]);
+            return 2;
+        }
+    }
+    if (output_path != NULL) {
+        output = fopen(output_path, "w");
+        if (output == NULL) {
+            perror(output_path);
+            return 2;
+        }
+    }
+    pass = run_case(rate_hz, delay_ms, output);
+    if (output_path != NULL) fclose(output);
+    return pass ? 0 : 1;
+}

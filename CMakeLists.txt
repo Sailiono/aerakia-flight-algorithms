@@ -128,6 +128,15 @@ if(AERAKIA_BUILD_TESTS)
     add_executable(aerakia_fcone_adapter_contract validation/fcone_adapter_contract.c)
     target_link_libraries(aerakia_fcone_adapter_contract PRIVATE Aerakia::Algorithms)
     add_test(NAME fcone_adapter_contract COMMAND aerakia_fcone_adapter_contract)
+
+    add_executable(aerakia_delayed_gnss_reprop_oracle
+        validation/delayed_gnss_reprop_oracle.c
+    )
+    target_link_libraries(aerakia_delayed_gnss_reprop_oracle PRIVATE Aerakia::Algorithms)
+    add_test(
+        NAME delayed_gnss_reprop_oracle
+        COMMAND aerakia_delayed_gnss_reprop_oracle --rate-hz 400 --delay-ms 100
+    )
 endif()
 
 if(AERAKIA_BUILD_VALIDATION)
