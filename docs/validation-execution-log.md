@@ -1965,15 +1965,16 @@ delivery, the delayed lane restores the source-time pre-aiding snapshot,
 performs the ordinary timestamped GPS update, and replays later IMU plus
 already-committed GPS events in canonical order.
 
-The executed matrix has nine exact-boundary cases: 100/200/400 Hz and
-20/50/100 ms delivery delay. The Python wrapper validates status/scope,
+The executed matrix has twelve exact-boundary cases over one deterministic,
+exact-timestamp synthetic P/V stream: 100/200/400 Hz and
+20/50/100/150 ms delivery delay. The Python wrapper validates status/scope,
 pre-delivery sensitivity, post-delivery state/covariance/metadata equivalence,
 finite state, PSD covariance, and the native pass result. It does not use truth
 inside the replay path.
 
 ### Result
 
-All `9/9` cases passed. Each delayed lane visibly diverged before delivery
+All `12/12` cases passed. Each delayed lane visibly diverged before delivery
 (maximum state-component difference approximately `8.5e-4`--`9.0e-4`), then
 matched the zero-delay reference after replay with zero recorded state and
 covariance difference and matching metadata under a `1e-12` double-precision

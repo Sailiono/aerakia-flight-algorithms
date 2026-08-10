@@ -24,7 +24,7 @@
 #define ORACLE_GPS_INTERVAL_US 100000U
 #define ORACLE_SOURCE_TIMESTAMP_US 3000000U
 #define ORACLE_DURATION_US 6000000U
-#define ORACLE_MAX_DELAY_MS 100U
+#define ORACLE_MAX_DELAY_MS 150U
 
 typedef struct {
     uint64_t sequence;
@@ -453,7 +453,7 @@ static bool run_case(unsigned rate_hz, unsigned delay_ms, FILE *output)
                 "{\n"
                 "  \"schema_version\": 1,\n"
                 "  \"status\": \"host_only_research_oracle_not_flight_feature\",\n"
-                "  \"input_contract\": \"synthetic_v2_exact_timestamp_pv_only\",\n"
+                "  \"input_contract\": \"synthetic_exact_timestamp_pv_only\",\n"
                 "  \"rate_hz\": %u,\n"
                 "  \"delay_ms\": %u,\n"
                 "  \"history_capacity_samples\": %u,\n"

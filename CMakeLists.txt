@@ -135,7 +135,7 @@ if(AERAKIA_BUILD_TESTS)
     target_link_libraries(aerakia_delayed_gnss_reprop_oracle PRIVATE Aerakia::Algorithms)
     add_test(
         NAME delayed_gnss_reprop_oracle
-        COMMAND aerakia_delayed_gnss_reprop_oracle --rate-hz 400 --delay-ms 100
+        COMMAND aerakia_delayed_gnss_reprop_oracle --rate-hz 400 --delay-ms 150
     )
 endif()
 

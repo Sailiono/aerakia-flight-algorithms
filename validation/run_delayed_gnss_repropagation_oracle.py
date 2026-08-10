@@ -21,9 +21,9 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_RATES = (100, 200, 400)
-DEFAULT_DELAYS = (20, 50, 100)
+DEFAULT_DELAYS = (20, 50, 100, 150)
 EXPECTED_STATUS = "host_only_research_oracle_not_flight_feature"
-EXPECTED_INPUT_CONTRACT = "synthetic_v2_exact_timestamp_pv_only"
+EXPECTED_INPUT_CONTRACT = "synthetic_exact_timestamp_pv_only"
 
 
 def sha256(path: Path) -> str:
@@ -63,7 +63,7 @@ def validate_case(payload: dict[str, Any]) -> list[dict[str, Any]]:
             "passed": payload.get("status") == EXPECTED_STATUS,
         },
         {
-            "name": "synthetic_v2_pv_contract_is_explicit",
+            "name": "synthetic_exact_timestamp_pv_contract_is_explicit",
             "passed": payload.get("input_contract") == EXPECTED_INPUT_CONTRACT,
         },
         {
@@ -171,7 +171,7 @@ def main() -> int:
     document: dict[str, Any] = {
         "schema_version": 1,
         "status": EXPECTED_STATUS,
-        "scope": "synthetic v2 exact-timestamp isolated GNSS P/V rewind/repropagation oracle",
+        "scope": "synthetic exact-timestamp isolated GNSS P/V rewind/repropagation oracle",
         "input_contract": EXPECTED_INPUT_CONTRACT,
         "rates_hz": list(rates),
         "delays_ms": list(delays),

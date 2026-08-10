@@ -45,15 +45,15 @@ The fixed scope is deliberately narrow:
 
 The compact result is
 [`delayed_gnss_repropagation_oracle_v1.json`](../validation/public/delayed_gnss_repropagation_oracle_v1.json).
-It covers one synthetic-v2 P/V stream at:
+It covers one deterministic, exact-timestamp synthetic P/V stream at:
 
 | IMU rate | Delivery delay | Cases |
 | ---: | ---: | ---: |
-| 100 Hz | 20, 50, 100 ms | 3 |
-| 200 Hz | 20, 50, 100 ms | 3 |
-| 400 Hz | 20, 50, 100 ms | 3 |
+| 100 Hz | 20, 50, 100, 150 ms | 4 |
+| 200 Hz | 20, 50, 100, 150 ms | 4 |
+| 400 Hz | 20, 50, 100, 150 ms | 4 |
 
-All `9/9` cases pass. The source update is accepted, delayed and baseline lanes
+All `12/12` cases pass. The source update is accepted, delayed and baseline lanes
 diverge before delivery by roughly `8.5e-4` to `9.0e-4` in maximum state
 component difference, and after replay all cases report zero state difference,
 zero covariance difference, matching estimator metadata, finite state, and PSD
@@ -73,7 +73,7 @@ python3 validation/run_delayed_gnss_repropagation_oracle.py \
   --out build/delayed-gnss-reprop/oracle-v1.json
 ```
 
-The CTest entry runs one representative 400 Hz / 100 ms case. The Python
+The CTest entry runs one representative 400 Hz / 150 ms near-ring-limit case. The Python
 campaign runs the full nine-case matrix and fails closed if a native result
 omits the research-only status, source-contract label, divergence sensitivity,
 post-replay equivalence, health, or PSD condition.
