@@ -19,6 +19,9 @@
         "final_window_ready": false,
         "first_ready_time_s": null,
         "maximum_effective_rank": 3,
+        "maximum_minimum_direction_information": 1062.1897078592285,
+        "maximum_minimum_eigenvalue": 0.00025350880758813916,
+        "minimum_full_rank_condition_number": null,
         "static_prefix_end_s": 3.0,
         "structural_ready_before_excitation_count": 0,
         "structural_ready_time_span_s": null,
@@ -50,6 +53,9 @@
         "final_window_ready": true,
         "first_ready_time_s": 5.0,
         "maximum_effective_rank": 5,
+        "maximum_minimum_direction_information": 719.6012217869043,
+        "maximum_minimum_eigenvalue": 0.12184913532071726,
+        "minimum_full_rank_condition_number": 8568.55322169391,
         "static_prefix_end_s": 3.0,
         "structural_ready_before_excitation_count": 0,
         "structural_ready_time_span_s": [
@@ -84,6 +90,9 @@
         "final_window_ready": true,
         "first_ready_time_s": 7.0,
         "maximum_effective_rank": 5,
+        "maximum_minimum_direction_information": 1996.2055733832897,
+        "maximum_minimum_eigenvalue": 211.32691900774697,
+        "minimum_full_rank_condition_number": 87.05843649026798,
         "static_prefix_end_s": 3.0,
         "structural_ready_before_excitation_count": 0,
         "structural_ready_time_span_s": [
@@ -120,6 +129,9 @@
         "final_window_ready": false,
         "first_ready_time_s": 5.0,
         "maximum_effective_rank": 5,
+        "maximum_minimum_direction_information": 40.22925676950846,
+        "maximum_minimum_eigenvalue": 0.04785593889482697,
+        "minimum_full_rank_condition_number": 8568.55322169391,
         "static_prefix_end_s": 3.0,
         "structural_ready_before_excitation_count": 0,
         "structural_ready_time_span_s": [
@@ -140,7 +152,7 @@
   ],
   "dataset": "G0 zero-noise trajectory structural screen",
   "generator_sha256": "324c927a3df2cc4fbca77e16e075fb1a8ebbaecf8c8875b5d7f529570e8fe81c",
-  "git_commit": "bf7e2c70bda5063c6ac5a4e13deabc0bea516eaf",
+  "git_commit": "e3d58f48acef9ff3070a74fb75dacadad91c6d9f",
   "limitations": [
     "Zero generated measurement noise is a structural control, not a physical sensor model.",
     "The analyzer omits process noise, preintegration covariance, aiding correlations, and reset Jacobians.",

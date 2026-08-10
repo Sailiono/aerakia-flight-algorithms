@@ -43,6 +43,8 @@ const catalogSpecs = [
   { id: "g0-rate-sensitivity", label: "G0 · bias observability rate sensitivity", grade: "E", kind: "synthetic_contract_diagnostic", file: "validation/public/g0_rate_sensitivity.json", role: "rate/window/analyzer diagnostic; not an estimator gate" },
   { id: "g0-trajectory-screen", label: "G0 · zero-noise trajectory screen", grade: "E", kind: "synthetic_structural_diagnostic", file: "validation/public/g0_trajectory_screen.json", role: "maneuver geometry candidate screen; not noisy convergence evidence" },
   { id: "g0-gate-characterization", label: "G0 · analyzer gate characterization", grade: "E", kind: "synthetic_analyzer_error_rate", file: "validation/public/g0_gate_characterization.json", role: "stationary null and structural controls; not an estimator gate" },
+  { id: "g0-gate-null-split", label: "G0 · disjoint null split validation", grade: "E", kind: "synthetic_analyzer_calibration", file: "validation/public/g0_gate_null_split_validation.json", role: "held-out stationary score-threshold check; not an estimator gate" },
+  { id: "g0-excitation-score", label: "G0 · noisy excitation score campaign", grade: "E", kind: "synthetic_analyzer_calibration", file: "validation/public/g0_excitation_score_campaign.json", role: "noisy maneuver score check; not bias-convergence evidence" },
 ];
 
 function relative(file) {

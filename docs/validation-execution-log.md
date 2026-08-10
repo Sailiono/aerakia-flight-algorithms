@@ -1874,3 +1874,18 @@ Per-rate ready counts were 6/16 at 50 Hz, 5/16 at 100 Hz, 5/16 at 200 Hz, and
 recoveries. Both zero-noise positive-control trajectories were structural-ready
 at all four rates. The current analyzer gate is therefore rejected; only the
 ideal trajectory candidates are retained for a future corrected model.
+
+## 2026-08-10 — G0 score calibration split
+
+The binary analyzer gate was retained as a rejected diagnostic after its
+stationary false-positive result. A continuous score, the maximum minimum
+eigenvalue over causal windows, was calibrated only on stationary seeds 0--7.
+The candidate threshold was frozen as three times the calibration P99:
+`0.004936251852866821`.
+
+On disjoint stationary seeds 100--115 at 50/100/200/400 Hz, the candidate score
+passed `0/64`, while the old structural-ready flag passed `31/64`. On the same
+new seeds and rates, noisy `takeoff_box_land` and `yaw_quadrant_hover` each
+passed `64/64`; their minimum scores were `0.09024` and `139.1852`. These are
+analyzer screening results only. The score remains disconnected from ESKF
+correction, supervisor qualification, and flight authority.

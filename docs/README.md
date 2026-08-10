@@ -71,6 +71,8 @@ is the stable navigation layer rather than a disruptive mass rename.
   null and zero-noise structural controls for measuring analyzer error rates.
 - [G0 trajectory screen](g0-bias-observability-trajectory-screen.md): frozen
   maneuver geometry screen and its limits.
+- [G0 score calibration](g0-score-calibration.md): disjoint stationary-null
+  validation and noisy maneuver score campaign.
 - [Barometer source supervision](barometer-supervision-study.md) and
   [airspeed/barometer plan](airspeed-barometer-plan.md): vertical-aiding
   evidence, limits, and follow-up architecture.

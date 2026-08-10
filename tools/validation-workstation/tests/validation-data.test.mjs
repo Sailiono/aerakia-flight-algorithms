@@ -74,6 +74,8 @@ test("G0 trajectory screen and gate characterization entries match evidence", as
   for (const [id, file, samples] of [
     ["g0-trajectory-screen", "g0_trajectory_screen.json", 4],
     ["g0-gate-characterization", "g0_gate_characterization.json", null],
+    ["g0-gate-null-split", "g0_gate_null_split_validation.json", 64],
+    ["g0-excitation-score", "g0_excitation_score_campaign.json", 128],
   ]) {
     const entry = data.datasets.find((item) => item.id === id);
     assert.ok(entry);

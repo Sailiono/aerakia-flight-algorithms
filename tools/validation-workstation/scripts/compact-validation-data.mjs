@@ -116,6 +116,22 @@ for (const spec of [
     file: "validation/public/g0_gate_characterization.json",
     samples: (evidence) => evidence.static_null?.total_cases ?? null,
   },
+  {
+    id: "g0-gate-null-split",
+    label: "G0 · disjoint null split validation",
+    referenceKind: "synthetic_analyzer_calibration",
+    role: "held-out stationary score-threshold check; not an estimator gate",
+    file: "validation/public/g0_gate_null_split_validation.json",
+    samples: (evidence) => evidence.validation?.case_count ?? null,
+  },
+  {
+    id: "g0-excitation-score",
+    label: "G0 · noisy excitation score campaign",
+    referenceKind: "synthetic_analyzer_calibration",
+    role: "noisy maneuver score check; not bias-convergence evidence",
+    file: "validation/public/g0_excitation_score_campaign.json",
+    samples: (evidence) => evidence.cases?.length ?? null,
+  },
 ]) {
   const evidencePath = path.join(repositoryRoot, spec.file);
   try {

@@ -22,6 +22,10 @@ portable C library and from FCOne-specific integration code.
   for frozen maneuver candidates; it does not establish noisy convergence.
 - `run_bias_observability_gate_characterization.py`: stationary-noise null and
   zero-noise structural-control campaign for analyzer false-positive evidence.
+- `run_bias_observability_null_split_validation.py`: disjoint-seed check of a
+  development-only score threshold.
+- `run_bias_observability_excitation_score_campaign.py`: noisy score coverage
+  on two structural candidate maneuvers; not bias-convergence evidence.
 - `run_baro_outage_campaign.py` and `run_baro_outage_ab.py`: barometer source
   supervision experiments.
 - `run_px4_bias_ab_m0.py`: optional PX4 host comparison; it is blocked until a

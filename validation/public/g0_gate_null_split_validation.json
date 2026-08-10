@@ -1,0 +1,676 @@
+{
+  "analyzer_sha256": "73d494614d4984a63bad18b234717bc2cafd825c182bfdbb2b0296a72bdbf11a",
+  "calibration": {
+    "candidate_threshold": 0.004936251852866821,
+    "case_count": 32,
+    "p99_score": 0.0016454172842889402,
+    "seed_stop_exclusive": 8,
+    "source_path": "validation/public/g0_gate_characterization.json",
+    "source_sha256": "1b695001527f5d2e902a8205155b50434a2a272bd29be62eadba782f5d9850fe"
+  },
+  "generator_sha256": "324c927a3df2cc4fbca77e16e075fb1a8ebbaecf8c8875b5d7f529570e8fe81c",
+  "git_commit": "09d7c17b83a7336ad34416c3ee5dd42d18748159",
+  "limitations": [
+    "The threshold is calibrated on synthetic stationary data and is not valid for FCOne sensors until their noise, timing, and covariance contract is measured.",
+    "A clean stationary null does not establish a noisy true-positive rate or bias convergence.",
+    "This score is not connected to ESKF correction, supervisor qualification, or flight-control authority."
+  ],
+  "p99_multiplier": 3.0,
+  "protocol_sha256": "a0159fd5cac7124117570d489ddd4e58139ccb64e4bf7548978971954514b1d8",
+  "runner_sha256": "0eb216812feaee17017ab29930fda1e80593945b64ff0639e7b629fc4c1ad147",
+  "schema_version": 1,
+  "score_definition": "maximum minimum eigenvalue over causal analyzer windows",
+  "status": "diagnostic_candidate_threshold_not_runtime_gate",
+  "study_id": "g0-bias-observability-null-split-validation-v1",
+  "threshold_definition": "p99 of calibration stationary-null scores multiplied by the declared multiplier",
+  "validation": {
+    "candidate_false_positive_rate": 0.0,
+    "candidate_score_passes": 0,
+    "case_count": 64,
+    "cases": [
+      {
+        "current_full_rank": true,
+        "current_structural_ready": false,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 50.0,
+        "score_maximum_minimum_eigenvalue": 0.0002568128992948816,
+        "score_pass": false,
+        "seed": 100
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": false,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 100.0,
+        "score_maximum_minimum_eigenvalue": 0.0008757312779606871,
+        "score_pass": false,
+        "seed": 100
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": true,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 200.0,
+        "score_maximum_minimum_eigenvalue": 0.0010487304665839177,
+        "score_pass": false,
+        "seed": 100
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": true,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 400.0,
+        "score_maximum_minimum_eigenvalue": 0.0008872590008410326,
+        "score_pass": false,
+        "seed": 100
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": false,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 50.0,
+        "score_maximum_minimum_eigenvalue": 0.00031381706869001936,
+        "score_pass": false,
+        "seed": 101
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": true,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 100.0,
+        "score_maximum_minimum_eigenvalue": 0.0012313231907602783,
+        "score_pass": false,
+        "seed": 101
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": true,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 200.0,
+        "score_maximum_minimum_eigenvalue": 0.001546123126114814,
+        "score_pass": false,
+        "seed": 101
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": true,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 400.0,
+        "score_maximum_minimum_eigenvalue": 0.001464614571975982,
+        "score_pass": false,
+        "seed": 101
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": false,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 50.0,
+        "score_maximum_minimum_eigenvalue": 0.00017381804156637906,
+        "score_pass": false,
+        "seed": 102
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": false,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 100.0,
+        "score_maximum_minimum_eigenvalue": 0.00034013193202262507,
+        "score_pass": false,
+        "seed": 102
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": true,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 200.0,
+        "score_maximum_minimum_eigenvalue": 0.0005646219557057997,
+        "score_pass": false,
+        "seed": 102
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": true,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 400.0,
+        "score_maximum_minimum_eigenvalue": 0.0007577001453057052,
+        "score_pass": false,
+        "seed": 102
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": true,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 50.0,
+        "score_maximum_minimum_eigenvalue": 0.0009192249496230512,
+        "score_pass": false,
+        "seed": 103
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": true,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 100.0,
+        "score_maximum_minimum_eigenvalue": 0.0008509341221559114,
+        "score_pass": false,
+        "seed": 103
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": true,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 200.0,
+        "score_maximum_minimum_eigenvalue": 0.0006905970118750072,
+        "score_pass": false,
+        "seed": 103
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": true,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 400.0,
+        "score_maximum_minimum_eigenvalue": 0.002015432769011241,
+        "score_pass": false,
+        "seed": 103
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": false,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 50.0,
+        "score_maximum_minimum_eigenvalue": 0.0003350989478361746,
+        "score_pass": false,
+        "seed": 104
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": true,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 100.0,
+        "score_maximum_minimum_eigenvalue": 0.00041604825034697744,
+        "score_pass": false,
+        "seed": 104
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": true,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 200.0,
+        "score_maximum_minimum_eigenvalue": 0.0005107710774057306,
+        "score_pass": false,
+        "seed": 104
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": false,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 400.0,
+        "score_maximum_minimum_eigenvalue": 0.0004800723227887754,
+        "score_pass": false,
+        "seed": 104
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": false,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 50.0,
+        "score_maximum_minimum_eigenvalue": 0.00016795721429895384,
+        "score_pass": false,
+        "seed": 105
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": false,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 100.0,
+        "score_maximum_minimum_eigenvalue": 0.0002315189754718687,
+        "score_pass": false,
+        "seed": 105
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": false,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 200.0,
+        "score_maximum_minimum_eigenvalue": 0.000276266726549485,
+        "score_pass": false,
+        "seed": 105
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": false,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 400.0,
+        "score_maximum_minimum_eigenvalue": 0.0002753504398195346,
+        "score_pass": false,
+        "seed": 105
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": false,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 50.0,
+        "score_maximum_minimum_eigenvalue": 0.00028802771631159625,
+        "score_pass": false,
+        "seed": 106
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": true,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 100.0,
+        "score_maximum_minimum_eigenvalue": 0.001389644369808676,
+        "score_pass": false,
+        "seed": 106
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": true,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 200.0,
+        "score_maximum_minimum_eigenvalue": 0.001238350365358205,
+        "score_pass": false,
+        "seed": 106
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": true,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 400.0,
+        "score_maximum_minimum_eigenvalue": 0.0040328257412521095,
+        "score_pass": false,
+        "seed": 106
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": false,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 50.0,
+        "score_maximum_minimum_eigenvalue": 0.0016610595912209202,
+        "score_pass": false,
+        "seed": 107
+      },
+      {
+        "current_full_rank": false,
+        "current_structural_ready": false,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 100.0,
+        "score_maximum_minimum_eigenvalue": 0.00043050987882598847,
+        "score_pass": false,
+        "seed": 107
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": true,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 200.0,
+        "score_maximum_minimum_eigenvalue": 0.0008514472334486535,
+        "score_pass": false,
+        "seed": 107
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": true,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 400.0,
+        "score_maximum_minimum_eigenvalue": 0.001383364648004936,
+        "score_pass": false,
+        "seed": 107
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": false,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 50.0,
+        "score_maximum_minimum_eigenvalue": 0.00012481227076130218,
+        "score_pass": false,
+        "seed": 108
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": false,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 100.0,
+        "score_maximum_minimum_eigenvalue": 0.0002932299446810737,
+        "score_pass": false,
+        "seed": 108
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": false,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 200.0,
+        "score_maximum_minimum_eigenvalue": 0.00045037764481120667,
+        "score_pass": false,
+        "seed": 108
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": false,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 400.0,
+        "score_maximum_minimum_eigenvalue": 0.0005019483476604112,
+        "score_pass": false,
+        "seed": 108
+      },
+      {
+        "current_full_rank": false,
+        "current_structural_ready": false,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 50.0,
+        "score_maximum_minimum_eigenvalue": 0.001374243483686709,
+        "score_pass": false,
+        "seed": 109
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": true,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 100.0,
+        "score_maximum_minimum_eigenvalue": 0.0027084543120725964,
+        "score_pass": false,
+        "seed": 109
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": true,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 200.0,
+        "score_maximum_minimum_eigenvalue": 0.002148776672301288,
+        "score_pass": false,
+        "seed": 109
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": true,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 400.0,
+        "score_maximum_minimum_eigenvalue": 0.002775722265939311,
+        "score_pass": false,
+        "seed": 109
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": false,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 50.0,
+        "score_maximum_minimum_eigenvalue": 0.00011355389351066466,
+        "score_pass": false,
+        "seed": 110
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": false,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 100.0,
+        "score_maximum_minimum_eigenvalue": 0.0006576936639602523,
+        "score_pass": false,
+        "seed": 110
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": true,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 200.0,
+        "score_maximum_minimum_eigenvalue": 0.0005743492712510513,
+        "score_pass": false,
+        "seed": 110
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": false,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 400.0,
+        "score_maximum_minimum_eigenvalue": 0.0009076704729397764,
+        "score_pass": false,
+        "seed": 110
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": true,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 50.0,
+        "score_maximum_minimum_eigenvalue": 0.0011530920813722584,
+        "score_pass": false,
+        "seed": 111
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": true,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 100.0,
+        "score_maximum_minimum_eigenvalue": 0.001119332466813884,
+        "score_pass": false,
+        "seed": 111
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": false,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 200.0,
+        "score_maximum_minimum_eigenvalue": 0.0017576440175583047,
+        "score_pass": false,
+        "seed": 111
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": true,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 400.0,
+        "score_maximum_minimum_eigenvalue": 0.0016057850140079235,
+        "score_pass": false,
+        "seed": 111
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": true,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 50.0,
+        "score_maximum_minimum_eigenvalue": 0.0003888799619945739,
+        "score_pass": false,
+        "seed": 112
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": false,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 100.0,
+        "score_maximum_minimum_eigenvalue": 0.0006817894721727327,
+        "score_pass": false,
+        "seed": 112
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": true,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 200.0,
+        "score_maximum_minimum_eigenvalue": 0.0011753743395557358,
+        "score_pass": false,
+        "seed": 112
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": true,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 400.0,
+        "score_maximum_minimum_eigenvalue": 0.0022327453663496012,
+        "score_pass": false,
+        "seed": 112
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": false,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 50.0,
+        "score_maximum_minimum_eigenvalue": 0.00014434181316203974,
+        "score_pass": false,
+        "seed": 113
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": false,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 100.0,
+        "score_maximum_minimum_eigenvalue": 0.0002927503901814993,
+        "score_pass": false,
+        "seed": 113
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": false,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 200.0,
+        "score_maximum_minimum_eigenvalue": 0.0002259253329101899,
+        "score_pass": false,
+        "seed": 113
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": true,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 400.0,
+        "score_maximum_minimum_eigenvalue": 0.00041077609054206545,
+        "score_pass": false,
+        "seed": 113
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": false,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 50.0,
+        "score_maximum_minimum_eigenvalue": 0.0002766123900365921,
+        "score_pass": false,
+        "seed": 114
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": false,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 100.0,
+        "score_maximum_minimum_eigenvalue": 0.00015982345447578542,
+        "score_pass": false,
+        "seed": 114
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": false,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 200.0,
+        "score_maximum_minimum_eigenvalue": 0.000187989215435844,
+        "score_pass": false,
+        "seed": 114
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": false,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 400.0,
+        "score_maximum_minimum_eigenvalue": 0.00032555079899691586,
+        "score_pass": false,
+        "seed": 114
+      },
+      {
+        "current_full_rank": false,
+        "current_structural_ready": false,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 50.0,
+        "score_maximum_minimum_eigenvalue": 0.00028195306010113397,
+        "score_pass": false,
+        "seed": 115
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": false,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 100.0,
+        "score_maximum_minimum_eigenvalue": 0.0007984164760188764,
+        "score_pass": false,
+        "seed": 115
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": true,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 200.0,
+        "score_maximum_minimum_eigenvalue": 0.0011999558848625675,
+        "score_pass": false,
+        "seed": 115
+      },
+      {
+        "current_full_rank": true,
+        "current_structural_ready": true,
+        "estimator_healthy_ratio": 1.0,
+        "navigation_recoveries": 0,
+        "rate_hz": 400.0,
+        "score_maximum_minimum_eigenvalue": 0.0015484761660873219,
+        "score_pass": false,
+        "seed": 115
+      }
+    ],
+    "current_structural_ready_rate": 0.484375,
+    "seed_count": 16,
+    "seed_start": 100
+  }
+}
