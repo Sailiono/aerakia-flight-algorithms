@@ -76,6 +76,52 @@ def passing_sequential_payload() -> dict[str, object]:
     }
 
 
+def passing_overlap_payload() -> dict[str, object]:
+    older = {
+        "event_index": 1,
+        "source_timestamp_us": 3_000_000,
+        "delivery_timestamp_us": 3_150_000,
+        "source_gps_accepted": True,
+        "repropagated": True,
+        "pending_earlier_event_count_at_delivery": 0,
+        "zero_delay_equivalence_required_after_delivery": True,
+        "pre_delivery_max_state_difference": 1.0e-3,
+        "post_delivery_max_state_difference": 0.0,
+        "post_delivery_max_covariance_difference": 0.0,
+        "post_delivery_metadata_match": True,
+    }
+    newer = {
+        "event_index": 2,
+        "source_timestamp_us": 3_020_000,
+        "delivery_timestamp_us": 3_030_000,
+        "source_gps_accepted": True,
+        "repropagated": True,
+        "pending_earlier_event_count_at_delivery": 1,
+        "zero_delay_equivalence_required_after_delivery": False,
+        "pre_delivery_max_state_difference": 1.0e-3,
+        "post_delivery_max_state_difference": 1.0e-4,
+        "post_delivery_max_covariance_difference": 1.0e-3,
+        "post_delivery_metadata_match": True,
+    }
+    return {
+        "status": MODULE.EXPECTED_STATUS,
+        "scenario": MODULE.OVERLAPPING_SCENARIO,
+        "input_contract": MODULE.EXPECTED_INPUT_CONTRACT,
+        "overlapping_delivery_windows": True,
+        "delivery_order_reversed": True,
+        "healthy": True,
+        "covariance_psd": True,
+        "state_tolerance": 1.0e-12,
+        "covariance_tolerance": 1.0e-12,
+        "event_count": 2,
+        "events": [older, newer],
+        "final_max_state_difference": 0.0,
+        "final_max_covariance_difference": 0.0,
+        "final_metadata_match": True,
+        "pass": True,
+    }
+
+
 class DelayedGnssRepropagationOracleTest(unittest.TestCase):
     def test_complete_case_passes_all_checks(self) -> None:
         checks = MODULE.validate_case(passing_payload())
@@ -120,6 +166,68 @@ class DelayedGnssRepropagationOracleTest(unittest.TestCase):
         checks = MODULE.validate_case(payload)
         failed = {check["name"] for check in checks if not check["passed"]}
         self.assertIn("second_repropagation_executed", failed)
+
+    def test_overlap_case_passes_all_checks(self) -> None:
+        checks = MODULE.validate_case(passing_overlap_payload())
+        self.assertTrue(all(check["passed"] for check in checks))
+
+    def test_overlap_case_rejects_non_overlapping_delivery_window(self) -> None:
+        payload = passing_overlap_payload()
+        payload["overlapping_delivery_windows"] = False
+        checks = MODULE.validate_case(payload)
+        failed = {check["name"] for check in checks if not check["passed"]}
+        self.assertIn("overlap_delivery_windows_are_explicit_and_real", failed)
+
+    def test_overlap_case_rejects_non_reversed_delivery_order(self) -> None:
+        payload = passing_overlap_payload()
+        events = payload["events"]
+        assert isinstance(events, list)
+        newer = events[1]
+        assert isinstance(newer, dict)
+        newer["delivery_timestamp_us"] = 3_160_000
+        checks = MODULE.validate_case(payload)
+        failed = {check["name"] for check in checks if not check["passed"]}
+        self.assertIn("overlap_delivery_order_is_reversed", failed)
+
+    def test_overlap_case_rejects_non_chronological_source_order(self) -> None:
+        payload = passing_overlap_payload()
+        events = payload["events"]
+        assert isinstance(events, list)
+        newer = events[1]
+        assert isinstance(newer, dict)
+        newer["source_timestamp_us"] = 3_000_000
+        checks = MODULE.validate_case(payload)
+        failed = {check["name"] for check in checks if not check["passed"]}
+        self.assertIn("overlap_source_order_is_chronological", failed)
+
+    def test_overlap_case_requires_pending_earlier_event(self) -> None:
+        payload = passing_overlap_payload()
+        events = payload["events"]
+        assert isinstance(events, list)
+        newer = events[1]
+        assert isinstance(newer, dict)
+        newer["pending_earlier_event_count_at_delivery"] = 0
+        checks = MODULE.validate_case(payload)
+        failed = {check["name"] for check in checks if not check["passed"]}
+        self.assertIn("newer_delivery_reports_one_pending_earlier_event", failed)
+
+    def test_overlap_case_rejects_premature_equivalence(self) -> None:
+        payload = passing_overlap_payload()
+        events = payload["events"]
+        assert isinstance(events, list)
+        newer = events[1]
+        assert isinstance(newer, dict)
+        newer["post_delivery_max_state_difference"] = 0.0
+        checks = MODULE.validate_case(payload)
+        failed = {check["name"] for check in checks if not check["passed"]}
+        self.assertIn(
+            "newer_delivery_remains_observably_different_while_older_event_is_pending",
+            failed,
+        )
+
+    def test_overlap_delay_below_pending_window_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "overlap requires delays"):
+            MODULE.parse_delays("overlap", "20,50")
 
 
 if __name__ == "__main__":

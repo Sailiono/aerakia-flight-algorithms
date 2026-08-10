@@ -60,13 +60,16 @@ does not change the frozen trial matrix or metrics.
 ## What must precede another correction candidate
 
 This result does not prove that joint tilt/bias correction is impossible. It
-does prove that a marginal 5x5 MAP proposal is insufficient. The next bounded
-piece of work is a host-only delayed-GNSS rewind/replay oracle. Its isolated
-and sequential non-overlapping matrices now prove that a full state/covariance
-snapshot, the existing Joseph update, attitude reset, and canonical event order
-reproduce the zero-delay reference when exact-timestamp GNSS epochs arrive late.
-It is not a product delayed-fusion implementation, does not support overlapping
-out-of-sequence events, and does not inject this rejected proposal.
+does prove that a marginal 5x5 MAP proposal is insufficient. The bounded
+host-only delayed-GNSS rewind/replay oracle now proves that a full
+state/covariance snapshot, the existing Joseph update, attitude reset, and
+canonical event order reproduce the zero-delay reference for isolated,
+sequential non-overlapping, and one exact two-event overlapping/reordered P/V
+schedule. In that overlap schedule, replay uses only sources delivered so far;
+it does not silently accept the older pending observation. It remains a
+research oracle, not a product delayed-fusion implementation, does not support
+arbitrary overlapping out-of-sequence events, and does not inject this rejected
+proposal.
 
 Only after that prerequisite is independently passing may a new candidate be
 specified with full 15-state lag covariance, process/preintegration covariance,

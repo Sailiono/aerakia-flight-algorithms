@@ -2040,10 +2040,56 @@ filters remained finite/PSD.
 The new CTest target, Python negative schedule test, and compact evidence are
 retained under
 [`delayed_gnss_repropagation_sequential_v1.json`](../validation/public/delayed_gnss_repropagation_sequential_v1.json).
-This remains host-only replay correctness evidence. Overlapping/reordered
-pending events, delayed heading/barometer, mixed sensor types, interpolation,
-physical source-arrival timestamps, target resource limits, and flight policy
-are still open.
+This remains host-only replay correctness evidence. Delayed heading/barometer,
+mixed sensor types, interpolation, physical source-arrival timestamps, target
+resource limits, and flight policy are still open.
+
+## 2026-08-10 — overlapping/reordered delayed-GNSS replay boundary
+
+### Reason
+
+The sequential oracle deliberately avoided a harder condition: a newer source
+can arrive while an earlier source is still pending. Reusing the isolated
+replay helper in that case would be wrong because it replays every historical
+P/V update and would silently fuse the older source before its declared
+delivery. The next bounded evidence step is therefore not a product OOSM
+implementation; it is a test that detects exactly that premature fusion error.
+
+### Method
+
+The new `overlap` scenario retains two exact 20 ms-cadence P/V source epochs at
+`3.000 s` and `3.020 s`. The newer epoch is delivered one IMU interval after
+its source. The older one arrives after `50`, `100`, or `150 ms`, giving a
+strictly overlapping source/delivery window and reverse delivery order.
+
+At every delivery, the delayed lane rebuilds from the earliest affected full
+pre-aiding `AerakiaEskf` snapshot. It processes immutable IMU records and
+applies an aiding record only if that source has already been delivered. The
+new wrapper and negative tests require exactly two chronological sources,
+overlap, reverse delivery, one pending earlier source at newer delivery, a
+nonzero newer-delivery difference while that source is pending, and final
+state/covariance/metadata equivalence only after the older delivery. A delay
+below `50 ms` is rejected because it cannot express that pending condition.
+
+### Result
+
+The `100/200/400 Hz x 50/100/150 ms` matrix passed `9/9` cases. The older and
+newer pre-delivery state differences range from `2.47945e-4` to `2.48558e-4`.
+After the newer first delivery, the delayed lane correctly remains different
+from the zero-delay baseline: state difference is `1.18867e-4`--`1.19160e-4`
+and covariance difference is `1.24941e-3`--`1.26297e-3`. After the older
+delivery, every final state and covariance difference is exactly zero and
+metadata matches under the `1e-12` double-precision tolerance. Both lanes stay
+finite and PSD. The 400 Hz / 150 ms CTest exercises a 60-sample delay inside
+the 64-sample host ring.
+
+The evidence is retained under
+[`delayed_gnss_repropagation_overlap_v1.json`](../validation/public/delayed_gnss_repropagation_overlap_v1.json).
+This closes a small replay-correctness uncertainty only. It does not establish
+arbitrary event-count OOSM support, loss behavior for pending observations,
+interpolation, delayed heading/barometer, multi-IMU replay, physical
+source/arrival timing, target resource cost, controller policy, or flight
+readiness.
 
 ## 2026-08-10 — GCC static-analysis hardening
 

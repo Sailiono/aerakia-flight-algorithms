@@ -32,10 +32,12 @@ portable C library and from FCOne-specific integration code.
   compact evidence, and do not treat it as an estimator implementation. It
   defaults to one worker; `--jobs` is an explicitly validated workstation
   parallelism option.
-- `run_delayed_gnss_repropagation_oracle.py`: twelve-case host-only isolated
-  or sequential non-overlapping delayed-GNSS rewind/replay campaign. It proves
-  only exact state/covariance equivalence to a zero-delay reference; it is not
-  a product delayed-fusion API or a claim of generic overlapping OOSM support.
+- `run_delayed_gnss_repropagation_oracle.py`: host-only isolated, sequential
+  non-overlapping, and tightly bounded two-event overlapping/reordered
+  delayed-GNSS rewind/replay campaigns. The overlap gate requires the newer
+  delivery to remain non-equivalent while the earlier source is pending, then
+  requires final exact state/covariance equivalence to a zero-delay reference.
+  It is not a product delayed-fusion API or a claim of generic OOSM support.
 - `run_cortex_m7_cross_compile.py`: strict Cortex-M7 hard-float compile,
   internal-link, public-layout, and dependency preflight. It does not create
   an FCOne image or measure target timing, stack, Flash/RAM, or runtime health.

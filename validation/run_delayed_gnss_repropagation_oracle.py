@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Run the bounded delayed-GNSS repropagation oracle.
 
-The native oracle is deliberately host-only and research-only.  It exercises
-one exact source/delivery timestamp pair per case, with a single delayed GNSS
-position/velocity observation and all other P/V observations on time.  A
-sequential mode exercises exactly two non-overlapping delayed events.  The
-strict gate is equivalence to the zero-delay reference after replay, not an
-accuracy or flight-readiness claim.
+The native oracle is deliberately host-only and research-only. It exercises
+exact source/delivery timestamp pairs for delayed GNSS position/velocity
+observations. The overlap mode has two source epochs whose delivery windows
+overlap and arrive in reverse order. Its newer event must remain different
+from the zero-delay baseline while the earlier source is pending; only the
+fully delivered lane must become equivalent. The gate is replay correctness,
+not an accuracy or flight-readiness claim.
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import subprocess
 import sys
 from pathlib import Path
@@ -23,10 +25,13 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_RATES = (100, 200, 400)
 DEFAULT_DELAYS = (20, 50, 100, 150)
+OVERLAP_DEFAULT_DELAYS = (50, 100, 150)
+OVERLAP_MIN_DELAY_MS = 50
 EXPECTED_STATUS = "host_only_research_oracle_not_flight_feature"
 EXPECTED_INPUT_CONTRACT = "synthetic_exact_timestamp_pv_only"
 SINGLE_SCENARIO = "single_isolated"
 SEQUENTIAL_SCENARIO = "sequential_two_non_overlapping"
+OVERLAPPING_SCENARIO = "overlapping_reordered_two_event"
 
 
 def sha256(path: Path) -> str:
@@ -55,9 +60,51 @@ def parse_integer_list(value: str, label: str) -> tuple[int, ...]:
     return values
 
 
-def event_checks(event: dict[str, Any], prefix: str, state_tolerance: float,
-                 covariance_tolerance: float) -> list[dict[str, Any]]:
-    """Return per-event checks shared by the isolated and sequential scenarios."""
+def parse_delays(scenario: str, value: str | None) -> tuple[int, ...]:
+    """Parse scenario-specific delays and reject a non-late overlap schedule."""
+
+    if value is None:
+        return OVERLAP_DEFAULT_DELAYS if scenario == "overlap" else DEFAULT_DELAYS
+    delays = parse_integer_list(value, "--delays-ms")
+    if scenario == "overlap" and any(delay < OVERLAP_MIN_DELAY_MS for delay in delays):
+        raise ValueError(
+            f"overlap requires delays of at least {OVERLAP_MIN_DELAY_MS} ms "
+            "so the earlier event remains pending when the newer event arrives"
+        )
+    return delays
+
+
+def finite_number(value: object) -> float | None:
+    """Return a finite number without accepting malformed native JSON silently."""
+
+    if isinstance(value, bool):
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
+
+
+def integer(value: object) -> int | None:
+    """Accept JSON integer fields only; bool and float values are malformed."""
+
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def numeric_at_most(value: object, tolerance: float) -> bool:
+    number = finite_number(value)
+    return number is not None and math.isfinite(tolerance) and number <= tolerance
+
+
+def numeric_above(value: object, tolerance: float) -> bool:
+    number = finite_number(value)
+    return number is not None and math.isfinite(tolerance) and number > tolerance
+
+
+def event_progress_checks(event: dict[str, Any], prefix: str,
+                          state_tolerance: float) -> list[dict[str, Any]]:
+    """Check one delayed event before deciding whether equivalence is due."""
 
     label = f"{prefix}_" if prefix else ""
     return [
@@ -71,18 +118,31 @@ def event_checks(event: dict[str, Any], prefix: str, state_tolerance: float,
         },
         {
             "name": f"{label}pre_delivery_difference_is_observable",
-            "passed": float(event.get("pre_delivery_max_state_difference", 0.0))
-            > state_tolerance,
+            "passed": numeric_above(
+                event.get("pre_delivery_max_state_difference"), state_tolerance
+            ),
         },
+    ]
+
+
+def event_equivalence_checks(event: dict[str, Any], prefix: str,
+                             state_tolerance: float,
+                             covariance_tolerance: float) -> list[dict[str, Any]]:
+    """Check the zero-delay equivalence that is valid only after all sources arrive."""
+
+    label = f"{prefix}_" if prefix else ""
+    return [
         {
             "name": f"{label}post_delivery_state_matches_zero_delay",
-            "passed": float(event.get("post_delivery_max_state_difference", float("inf")))
-            <= state_tolerance,
+            "passed": numeric_at_most(
+                event.get("post_delivery_max_state_difference"), state_tolerance
+            ),
         },
         {
             "name": f"{label}post_delivery_covariance_matches_zero_delay",
-            "passed": float(event.get("post_delivery_max_covariance_difference", float("inf")))
-            <= covariance_tolerance,
+            "passed": numeric_at_most(
+                event.get("post_delivery_max_covariance_difference"), covariance_tolerance
+            ),
         },
         {
             "name": f"{label}post_delivery_metadata_matches_zero_delay",
@@ -91,11 +151,30 @@ def event_checks(event: dict[str, Any], prefix: str, state_tolerance: float,
     ]
 
 
+def event_checks(event: dict[str, Any], prefix: str, state_tolerance: float,
+                 covariance_tolerance: float) -> list[dict[str, Any]]:
+    """Return complete checks for a fully delivered delayed event."""
+
+    return event_progress_checks(event, prefix, state_tolerance) + event_equivalence_checks(
+        event, prefix, state_tolerance, covariance_tolerance
+    )
+
+
 def validate_case(payload: dict[str, Any]) -> list[dict[str, Any]]:
     """Return named, fail-closed checks for one native oracle result."""
 
-    state_tolerance = float(payload.get("state_tolerance", float("nan")))
-    covariance_tolerance = float(payload.get("covariance_tolerance", float("nan")))
+    state_tolerance = finite_number(payload.get("state_tolerance"))
+    covariance_tolerance = finite_number(payload.get("covariance_tolerance"))
+    valid_tolerances = (
+        state_tolerance is not None
+        and covariance_tolerance is not None
+        and state_tolerance >= 0.0
+        and covariance_tolerance >= 0.0
+    )
+    checked_state_tolerance = state_tolerance if state_tolerance is not None else float("nan")
+    checked_covariance_tolerance = (
+        covariance_tolerance if covariance_tolerance is not None else float("nan")
+    )
     scenario = payload.get("scenario", SINGLE_SCENARIO)
     checks: list[dict[str, Any]] = [
         {
@@ -106,9 +185,15 @@ def validate_case(payload: dict[str, Any]) -> list[dict[str, Any]]:
             "name": "synthetic_exact_timestamp_pv_contract_is_explicit",
             "passed": payload.get("input_contract") == EXPECTED_INPUT_CONTRACT,
         },
+        {
+            "name": "finite_nonnegative_tolerances_are_explicit",
+            "passed": valid_tolerances,
+        },
     ]
     if scenario == SINGLE_SCENARIO:
-        checks.extend(event_checks(payload, "", state_tolerance, covariance_tolerance))
+        checks.extend(event_checks(
+            payload, "", checked_state_tolerance, checked_covariance_tolerance
+        ))
     elif scenario == SEQUENTIAL_SCENARIO:
         events = payload.get("events")
         first = events[0] if isinstance(events, list) and len(events) >= 1 else {}
@@ -131,24 +216,147 @@ def validate_case(payload: dict[str, Any]) -> list[dict[str, Any]]:
                 "passed": (
                     isinstance(first, dict)
                     and isinstance(second, dict)
-                    and int(second.get("source_timestamp_us", 0))
-                    > int(first.get("delivery_timestamp_us", 0))
+                    and integer(second.get("source_timestamp_us")) is not None
+                    and integer(first.get("delivery_timestamp_us")) is not None
+                    and integer(second.get("source_timestamp_us"))
+                    > integer(first.get("delivery_timestamp_us"))
                     and payload.get("sequential_non_overlapping") is True
                 ),
             },
         ])
-        checks.extend(event_checks(first, "first", state_tolerance, covariance_tolerance))
-        checks.extend(event_checks(second, "second", state_tolerance, covariance_tolerance))
+        checks.extend(event_checks(
+            first, "first", checked_state_tolerance, checked_covariance_tolerance
+        ))
+        checks.extend(event_checks(
+            second, "second", checked_state_tolerance, checked_covariance_tolerance
+        ))
         checks.extend([
             {
                 "name": "final_state_matches_zero_delay",
-                "passed": float(payload.get("final_max_state_difference", float("inf")))
-                <= state_tolerance,
+                "passed": numeric_at_most(
+                    payload.get("final_max_state_difference"), checked_state_tolerance
+                ),
             },
             {
                 "name": "final_covariance_matches_zero_delay",
-                "passed": float(payload.get("final_max_covariance_difference", float("inf")))
-                <= covariance_tolerance,
+                "passed": numeric_at_most(
+                    payload.get("final_max_covariance_difference"),
+                    checked_covariance_tolerance,
+                ),
+            },
+            {
+                "name": "final_metadata_matches_zero_delay",
+                "passed": payload.get("final_metadata_match") is True,
+            },
+        ])
+    elif scenario == OVERLAPPING_SCENARIO:
+        events = payload.get("events")
+        older = events[0] if isinstance(events, list) and len(events) >= 1 else {}
+        newer = events[1] if isinstance(events, list) and len(events) >= 2 else {}
+        older_source = integer(older.get("source_timestamp_us")) if isinstance(older, dict) else None
+        newer_source = integer(newer.get("source_timestamp_us")) if isinstance(newer, dict) else None
+        older_delivery = (
+            integer(older.get("delivery_timestamp_us")) if isinstance(older, dict) else None
+        )
+        newer_delivery = (
+            integer(newer.get("delivery_timestamp_us")) if isinstance(newer, dict) else None
+        )
+        checks.extend([
+            {
+                "name": "overlap_mode_is_explicit",
+                "passed": payload.get("scenario") == OVERLAPPING_SCENARIO,
+            },
+            {
+                "name": "overlap_mode_has_exactly_two_events",
+                "passed": (
+                    isinstance(events, list)
+                    and len(events) == 2
+                    and payload.get("event_count") == 2
+                ),
+            },
+            {
+                "name": "overlap_source_order_is_chronological",
+                "passed": (
+                    older_source is not None
+                    and newer_source is not None
+                    and older_source < newer_source
+                ),
+            },
+            {
+                "name": "overlap_delivery_windows_are_explicit_and_real",
+                "passed": (
+                    payload.get("overlapping_delivery_windows") is True
+                    and older_source is not None
+                    and newer_source is not None
+                    and older_delivery is not None
+                    and newer_source < older_delivery
+                ),
+            },
+            {
+                "name": "overlap_delivery_order_is_reversed",
+                "passed": (
+                    payload.get("delivery_order_reversed") is True
+                    and older_delivery is not None
+                    and newer_delivery is not None
+                    and newer_delivery < older_delivery
+                ),
+            },
+        ])
+        checks.extend(event_checks(
+            older, "older", checked_state_tolerance, checked_covariance_tolerance
+        ))
+        checks.extend(event_progress_checks(newer, "newer", checked_state_tolerance))
+        checks.extend([
+            {
+                "name": "newer_delivery_reports_one_pending_earlier_event",
+                "passed": (
+                    isinstance(newer, dict)
+                    and newer.get("pending_earlier_event_count_at_delivery") == 1
+                ),
+            },
+            {
+                "name": "newer_delivery_does_not_prematurely_require_zero_delay_equivalence",
+                "passed": (
+                    isinstance(newer, dict)
+                    and newer.get("zero_delay_equivalence_required_after_delivery") is False
+                ),
+            },
+            {
+                "name": "newer_delivery_remains_observably_different_while_older_event_is_pending",
+                "passed": (
+                    isinstance(newer, dict)
+                    and numeric_above(
+                        newer.get("post_delivery_max_state_difference"),
+                        checked_state_tolerance,
+                    )
+                ),
+            },
+            {
+                "name": "older_delivery_has_no_pending_earlier_event",
+                "passed": (
+                    isinstance(older, dict)
+                    and older.get("pending_earlier_event_count_at_delivery") == 0
+                ),
+            },
+            {
+                "name": "older_delivery_requires_zero_delay_equivalence",
+                "passed": (
+                    isinstance(older, dict)
+                    and older.get("zero_delay_equivalence_required_after_delivery") is True
+                ),
+            },
+            {
+                "name": "final_state_matches_zero_delay",
+                "passed": numeric_at_most(
+                    payload.get("final_max_state_difference"), checked_state_tolerance
+                ),
+            },
+            {
+                "name": "final_covariance_matches_zero_delay",
+                "passed": numeric_at_most(
+                    payload.get("final_max_covariance_difference"),
+                    checked_covariance_tolerance,
+                ),
             },
             {
                 "name": "final_metadata_matches_zero_delay",
@@ -219,15 +427,22 @@ def main() -> int:
     parser.add_argument("--oracle", type=Path, required=True)
     parser.add_argument("--out", type=Path, default=Path("build/delayed-gnss-reprop/oracle-v1.json"))
     parser.add_argument("--rates", default=",".join(str(value) for value in DEFAULT_RATES))
-    parser.add_argument("--delays-ms", default=",".join(str(value) for value in DEFAULT_DELAYS))
-    parser.add_argument("--scenario", choices=("single", "sequential"), default="single")
+    parser.add_argument(
+        "--delays-ms",
+        default=None,
+        help=(
+            "comma-separated increasing delays; defaults to 20,50,100,150 for "
+            "single/sequential and 50,100,150 for overlap"
+        ),
+    )
+    parser.add_argument("--scenario", choices=("single", "sequential", "overlap"), default="single")
     args = parser.parse_args()
     oracle = args.oracle.resolve()
     if not oracle.is_file():
         parser.error(f"oracle does not exist: {oracle}")
     try:
         rates = parse_integer_list(args.rates, "--rates")
-        delays = parse_integer_list(args.delays_ms, "--delays-ms")
+        delays = parse_delays(args.scenario, args.delays_ms)
     except ValueError as error:
         parser.error(str(error))
 
@@ -241,11 +456,17 @@ def main() -> int:
     document: dict[str, Any] = {
         "schema_version": 1,
         "status": EXPECTED_STATUS,
-        "scope": (
-            "synthetic exact-timestamp sequential GNSS P/V rewind/repropagation oracle"
-            if args.scenario == "sequential"
-            else "synthetic exact-timestamp isolated GNSS P/V rewind/repropagation oracle"
-        ),
+        "scope": {
+            "single": "synthetic exact-timestamp isolated GNSS P/V rewind/repropagation oracle",
+            "sequential": (
+                "synthetic exact-timestamp sequential non-overlapping GNSS P/V "
+                "rewind/repropagation oracle"
+            ),
+            "overlap": (
+                "synthetic exact-timestamp overlapping reordered two-event GNSS P/V "
+                "rewind/repropagation oracle"
+            ),
+        }[args.scenario],
         "scenario": args.scenario,
         "input_contract": EXPECTED_INPUT_CONTRACT,
         "rates_hz": list(rates),
@@ -257,11 +478,17 @@ def main() -> int:
         "campaign_runner": fingerprint(Path(__file__).resolve()),
         "cases": cases,
         "limitations": [
-            (
-                "Exactly two sequential, non-overlapping delayed GNSS P/V events are replayed per case."
-                if args.scenario == "sequential"
-                else "Only one isolated delayed GNSS P/V event is replayed per case."
-            ),
+            {
+                "single": "Only one isolated delayed GNSS P/V event is replayed per case.",
+                "sequential": (
+                    "Exactly two sequential, non-overlapping delayed GNSS P/V events are "
+                    "replayed per case."
+                ),
+                "overlap": (
+                    "Exactly two overlapping GNSS P/V events are replayed per case, with the "
+                    "newer source delivered first."
+                ),
+            }[args.scenario],
             "The ring is a host validation implementation and is not a production rewind API.",
             "No delayed heading, barometer, multi-IMU, supervisor, sensor-delay, or controller path is covered.",
             "The synthetic truth creates the P/V measurement only; the replay logic receives no truth fields.",
