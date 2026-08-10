@@ -137,6 +137,11 @@ if(AERAKIA_BUILD_TESTS)
         NAME delayed_gnss_reprop_oracle
         COMMAND aerakia_delayed_gnss_reprop_oracle --rate-hz 400 --delay-ms 150
     )
+    add_test(
+        NAME delayed_gnss_reprop_sequential_oracle
+        COMMAND aerakia_delayed_gnss_reprop_oracle
+            --rate-hz 400 --delay-ms 150 --scenario sequential
+    )
 endif()
 
 if(AERAKIA_BUILD_VALIDATION)

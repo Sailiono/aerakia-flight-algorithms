@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Run the bounded isolated delayed-GNSS repropagation oracle.
+"""Run the bounded delayed-GNSS repropagation oracle.
 
 The native oracle is deliberately host-only and research-only.  It exercises
 one exact source/delivery timestamp pair per case, with a single delayed GNSS
-position/velocity observation and all other P/V observations on time.  The
+position/velocity observation and all other P/V observations on time.  A
+sequential mode exercises exactly two non-overlapping delayed events.  The
 strict gate is equivalence to the zero-delay reference after replay, not an
 accuracy or flight-readiness claim.
 """
@@ -24,6 +25,8 @@ DEFAULT_RATES = (100, 200, 400)
 DEFAULT_DELAYS = (20, 50, 100, 150)
 EXPECTED_STATUS = "host_only_research_oracle_not_flight_feature"
 EXPECTED_INPUT_CONTRACT = "synthetic_exact_timestamp_pv_only"
+SINGLE_SCENARIO = "single_isolated"
+SEQUENTIAL_SCENARIO = "sequential_two_non_overlapping"
 
 
 def sha256(path: Path) -> str:
@@ -52,12 +55,49 @@ def parse_integer_list(value: str, label: str) -> tuple[int, ...]:
     return values
 
 
+def event_checks(event: dict[str, Any], prefix: str, state_tolerance: float,
+                 covariance_tolerance: float) -> list[dict[str, Any]]:
+    """Return per-event checks shared by the isolated and sequential scenarios."""
+
+    label = f"{prefix}_" if prefix else ""
+    return [
+        {
+            "name": f"{label}source_update_accepted",
+            "passed": event.get("source_gps_accepted") is True,
+        },
+        {
+            "name": f"{label}repropagation_executed",
+            "passed": event.get("repropagated") is True,
+        },
+        {
+            "name": f"{label}pre_delivery_difference_is_observable",
+            "passed": float(event.get("pre_delivery_max_state_difference", 0.0))
+            > state_tolerance,
+        },
+        {
+            "name": f"{label}post_delivery_state_matches_zero_delay",
+            "passed": float(event.get("post_delivery_max_state_difference", float("inf")))
+            <= state_tolerance,
+        },
+        {
+            "name": f"{label}post_delivery_covariance_matches_zero_delay",
+            "passed": float(event.get("post_delivery_max_covariance_difference", float("inf")))
+            <= covariance_tolerance,
+        },
+        {
+            "name": f"{label}post_delivery_metadata_matches_zero_delay",
+            "passed": event.get("post_delivery_metadata_match") is True,
+        },
+    ]
+
+
 def validate_case(payload: dict[str, Any]) -> list[dict[str, Any]]:
     """Return named, fail-closed checks for one native oracle result."""
 
     state_tolerance = float(payload.get("state_tolerance", float("nan")))
     covariance_tolerance = float(payload.get("covariance_tolerance", float("nan")))
-    return [
+    scenario = payload.get("scenario", SINGLE_SCENARIO)
+    checks: list[dict[str, Any]] = [
         {
             "name": "research_only_status_is_explicit",
             "passed": payload.get("status") == EXPECTED_STATUS,
@@ -66,33 +106,58 @@ def validate_case(payload: dict[str, Any]) -> list[dict[str, Any]]:
             "name": "synthetic_exact_timestamp_pv_contract_is_explicit",
             "passed": payload.get("input_contract") == EXPECTED_INPUT_CONTRACT,
         },
-        {
-            "name": "isolated_source_update_accepted",
-            "passed": payload.get("source_gps_accepted") is True,
-        },
-        {
-            "name": "repropagation_executed",
-            "passed": payload.get("repropagated") is True,
-        },
-        {
-            "name": "pre_delivery_difference_is_observable",
-            "passed": float(payload.get("pre_delivery_max_state_difference", 0.0))
-            > state_tolerance,
-        },
-        {
-            "name": "post_delivery_state_matches_zero_delay",
-            "passed": float(payload.get("post_delivery_max_state_difference", float("inf")))
-            <= state_tolerance,
-        },
-        {
-            "name": "post_delivery_covariance_matches_zero_delay",
-            "passed": float(payload.get("post_delivery_max_covariance_difference", float("inf")))
-            <= covariance_tolerance,
-        },
-        {
-            "name": "post_delivery_metadata_matches_zero_delay",
-            "passed": payload.get("post_delivery_metadata_match") is True,
-        },
+    ]
+    if scenario == SINGLE_SCENARIO:
+        checks.extend(event_checks(payload, "", state_tolerance, covariance_tolerance))
+    elif scenario == SEQUENTIAL_SCENARIO:
+        events = payload.get("events")
+        first = events[0] if isinstance(events, list) and len(events) >= 1 else {}
+        second = events[1] if isinstance(events, list) and len(events) >= 2 else {}
+        checks.extend([
+            {
+                "name": "sequential_mode_is_explicit",
+                "passed": payload.get("scenario") == SEQUENTIAL_SCENARIO,
+            },
+            {
+                "name": "sequential_mode_has_exactly_two_events",
+                "passed": (
+                    isinstance(events, list)
+                    and len(events) == 2
+                    and payload.get("event_count") == 2
+                ),
+            },
+            {
+                "name": "second_source_is_after_first_delivery",
+                "passed": (
+                    isinstance(first, dict)
+                    and isinstance(second, dict)
+                    and int(second.get("source_timestamp_us", 0))
+                    > int(first.get("delivery_timestamp_us", 0))
+                    and payload.get("sequential_non_overlapping") is True
+                ),
+            },
+        ])
+        checks.extend(event_checks(first, "first", state_tolerance, covariance_tolerance))
+        checks.extend(event_checks(second, "second", state_tolerance, covariance_tolerance))
+        checks.extend([
+            {
+                "name": "final_state_matches_zero_delay",
+                "passed": float(payload.get("final_max_state_difference", float("inf")))
+                <= state_tolerance,
+            },
+            {
+                "name": "final_covariance_matches_zero_delay",
+                "passed": float(payload.get("final_max_covariance_difference", float("inf")))
+                <= covariance_tolerance,
+            },
+            {
+                "name": "final_metadata_matches_zero_delay",
+                "passed": payload.get("final_metadata_match") is True,
+            },
+        ])
+    else:
+        checks.append({"name": "scenario_is_known", "passed": False})
+    checks.extend([
         {
             "name": "finite_healthy_state",
             "passed": payload.get("healthy") is True,
@@ -105,16 +170,19 @@ def validate_case(payload: dict[str, Any]) -> list[dict[str, Any]]:
             "name": "native_case_gate_passed",
             "passed": payload.get("pass") is True,
         },
-    ]
+    ])
+    return checks
 
 
-def run_case(oracle: Path, rate_hz: int, delay_ms: int) -> dict[str, Any]:
+def run_case(oracle: Path, rate_hz: int, delay_ms: int, scenario: str) -> dict[str, Any]:
     command = [
         str(oracle),
         "--rate-hz",
         str(rate_hz),
         "--delay-ms",
         str(delay_ms),
+        "--scenario",
+        scenario,
     ]
     completed = subprocess.run(
         command,
@@ -137,6 +205,7 @@ def run_case(oracle: Path, rate_hz: int, delay_ms: int) -> dict[str, Any]:
     return {
         "rate_hz": rate_hz,
         "delay_ms": delay_ms,
+        "scenario": scenario,
         "command": command,
         "returncode": completed.returncode,
         "checks": checks,
@@ -151,6 +220,7 @@ def main() -> int:
     parser.add_argument("--out", type=Path, default=Path("build/delayed-gnss-reprop/oracle-v1.json"))
     parser.add_argument("--rates", default=",".join(str(value) for value in DEFAULT_RATES))
     parser.add_argument("--delays-ms", default=",".join(str(value) for value in DEFAULT_DELAYS))
+    parser.add_argument("--scenario", choices=("single", "sequential"), default="single")
     args = parser.parse_args()
     oracle = args.oracle.resolve()
     if not oracle.is_file():
@@ -164,14 +234,19 @@ def main() -> int:
     cases: list[dict[str, Any]] = []
     for rate_hz in rates:
         for delay_ms in delays:
-            cases.append(run_case(oracle, rate_hz, delay_ms))
+            cases.append(run_case(oracle, rate_hz, delay_ms, args.scenario))
     passed = all(case["passed"] for case in cases)
     output = args.out if args.out.is_absolute() else ROOT / args.out
     output.parent.mkdir(parents=True, exist_ok=True)
     document: dict[str, Any] = {
         "schema_version": 1,
         "status": EXPECTED_STATUS,
-        "scope": "synthetic exact-timestamp isolated GNSS P/V rewind/repropagation oracle",
+        "scope": (
+            "synthetic exact-timestamp sequential GNSS P/V rewind/repropagation oracle"
+            if args.scenario == "sequential"
+            else "synthetic exact-timestamp isolated GNSS P/V rewind/repropagation oracle"
+        ),
+        "scenario": args.scenario,
         "input_contract": EXPECTED_INPUT_CONTRACT,
         "rates_hz": list(rates),
         "delays_ms": list(delays),
@@ -182,7 +257,11 @@ def main() -> int:
         "campaign_runner": fingerprint(Path(__file__).resolve()),
         "cases": cases,
         "limitations": [
-            "Only one isolated delayed GNSS P/V event is replayed per case.",
+            (
+                "Exactly two sequential, non-overlapping delayed GNSS P/V events are replayed per case."
+                if args.scenario == "sequential"
+                else "Only one isolated delayed GNSS P/V event is replayed per case."
+            ),
             "The ring is a host validation implementation and is not a production rewind API.",
             "No delayed heading, barometer, multi-IMU, supervisor, sensor-delay, or controller path is covered.",
             "The synthetic truth creates the P/V measurement only; the replay logic receives no truth fields.",

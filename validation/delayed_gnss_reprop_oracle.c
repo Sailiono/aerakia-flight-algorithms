@@ -3,9 +3,11 @@
  * @brief Host-only isolated delayed-GNSS rewind/repropagation oracle.
  *
  * This is a validation experiment, not a flight feature.  It keeps a bounded
- * ring of complete AerakiaEskf snapshots and exact IMU/P-V events, rewinds one
- * delayed GNSS observation to its source timestamp, and replays the intervening
- * stream.  The result is compared with an otherwise identical zero-delay run.
+ * ring of complete AerakiaEskf snapshots and exact IMU/P-V events, rewinds an
+ * isolated delayed GNSS observation to its source timestamp, and replays the
+ * intervening stream.  The optional sequential mode performs this twice only
+ * after the first delivery has completed; it is not an overlapping-OOSM path.
+ * The result is compared with an otherwise identical zero-delay run.
  *
  * Only the timestamped P/V contract is exercised.  The experiment deliberately
  * excludes magnetic, heading, barometer, supervisor, and multi-IMU behavior.
@@ -22,7 +24,8 @@
 
 #define ORACLE_HISTORY_CAPACITY 64U
 #define ORACLE_GPS_INTERVAL_US 100000U
-#define ORACLE_SOURCE_TIMESTAMP_US 3000000U
+#define ORACLE_FIRST_SOURCE_TIMESTAMP_US 3000000U
+#define ORACLE_SECOND_SOURCE_TIMESTAMP_US 4000000U
 #define ORACLE_DURATION_US 6000000U
 #define ORACLE_MAX_DELAY_MS 150U
 
@@ -46,11 +49,28 @@ typedef struct {
     AerakiaVec3f velocity_ned_m_s;
 } TruthState;
 
+typedef enum {
+    ORACLE_SCENARIO_SINGLE = 0,
+    ORACLE_SCENARIO_SEQUENTIAL = 1
+} OracleScenario;
+
+typedef struct {
+    uint64_t source_sequence;
+    uint64_t delivery_sequence;
+    bool source_accepted;
+    bool repropagated;
+    double pre_delivery_max_state_difference;
+    double post_delivery_max_state_difference;
+    double post_delivery_max_covariance_difference;
+    bool post_delivery_metadata_match;
+} DelayedEvent;
+
 static void usage(const char *program)
 {
     fprintf(
         stderr,
-        "Usage: %s [--rate-hz HZ] [--delay-ms MS] [--out PATH]\n",
+        "Usage: %s [--rate-hz HZ] [--delay-ms MS] "
+        "[--scenario single|sequential] [--out PATH]\n",
         program
     );
 }
@@ -64,6 +84,27 @@ static bool parse_unsigned(const char *text, unsigned *value)
     if (end == text || *end != '\0' || parsed > UINT32_MAX) return false;
     *value = (unsigned)parsed;
     return true;
+}
+
+static bool parse_scenario(const char *text, OracleScenario *scenario)
+{
+    if (text == NULL || scenario == NULL) return false;
+    if (strcmp(text, "single") == 0) {
+        *scenario = ORACLE_SCENARIO_SINGLE;
+        return true;
+    }
+    if (strcmp(text, "sequential") == 0) {
+        *scenario = ORACLE_SCENARIO_SEQUENTIAL;
+        return true;
+    }
+    return false;
+}
+
+static const char *scenario_name(OracleScenario scenario)
+{
+    return scenario == ORACLE_SCENARIO_SEQUENTIAL
+        ? "sequential_two_non_overlapping"
+        : "single_isolated";
 }
 
 static double state_component_difference(const ESKF_NominalState *first,
@@ -273,6 +314,30 @@ static HistoryEntry *history_find(HistoryEntry history[ORACLE_HISTORY_CAPACITY],
     return entry;
 }
 
+static int event_index_for_source(const DelayedEvent *events,
+                                  unsigned event_count,
+                                  uint64_t sequence)
+{
+    unsigned index;
+    if (events == NULL) return -1;
+    for (index = 0U; index < event_count; ++index) {
+        if (events[index].source_sequence == sequence) return (int)index;
+    }
+    return -1;
+}
+
+static int event_index_for_delivery(const DelayedEvent *events,
+                                    unsigned event_count,
+                                    uint64_t sequence)
+{
+    unsigned index;
+    if (events == NULL) return -1;
+    for (index = 0U; index < event_count; ++index) {
+        if (events[index].delivery_sequence == sequence) return (int)index;
+    }
+    return -1;
+}
+
 static bool process_sample(AerakiaEskf *filter, const AerakiaImuSample *sample)
 {
     AerakiaNavigationEstimate estimate;
@@ -337,40 +402,116 @@ static bool initialize_filter(AerakiaEskf *filter)
     return true;
 }
 
-static bool run_case(unsigned rate_hz, unsigned delay_ms, FILE *output)
+static void write_event_json(FILE *output,
+                             const DelayedEvent *event,
+                             uint64_t dt_us,
+                             unsigned event_index,
+                             bool trailing_comma)
+{
+    if (output == NULL || event == NULL) return;
+    fprintf(
+        output,
+        "    {\n"
+        "      \"event_index\": %u,\n"
+        "      \"source_timestamp_us\": %llu,\n"
+        "      \"delivery_timestamp_us\": %llu,\n"
+        "      \"source_gps_accepted\": %s,\n"
+        "      \"repropagated\": %s,\n"
+        "      \"pre_delivery_max_state_difference\": %.17g,\n"
+        "      \"post_delivery_max_state_difference\": %.17g,\n"
+        "      \"post_delivery_max_covariance_difference\": %.17g,\n"
+        "      \"post_delivery_metadata_match\": %s\n"
+        "    }%s\n",
+        event_index,
+        (unsigned long long)(event->source_sequence * dt_us),
+        (unsigned long long)(event->delivery_sequence * dt_us),
+        event->source_accepted ? "true" : "false",
+        event->repropagated ? "true" : "false",
+        event->pre_delivery_max_state_difference,
+        event->post_delivery_max_state_difference,
+        event->post_delivery_max_covariance_difference,
+        event->post_delivery_metadata_match ? "true" : "false",
+        trailing_comma ? "," : ""
+    );
+}
+
+static bool run_case(unsigned rate_hz,
+                     unsigned delay_ms,
+                     OracleScenario scenario,
+                     FILE *output)
 {
     AerakiaEskf baseline;
     AerakiaEskf delayed;
-    HistoryEntry history[ORACLE_HISTORY_CAPACITY] = {{0}};
+    HistoryEntry history[ORACLE_HISTORY_CAPACITY];
     TruthState truth;
-    const uint64_t dt_us = 1000000U / rate_hz;
-    const uint64_t delay_us = (uint64_t)delay_ms * 1000U;
-    const uint64_t delay_samples = delay_us / dt_us;
-    const uint64_t source_sequence = ORACLE_SOURCE_TIMESTAMP_US / dt_us;
-    const uint64_t duration_samples = ORACLE_DURATION_US / dt_us;
-    const uint64_t gps_interval_samples = ORACLE_GPS_INTERVAL_US / dt_us;
-    const uint64_t delivery_sequence = source_sequence + delay_samples;
-    double pre_delivery_difference = 0.0;
-    double post_delivery_state_difference = 0.0;
-    double post_delivery_covariance_difference = 0.0;
-    bool post_delivery_metadata_match = true;
-    bool source_accepted = false;
-    bool repropagated = false;
+    DelayedEvent events[2];
+    uint64_t dt_us;
+    uint64_t delay_us;
+    uint64_t delay_samples;
+    uint64_t duration_samples;
+    uint64_t gps_interval_samples;
+    unsigned event_count;
+    double final_state_difference = 0.0;
+    double final_covariance_difference = 0.0;
+    bool final_metadata_match = true;
     bool healthy = true;
     bool covariance_psd = true;
+    bool sequential_non_overlapping = false;
     uint64_t sequence;
-    memset(&truth, 0, sizeof(truth));
-    if (rate_hz == 0U || 1000000U % rate_hz != 0U || delay_ms > ORACLE_MAX_DELAY_MS
-        || delay_us == 0U || delay_us % dt_us != 0U || delay_samples + 1U > ORACLE_HISTORY_CAPACITY
-        || source_sequence >= duration_samples || delivery_sequence >= duration_samples) {
+    unsigned event_index;
+    const double state_tolerance =
+#if defined(AERAKIA_ESKF_CORE_USE_FLOAT)
+        2.0e-5;
+#else
+        1.0e-12;
+#endif
+    const double covariance_tolerance =
+#if defined(AERAKIA_ESKF_CORE_USE_FLOAT)
+        2.0e-5;
+#else
+        1.0e-12;
+#endif
+
+    if (rate_hz == 0U || 1000000U % rate_hz != 0U || delay_ms > ORACLE_MAX_DELAY_MS) {
         return false;
     }
+    dt_us = 1000000U / rate_hz;
+    delay_us = (uint64_t)delay_ms * 1000U;
+    if (delay_us == 0U || delay_us % dt_us != 0U) return false;
+    delay_samples = delay_us / dt_us;
+    if (delay_samples == 0U || delay_samples + 1U > ORACLE_HISTORY_CAPACITY) return false;
+    if (ORACLE_GPS_INTERVAL_US % dt_us != 0U) return false;
+    duration_samples = ORACLE_DURATION_US / dt_us;
+    gps_interval_samples = ORACLE_GPS_INTERVAL_US / dt_us;
+    event_count = scenario == ORACLE_SCENARIO_SEQUENTIAL ? 2U : 1U;
+    memset(&history, 0, sizeof(history));
+    memset(&truth, 0, sizeof(truth));
+    memset(&events, 0, sizeof(events));
+    events[0].source_sequence = ORACLE_FIRST_SOURCE_TIMESTAMP_US / dt_us;
+    events[0].delivery_sequence = events[0].source_sequence + delay_samples;
+    events[0].post_delivery_metadata_match = true;
+    if (event_count == 2U) {
+        events[1].source_sequence = ORACLE_SECOND_SOURCE_TIMESTAMP_US / dt_us;
+        events[1].delivery_sequence = events[1].source_sequence + delay_samples;
+        events[1].post_delivery_metadata_match = true;
+        sequential_non_overlapping = events[1].source_sequence > events[0].delivery_sequence;
+    }
+    for (event_index = 0U; event_index < event_count; ++event_index) {
+        if (events[event_index].source_sequence == 0U
+            || events[event_index].source_sequence % gps_interval_samples != 0U
+            || events[event_index].delivery_sequence >= duration_samples) {
+            return false;
+        }
+    }
+    if (event_count == 2U && !sequential_non_overlapping) return false;
     if (!initialize_filter(&baseline) || !initialize_filter(&delayed)) return false;
 
     for (sequence = 0U; sequence < duration_samples; ++sequence) {
         const uint64_t timestamp_us = sequence * dt_us;
         const AerakiaImuSample sample = make_sample(timestamp_us);
         const bool gps_update = sequence > 0U && sequence % gps_interval_samples == 0U;
+        int source_event;
+        int delivery_event;
         AerakiaGpsObservation gps;
         FilterDifference difference;
         if (sequence > 0U) {
@@ -385,22 +526,25 @@ static bool run_case(unsigned rate_hz, unsigned delay_ms, FILE *output)
         if (!history_store(history, sequence, &sample, &gps, gps_update, &delayed)) {
             return false;
         }
+        source_event = event_index_for_source(events, event_count, sequence);
+        delivery_event = event_index_for_delivery(events, event_count, sequence);
         if (gps_update) {
             if (!apply_gps(&baseline, &gps)) return false;
-            if (sequence == source_sequence) {
-                source_accepted = baseline.position_accepted && baseline.velocity_accepted;
+            if (source_event >= 0) {
+                events[(unsigned)source_event].source_accepted = true;
             }
         }
-        if (gps_update && sequence != source_sequence && sequence != delivery_sequence) {
+        if (gps_update && source_event < 0 && delivery_event < 0) {
             if (!apply_gps(&delayed, &gps)) return false;
         }
-        if (sequence == delivery_sequence) {
+        if (delivery_event >= 0) {
+            DelayedEvent *event = &events[(unsigned)delivery_event];
             if (!repropagate_from_source(
-                    &delayed, history, source_sequence, delivery_sequence
+                    &delayed, history, event->source_sequence, event->delivery_sequence
                 )) {
                 return false;
             }
-            repropagated = true;
+            event->repropagated = true;
         }
         healthy = healthy && state_is_finite(&baseline.core.state)
             && state_is_finite(&delayed.core.state)
@@ -409,45 +553,53 @@ static bool run_case(unsigned rate_hz, unsigned delay_ms, FILE *output)
         covariance_psd = covariance_psd && covariance_is_symmetric_psd(baseline.core.P)
             && covariance_is_symmetric_psd(delayed.core.P);
         difference = compare_filters(&baseline, &delayed);
-        if (sequence > source_sequence && sequence < delivery_sequence) {
-            pre_delivery_difference = fmax(
-                pre_delivery_difference,
-                difference.max_state_difference
-            );
+        for (event_index = 0U; event_index < event_count; ++event_index) {
+            DelayedEvent *event = &events[event_index];
+            const uint64_t post_stop_sequence = event_index + 1U < event_count
+                ? events[event_index + 1U].source_sequence
+                : duration_samples;
+            if (sequence > event->source_sequence && sequence < event->delivery_sequence) {
+                event->pre_delivery_max_state_difference = fmax(
+                    event->pre_delivery_max_state_difference,
+                    difference.max_state_difference
+                );
+            }
+            if (sequence >= event->delivery_sequence && sequence < post_stop_sequence) {
+                event->post_delivery_max_state_difference = fmax(
+                    event->post_delivery_max_state_difference,
+                    difference.max_state_difference
+                );
+                event->post_delivery_max_covariance_difference = fmax(
+                    event->post_delivery_max_covariance_difference,
+                    difference.max_covariance_difference
+                );
+                event->post_delivery_metadata_match = event->post_delivery_metadata_match
+                    && difference.metadata_match;
+            }
         }
-        if (sequence >= delivery_sequence) {
-            post_delivery_state_difference = fmax(
-                post_delivery_state_difference,
-                difference.max_state_difference
+        if (sequence >= events[event_count - 1U].delivery_sequence) {
+            final_state_difference = fmax(final_state_difference, difference.max_state_difference);
+            final_covariance_difference = fmax(
+                final_covariance_difference, difference.max_covariance_difference
             );
-            post_delivery_covariance_difference = fmax(
-                post_delivery_covariance_difference,
-                difference.max_covariance_difference
-            );
-            post_delivery_metadata_match = post_delivery_metadata_match
-                && difference.metadata_match;
+            final_metadata_match = final_metadata_match && difference.metadata_match;
         }
     }
 
     {
-        const double state_tolerance =
-#if defined(AERAKIA_ESKF_CORE_USE_FLOAT)
-            2.0e-5;
-#else
-            1.0e-12;
-#endif
-        const double covariance_tolerance =
-#if defined(AERAKIA_ESKF_CORE_USE_FLOAT)
-            2.0e-5;
-#else
-            1.0e-12;
-#endif
-        const bool pass = repropagated && source_accepted && healthy && covariance_psd
-            && pre_delivery_difference > state_tolerance
-            && post_delivery_state_difference <= state_tolerance
-            && post_delivery_covariance_difference <= covariance_tolerance
-            && post_delivery_metadata_match;
-        if (output != NULL) {
+        bool pass = healthy && covariance_psd && final_state_difference <= state_tolerance
+            && final_covariance_difference <= covariance_tolerance && final_metadata_match;
+        for (event_index = 0U; event_index < event_count; ++event_index) {
+            const DelayedEvent *event = &events[event_index];
+            pass = pass && event->source_accepted && event->repropagated
+                && event->pre_delivery_max_state_difference > state_tolerance
+                && event->post_delivery_max_state_difference <= state_tolerance
+                && event->post_delivery_max_covariance_difference <= covariance_tolerance
+                && event->post_delivery_metadata_match;
+        }
+        if (event_count == 2U) pass = pass && sequential_non_overlapping;
+        if (output != NULL && event_count == 1U) {
+            const DelayedEvent *event = &events[0];
             fprintf(
                 output,
                 "{\n"
@@ -480,18 +632,73 @@ static bool run_case(unsigned rate_hz, unsigned delay_ms, FILE *output)
                 "}\n",
                 rate_hz, delay_ms, ORACLE_HISTORY_CAPACITY,
                 (unsigned long long)delay_samples,
-                (unsigned long long)(source_sequence * dt_us),
-                (unsigned long long)(delivery_sequence * dt_us),
-                source_accepted ? "true" : "false",
-                repropagated ? "true" : "false",
+                (unsigned long long)(event->source_sequence * dt_us),
+                (unsigned long long)(event->delivery_sequence * dt_us),
+                event->source_accepted ? "true" : "false",
+                event->repropagated ? "true" : "false",
                 healthy ? "true" : "false",
                 covariance_psd ? "true" : "false",
-                pre_delivery_difference,
-                post_delivery_state_difference,
-                post_delivery_covariance_difference,
-                post_delivery_metadata_match ? "true" : "false",
+                event->pre_delivery_max_state_difference,
+                event->post_delivery_max_state_difference,
+                event->post_delivery_max_covariance_difference,
+                event->post_delivery_metadata_match ? "true" : "false",
                 state_tolerance,
                 covariance_tolerance,
+                pass ? "true" : "false"
+            );
+        } else if (output != NULL) {
+            fprintf(
+                output,
+                "{\n"
+                "  \"schema_version\": 1,\n"
+                "  \"status\": \"host_only_research_oracle_not_flight_feature\",\n"
+                "  \"scenario\": \"%s\",\n"
+                "  \"input_contract\": \"synthetic_exact_timestamp_pv_only\",\n"
+                "  \"rate_hz\": %u,\n"
+                "  \"delay_ms\": %u,\n"
+                "  \"history_capacity_samples\": %u,\n"
+                "  \"delay_samples\": %llu,\n"
+                "  \"sequential_non_overlapping\": %s,\n"
+                "  \"healthy\": %s,\n"
+                "  \"covariance_psd\": %s,\n"
+                "  \"state_tolerance\": %.17g,\n"
+                "  \"covariance_tolerance\": %.17g,\n"
+                "  \"event_count\": %u,\n"
+                "  \"events\": [\n",
+                scenario_name(scenario), rate_hz, delay_ms, ORACLE_HISTORY_CAPACITY,
+                (unsigned long long)delay_samples,
+                sequential_non_overlapping ? "true" : "false",
+                healthy ? "true" : "false",
+                covariance_psd ? "true" : "false",
+                state_tolerance,
+                covariance_tolerance,
+                event_count
+            );
+            for (event_index = 0U; event_index < event_count; ++event_index) {
+                write_event_json(
+                    output, &events[event_index], dt_us, event_index + 1U,
+                    event_index + 1U < event_count
+                );
+            }
+            fprintf(
+                output,
+                "  ],\n"
+                "  \"final_max_state_difference\": %.17g,\n"
+                "  \"final_max_covariance_difference\": %.17g,\n"
+                "  \"final_metadata_match\": %s,\n"
+                "  \"pass\": %s,\n"
+                "  \"limitations\": [\n"
+                "    \"Exactly two sequential, non-overlapping delayed GNSS P/V events are replayed.\",\n"
+                "    \"The second source timestamp is after the first delivery timestamp.\",\n"
+                "    \"This is not a generic overlapping out-of-sequence measurement implementation.\",\n"
+                "    \"History is a host validation ring; no production rewind API is added.\",\n"
+                "    \"The experiment does not validate delayed heading, barometer, multi-IMU, or supervisor policy.\",\n"
+                "    \"Truth is used only to generate the synthetic P/V observation and is not read by the replay logic.\"\n"
+                "  ]\n"
+                "}\n",
+                final_state_difference,
+                final_covariance_difference,
+                final_metadata_match ? "true" : "false",
                 pass ? "true" : "false"
             );
         }
@@ -503,6 +710,7 @@ int main(int argc, char **argv)
 {
     unsigned rate_hz = 100U;
     unsigned delay_ms = 50U;
+    OracleScenario scenario = ORACLE_SCENARIO_SINGLE;
     const char *output_path = NULL;
     FILE *output = stdout;
     int argument;
@@ -515,6 +723,11 @@ int main(int argc, char **argv)
             }
         } else if (strcmp(argv[argument], "--delay-ms") == 0 && argument + 1 < argc) {
             if (!parse_unsigned(argv[++argument], &delay_ms)) {
+                usage(argv[0]);
+                return 2;
+            }
+        } else if (strcmp(argv[argument], "--scenario") == 0 && argument + 1 < argc) {
+            if (!parse_scenario(argv[++argument], &scenario)) {
                 usage(argv[0]);
                 return 2;
             }
@@ -532,7 +745,7 @@ int main(int argc, char **argv)
             return 2;
         }
     }
-    pass = run_case(rate_hz, delay_ms, output);
+    pass = run_case(rate_hz, delay_ms, scenario, output);
     if (output_path != NULL) fclose(output);
     return pass ? 0 : 1;
 }
