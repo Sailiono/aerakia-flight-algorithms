@@ -1889,3 +1889,96 @@ new seeds and rates, noisy `takeoff_box_land` and `yaw_quadrant_hover` each
 passed `64/64`; their minimum scores were `0.09024` and `139.1852`. These are
 analyzer screening results only. The score remains disconnected from ESKF
 correction, supervisor qualification, and flight authority.
+
+## 2026-08-10 — no-injection fixed-lag bias proposal rejected
+
+### Reason
+
+The corrected continuous score removed the binary analyzer's known stationary
+false-positive path, but it did not establish that a score-qualified
+tilt/accelerometer-bias correction would improve the filter. Before modifying
+the ESKF, a host-only solver was built to make that distinction explicit.
+
+### Method
+
+Each trial runs the unmodified native ESKF first. A separate Python solver then
+uses only the closed 20 s window of IMU, accepted GNSS position/velocity, and
+baseline filter outputs. It nuisance-projects the whitened design and forms a
+prior-regularized MAP proposal for right tilt x/y and three accelerometer-bias
+components. Truth is deliberately unavailable to the solver and is read only
+afterward by the evaluator.
+
+The frozen development matrix covered two causal v2 maneuvers, nine signed
+residual-bias groups, and eight seeds: `144` baseline replays. Four closed
+windows were evaluated per replay where score-qualified. Three prior-information
+scales (`0.1`, `0.3`, `1.0`) were compared. No proposal was injected, no state
+or covariance was replayed, and no flight/control authority was exercised.
+
+### Result and decision
+
+All `144` baseline executions had `100%` numerical health and zero navigation
+recoveries. None of the three scales met a non-regression criterion. At the
+least harmful scale (`1.0`), all `475` score-qualified windows changed mean/P95
+bias error from `0.09508/0.22055` to `0.09729/0.22663 m/s2`; only `163/475`
+windows improved. At the terminal window, the result was `0.10189/0.22257` to
+`0.10291/0.23550 m/s2`, with `61/144` improved.
+
+The candidate is rejected. No public estimator core, default parameter,
+threshold, or private FCOne product setting was changed. The durable compact
+artifact records the protocol, code identities, per-trial input/result manifest
+hashes, aggregate statistics, and motion stratification:
+[`fixed_lag_bias_proposal_campaign.json`](../validation/public/fixed_lag_bias_proposal_campaign.json).
+The campaign runner now omits large per-window details by default; they are
+available only with `--include-trials` for local debugging and stay outside Git.
+
+### Next bounded experiment
+
+Do not turn this rejected 5x5 marginal proposal into an injected correction.
+First construct a host-only delayed-GNSS rewind/replay oracle. It must restore a
+full pre-aiding ESKF snapshot at an exact IMU boundary, apply the existing GPS
+update, and replay immutable later IMU/aiding events in canonical order. Its
+isolated delayed-epoch output must match the zero-delay reference in state and
+covariance before any new full-lag correction candidate can be specified. This
+is prerequisite infrastructure, not a claim of product delayed fusion or flight
+readiness.
+
+## 2026-08-10 — delayed-GNSS rewind/replay prerequisite
+
+### Reason
+
+The rejected MAP proposal exposed a concrete missing prerequisite: it had no
+full lag covariance or state/covariance repropagation path. The existing public
+adapter has a timestamp/freshness contract but no historical state buffer.
+Before designing another estimator correction, we needed to test the existing
+ESKF update/reset mathematics in a complete replay transaction rather than
+implement a partial correction shortcut.
+
+### Method
+
+The new host-only native oracle retains complete `AerakiaEskf` snapshots at
+IMU boundaries and immutable IMU/GNSS P/V records in a bounded ring. It runs a
+zero-delay reference and a lane with exactly one withheld GNSS P/V epoch. At
+delivery, the delayed lane restores the source-time pre-aiding snapshot,
+performs the ordinary timestamped GPS update, and replays later IMU plus
+already-committed GPS events in canonical order.
+
+The executed matrix has nine exact-boundary cases: 100/200/400 Hz and
+20/50/100 ms delivery delay. The Python wrapper validates status/scope,
+pre-delivery sensitivity, post-delivery state/covariance/metadata equivalence,
+finite state, PSD covariance, and the native pass result. It does not use truth
+inside the replay path.
+
+### Result
+
+All `9/9` cases passed. Each delayed lane visibly diverged before delivery
+(maximum state-component difference approximately `8.5e-4`--`9.0e-4`), then
+matched the zero-delay reference after replay with zero recorded state and
+covariance difference and matching metadata under a `1e-12` double-precision
+tolerance. Every case remained finite and PSD.
+
+This proves only deterministic replay equivalence for an isolated synthetic
+GNSS P/V event. It does not add a production rewind API, validate multi-event
+delays, delayed heading/barometer, source-arrival timing, multi-IMU switching,
+target CPU/RAM, or safety behavior. The compact evidence and full boundary are
+in [`delayed_gnss_repropagation_oracle_v1.json`](../validation/public/delayed_gnss_repropagation_oracle_v1.json)
+and [Delayed GNSS rewind/replay oracle](delayed-gnss-repropagation-oracle.md).

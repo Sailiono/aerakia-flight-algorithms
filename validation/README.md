@@ -27,7 +27,13 @@ portable C library and from FCOne-specific integration code.
 - `run_bias_observability_excitation_score_campaign.py`: noisy score coverage
   on two structural candidate maneuvers; not bias-convergence evidence.
 - `fixed_lag_bias_proposal.py`: causal, prior-regularized joint tilt/bias
-  proposal solver with no ESKF state injection.
+  proposal solver with no ESKF state injection. Its 144-replay campaign is
+  rejected; use `run_fixed_lag_bias_proposal_campaign.py` to regenerate the
+  compact evidence, and do not treat it as an estimator implementation.
+- `run_delayed_gnss_repropagation_oracle.py`: nine-case host-only isolated
+  delayed-GNSS rewind/replay correctness campaign. It proves only exact
+  state/covariance equivalence to a zero-delay reference; it is not a product
+  delayed-fusion API.
 - `run_baro_outage_campaign.py` and `run_baro_outage_ab.py`: barometer source
   supervision experiments.
 - `run_px4_bias_ab_m0.py`: optional PX4 host comparison; it is blocked until a

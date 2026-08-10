@@ -27,6 +27,44 @@ not repropagate the nominal state, replay covariance through the correction, or
 run controller authority. Those are required before a C implementation can be
 considered.
 
-The next campaign evaluates the proposal on causal v2 replays with signed
-multi-axis residual-bias vectors. Truth is read only by the separate evaluator
-after the solver returns, so the correction path remains auditable.
+## Campaign and decision
+
+The completed v1 campaign used two causal v2 motions (`takeoff_box_land` and
+`yaw_quadrant_hover`), all nine signed residual-bias groups, and eight seeds:
+`144` independent baseline replays. Four closed windows were evaluated per
+replay where the calibrated information score admitted a proposal. Every
+baseline replay remained numerically healthy and none entered navigation
+recovery.
+
+The three explicit prior-information scales all failed the non-regression
+criterion. The least harmful scale, `1.0`, still made the aggregate result
+worse:
+
+| Scope | Baseline mean / P95 | Proposal mean / P95 | Improved observations |
+| --- | --- | --- | ---: |
+| All score-qualified windows (`475`) | `0.09508 / 0.22055 m/s2` | `0.09729 / 0.22663 m/s2` | `163 / 475` |
+| Final window of every replay (`144`) | `0.10189 / 0.22257 m/s2` | `0.10291 / 0.23550 m/s2` | `61 / 144` |
+
+The weaker scales were materially worse. This is a **rejection**, not a tune
+request: no proposal, covariance setting, or estimator-core change is promoted.
+The compact, input/result-manifest-hashed evidence is
+[`fixed_lag_bias_proposal_campaign.json`](../validation/public/fixed_lag_bias_proposal_campaign.json).
+It retains the campaign matrix and stratified aggregate statistics; raw replay
+CSVs and per-window details remain disposable build artifacts.
+
+## What must precede another correction candidate
+
+This result does not prove that joint tilt/bias correction is impossible. It
+does prove that a marginal 5x5 MAP proposal is insufficient. The next bounded
+piece of work is a host-only delayed-GNSS rewind/replay oracle. It must first
+prove that a full state/covariance snapshot, the existing Joseph update,
+attitude reset, and canonical event order reproduce the zero-delay reference
+when one exact-timestamp GNSS epoch is delivered late. That oracle is not a
+product delayed-fusion implementation and does not inject this rejected
+proposal.
+
+Only after that prerequisite is independently passing may a new candidate be
+specified with full 15-state lag covariance, process/preintegration covariance,
+atomic nominal-state injection, reset Jacobians, persistence/hysteresis, clean
+train/tune data, and a sealed holdout. Physical source/arrival timestamps,
+thermal behavior, and selector state remain FCOne-private integration evidence.

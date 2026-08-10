@@ -34,6 +34,7 @@ boundary are defined in [FCOne v2 algorithm closure](fcone-v2-algorithm-closure.
 | G0 v2 IMU input contract | Physical timestamped interval semantics, delta-angle/delta-velocity audit fields, causal quantized-IMU stationarity, and rate-invariant noise density | Implemented as a four-rate integrity smoke; this is not estimator-capability evidence. Timestamp transport faults, thermal/random-walk profiles, and private FCOne selector policy remain open. See [G0 v2 input contract](bias-observability-v2-input-contract.md). |
 | Airspeed/barometer degraded navigation | Paired IMU-only, raw barometer, supervised barometer, hot-shadow failover, known-wind TAS, estimated-wind TAS, and combined arms cover fixed-wing/VTOL regimes and 5-120 s GNSS outages | The v1 `600/600` synthetic matrix is complete and hashed: nominal 120 s vertical RMSE is `0.1008 m` raw / `0.1014 m` supervised versus `41.6243 m` IMU-only; timestamp delay is rejected. Persistent datum bias, source-reset behavior, real full-state failover, sealed physical pressure tests, and airspeed/wind remain open. See [barometer study](barometer-supervision-study.md). |
 | Timing and malformed input | Duplicate, stale, out-of-order, delayed, missing, non-finite, and implausible samples have explicit deterministic behavior and tests | Implemented deterministic matrix plus 1,020,000-attempt, 100-seed campaign; retain as a host gate |
+| Delayed-GNSS replay prerequisite | Exact source-timestamp rewind, full snapshot restore, existing GPS update, deterministic IMU/aiding replay, state/covariance equivalence, and fail-closed scope | Host-only isolated P/V oracle passes 9/9 cases at 100/200/400 Hz and 20/50/100 ms; no production rewind API, multi-event schedule, or FCOne arrival-time path yet |
 | Public dataset runner | Dataset manifest records source, hash, frame transform, time offset, command, code commit, and output summary; selected datasets reproduce with one command | Implemented for 6 EuRoC, 3 Blackbird, and 2 UrbanNav tracks; 398,493 unique external-reference IMU samples and 865,845 replay attempts; keep all reviewed baseline gates passing |
 | High-volume PX4 compatibility | Audit current PX4 schemas at corpus scale, select stress tracks before scoring, and retain resets/clipping/innovation failures without treating PX4 estimates as truth | IDF-DS audit complete: 13 raw ULogs, 7.13 million IMU samples over 9.92 h; three selected native replays total 1.61 million samples and expose high NIS/recovery counts |
 | Aerial physical position/reference | Exercise physical aircraft IMU and GPS position input against a separately recorded RTK position/velocity path without synthesizing absent receiver fields | Electrical-survey `voo_3` complete: 16,560 replay samples, 2,070 GPS position updates, RTK reference path; physical drone-GPS velocity remains absent |
@@ -134,11 +135,15 @@ generalize. The final generic host-only variant, a physically correlated static
 tilt/accelerometer-bias startup prior, was also rejected after a paired 576+576 train/tune campaign:
 aggregate improvement came with 22 zero-bias and five mirror-symmetry regressions. Its complete
 result is [`g0_correlated_static_prior_rejection.json`](../validation/public/g0_correlated_static_prior_rejection.json).
-The next G0 work is therefore a materially different, pre-registered causal fixed-lag
-excitation-aware joint correction under a clean v2 protocol, followed by a new sealed holdout
-executed once in protected CI after source, immutable inputs, and gates are frozen. It requires the
-private FCOne v2 physical IMU interval, timestamp, causal-stationarity, and source-quality
-contract; repeated static-prior or scalar P/Q tuning is not an accepted path.
+The first materially different candidate, a no-injection causal 20 s fixed-lag MAP proposal, has
+now also been rejected. It ran 144 causal v2 replays without modifying ESKF; its best scale worsened
+terminal mean/P95 bias error from `0.10189/0.22257` to `0.10291/0.23550 m/s2` and improved only
+`61/144` terminals. The next G0 work is a bounded delayed-GNSS rewind/replay oracle: prove exact
+state/covariance replay before designing another correction transaction. Only then may a new,
+pre-registered causal fixed-lag joint correction be evaluated under a clean v2 protocol and sealed
+holdout. Private FCOne v2 physical IMU interval, source/arrival timestamp, causal-stationarity, and
+source-quality contracts remain required; repeated static-prior or scalar P/Q tuning is not an
+accepted path.
 
 The statistical result assumes each calibrated startup residual-bias component lies within three sigma
 (`0.15 m/s²` accelerometer and `0.6 deg/s` gyroscope under the current provisional prior). FCOne

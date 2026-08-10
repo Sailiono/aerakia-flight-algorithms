@@ -199,30 +199,88 @@ def trial(
     return trial_result
 
 
-def aggregate(trials: list[dict[str, object]], scales: tuple[float, ...]) -> dict[str, object]:
-    summary: dict[str, object] = {}
-    for scale in scales:
-        observations = [
+def _observations(
+    trials: list[dict[str, object]],
+    scale: float,
+    *,
+    motion_id: str | None = None,
+    terminal_only: bool = False,
+) -> list[dict[str, object]]:
+    selected: list[dict[str, object]] = []
+    for trial_result in trials:
+        if motion_id is not None and trial_result["motion_id"] != motion_id:
+            continue
+        items = list(trial_result["proposals"][str(scale)])
+        if terminal_only and items:
+            terminal_time = max(float(item["stop_time_s"]) for item in items)
+            items = [
+                item
+                for item in items
+                if math.isclose(float(item["stop_time_s"]), terminal_time, abs_tol=1.0e-9)
+            ]
+        selected.extend(
             item
-            for trial_result in trials
-            for item in trial_result["proposals"][str(scale)]
+            for item in items
             if item["score_pass"] and item["corrected_error_norm_m_s2"] is not None
-        ]
-        baseline = [float(item["baseline_error_norm_m_s2"]) for item in observations]
-        corrected = [float(item["corrected_error_norm_m_s2"]) for item in observations]
-        summary[str(scale)] = {
-            "proposal_observations": len(observations),
-            "improved_observations": sum(bool(item["improved"]) for item in observations),
-            "improvement_rate": (
-                sum(bool(item["improved"]) for item in observations) / len(observations)
-                if observations else None
-            ),
-            "baseline_error_mean_m_s2": float(np.mean(baseline)) if baseline else None,
-            "corrected_error_mean_m_s2": float(np.mean(corrected)) if corrected else None,
-            "baseline_error_p95_m_s2": float(np.percentile(baseline, 95)) if baseline else None,
-            "corrected_error_p95_m_s2": float(np.percentile(corrected, 95)) if corrected else None,
+        )
+    return selected
+
+
+def _summarize_observations(observations: list[dict[str, object]]) -> dict[str, object]:
+    baseline = [float(item["baseline_error_norm_m_s2"]) for item in observations]
+    corrected = [float(item["corrected_error_norm_m_s2"]) for item in observations]
+    improved = sum(bool(item["improved"]) for item in observations)
+    return {
+        "proposal_observations": len(observations),
+        "improved_observations": improved,
+        "improvement_rate": improved / len(observations) if observations else None,
+        "baseline_error_mean_m_s2": float(np.mean(baseline)) if baseline else None,
+        "corrected_error_mean_m_s2": float(np.mean(corrected)) if corrected else None,
+        "delta_error_mean_m_s2": float(np.mean(np.asarray(corrected) - np.asarray(baseline)))
+        if observations
+        else None,
+        "baseline_error_p95_m_s2": float(np.percentile(baseline, 95)) if baseline else None,
+        "corrected_error_p95_m_s2": float(np.percentile(corrected, 95)) if corrected else None,
+        "delta_error_p95_m_s2": float(
+            np.percentile(np.asarray(corrected) - np.asarray(baseline), 95)
+        )
+        if observations
+        else None,
+    }
+
+
+def aggregate(
+    trials: list[dict[str, object]],
+    scales: tuple[float, ...],
+    *,
+    motion_id: str | None = None,
+    terminal_only: bool = False,
+) -> dict[str, object]:
+    return {
+        str(scale): _summarize_observations(
+            _observations(
+                trials,
+                scale,
+                motion_id=motion_id,
+                terminal_only=terminal_only,
+            )
+        )
+        for scale in scales
+    }
+
+
+def trial_manifest_sha256(trials: list[dict[str, object]], field: str) -> str:
+    manifest = [
+        {
+            "motion_id": trial["motion_id"],
+            "vector_id": trial["vector_id"],
+            "seed": trial["seed"],
+            field: trial[field],
         }
-    return summary
+        for trial in trials
+    ]
+    encoded = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def main() -> int:
@@ -236,6 +294,11 @@ def main() -> int:
     parser.add_argument("--score-threshold", type=float, default=0.004936251852866821)
     parser.add_argument("--jobs", type=int, default=4)
     parser.add_argument("--keep-work", action="store_true")
+    parser.add_argument(
+        "--include-trials",
+        action="store_true",
+        help="include large per-window trial details in the output for local debugging",
+    )
     args = parser.parse_args()
     prior_scales = tuple(float(value) for value in args.prior_scales.split(","))
     if not prior_scales or any(value <= 0.0 or not math.isfinite(value) for value in prior_scales):
@@ -276,6 +339,7 @@ def main() -> int:
     result = {
         "schema_version": 1,
         "status": "proposal_only_no_estimator_injection",
+        "promotion_decision": "rejected_for_promotion",
         "study_id": "aerakia-fixed-lag-bias-proposal-campaign-v1",
         "protocol_path": str(PROTOCOL.relative_to(ROOT)),
         "protocol_sha256": sha256(PROTOCOL),
@@ -290,8 +354,14 @@ def main() -> int:
         "trial_count": len(trials),
         "healthy_ratio_min": min(float(item["estimator_healthy_ratio"]) for item in trials),
         "navigation_recoveries_max": max(int(item["navigation_recoveries"]) for item in trials),
+        "trial_input_manifest_sha256": trial_manifest_sha256(trials, "input_sha256"),
+        "trial_result_manifest_sha256": trial_manifest_sha256(trials, "result_sha256"),
         "aggregate": aggregate(trials, prior_scales),
-        "trials": trials,
+        "terminal_aggregate": aggregate(trials, prior_scales, terminal_only=True),
+        "by_motion": {
+            motion_id: aggregate(trials, prior_scales, motion_id=motion_id)
+            for motion_id, _, _ in MOTIONS
+        },
         "limitations": [
             "The baseline ESKF is never modified; corrected errors are an offline proposal score.",
             "Truth is used only after proposal generation by this evaluator.",
@@ -302,6 +372,8 @@ def main() -> int:
             ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
         ).strip(),
     }
+    if args.include_trials:
+        result["trials"] = trials
     output = args.out if args.out.is_absolute() else ROOT / args.out
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")

@@ -36,6 +36,8 @@ shows that detection without an uncontaminated ESKF shadow cannot undo state/cov
 | Physical magnetometer yaw | Raw PX4 magnetometer input scored against external raw OptiTrack orientation with calibration/development/holdout isolation | `indoor_1` local-datum adverse result: mag-off/on ESKF yaw RMSE `0.270°/12.528°`, robust Mahony `0.316°/7.599°`; `transition_1` is rejected as accuracy evidence because its initial field differs from the frozen datum by `49.298°` |
 | Online IMU bias behavior | Static gyro initialization plus motion/GNSS-aided accelerometer-bias convergence, with truth error and settling time reported separately | Passing deterministic multi-axis synthetic gate; single-pose accelerometer observability limit and hardware thermal behavior remain explicit |
 | Tilt/bias excitation information | Causal local information matrix for five-dimensional tilt and accelerometer-bias subspace using estimated state, IMU, and accepted aiding only | Analyzer controls classify static/yaw/single-direction/all-rejected cases as insufficient and multi-direction as full rank; thresholds and estimator correction remain unpromoted. The v2 input-contract smoke now removes truth-derived stationarity and endpoint/interval ambiguity before the next candidate. |
+| No-injection fixed-lag bias proposal | Causal 20 s nuisance-projected MAP proposal for right tilt x/y and three accelerometer-bias components, evaluated only after the baseline ESKF completes | Rejected over 144 causal v2 replays: the best scale worsened terminal mean/P95 bias error from `0.10189/0.22257` to `0.10291/0.23550 m/s2`; `61/144` terminal cases improved. It never modified ESKF state/covariance. A delayed-GNSS rewind/replay oracle is the prerequisite before any new correction candidate. |
+| Delayed-GNSS rewind/replay oracle | Host-only full `AerakiaEskf` snapshot, exact source timestamp, existing P/V update, canonical IMU/aiding replay, and state/covariance comparison | `9/9` isolated cases pass at 100/200/400 Hz and 20/50/100 ms; pre-delivery difference is observable and post-delivery state/covariance/metadata match zero-delay. This is correctness infrastructure only, not product delayed fusion. |
 | Cold-start alignment | Static accelerometer tilt, magnetic heading with explicit declination, IMU-bias initialization, and covariance reset at the new linearization point; no PX4 attitude seed | Passing unit/noisy synthetic checks and direct-Vicon tilt (0.862° post-alignment RMSE); external yaw truth still pending |
 | Navigation consistency | GNSS position/velocity NIS and posterior 6-state navigation NEES through a five-second outage and reacquisition | The 1,000-seed calibrated-bias distribution passes hard, bootstrap, consistency, health, and recovery gates; deterministic bias-box coverage retains a direction-sensitive 35 s convergence failure, and the preceding unbounded-prior confirmation retains one 4-sigma tail failure |
 | EuRoC public replay | 36,381-sample Leica/IMU `MH_01_easy` and 20,932-sample direct-pose `V1_03_difficult`; raw, cold-start, derived-heading, and reference-bias tracks retained | Navigation NIS/NEES consistent; direct Vicon pose passes high-dynamic replay; derived heading is not a recorded heading sensor |
@@ -400,8 +402,9 @@ estimator or FCOne product configuration.
 This leaves accelerometer-bias observability as an active G0 blocker. The evidence points to
 unresolved tilt--horizontal-bias coupling under the current excitation and covariance model; it does
 not prove universal unobservability, justify widening gates, establish PX4 non-inferiority, or imply
-FCOne v2 flight readiness. The next experiment must be a materially different, pre-registered
-excitation-aware estimator hypothesis under a clean v2 protocol, not another scalar tuning sweep.
+FCOne v2 flight readiness. A new materially different correction candidate remains possible, but it
+must first have a passing delayed-GNSS rewind/replay oracle and a clean v2 protocol; another scalar
+tuning sweep is not accepted.
 
 The A/B evidence is diagnostic only: the historical runs used a dirty tree and compact output that
 predated per-trial input provenance, and the v1 smoke exposed seed `30000` from both holdout
@@ -424,6 +427,10 @@ configuration changed.
 This closes generic static-prior and scalar P/Q exploration. The retained boundary is not a claim
 that bias observability is impossible: correcting it safely needs a causal fixed-lag joint tilt/bias
 method based on actual accepted GNSS position/velocity observations and correct replay covariance.
-That method is intentionally deferred until FCOne v2 provides a physical interval-IMU, timestamp,
-stationarity, and source-quality contract. The complete diagnostic boundary and results are in
-[G0 correlated static-prior rejection](g0-correlated-static-prior.md).
+The first no-injection MAP proposal was subsequently tested across 144 causal v2 replays and
+rejected because its best scale worsened the terminal mean/P95 bias error and improved only 61/144
+terminal cases. It did not modify ESKF. A delayed-GNSS rewind/replay oracle now precedes any new
+correction candidate; physical source/arrival timing, stationarity, and source-quality contracts
+remain private FCOne v2 evidence. The complete static-prior boundary remains in
+[G0 correlated static-prior rejection](g0-correlated-static-prior.md), and the new proposal
+decision is in [Fixed-lag proposal](fixed-lag-bias-proposal.md).

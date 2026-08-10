@@ -29,6 +29,56 @@ class FixedLagBiasProposalCampaignTests(unittest.TestCase):
         self.assertEqual(len(vectors), 9)
         self.assertEqual(vectors[2]["accel_bias_m_s2"], [0.1, 0.0, 0.0])
 
+    def test_terminal_aggregate_excludes_earlier_windows(self) -> None:
+        trial = {
+            "motion_id": "takeoff_box_land",
+            "input_sha256": "input-a",
+            "result_sha256": "result-a",
+            "vector_id": "x_pos",
+            "seed": 3,
+            "proposals": {
+                "1.0": [
+                    {
+                        "stop_time_s": 20.0,
+                        "score_pass": True,
+                        "baseline_error_norm_m_s2": 1.0,
+                        "corrected_error_norm_m_s2": 0.5,
+                        "improved": True,
+                    },
+                    {
+                        "stop_time_s": 40.0,
+                        "score_pass": True,
+                        "baseline_error_norm_m_s2": 2.0,
+                        "corrected_error_norm_m_s2": 3.0,
+                        "improved": False,
+                    },
+                ]
+            },
+        }
+        all_windows = campaign.aggregate([trial], (1.0,))["1.0"]
+        terminal = campaign.aggregate([trial], (1.0,), terminal_only=True)["1.0"]
+        self.assertEqual(all_windows["proposal_observations"], 2)
+        self.assertEqual(terminal["proposal_observations"], 1)
+        self.assertEqual(terminal["baseline_error_mean_m_s2"], 2.0)
+        self.assertEqual(terminal["corrected_error_mean_m_s2"], 3.0)
+        self.assertEqual(terminal["improved_observations"], 0)
+
+    def test_trial_manifest_binds_input_and_result_identities(self) -> None:
+        trials = [
+            {
+                "motion_id": "takeoff_box_land",
+                "vector_id": "x_pos",
+                "seed": 0,
+                "input_sha256": "input-a",
+                "result_sha256": "result-a",
+            }
+        ]
+        input_manifest = campaign.trial_manifest_sha256(trials, "input_sha256")
+        result_manifest = campaign.trial_manifest_sha256(trials, "result_sha256")
+        self.assertNotEqual(input_manifest, result_manifest)
+        trials[0]["input_sha256"] = "input-b"
+        self.assertNotEqual(input_manifest, campaign.trial_manifest_sha256(trials, "input_sha256"))
+
 
 if __name__ == "__main__":
     unittest.main()
