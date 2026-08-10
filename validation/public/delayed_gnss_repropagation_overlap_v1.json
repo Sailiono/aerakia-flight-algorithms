@@ -1,0 +1,1727 @@
+{
+  "campaign_runner": {
+    "bytes": 19875,
+    "path": "validation/run_delayed_gnss_repropagation_oracle.py",
+    "sha256": "e62c915ae41813e98c1b8feddfabd812a33903bc89d8e01eea6a4cf97f1fc0dd"
+  },
+  "case_count": 9,
+  "cases": [
+    {
+      "checks": [
+        {
+          "name": "research_only_status_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "synthetic_exact_timestamp_pv_contract_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "finite_nonnegative_tolerances_are_explicit",
+          "passed": true
+        },
+        {
+          "name": "overlap_mode_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "overlap_mode_has_exactly_two_events",
+          "passed": true
+        },
+        {
+          "name": "overlap_source_order_is_chronological",
+          "passed": true
+        },
+        {
+          "name": "overlap_delivery_windows_are_explicit_and_real",
+          "passed": true
+        },
+        {
+          "name": "overlap_delivery_order_is_reversed",
+          "passed": true
+        },
+        {
+          "name": "older_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "older_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "older_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "older_post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "older_post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "older_post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "newer_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "newer_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "newer_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "newer_delivery_reports_one_pending_earlier_event",
+          "passed": true
+        },
+        {
+          "name": "newer_delivery_does_not_prematurely_require_zero_delay_equivalence",
+          "passed": true
+        },
+        {
+          "name": "newer_delivery_remains_observably_different_while_older_event_is_pending",
+          "passed": true
+        },
+        {
+          "name": "older_delivery_has_no_pending_earlier_event",
+          "passed": true
+        },
+        {
+          "name": "older_delivery_requires_zero_delay_equivalence",
+          "passed": true
+        },
+        {
+          "name": "final_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "finite_healthy_state",
+          "passed": true
+        },
+        {
+          "name": "covariance_remains_psd",
+          "passed": true
+        },
+        {
+          "name": "native_case_gate_passed",
+          "passed": true
+        }
+      ],
+      "command": [
+        "build/overlap-evidence/aerakia_delayed_gnss_reprop_oracle",
+        "--rate-hz",
+        "100",
+        "--delay-ms",
+        "50",
+        "--scenario",
+        "overlap"
+      ],
+      "delay_ms": 50,
+      "passed": true,
+      "rate_hz": 100,
+      "result": {
+        "covariance_psd": true,
+        "covariance_tolerance": 1e-12,
+        "delay_ms": 50,
+        "delay_samples": 5,
+        "delivery_order_reversed": true,
+        "event_count": 2,
+        "events": [
+          {
+            "delivery_timestamp_us": 3050000,
+            "event_index": 1,
+            "pending_earlier_event_count_at_delivery": 0,
+            "post_delivery_max_covariance_difference": 0,
+            "post_delivery_max_state_difference": 0,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.00024855806205845155,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 3000000,
+            "zero_delay_equivalence_required_after_delivery": true
+          },
+          {
+            "delivery_timestamp_us": 3030000,
+            "event_index": 2,
+            "pending_earlier_event_count_at_delivery": 1,
+            "post_delivery_max_covariance_difference": 0.0012629650480095872,
+            "post_delivery_max_state_difference": 0.00011916045217053028,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.00024855806205845155,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 3020000,
+            "zero_delay_equivalence_required_after_delivery": false
+          }
+        ],
+        "final_max_covariance_difference": 0,
+        "final_max_state_difference": 0,
+        "final_metadata_match": true,
+        "gps_interval_us": 20000,
+        "healthy": true,
+        "history_capacity_samples": 64,
+        "input_contract": "synthetic_exact_timestamp_pv_only",
+        "limitations": [
+          "Exactly two GNSS P/V events overlap, and the newer source is delivered first.",
+          "The host oracle rebuilds from the earliest retained full snapshot using only events delivered so far.",
+          "This is not a production OOSM buffer, controller policy, or target-resource measurement.",
+          "The experiment does not validate delayed heading, barometer, multi-IMU, interpolation, or physical source-arrival timing.",
+          "Truth creates the synthetic P/V observation only and is not read by replay logic."
+        ],
+        "overlapping_delivery_windows": true,
+        "pass": true,
+        "rate_hz": 100,
+        "scenario": "overlapping_reordered_two_event",
+        "schema_version": 1,
+        "state_tolerance": 1e-12,
+        "status": "host_only_research_oracle_not_flight_feature"
+      },
+      "returncode": 0,
+      "scenario": "overlap"
+    },
+    {
+      "checks": [
+        {
+          "name": "research_only_status_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "synthetic_exact_timestamp_pv_contract_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "finite_nonnegative_tolerances_are_explicit",
+          "passed": true
+        },
+        {
+          "name": "overlap_mode_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "overlap_mode_has_exactly_two_events",
+          "passed": true
+        },
+        {
+          "name": "overlap_source_order_is_chronological",
+          "passed": true
+        },
+        {
+          "name": "overlap_delivery_windows_are_explicit_and_real",
+          "passed": true
+        },
+        {
+          "name": "overlap_delivery_order_is_reversed",
+          "passed": true
+        },
+        {
+          "name": "older_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "older_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "older_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "older_post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "older_post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "older_post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "newer_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "newer_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "newer_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "newer_delivery_reports_one_pending_earlier_event",
+          "passed": true
+        },
+        {
+          "name": "newer_delivery_does_not_prematurely_require_zero_delay_equivalence",
+          "passed": true
+        },
+        {
+          "name": "newer_delivery_remains_observably_different_while_older_event_is_pending",
+          "passed": true
+        },
+        {
+          "name": "older_delivery_has_no_pending_earlier_event",
+          "passed": true
+        },
+        {
+          "name": "older_delivery_requires_zero_delay_equivalence",
+          "passed": true
+        },
+        {
+          "name": "final_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "finite_healthy_state",
+          "passed": true
+        },
+        {
+          "name": "covariance_remains_psd",
+          "passed": true
+        },
+        {
+          "name": "native_case_gate_passed",
+          "passed": true
+        }
+      ],
+      "command": [
+        "build/overlap-evidence/aerakia_delayed_gnss_reprop_oracle",
+        "--rate-hz",
+        "100",
+        "--delay-ms",
+        "100",
+        "--scenario",
+        "overlap"
+      ],
+      "delay_ms": 100,
+      "passed": true,
+      "rate_hz": 100,
+      "result": {
+        "covariance_psd": true,
+        "covariance_tolerance": 1e-12,
+        "delay_ms": 100,
+        "delay_samples": 10,
+        "delivery_order_reversed": true,
+        "event_count": 2,
+        "events": [
+          {
+            "delivery_timestamp_us": 3100000,
+            "event_index": 1,
+            "pending_earlier_event_count_at_delivery": 0,
+            "post_delivery_max_covariance_difference": 0,
+            "post_delivery_max_state_difference": 0,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.00024855806205845155,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 3000000,
+            "zero_delay_equivalence_required_after_delivery": true
+          },
+          {
+            "delivery_timestamp_us": 3030000,
+            "event_index": 2,
+            "pending_earlier_event_count_at_delivery": 1,
+            "post_delivery_max_covariance_difference": 0.0012629650480095872,
+            "post_delivery_max_state_difference": 0.00011916045217053028,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.00024855806205845155,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 3020000,
+            "zero_delay_equivalence_required_after_delivery": false
+          }
+        ],
+        "final_max_covariance_difference": 0,
+        "final_max_state_difference": 0,
+        "final_metadata_match": true,
+        "gps_interval_us": 20000,
+        "healthy": true,
+        "history_capacity_samples": 64,
+        "input_contract": "synthetic_exact_timestamp_pv_only",
+        "limitations": [
+          "Exactly two GNSS P/V events overlap, and the newer source is delivered first.",
+          "The host oracle rebuilds from the earliest retained full snapshot using only events delivered so far.",
+          "This is not a production OOSM buffer, controller policy, or target-resource measurement.",
+          "The experiment does not validate delayed heading, barometer, multi-IMU, interpolation, or physical source-arrival timing.",
+          "Truth creates the synthetic P/V observation only and is not read by replay logic."
+        ],
+        "overlapping_delivery_windows": true,
+        "pass": true,
+        "rate_hz": 100,
+        "scenario": "overlapping_reordered_two_event",
+        "schema_version": 1,
+        "state_tolerance": 1e-12,
+        "status": "host_only_research_oracle_not_flight_feature"
+      },
+      "returncode": 0,
+      "scenario": "overlap"
+    },
+    {
+      "checks": [
+        {
+          "name": "research_only_status_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "synthetic_exact_timestamp_pv_contract_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "finite_nonnegative_tolerances_are_explicit",
+          "passed": true
+        },
+        {
+          "name": "overlap_mode_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "overlap_mode_has_exactly_two_events",
+          "passed": true
+        },
+        {
+          "name": "overlap_source_order_is_chronological",
+          "passed": true
+        },
+        {
+          "name": "overlap_delivery_windows_are_explicit_and_real",
+          "passed": true
+        },
+        {
+          "name": "overlap_delivery_order_is_reversed",
+          "passed": true
+        },
+        {
+          "name": "older_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "older_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "older_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "older_post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "older_post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "older_post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "newer_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "newer_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "newer_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "newer_delivery_reports_one_pending_earlier_event",
+          "passed": true
+        },
+        {
+          "name": "newer_delivery_does_not_prematurely_require_zero_delay_equivalence",
+          "passed": true
+        },
+        {
+          "name": "newer_delivery_remains_observably_different_while_older_event_is_pending",
+          "passed": true
+        },
+        {
+          "name": "older_delivery_has_no_pending_earlier_event",
+          "passed": true
+        },
+        {
+          "name": "older_delivery_requires_zero_delay_equivalence",
+          "passed": true
+        },
+        {
+          "name": "final_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "finite_healthy_state",
+          "passed": true
+        },
+        {
+          "name": "covariance_remains_psd",
+          "passed": true
+        },
+        {
+          "name": "native_case_gate_passed",
+          "passed": true
+        }
+      ],
+      "command": [
+        "build/overlap-evidence/aerakia_delayed_gnss_reprop_oracle",
+        "--rate-hz",
+        "100",
+        "--delay-ms",
+        "150",
+        "--scenario",
+        "overlap"
+      ],
+      "delay_ms": 150,
+      "passed": true,
+      "rate_hz": 100,
+      "result": {
+        "covariance_psd": true,
+        "covariance_tolerance": 1e-12,
+        "delay_ms": 150,
+        "delay_samples": 15,
+        "delivery_order_reversed": true,
+        "event_count": 2,
+        "events": [
+          {
+            "delivery_timestamp_us": 3150000,
+            "event_index": 1,
+            "pending_earlier_event_count_at_delivery": 0,
+            "post_delivery_max_covariance_difference": 0,
+            "post_delivery_max_state_difference": 0,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.00024855806205845155,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 3000000,
+            "zero_delay_equivalence_required_after_delivery": true
+          },
+          {
+            "delivery_timestamp_us": 3030000,
+            "event_index": 2,
+            "pending_earlier_event_count_at_delivery": 1,
+            "post_delivery_max_covariance_difference": 0.0012629650480095872,
+            "post_delivery_max_state_difference": 0.00011916045217053028,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.00024855806205845155,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 3020000,
+            "zero_delay_equivalence_required_after_delivery": false
+          }
+        ],
+        "final_max_covariance_difference": 0,
+        "final_max_state_difference": 0,
+        "final_metadata_match": true,
+        "gps_interval_us": 20000,
+        "healthy": true,
+        "history_capacity_samples": 64,
+        "input_contract": "synthetic_exact_timestamp_pv_only",
+        "limitations": [
+          "Exactly two GNSS P/V events overlap, and the newer source is delivered first.",
+          "The host oracle rebuilds from the earliest retained full snapshot using only events delivered so far.",
+          "This is not a production OOSM buffer, controller policy, or target-resource measurement.",
+          "The experiment does not validate delayed heading, barometer, multi-IMU, interpolation, or physical source-arrival timing.",
+          "Truth creates the synthetic P/V observation only and is not read by replay logic."
+        ],
+        "overlapping_delivery_windows": true,
+        "pass": true,
+        "rate_hz": 100,
+        "scenario": "overlapping_reordered_two_event",
+        "schema_version": 1,
+        "state_tolerance": 1e-12,
+        "status": "host_only_research_oracle_not_flight_feature"
+      },
+      "returncode": 0,
+      "scenario": "overlap"
+    },
+    {
+      "checks": [
+        {
+          "name": "research_only_status_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "synthetic_exact_timestamp_pv_contract_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "finite_nonnegative_tolerances_are_explicit",
+          "passed": true
+        },
+        {
+          "name": "overlap_mode_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "overlap_mode_has_exactly_two_events",
+          "passed": true
+        },
+        {
+          "name": "overlap_source_order_is_chronological",
+          "passed": true
+        },
+        {
+          "name": "overlap_delivery_windows_are_explicit_and_real",
+          "passed": true
+        },
+        {
+          "name": "overlap_delivery_order_is_reversed",
+          "passed": true
+        },
+        {
+          "name": "older_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "older_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "older_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "older_post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "older_post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "older_post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "newer_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "newer_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "newer_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "newer_delivery_reports_one_pending_earlier_event",
+          "passed": true
+        },
+        {
+          "name": "newer_delivery_does_not_prematurely_require_zero_delay_equivalence",
+          "passed": true
+        },
+        {
+          "name": "newer_delivery_remains_observably_different_while_older_event_is_pending",
+          "passed": true
+        },
+        {
+          "name": "older_delivery_has_no_pending_earlier_event",
+          "passed": true
+        },
+        {
+          "name": "older_delivery_requires_zero_delay_equivalence",
+          "passed": true
+        },
+        {
+          "name": "final_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "finite_healthy_state",
+          "passed": true
+        },
+        {
+          "name": "covariance_remains_psd",
+          "passed": true
+        },
+        {
+          "name": "native_case_gate_passed",
+          "passed": true
+        }
+      ],
+      "command": [
+        "build/overlap-evidence/aerakia_delayed_gnss_reprop_oracle",
+        "--rate-hz",
+        "200",
+        "--delay-ms",
+        "50",
+        "--scenario",
+        "overlap"
+      ],
+      "delay_ms": 50,
+      "passed": true,
+      "rate_hz": 200,
+      "result": {
+        "covariance_psd": true,
+        "covariance_tolerance": 1e-12,
+        "delay_ms": 50,
+        "delay_samples": 10,
+        "delivery_order_reversed": true,
+        "event_count": 2,
+        "events": [
+          {
+            "delivery_timestamp_us": 3050000,
+            "event_index": 1,
+            "pending_earlier_event_count_at_delivery": 0,
+            "post_delivery_max_covariance_difference": 0,
+            "post_delivery_max_state_difference": 0,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.00024814816657889316,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 3000000,
+            "zero_delay_equivalence_required_after_delivery": true
+          },
+          {
+            "delivery_timestamp_us": 3025000,
+            "event_index": 2,
+            "pending_earlier_event_count_at_delivery": 1,
+            "post_delivery_max_covariance_difference": 0.001253918851793455,
+            "post_delivery_max_state_difference": 0.00011896444132331041,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.00024814816657889316,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 3020000,
+            "zero_delay_equivalence_required_after_delivery": false
+          }
+        ],
+        "final_max_covariance_difference": 0,
+        "final_max_state_difference": 0,
+        "final_metadata_match": true,
+        "gps_interval_us": 20000,
+        "healthy": true,
+        "history_capacity_samples": 64,
+        "input_contract": "synthetic_exact_timestamp_pv_only",
+        "limitations": [
+          "Exactly two GNSS P/V events overlap, and the newer source is delivered first.",
+          "The host oracle rebuilds from the earliest retained full snapshot using only events delivered so far.",
+          "This is not a production OOSM buffer, controller policy, or target-resource measurement.",
+          "The experiment does not validate delayed heading, barometer, multi-IMU, interpolation, or physical source-arrival timing.",
+          "Truth creates the synthetic P/V observation only and is not read by replay logic."
+        ],
+        "overlapping_delivery_windows": true,
+        "pass": true,
+        "rate_hz": 200,
+        "scenario": "overlapping_reordered_two_event",
+        "schema_version": 1,
+        "state_tolerance": 1e-12,
+        "status": "host_only_research_oracle_not_flight_feature"
+      },
+      "returncode": 0,
+      "scenario": "overlap"
+    },
+    {
+      "checks": [
+        {
+          "name": "research_only_status_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "synthetic_exact_timestamp_pv_contract_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "finite_nonnegative_tolerances_are_explicit",
+          "passed": true
+        },
+        {
+          "name": "overlap_mode_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "overlap_mode_has_exactly_two_events",
+          "passed": true
+        },
+        {
+          "name": "overlap_source_order_is_chronological",
+          "passed": true
+        },
+        {
+          "name": "overlap_delivery_windows_are_explicit_and_real",
+          "passed": true
+        },
+        {
+          "name": "overlap_delivery_order_is_reversed",
+          "passed": true
+        },
+        {
+          "name": "older_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "older_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "older_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "older_post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "older_post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "older_post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "newer_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "newer_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "newer_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "newer_delivery_reports_one_pending_earlier_event",
+          "passed": true
+        },
+        {
+          "name": "newer_delivery_does_not_prematurely_require_zero_delay_equivalence",
+          "passed": true
+        },
+        {
+          "name": "newer_delivery_remains_observably_different_while_older_event_is_pending",
+          "passed": true
+        },
+        {
+          "name": "older_delivery_has_no_pending_earlier_event",
+          "passed": true
+        },
+        {
+          "name": "older_delivery_requires_zero_delay_equivalence",
+          "passed": true
+        },
+        {
+          "name": "final_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "finite_healthy_state",
+          "passed": true
+        },
+        {
+          "name": "covariance_remains_psd",
+          "passed": true
+        },
+        {
+          "name": "native_case_gate_passed",
+          "passed": true
+        }
+      ],
+      "command": [
+        "build/overlap-evidence/aerakia_delayed_gnss_reprop_oracle",
+        "--rate-hz",
+        "200",
+        "--delay-ms",
+        "100",
+        "--scenario",
+        "overlap"
+      ],
+      "delay_ms": 100,
+      "passed": true,
+      "rate_hz": 200,
+      "result": {
+        "covariance_psd": true,
+        "covariance_tolerance": 1e-12,
+        "delay_ms": 100,
+        "delay_samples": 20,
+        "delivery_order_reversed": true,
+        "event_count": 2,
+        "events": [
+          {
+            "delivery_timestamp_us": 3100000,
+            "event_index": 1,
+            "pending_earlier_event_count_at_delivery": 0,
+            "post_delivery_max_covariance_difference": 0,
+            "post_delivery_max_state_difference": 0,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.00024814816657889316,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 3000000,
+            "zero_delay_equivalence_required_after_delivery": true
+          },
+          {
+            "delivery_timestamp_us": 3025000,
+            "event_index": 2,
+            "pending_earlier_event_count_at_delivery": 1,
+            "post_delivery_max_covariance_difference": 0.001253918851793455,
+            "post_delivery_max_state_difference": 0.00011896444132331041,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.00024814816657889316,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 3020000,
+            "zero_delay_equivalence_required_after_delivery": false
+          }
+        ],
+        "final_max_covariance_difference": 0,
+        "final_max_state_difference": 0,
+        "final_metadata_match": true,
+        "gps_interval_us": 20000,
+        "healthy": true,
+        "history_capacity_samples": 64,
+        "input_contract": "synthetic_exact_timestamp_pv_only",
+        "limitations": [
+          "Exactly two GNSS P/V events overlap, and the newer source is delivered first.",
+          "The host oracle rebuilds from the earliest retained full snapshot using only events delivered so far.",
+          "This is not a production OOSM buffer, controller policy, or target-resource measurement.",
+          "The experiment does not validate delayed heading, barometer, multi-IMU, interpolation, or physical source-arrival timing.",
+          "Truth creates the synthetic P/V observation only and is not read by replay logic."
+        ],
+        "overlapping_delivery_windows": true,
+        "pass": true,
+        "rate_hz": 200,
+        "scenario": "overlapping_reordered_two_event",
+        "schema_version": 1,
+        "state_tolerance": 1e-12,
+        "status": "host_only_research_oracle_not_flight_feature"
+      },
+      "returncode": 0,
+      "scenario": "overlap"
+    },
+    {
+      "checks": [
+        {
+          "name": "research_only_status_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "synthetic_exact_timestamp_pv_contract_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "finite_nonnegative_tolerances_are_explicit",
+          "passed": true
+        },
+        {
+          "name": "overlap_mode_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "overlap_mode_has_exactly_two_events",
+          "passed": true
+        },
+        {
+          "name": "overlap_source_order_is_chronological",
+          "passed": true
+        },
+        {
+          "name": "overlap_delivery_windows_are_explicit_and_real",
+          "passed": true
+        },
+        {
+          "name": "overlap_delivery_order_is_reversed",
+          "passed": true
+        },
+        {
+          "name": "older_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "older_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "older_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "older_post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "older_post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "older_post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "newer_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "newer_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "newer_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "newer_delivery_reports_one_pending_earlier_event",
+          "passed": true
+        },
+        {
+          "name": "newer_delivery_does_not_prematurely_require_zero_delay_equivalence",
+          "passed": true
+        },
+        {
+          "name": "newer_delivery_remains_observably_different_while_older_event_is_pending",
+          "passed": true
+        },
+        {
+          "name": "older_delivery_has_no_pending_earlier_event",
+          "passed": true
+        },
+        {
+          "name": "older_delivery_requires_zero_delay_equivalence",
+          "passed": true
+        },
+        {
+          "name": "final_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "finite_healthy_state",
+          "passed": true
+        },
+        {
+          "name": "covariance_remains_psd",
+          "passed": true
+        },
+        {
+          "name": "native_case_gate_passed",
+          "passed": true
+        }
+      ],
+      "command": [
+        "build/overlap-evidence/aerakia_delayed_gnss_reprop_oracle",
+        "--rate-hz",
+        "200",
+        "--delay-ms",
+        "150",
+        "--scenario",
+        "overlap"
+      ],
+      "delay_ms": 150,
+      "passed": true,
+      "rate_hz": 200,
+      "result": {
+        "covariance_psd": true,
+        "covariance_tolerance": 1e-12,
+        "delay_ms": 150,
+        "delay_samples": 30,
+        "delivery_order_reversed": true,
+        "event_count": 2,
+        "events": [
+          {
+            "delivery_timestamp_us": 3150000,
+            "event_index": 1,
+            "pending_earlier_event_count_at_delivery": 0,
+            "post_delivery_max_covariance_difference": 0,
+            "post_delivery_max_state_difference": 0,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.00024814816657889316,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 3000000,
+            "zero_delay_equivalence_required_after_delivery": true
+          },
+          {
+            "delivery_timestamp_us": 3025000,
+            "event_index": 2,
+            "pending_earlier_event_count_at_delivery": 1,
+            "post_delivery_max_covariance_difference": 0.001253918851793455,
+            "post_delivery_max_state_difference": 0.00011896444132331041,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.00024814816657889316,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 3020000,
+            "zero_delay_equivalence_required_after_delivery": false
+          }
+        ],
+        "final_max_covariance_difference": 0,
+        "final_max_state_difference": 0,
+        "final_metadata_match": true,
+        "gps_interval_us": 20000,
+        "healthy": true,
+        "history_capacity_samples": 64,
+        "input_contract": "synthetic_exact_timestamp_pv_only",
+        "limitations": [
+          "Exactly two GNSS P/V events overlap, and the newer source is delivered first.",
+          "The host oracle rebuilds from the earliest retained full snapshot using only events delivered so far.",
+          "This is not a production OOSM buffer, controller policy, or target-resource measurement.",
+          "The experiment does not validate delayed heading, barometer, multi-IMU, interpolation, or physical source-arrival timing.",
+          "Truth creates the synthetic P/V observation only and is not read by replay logic."
+        ],
+        "overlapping_delivery_windows": true,
+        "pass": true,
+        "rate_hz": 200,
+        "scenario": "overlapping_reordered_two_event",
+        "schema_version": 1,
+        "state_tolerance": 1e-12,
+        "status": "host_only_research_oracle_not_flight_feature"
+      },
+      "returncode": 0,
+      "scenario": "overlap"
+    },
+    {
+      "checks": [
+        {
+          "name": "research_only_status_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "synthetic_exact_timestamp_pv_contract_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "finite_nonnegative_tolerances_are_explicit",
+          "passed": true
+        },
+        {
+          "name": "overlap_mode_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "overlap_mode_has_exactly_two_events",
+          "passed": true
+        },
+        {
+          "name": "overlap_source_order_is_chronological",
+          "passed": true
+        },
+        {
+          "name": "overlap_delivery_windows_are_explicit_and_real",
+          "passed": true
+        },
+        {
+          "name": "overlap_delivery_order_is_reversed",
+          "passed": true
+        },
+        {
+          "name": "older_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "older_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "older_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "older_post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "older_post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "older_post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "newer_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "newer_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "newer_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "newer_delivery_reports_one_pending_earlier_event",
+          "passed": true
+        },
+        {
+          "name": "newer_delivery_does_not_prematurely_require_zero_delay_equivalence",
+          "passed": true
+        },
+        {
+          "name": "newer_delivery_remains_observably_different_while_older_event_is_pending",
+          "passed": true
+        },
+        {
+          "name": "older_delivery_has_no_pending_earlier_event",
+          "passed": true
+        },
+        {
+          "name": "older_delivery_requires_zero_delay_equivalence",
+          "passed": true
+        },
+        {
+          "name": "final_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "finite_healthy_state",
+          "passed": true
+        },
+        {
+          "name": "covariance_remains_psd",
+          "passed": true
+        },
+        {
+          "name": "native_case_gate_passed",
+          "passed": true
+        }
+      ],
+      "command": [
+        "build/overlap-evidence/aerakia_delayed_gnss_reprop_oracle",
+        "--rate-hz",
+        "400",
+        "--delay-ms",
+        "50",
+        "--scenario",
+        "overlap"
+      ],
+      "delay_ms": 50,
+      "passed": true,
+      "rate_hz": 400,
+      "result": {
+        "covariance_psd": true,
+        "covariance_tolerance": 1e-12,
+        "delay_ms": 50,
+        "delay_samples": 20,
+        "delivery_order_reversed": true,
+        "event_count": 2,
+        "events": [
+          {
+            "delivery_timestamp_us": 3050000,
+            "event_index": 1,
+            "pending_earlier_event_count_at_delivery": 0,
+            "post_delivery_max_covariance_difference": 0,
+            "post_delivery_max_state_difference": 0,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.0002479452010859251,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 3000000,
+            "zero_delay_equivalence_required_after_delivery": true
+          },
+          {
+            "delivery_timestamp_us": 3022500,
+            "event_index": 2,
+            "pending_earlier_event_count_at_delivery": 1,
+            "post_delivery_max_covariance_difference": 0.0012494121521573129,
+            "post_delivery_max_state_difference": 0.0001188672153063508,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.0002479452010859251,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 3020000,
+            "zero_delay_equivalence_required_after_delivery": false
+          }
+        ],
+        "final_max_covariance_difference": 0,
+        "final_max_state_difference": 0,
+        "final_metadata_match": true,
+        "gps_interval_us": 20000,
+        "healthy": true,
+        "history_capacity_samples": 64,
+        "input_contract": "synthetic_exact_timestamp_pv_only",
+        "limitations": [
+          "Exactly two GNSS P/V events overlap, and the newer source is delivered first.",
+          "The host oracle rebuilds from the earliest retained full snapshot using only events delivered so far.",
+          "This is not a production OOSM buffer, controller policy, or target-resource measurement.",
+          "The experiment does not validate delayed heading, barometer, multi-IMU, interpolation, or physical source-arrival timing.",
+          "Truth creates the synthetic P/V observation only and is not read by replay logic."
+        ],
+        "overlapping_delivery_windows": true,
+        "pass": true,
+        "rate_hz": 400,
+        "scenario": "overlapping_reordered_two_event",
+        "schema_version": 1,
+        "state_tolerance": 1e-12,
+        "status": "host_only_research_oracle_not_flight_feature"
+      },
+      "returncode": 0,
+      "scenario": "overlap"
+    },
+    {
+      "checks": [
+        {
+          "name": "research_only_status_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "synthetic_exact_timestamp_pv_contract_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "finite_nonnegative_tolerances_are_explicit",
+          "passed": true
+        },
+        {
+          "name": "overlap_mode_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "overlap_mode_has_exactly_two_events",
+          "passed": true
+        },
+        {
+          "name": "overlap_source_order_is_chronological",
+          "passed": true
+        },
+        {
+          "name": "overlap_delivery_windows_are_explicit_and_real",
+          "passed": true
+        },
+        {
+          "name": "overlap_delivery_order_is_reversed",
+          "passed": true
+        },
+        {
+          "name": "older_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "older_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "older_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "older_post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "older_post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "older_post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "newer_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "newer_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "newer_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "newer_delivery_reports_one_pending_earlier_event",
+          "passed": true
+        },
+        {
+          "name": "newer_delivery_does_not_prematurely_require_zero_delay_equivalence",
+          "passed": true
+        },
+        {
+          "name": "newer_delivery_remains_observably_different_while_older_event_is_pending",
+          "passed": true
+        },
+        {
+          "name": "older_delivery_has_no_pending_earlier_event",
+          "passed": true
+        },
+        {
+          "name": "older_delivery_requires_zero_delay_equivalence",
+          "passed": true
+        },
+        {
+          "name": "final_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "finite_healthy_state",
+          "passed": true
+        },
+        {
+          "name": "covariance_remains_psd",
+          "passed": true
+        },
+        {
+          "name": "native_case_gate_passed",
+          "passed": true
+        }
+      ],
+      "command": [
+        "build/overlap-evidence/aerakia_delayed_gnss_reprop_oracle",
+        "--rate-hz",
+        "400",
+        "--delay-ms",
+        "100",
+        "--scenario",
+        "overlap"
+      ],
+      "delay_ms": 100,
+      "passed": true,
+      "rate_hz": 400,
+      "result": {
+        "covariance_psd": true,
+        "covariance_tolerance": 1e-12,
+        "delay_ms": 100,
+        "delay_samples": 40,
+        "delivery_order_reversed": true,
+        "event_count": 2,
+        "events": [
+          {
+            "delivery_timestamp_us": 3100000,
+            "event_index": 1,
+            "pending_earlier_event_count_at_delivery": 0,
+            "post_delivery_max_covariance_difference": 0,
+            "post_delivery_max_state_difference": 0,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.0002479452010859251,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 3000000,
+            "zero_delay_equivalence_required_after_delivery": true
+          },
+          {
+            "delivery_timestamp_us": 3022500,
+            "event_index": 2,
+            "pending_earlier_event_count_at_delivery": 1,
+            "post_delivery_max_covariance_difference": 0.0012494121521573129,
+            "post_delivery_max_state_difference": 0.0001188672153063508,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.0002479452010859251,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 3020000,
+            "zero_delay_equivalence_required_after_delivery": false
+          }
+        ],
+        "final_max_covariance_difference": 0,
+        "final_max_state_difference": 0,
+        "final_metadata_match": true,
+        "gps_interval_us": 20000,
+        "healthy": true,
+        "history_capacity_samples": 64,
+        "input_contract": "synthetic_exact_timestamp_pv_only",
+        "limitations": [
+          "Exactly two GNSS P/V events overlap, and the newer source is delivered first.",
+          "The host oracle rebuilds from the earliest retained full snapshot using only events delivered so far.",
+          "This is not a production OOSM buffer, controller policy, or target-resource measurement.",
+          "The experiment does not validate delayed heading, barometer, multi-IMU, interpolation, or physical source-arrival timing.",
+          "Truth creates the synthetic P/V observation only and is not read by replay logic."
+        ],
+        "overlapping_delivery_windows": true,
+        "pass": true,
+        "rate_hz": 400,
+        "scenario": "overlapping_reordered_two_event",
+        "schema_version": 1,
+        "state_tolerance": 1e-12,
+        "status": "host_only_research_oracle_not_flight_feature"
+      },
+      "returncode": 0,
+      "scenario": "overlap"
+    },
+    {
+      "checks": [
+        {
+          "name": "research_only_status_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "synthetic_exact_timestamp_pv_contract_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "finite_nonnegative_tolerances_are_explicit",
+          "passed": true
+        },
+        {
+          "name": "overlap_mode_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "overlap_mode_has_exactly_two_events",
+          "passed": true
+        },
+        {
+          "name": "overlap_source_order_is_chronological",
+          "passed": true
+        },
+        {
+          "name": "overlap_delivery_windows_are_explicit_and_real",
+          "passed": true
+        },
+        {
+          "name": "overlap_delivery_order_is_reversed",
+          "passed": true
+        },
+        {
+          "name": "older_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "older_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "older_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "older_post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "older_post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "older_post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "newer_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "newer_repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "newer_pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "newer_delivery_reports_one_pending_earlier_event",
+          "passed": true
+        },
+        {
+          "name": "newer_delivery_does_not_prematurely_require_zero_delay_equivalence",
+          "passed": true
+        },
+        {
+          "name": "newer_delivery_remains_observably_different_while_older_event_is_pending",
+          "passed": true
+        },
+        {
+          "name": "older_delivery_has_no_pending_earlier_event",
+          "passed": true
+        },
+        {
+          "name": "older_delivery_requires_zero_delay_equivalence",
+          "passed": true
+        },
+        {
+          "name": "final_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "final_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "finite_healthy_state",
+          "passed": true
+        },
+        {
+          "name": "covariance_remains_psd",
+          "passed": true
+        },
+        {
+          "name": "native_case_gate_passed",
+          "passed": true
+        }
+      ],
+      "command": [
+        "build/overlap-evidence/aerakia_delayed_gnss_reprop_oracle",
+        "--rate-hz",
+        "400",
+        "--delay-ms",
+        "150",
+        "--scenario",
+        "overlap"
+      ],
+      "delay_ms": 150,
+      "passed": true,
+      "rate_hz": 400,
+      "result": {
+        "covariance_psd": true,
+        "covariance_tolerance": 1e-12,
+        "delay_ms": 150,
+        "delay_samples": 60,
+        "delivery_order_reversed": true,
+        "event_count": 2,
+        "events": [
+          {
+            "delivery_timestamp_us": 3150000,
+            "event_index": 1,
+            "pending_earlier_event_count_at_delivery": 0,
+            "post_delivery_max_covariance_difference": 0,
+            "post_delivery_max_state_difference": 0,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.0002479452010859251,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 3000000,
+            "zero_delay_equivalence_required_after_delivery": true
+          },
+          {
+            "delivery_timestamp_us": 3022500,
+            "event_index": 2,
+            "pending_earlier_event_count_at_delivery": 1,
+            "post_delivery_max_covariance_difference": 0.0012494121521573129,
+            "post_delivery_max_state_difference": 0.0001188672153063508,
+            "post_delivery_metadata_match": true,
+            "pre_delivery_max_state_difference": 0.0002479452010859251,
+            "repropagated": true,
+            "source_gps_accepted": true,
+            "source_timestamp_us": 3020000,
+            "zero_delay_equivalence_required_after_delivery": false
+          }
+        ],
+        "final_max_covariance_difference": 0,
+        "final_max_state_difference": 0,
+        "final_metadata_match": true,
+        "gps_interval_us": 20000,
+        "healthy": true,
+        "history_capacity_samples": 64,
+        "input_contract": "synthetic_exact_timestamp_pv_only",
+        "limitations": [
+          "Exactly two GNSS P/V events overlap, and the newer source is delivered first.",
+          "The host oracle rebuilds from the earliest retained full snapshot using only events delivered so far.",
+          "This is not a production OOSM buffer, controller policy, or target-resource measurement.",
+          "The experiment does not validate delayed heading, barometer, multi-IMU, interpolation, or physical source-arrival timing.",
+          "Truth creates the synthetic P/V observation only and is not read by replay logic."
+        ],
+        "overlapping_delivery_windows": true,
+        "pass": true,
+        "rate_hz": 400,
+        "scenario": "overlapping_reordered_two_event",
+        "schema_version": 1,
+        "state_tolerance": 1e-12,
+        "status": "host_only_research_oracle_not_flight_feature"
+      },
+      "returncode": 0,
+      "scenario": "overlap"
+    }
+  ],
+  "delays_ms": [
+    50,
+    100,
+    150
+  ],
+  "git_commit": "c0e941f61f70da8dbe2a716c793e8bea5d7d0536",
+  "input_contract": "synthetic_exact_timestamp_pv_only",
+  "limitations": [
+    "Exactly two overlapping GNSS P/V events are replayed per case, with the newer source delivered first.",
+    "The ring is a host validation implementation and is not a production rewind API.",
+    "No delayed heading, barometer, multi-IMU, supervisor, sensor-delay, or controller path is covered.",
+    "The synthetic truth creates the P/V measurement only; the replay logic receives no truth fields.",
+    "Equivalence to a zero-delay reference is a replay correctness result, not flight readiness."
+  ],
+  "oracle": {
+    "bytes": 91112,
+    "path": "build/overlap-evidence/aerakia_delayed_gnss_reprop_oracle",
+    "sha256": "1d4fbd548523ae0b7cdd106a70503862b8b955a614ac97ad9f6d4b68fcc2f08f"
+  },
+  "oracle_source": {
+    "bytes": 45331,
+    "path": "validation/delayed_gnss_reprop_oracle.c",
+    "sha256": "045bb5ff1a812ba0a5fe3f4e97de5a8a5f8938729403884a38e1aa3b1d7dca4a"
+  },
+  "passed": true,
+  "rates_hz": [
+    100,
+    200,
+    400
+  ],
+  "scenario": "overlap",
+  "schema_version": 1,
+  "scope": "synthetic exact-timestamp overlapping reordered two-event GNSS P/V rewind/repropagation oracle",
+  "status": "host_only_research_oracle_not_flight_feature"
+}
