@@ -2151,3 +2151,23 @@ stack, Flash/RAM, numerical health, scheduling, and logging load. The compact
 artifact is [`cortex_m7_cross_compile_v1.json`](../validation/public/cortex_m7_cross_compile_v1.json);
 the focused method and limitations are in
 [Cortex-M7 cross-compile preflight](cortex-m7-cross-compile.md).
+
+## 2026-08-10 — final reordered-replay verification
+
+The reordered-replay source, fail-closed wrapper, negative payload tests, and
+documentation were committed before evidence generation. The retained artifact
+therefore records source commit `c0e941f`, uses only repository-relative command
+paths, and passes all `9/9` `100/200/400 Hz x 50/100/150 ms` overlap cells.
+
+A fresh Release host regression then passed `13/13` CTests and `189/189`
+Python tests. It includes the unchanged full input-integrity campaign:
+`1,020,000` attempted IMU samples with zero invariant failures and zero
+unhealthy outputs. A fresh float evaluation profile also passed `12/12` CTests.
+
+Fresh ASan/UBSan Debug CTests passed `12/12` when the unchanged long
+input-integrity campaign was excluded. The managed desktop runner terminates
+that otherwise silent million-sample sanitizer executable before it can report
+completion, so a full sanitizer result for that one unchanged campaign is not
+claimed in this checkpoint. The new reordered oracle is included in the
+passing sanitizer set. Leak detection remains disabled because the managed
+traced environment cannot start LeakSanitizer.
