@@ -33,9 +33,9 @@ portable C library and from FCOne-specific integration code.
   defaults to one worker; `--jobs` is an explicitly validated workstation
   parallelism option.
 - `run_delayed_gnss_repropagation_oracle.py`: twelve-case host-only isolated
-  delayed-GNSS rewind/replay correctness campaign. It proves only exact
-  state/covariance equivalence to a zero-delay reference; it is not a product
-  delayed-fusion API.
+  or sequential non-overlapping delayed-GNSS rewind/replay campaign. It proves
+  only exact state/covariance equivalence to a zero-delay reference; it is not
+  a product delayed-fusion API or a claim of generic overlapping OOSM support.
 - `run_baro_outage_campaign.py` and `run_baro_outage_ab.py`: barometer source
   supervision experiments.
 - `run_px4_bias_ab_m0.py`: optional PX4 host comparison; it is blocked until a

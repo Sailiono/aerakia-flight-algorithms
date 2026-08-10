@@ -78,12 +78,45 @@ campaign runs the full twelve-case matrix and fails closed if a native result
 omits the research-only status, source-contract label, divergence sensitivity,
 post-replay equivalence, health, or PSD condition.
 
+## Sequential extension
+
+The original matrix exercises one withheld source epoch. The same host oracle
+now also has a separately named `sequential` scenario with two delayed GNSS
+P/V epochs: sources at 3.0 s and 4.0 s. The second source is deliberately
+after the first delivery, so its retained snapshot already includes the first
+completed replay transaction. This is a meaningful repeat-transaction check,
+but it is **not** a generic overlapping out-of-sequence measurement solution.
+
+The compact sequential result is
+[`delayed_gnss_repropagation_sequential_v1.json`](../validation/public/delayed_gnss_repropagation_sequential_v1.json).
+It repeats the 100/200/400 Hz by 20/50/100/150 ms matrix: `12/12` cases pass.
+Both source updates are accepted and replayed in every case. The first delayed
+event produces a pre-delivery state difference of `8.53e-4`--`8.96e-4`; the
+second produces `9.95e-4`--`1.06e-3`. After each replay and at the final time,
+state and full covariance differences are exactly zero with matching metadata.
+
+Reproduce it with:
+
+```bash
+python3 validation/run_delayed_gnss_repropagation_oracle.py \
+  --oracle build/delayed-oracle/aerakia_delayed_gnss_reprop_oracle \
+  --scenario sequential \
+  --out build/delayed-gnss-reprop/sequential-v1.json
+```
+
+An overlapping source/delivery schedule, arbitrary reordering, loss of a
+pending delayed event, interpolated source time, and mixed delayed sensor types
+are intentionally not implemented or claimed. They require a proper ordered
+event buffer and revised snapshot-maintenance contract before any product
+implementation can be considered.
+
 ## Consequence for G0
 
 The rejected fixed-lag bias proposal remains rejected. This oracle only removes
 one infrastructure uncertainty: full snapshot/update/replay can reproduce a
-zero-delay reference under a controlled isolated event. A future correction
-candidate still requires a full 15-state lag covariance, process/preintegration
-covariance, atomic nominal-state injection/reset treatment, causal persistence,
-clean train/tune separation, a sealed holdout, and physical FCOne source and
-arrival timestamps. None of those requirements is closed here.
+zero-delay reference for isolated and sequential non-overlapping events. A
+future correction candidate still requires a full 15-state lag covariance,
+process/preintegration covariance, atomic nominal-state injection/reset
+treatment, causal persistence, clean train/tune separation, a sealed holdout,
+and physical FCOne source and arrival timestamps. None of those requirements is
+closed here.

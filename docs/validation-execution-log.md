@@ -2003,5 +2003,44 @@ outputs. Leak detection remains unverified because LeakSanitizer cannot start in
 the managed traced desktop environment; no allocation-leak claim is made.
 
 These checks validate the current source and contracts only. They do not add
-physical sensor, thermal, target-MCU timing, multi-event transport, or flight
-evidence.
+physical sensor, thermal, target-MCU timing, generic overlapping multi-event
+transport, or flight evidence.
+
+## 2026-08-10 — sequential delayed-GNSS replay boundary
+
+### Reason
+
+The first rewind/replay oracle proved one isolated late P/V update, but a
+single success does not show that a later historical snapshot remains coherent
+after a prior replay transaction. The smallest useful extension is two
+non-overlapping delayed sources; an overlapping schedule needs a different
+ordered-event-buffer design and must not be implied by this test.
+
+### Method
+
+The native oracle adds a separately named `sequential` mode with source epochs
+at 3.0 s and 4.0 s. The second source is after the first delivery for every
+rate/delay cell. At each delivery, it restores the complete pre-aiding source
+snapshot, applies the normal GPS update, replays later IMU and already
+committed P/V events, and compares the result to the zero-delay lane. The
+wrapper rejects a missing event, a source that is not strictly after the prior
+delivery, a missing replay, a nonzero post-replay state/covariance difference,
+or metadata mismatch.
+
+### Result
+
+The 100/200/400 Hz by 20/50/100/150 ms matrix completed `12/12` sequential
+cases. Both source updates were accepted and replayed in every case. First
+event pre-delivery state differences ranged from `8.53e-4` to `8.96e-4`; the
+second ranged from `9.95e-4` to `1.06e-3`, confirming that the test would
+detect a missing late update. After each event and at final time, every state
+and full covariance comparison was exactly zero, metadata matched, and all
+filters remained finite/PSD.
+
+The new CTest target, Python negative schedule test, and compact evidence are
+retained under
+[`delayed_gnss_repropagation_sequential_v1.json`](../validation/public/delayed_gnss_repropagation_sequential_v1.json).
+This remains host-only replay correctness evidence. Overlapping/reordered
+pending events, delayed heading/barometer, mixed sensor types, interpolation,
+physical source-arrival timestamps, target resource limits, and flight policy
+are still open.

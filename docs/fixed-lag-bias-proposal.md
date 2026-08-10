@@ -61,12 +61,12 @@ does not change the frozen trial matrix or metrics.
 
 This result does not prove that joint tilt/bias correction is impossible. It
 does prove that a marginal 5x5 MAP proposal is insufficient. The next bounded
-piece of work is a host-only delayed-GNSS rewind/replay oracle. It must first
-prove that a full state/covariance snapshot, the existing Joseph update,
-attitude reset, and canonical event order reproduce the zero-delay reference
-when one exact-timestamp GNSS epoch is delivered late. That oracle is not a
-product delayed-fusion implementation and does not inject this rejected
-proposal.
+piece of work is a host-only delayed-GNSS rewind/replay oracle. Its isolated
+and sequential non-overlapping matrices now prove that a full state/covariance
+snapshot, the existing Joseph update, attitude reset, and canonical event order
+reproduce the zero-delay reference when exact-timestamp GNSS epochs arrive late.
+It is not a product delayed-fusion implementation, does not support overlapping
+out-of-sequence events, and does not inject this rejected proposal.
 
 Only after that prerequisite is independently passing may a new candidate be
 specified with full 15-state lag covariance, process/preintegration covariance,
