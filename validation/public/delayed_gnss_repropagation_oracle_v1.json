@@ -1,0 +1,826 @@
+{
+  "campaign_runner": {
+    "bytes": 7510,
+    "path": "validation/run_delayed_gnss_repropagation_oracle.py",
+    "sha256": "2adb252a3ab93ed6f78498d25f5adbe4f3fc683c8af7342c1e1c4bd646a06226"
+  },
+  "case_count": 9,
+  "cases": [
+    {
+      "checks": [
+        {
+          "name": "research_only_status_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "synthetic_v2_pv_contract_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "isolated_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "finite_healthy_state",
+          "passed": true
+        },
+        {
+          "name": "covariance_remains_psd",
+          "passed": true
+        },
+        {
+          "name": "native_case_gate_passed",
+          "passed": true
+        }
+      ],
+      "command": [
+        "/home/clark/DevFiles/OneDev/aerakia-flight-algorithms/build/delayed-oracle/aerakia_delayed_gnss_reprop_oracle",
+        "--rate-hz",
+        "100",
+        "--delay-ms",
+        "20"
+      ],
+      "delay_ms": 20,
+      "passed": true,
+      "rate_hz": 100,
+      "result": {
+        "covariance_psd": true,
+        "covariance_tolerance": 1e-12,
+        "delay_ms": 20,
+        "delay_samples": 2,
+        "delivery_timestamp_us": 3020000,
+        "healthy": true,
+        "history_capacity_samples": 64,
+        "input_contract": "synthetic_v2_exact_timestamp_pv_only",
+        "limitations": [
+          "Only one isolated delayed GNSS P/V event is replayed.",
+          "History is a host validation ring; no production rewind API is added.",
+          "The experiment does not validate delayed heading, barometer, multi-IMU, or supervisor policy.",
+          "Truth is used only to generate the synthetic P/V observation and is not read by the replay logic."
+        ],
+        "pass": true,
+        "post_delivery_max_covariance_difference": 0,
+        "post_delivery_max_state_difference": 0,
+        "post_delivery_metadata_match": true,
+        "pre_delivery_max_state_difference": 0.0008531406847021583,
+        "rate_hz": 100,
+        "repropagated": true,
+        "schema_version": 1,
+        "source_gps_accepted": true,
+        "source_timestamp_us": 3000000,
+        "state_tolerance": 1e-12,
+        "status": "host_only_research_oracle_not_flight_feature"
+      },
+      "returncode": 0
+    },
+    {
+      "checks": [
+        {
+          "name": "research_only_status_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "synthetic_v2_pv_contract_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "isolated_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "finite_healthy_state",
+          "passed": true
+        },
+        {
+          "name": "covariance_remains_psd",
+          "passed": true
+        },
+        {
+          "name": "native_case_gate_passed",
+          "passed": true
+        }
+      ],
+      "command": [
+        "/home/clark/DevFiles/OneDev/aerakia-flight-algorithms/build/delayed-oracle/aerakia_delayed_gnss_reprop_oracle",
+        "--rate-hz",
+        "100",
+        "--delay-ms",
+        "50"
+      ],
+      "delay_ms": 50,
+      "passed": true,
+      "rate_hz": 100,
+      "result": {
+        "covariance_psd": true,
+        "covariance_tolerance": 1e-12,
+        "delay_ms": 50,
+        "delay_samples": 5,
+        "delivery_timestamp_us": 3050000,
+        "healthy": true,
+        "history_capacity_samples": 64,
+        "input_contract": "synthetic_v2_exact_timestamp_pv_only",
+        "limitations": [
+          "Only one isolated delayed GNSS P/V event is replayed.",
+          "History is a host validation ring; no production rewind API is added.",
+          "The experiment does not validate delayed heading, barometer, multi-IMU, or supervisor policy.",
+          "Truth is used only to generate the synthetic P/V observation and is not read by the replay logic."
+        ],
+        "pass": true,
+        "post_delivery_max_covariance_difference": 0,
+        "post_delivery_max_state_difference": 0,
+        "post_delivery_metadata_match": true,
+        "pre_delivery_max_state_difference": 0.0008676258035070772,
+        "rate_hz": 100,
+        "repropagated": true,
+        "schema_version": 1,
+        "source_gps_accepted": true,
+        "source_timestamp_us": 3000000,
+        "state_tolerance": 1e-12,
+        "status": "host_only_research_oracle_not_flight_feature"
+      },
+      "returncode": 0
+    },
+    {
+      "checks": [
+        {
+          "name": "research_only_status_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "synthetic_v2_pv_contract_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "isolated_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "finite_healthy_state",
+          "passed": true
+        },
+        {
+          "name": "covariance_remains_psd",
+          "passed": true
+        },
+        {
+          "name": "native_case_gate_passed",
+          "passed": true
+        }
+      ],
+      "command": [
+        "/home/clark/DevFiles/OneDev/aerakia-flight-algorithms/build/delayed-oracle/aerakia_delayed_gnss_reprop_oracle",
+        "--rate-hz",
+        "100",
+        "--delay-ms",
+        "100"
+      ],
+      "delay_ms": 100,
+      "passed": true,
+      "rate_hz": 100,
+      "result": {
+        "covariance_psd": true,
+        "covariance_tolerance": 1e-12,
+        "delay_ms": 100,
+        "delay_samples": 10,
+        "delivery_timestamp_us": 3100000,
+        "healthy": true,
+        "history_capacity_samples": 64,
+        "input_contract": "synthetic_v2_exact_timestamp_pv_only",
+        "limitations": [
+          "Only one isolated delayed GNSS P/V event is replayed.",
+          "History is a host validation ring; no production rewind API is added.",
+          "The experiment does not validate delayed heading, barometer, multi-IMU, or supervisor policy.",
+          "Truth is used only to generate the synthetic P/V observation and is not read by the replay logic."
+        ],
+        "pass": true,
+        "post_delivery_max_covariance_difference": 0,
+        "post_delivery_max_state_difference": 0,
+        "post_delivery_metadata_match": true,
+        "pre_delivery_max_state_difference": 0.000891853996997094,
+        "rate_hz": 100,
+        "repropagated": true,
+        "schema_version": 1,
+        "source_gps_accepted": true,
+        "source_timestamp_us": 3000000,
+        "state_tolerance": 1e-12,
+        "status": "host_only_research_oracle_not_flight_feature"
+      },
+      "returncode": 0
+    },
+    {
+      "checks": [
+        {
+          "name": "research_only_status_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "synthetic_v2_pv_contract_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "isolated_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "finite_healthy_state",
+          "passed": true
+        },
+        {
+          "name": "covariance_remains_psd",
+          "passed": true
+        },
+        {
+          "name": "native_case_gate_passed",
+          "passed": true
+        }
+      ],
+      "command": [
+        "/home/clark/DevFiles/OneDev/aerakia-flight-algorithms/build/delayed-oracle/aerakia_delayed_gnss_reprop_oracle",
+        "--rate-hz",
+        "200",
+        "--delay-ms",
+        "20"
+      ],
+      "delay_ms": 20,
+      "passed": true,
+      "rate_hz": 200,
+      "result": {
+        "covariance_psd": true,
+        "covariance_tolerance": 1e-12,
+        "delay_ms": 20,
+        "delay_samples": 4,
+        "delivery_timestamp_us": 3020000,
+        "healthy": true,
+        "history_capacity_samples": 64,
+        "input_contract": "synthetic_v2_exact_timestamp_pv_only",
+        "limitations": [
+          "Only one isolated delayed GNSS P/V event is replayed.",
+          "History is a host validation ring; no production rewind API is added.",
+          "The experiment does not validate delayed heading, barometer, multi-IMU, or supervisor policy.",
+          "Truth is used only to generate the synthetic P/V observation and is not read by the replay logic."
+        ],
+        "pass": true,
+        "post_delivery_max_covariance_difference": 0,
+        "post_delivery_max_state_difference": 0,
+        "post_delivery_metadata_match": true,
+        "pre_delivery_max_state_difference": 0.0008557631048042857,
+        "rate_hz": 200,
+        "repropagated": true,
+        "schema_version": 1,
+        "source_gps_accepted": true,
+        "source_timestamp_us": 3000000,
+        "state_tolerance": 1e-12,
+        "status": "host_only_research_oracle_not_flight_feature"
+      },
+      "returncode": 0
+    },
+    {
+      "checks": [
+        {
+          "name": "research_only_status_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "synthetic_v2_pv_contract_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "isolated_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "finite_healthy_state",
+          "passed": true
+        },
+        {
+          "name": "covariance_remains_psd",
+          "passed": true
+        },
+        {
+          "name": "native_case_gate_passed",
+          "passed": true
+        }
+      ],
+      "command": [
+        "/home/clark/DevFiles/OneDev/aerakia-flight-algorithms/build/delayed-oracle/aerakia_delayed_gnss_reprop_oracle",
+        "--rate-hz",
+        "200",
+        "--delay-ms",
+        "50"
+      ],
+      "delay_ms": 50,
+      "passed": true,
+      "rate_hz": 200,
+      "result": {
+        "covariance_psd": true,
+        "covariance_tolerance": 1e-12,
+        "delay_ms": 50,
+        "delay_samples": 10,
+        "delivery_timestamp_us": 3050000,
+        "healthy": true,
+        "history_capacity_samples": 64,
+        "input_contract": "synthetic_v2_exact_timestamp_pv_only",
+        "limitations": [
+          "Only one isolated delayed GNSS P/V event is replayed.",
+          "History is a host validation ring; no production rewind API is added.",
+          "The experiment does not validate delayed heading, barometer, multi-IMU, or supervisor policy.",
+          "Truth is used only to generate the synthetic P/V observation and is not read by the replay logic."
+        ],
+        "pass": true,
+        "post_delivery_max_covariance_difference": 0,
+        "post_delivery_max_state_difference": 0,
+        "post_delivery_metadata_match": true,
+        "pre_delivery_max_state_difference": 0.0008702580965110895,
+        "rate_hz": 200,
+        "repropagated": true,
+        "schema_version": 1,
+        "source_gps_accepted": true,
+        "source_timestamp_us": 3000000,
+        "state_tolerance": 1e-12,
+        "status": "host_only_research_oracle_not_flight_feature"
+      },
+      "returncode": 0
+    },
+    {
+      "checks": [
+        {
+          "name": "research_only_status_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "synthetic_v2_pv_contract_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "isolated_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "finite_healthy_state",
+          "passed": true
+        },
+        {
+          "name": "covariance_remains_psd",
+          "passed": true
+        },
+        {
+          "name": "native_case_gate_passed",
+          "passed": true
+        }
+      ],
+      "command": [
+        "/home/clark/DevFiles/OneDev/aerakia-flight-algorithms/build/delayed-oracle/aerakia_delayed_gnss_reprop_oracle",
+        "--rate-hz",
+        "200",
+        "--delay-ms",
+        "100"
+      ],
+      "delay_ms": 100,
+      "passed": true,
+      "rate_hz": 200,
+      "result": {
+        "covariance_psd": true,
+        "covariance_tolerance": 1e-12,
+        "delay_ms": 100,
+        "delay_samples": 20,
+        "delivery_timestamp_us": 3100000,
+        "healthy": true,
+        "history_capacity_samples": 64,
+        "input_contract": "synthetic_v2_exact_timestamp_pv_only",
+        "limitations": [
+          "Only one isolated delayed GNSS P/V event is replayed.",
+          "History is a host validation ring; no production rewind API is added.",
+          "The experiment does not validate delayed heading, barometer, multi-IMU, or supervisor policy.",
+          "Truth is used only to generate the synthetic P/V observation and is not read by the replay logic."
+        ],
+        "pass": true,
+        "post_delivery_max_covariance_difference": 0,
+        "post_delivery_max_state_difference": 0,
+        "post_delivery_metadata_match": true,
+        "pre_delivery_max_state_difference": 0.0008945026987221549,
+        "rate_hz": 200,
+        "repropagated": true,
+        "schema_version": 1,
+        "source_gps_accepted": true,
+        "source_timestamp_us": 3000000,
+        "state_tolerance": 1e-12,
+        "status": "host_only_research_oracle_not_flight_feature"
+      },
+      "returncode": 0
+    },
+    {
+      "checks": [
+        {
+          "name": "research_only_status_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "synthetic_v2_pv_contract_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "isolated_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "finite_healthy_state",
+          "passed": true
+        },
+        {
+          "name": "covariance_remains_psd",
+          "passed": true
+        },
+        {
+          "name": "native_case_gate_passed",
+          "passed": true
+        }
+      ],
+      "command": [
+        "/home/clark/DevFiles/OneDev/aerakia-flight-algorithms/build/delayed-oracle/aerakia_delayed_gnss_reprop_oracle",
+        "--rate-hz",
+        "400",
+        "--delay-ms",
+        "20"
+      ],
+      "delay_ms": 20,
+      "passed": true,
+      "rate_hz": 400,
+      "result": {
+        "covariance_psd": true,
+        "covariance_tolerance": 1e-12,
+        "delay_ms": 20,
+        "delay_samples": 8,
+        "delivery_timestamp_us": 3020000,
+        "healthy": true,
+        "history_capacity_samples": 64,
+        "input_contract": "synthetic_v2_exact_timestamp_pv_only",
+        "limitations": [
+          "Only one isolated delayed GNSS P/V event is replayed.",
+          "History is a host validation ring; no production rewind API is added.",
+          "The experiment does not validate delayed heading, barometer, multi-IMU, or supervisor policy.",
+          "Truth is used only to generate the synthetic P/V observation and is not read by the replay logic."
+        ],
+        "pass": true,
+        "post_delivery_max_covariance_difference": 0,
+        "post_delivery_max_state_difference": 0,
+        "post_delivery_metadata_match": true,
+        "pre_delivery_max_state_difference": 0.0008570972513799457,
+        "rate_hz": 400,
+        "repropagated": true,
+        "schema_version": 1,
+        "source_gps_accepted": true,
+        "source_timestamp_us": 3000000,
+        "state_tolerance": 1e-12,
+        "status": "host_only_research_oracle_not_flight_feature"
+      },
+      "returncode": 0
+    },
+    {
+      "checks": [
+        {
+          "name": "research_only_status_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "synthetic_v2_pv_contract_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "isolated_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "finite_healthy_state",
+          "passed": true
+        },
+        {
+          "name": "covariance_remains_psd",
+          "passed": true
+        },
+        {
+          "name": "native_case_gate_passed",
+          "passed": true
+        }
+      ],
+      "command": [
+        "/home/clark/DevFiles/OneDev/aerakia-flight-algorithms/build/delayed-oracle/aerakia_delayed_gnss_reprop_oracle",
+        "--rate-hz",
+        "400",
+        "--delay-ms",
+        "50"
+      ],
+      "delay_ms": 50,
+      "passed": true,
+      "rate_hz": 400,
+      "result": {
+        "covariance_psd": true,
+        "covariance_tolerance": 1e-12,
+        "delay_ms": 50,
+        "delay_samples": 20,
+        "delivery_timestamp_us": 3050000,
+        "healthy": true,
+        "history_capacity_samples": 64,
+        "input_contract": "synthetic_v2_exact_timestamp_pv_only",
+        "limitations": [
+          "Only one isolated delayed GNSS P/V event is replayed.",
+          "History is a host validation ring; no production rewind API is added.",
+          "The experiment does not validate delayed heading, barometer, multi-IMU, or supervisor policy.",
+          "Truth is used only to generate the synthetic P/V observation and is not read by the replay logic."
+        ],
+        "pass": true,
+        "post_delivery_max_covariance_difference": 0,
+        "post_delivery_max_state_difference": 0,
+        "post_delivery_metadata_match": true,
+        "pre_delivery_max_state_difference": 0.0008715975165821677,
+        "rate_hz": 400,
+        "repropagated": true,
+        "schema_version": 1,
+        "source_gps_accepted": true,
+        "source_timestamp_us": 3000000,
+        "state_tolerance": 1e-12,
+        "status": "host_only_research_oracle_not_flight_feature"
+      },
+      "returncode": 0
+    },
+    {
+      "checks": [
+        {
+          "name": "research_only_status_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "synthetic_v2_pv_contract_is_explicit",
+          "passed": true
+        },
+        {
+          "name": "isolated_source_update_accepted",
+          "passed": true
+        },
+        {
+          "name": "repropagation_executed",
+          "passed": true
+        },
+        {
+          "name": "pre_delivery_difference_is_observable",
+          "passed": true
+        },
+        {
+          "name": "post_delivery_state_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "post_delivery_covariance_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "post_delivery_metadata_matches_zero_delay",
+          "passed": true
+        },
+        {
+          "name": "finite_healthy_state",
+          "passed": true
+        },
+        {
+          "name": "covariance_remains_psd",
+          "passed": true
+        },
+        {
+          "name": "native_case_gate_passed",
+          "passed": true
+        }
+      ],
+      "command": [
+        "/home/clark/DevFiles/OneDev/aerakia-flight-algorithms/build/delayed-oracle/aerakia_delayed_gnss_reprop_oracle",
+        "--rate-hz",
+        "400",
+        "--delay-ms",
+        "100"
+      ],
+      "delay_ms": 100,
+      "passed": true,
+      "rate_hz": 400,
+      "result": {
+        "covariance_psd": true,
+        "covariance_tolerance": 1e-12,
+        "delay_ms": 100,
+        "delay_samples": 40,
+        "delivery_timestamp_us": 3100000,
+        "healthy": true,
+        "history_capacity_samples": 64,
+        "input_contract": "synthetic_v2_exact_timestamp_pv_only",
+        "limitations": [
+          "Only one isolated delayed GNSS P/V event is replayed.",
+          "History is a host validation ring; no production rewind API is added.",
+          "The experiment does not validate delayed heading, barometer, multi-IMU, or supervisor policy.",
+          "Truth is used only to generate the synthetic P/V observation and is not read by the replay logic."
+        ],
+        "pass": true,
+        "post_delivery_max_covariance_difference": 0,
+        "post_delivery_max_state_difference": 0,
+        "post_delivery_metadata_match": true,
+        "pre_delivery_max_state_difference": 0.0008958508867143444,
+        "rate_hz": 400,
+        "repropagated": true,
+        "schema_version": 1,
+        "source_gps_accepted": true,
+        "source_timestamp_us": 3000000,
+        "state_tolerance": 1e-12,
+        "status": "host_only_research_oracle_not_flight_feature"
+      },
+      "returncode": 0
+    }
+  ],
+  "delays_ms": [
+    20,
+    50,
+    100
+  ],
+  "git_commit": "19038721dfdaa3504d14e4be6e41f87916564954",
+  "input_contract": "synthetic_v2_exact_timestamp_pv_only",
+  "limitations": [
+    "Only one isolated delayed GNSS P/V event is replayed per case.",
+    "The ring is a host validation implementation and is not a production rewind API.",
+    "No delayed heading, barometer, multi-IMU, supervisor, sensor-delay, or controller path is covered.",
+    "The synthetic truth creates the P/V measurement only; the replay logic receives no truth fields.",
+    "Equivalence to a zero-delay reference is a replay correctness result, not flight readiness."
+  ],
+  "oracle": {
+    "bytes": 82712,
+    "path": "build/delayed-oracle/aerakia_delayed_gnss_reprop_oracle",
+    "sha256": "a846184f744f7e73d7af08e523b8b702ffc004bb83a8199ed49a292dfe420300"
+  },
+  "oracle_source": {
+    "bytes": 21235,
+    "path": "validation/delayed_gnss_reprop_oracle.c",
+    "sha256": "7405d56d4c69813eb68ab0f0a357a122651f81bf6b76ac1a49d078df93b7500c"
+  },
+  "passed": true,
+  "rates_hz": [
+    100,
+    200,
+    400
+  ],
+  "schema_version": 1,
+  "scope": "synthetic v2 exact-timestamp isolated GNSS P/V rewind/repropagation oracle",
+  "status": "host_only_research_oracle_not_flight_feature"
+}
