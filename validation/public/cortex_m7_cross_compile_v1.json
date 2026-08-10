@@ -1,0 +1,539 @@
+{
+  "base_flags": [
+    "-mcpu=cortex-m7",
+    "-mthumb",
+    "-mfloat-abi=hard",
+    "-mfpu=fpv5-d16",
+    "-std=c99",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "-pedantic",
+    "-Os",
+    "-ffreestanding",
+    "-fno-builtin",
+    "-ffunction-sections",
+    "-fdata-sections"
+  ],
+  "compiler": {
+    "path": "/usr/bin/arm-none-eabi-gcc",
+    "version": "arm-none-eabi-gcc (15:14.2.rel1-1) 14.2.1 20241119"
+  },
+  "git_commit": "0ec315a31daf9a0f4029e7794f976c1dc195979c",
+  "limitations": [
+    "This compiles and archives the portable library only; no FCOne application image is linked.",
+    "Archive section sums are not final Flash/RAM use after linker garbage collection, startup, HAL, RTOS, logging, or application code.",
+    "No Cortex-M7 execution time, stack high-water mark, cache/DMA interaction, exception behavior, or numerical runtime result is measured.",
+    "External symbols are collected after a relocatable link resolves library-internal references; they are application/startup link dependencies, not a complete FCOne image closure.",
+    "The float profile is a compiler/layout evaluation, not authorization to change the reviewed public double default."
+  ],
+  "profiles": [
+    {
+      "external_link_dependencies": {
+        "by_source": {
+          "src/barometer_supervisor.c": [
+            "__aeabi_ul2d",
+            "fabsf",
+            "memset",
+            "sqrtf"
+          ],
+          "src/eskf.c": [
+            "asin",
+            "atan2",
+            "cos",
+            "fabs",
+            "fmax",
+            "fmin",
+            "hypot",
+            "memset",
+            "sin"
+          ],
+          "src/eskf_adapter.c": [
+            "__aeabi_f2ulz",
+            "__aeabi_ul2d",
+            "__aeabi_ul2f",
+            "asinf",
+            "atan2f",
+            "fabs",
+            "fabsf",
+            "fmaxf",
+            "fminf",
+            "memcpy",
+            "memset",
+            "sqrtf"
+          ],
+          "src/eskf_math.c": [
+            "cos",
+            "fabs",
+            "memcpy",
+            "memset",
+            "sin",
+            "sqrt"
+          ],
+          "src/eskf_models.c": [
+            "atan2",
+            "cos",
+            "sin"
+          ],
+          "src/mag_gate.c": [
+            "fabsf",
+            "fmaxf",
+            "sqrtf"
+          ],
+          "src/mahony.c": [
+            "__aeabi_ul2f",
+            "asinf",
+            "atan2f",
+            "cosf",
+            "fabsf",
+            "fmaxf",
+            "fminf",
+            "memcpy",
+            "memset",
+            "sinf",
+            "sqrtf"
+          ]
+        },
+        "categories": {
+          "compiler_runtime": [
+            "__aeabi_f2ulz",
+            "__aeabi_ul2d",
+            "__aeabi_ul2f"
+          ],
+          "libc": [
+            "memcpy",
+            "memset"
+          ],
+          "libm_double": [
+            "asin",
+            "atan2",
+            "cos",
+            "fabs",
+            "fmax",
+            "fmin",
+            "hypot",
+            "sin",
+            "sqrt"
+          ],
+          "libm_float": [
+            "asinf",
+            "atan2f",
+            "cosf",
+            "fabsf",
+            "fmaxf",
+            "fminf",
+            "sinf",
+            "sqrtf"
+          ],
+          "other": []
+        },
+        "symbols": [
+          "__aeabi_f2ulz",
+          "__aeabi_ul2d",
+          "__aeabi_ul2f",
+          "asin",
+          "asinf",
+          "atan2",
+          "atan2f",
+          "cos",
+          "cosf",
+          "fabs",
+          "fabsf",
+          "fmax",
+          "fmaxf",
+          "fmin",
+          "fminf",
+          "hypot",
+          "memcpy",
+          "memset",
+          "sin",
+          "sinf",
+          "sqrt",
+          "sqrtf"
+        ]
+      },
+      "library_archive_bytes": 58406,
+      "library_section_sum_bytes": {
+        "bss": 0,
+        "data": 0,
+        "other": 0,
+        "reported_total": 24954,
+        "rodata": 0,
+        "text": 24954
+      },
+      "objects": [
+        {
+          "object_bytes": 4356,
+          "sections": {
+            "bss": 0,
+            "data": 0,
+            "other": 0,
+            "reported_total": 2396,
+            "rodata": 0,
+            "text": 2396
+          },
+          "source": "src/barometer_supervisor.c"
+        },
+        {
+          "object_bytes": 13168,
+          "sections": {
+            "bss": 0,
+            "data": 0,
+            "other": 0,
+            "reported_total": 5758,
+            "rodata": 0,
+            "text": 5758
+          },
+          "source": "src/eskf.c"
+        },
+        {
+          "object_bytes": 16928,
+          "sections": {
+            "bss": 0,
+            "data": 0,
+            "other": 0,
+            "reported_total": 9090,
+            "rodata": 0,
+            "text": 9090
+          },
+          "source": "src/eskf_adapter.c"
+        },
+        {
+          "object_bytes": 8672,
+          "sections": {
+            "bss": 0,
+            "data": 0,
+            "other": 0,
+            "reported_total": 2552,
+            "rodata": 0,
+            "text": 2552
+          },
+          "source": "src/eskf_math.c"
+        },
+        {
+          "object_bytes": 3104,
+          "sections": {
+            "bss": 0,
+            "data": 0,
+            "other": 0,
+            "reported_total": 1034,
+            "rodata": 0,
+            "text": 1034
+          },
+          "source": "src/eskf_models.c"
+        },
+        {
+          "object_bytes": 1960,
+          "sections": {
+            "bss": 0,
+            "data": 0,
+            "other": 0,
+            "reported_total": 484,
+            "rodata": 0,
+            "text": 484
+          },
+          "source": "src/mag_gate.c"
+        },
+        {
+          "object_bytes": 7104,
+          "sections": {
+            "bss": 0,
+            "data": 0,
+            "other": 0,
+            "reported_total": 3640,
+            "rodata": 0,
+            "text": 3640
+          },
+          "source": "src/mahony.c"
+        }
+      ],
+      "preprocessor_definitions": [],
+      "profile": "double",
+      "relocatable_object_bytes": 48824,
+      "relocatable_section_sum_bytes": {
+        "bss": 0,
+        "data": 0,
+        "other": 0,
+        "reported_total": 24954,
+        "rodata": 0,
+        "text": 24954
+      },
+      "target_layout_bytes": {
+        "aerakia_eskf_bytes": 2912,
+        "eskf_handle_bytes": 2136,
+        "navigation_estimate_bytes": 504
+      }
+    },
+    {
+      "external_link_dependencies": {
+        "by_source": {
+          "src/barometer_supervisor.c": [
+            "__aeabi_ul2d",
+            "fabsf",
+            "memset",
+            "sqrtf"
+          ],
+          "src/eskf.c": [
+            "asinf",
+            "atan2f",
+            "cosf",
+            "fabsf",
+            "fmaxf",
+            "fminf",
+            "hypotf",
+            "memset",
+            "sinf"
+          ],
+          "src/eskf_adapter.c": [
+            "__aeabi_f2ulz",
+            "__aeabi_ul2d",
+            "__aeabi_ul2f",
+            "asinf",
+            "atan2f",
+            "fabsf",
+            "fmaxf",
+            "fminf",
+            "memcpy",
+            "memset",
+            "sqrtf"
+          ],
+          "src/eskf_math.c": [
+            "cosf",
+            "fabsf",
+            "memcpy",
+            "memset",
+            "sinf",
+            "sqrtf"
+          ],
+          "src/eskf_models.c": [
+            "atan2f",
+            "cosf",
+            "sinf"
+          ],
+          "src/mag_gate.c": [
+            "fabsf",
+            "fmaxf",
+            "sqrtf"
+          ],
+          "src/mahony.c": [
+            "__aeabi_ul2f",
+            "asinf",
+            "atan2f",
+            "cosf",
+            "fabsf",
+            "fmaxf",
+            "fminf",
+            "memcpy",
+            "memset",
+            "sinf",
+            "sqrtf"
+          ]
+        },
+        "categories": {
+          "compiler_runtime": [
+            "__aeabi_f2ulz",
+            "__aeabi_ul2d",
+            "__aeabi_ul2f"
+          ],
+          "libc": [
+            "memcpy",
+            "memset"
+          ],
+          "libm_double": [],
+          "libm_float": [
+            "asinf",
+            "atan2f",
+            "cosf",
+            "fabsf",
+            "fmaxf",
+            "fminf",
+            "hypotf",
+            "sinf",
+            "sqrtf"
+          ],
+          "other": []
+        },
+        "symbols": [
+          "__aeabi_f2ulz",
+          "__aeabi_ul2d",
+          "__aeabi_ul2f",
+          "asinf",
+          "atan2f",
+          "cosf",
+          "fabsf",
+          "fmaxf",
+          "fminf",
+          "hypotf",
+          "memcpy",
+          "memset",
+          "sinf",
+          "sqrtf"
+        ]
+      },
+      "float_core_double_promotion_check": {
+        "flags": [
+          "-Wdouble-promotion",
+          "-Werror=double-promotion"
+        ],
+        "sources": [
+          "src/eskf.c",
+          "src/eskf_math.c",
+          "src/eskf_models.c"
+        ],
+        "status": "passed"
+      },
+      "library_archive_bytes": 57094,
+      "library_section_sum_bytes": {
+        "bss": 0,
+        "data": 0,
+        "other": 0,
+        "reported_total": 23580,
+        "rodata": 0,
+        "text": 23580
+      },
+      "objects": [
+        {
+          "object_bytes": 4356,
+          "sections": {
+            "bss": 0,
+            "data": 0,
+            "other": 0,
+            "reported_total": 2396,
+            "rodata": 0,
+            "text": 2396
+          },
+          "source": "src/barometer_supervisor.c"
+        },
+        {
+          "object_bytes": 12560,
+          "sections": {
+            "bss": 0,
+            "data": 0,
+            "other": 0,
+            "reported_total": 5012,
+            "rodata": 0,
+            "text": 5012
+          },
+          "source": "src/eskf.c"
+        },
+        {
+          "object_bytes": 16404,
+          "sections": {
+            "bss": 0,
+            "data": 0,
+            "other": 0,
+            "reported_total": 8604,
+            "rodata": 0,
+            "text": 8604
+          },
+          "source": "src/eskf_adapter.c"
+        },
+        {
+          "object_bytes": 8464,
+          "sections": {
+            "bss": 0,
+            "data": 0,
+            "other": 0,
+            "reported_total": 2384,
+            "rodata": 0,
+            "text": 2384
+          },
+          "source": "src/eskf_math.c"
+        },
+        {
+          "object_bytes": 3132,
+          "sections": {
+            "bss": 0,
+            "data": 0,
+            "other": 0,
+            "reported_total": 1060,
+            "rodata": 0,
+            "text": 1060
+          },
+          "source": "src/eskf_models.c"
+        },
+        {
+          "object_bytes": 1960,
+          "sections": {
+            "bss": 0,
+            "data": 0,
+            "other": 0,
+            "reported_total": 484,
+            "rodata": 0,
+            "text": 484
+          },
+          "source": "src/mag_gate.c"
+        },
+        {
+          "object_bytes": 7104,
+          "sections": {
+            "bss": 0,
+            "data": 0,
+            "other": 0,
+            "reported_total": 3640,
+            "rodata": 0,
+            "text": 3640
+          },
+          "source": "src/mahony.c"
+        }
+      ],
+      "preprocessor_definitions": [
+        "AERAKIA_ESKF_CORE_USE_FLOAT=1"
+      ],
+      "profile": "float",
+      "relocatable_object_bytes": 47364,
+      "relocatable_section_sum_bytes": {
+        "bss": 0,
+        "data": 0,
+        "other": 0,
+        "reported_total": 23580,
+        "rodata": 0,
+        "text": 23580
+      },
+      "target_layout_bytes": {
+        "aerakia_eskf_bytes": 1824,
+        "eskf_handle_bytes": 1068,
+        "navigation_estimate_bytes": 504
+      }
+    }
+  ],
+  "schema_version": 1,
+  "source_manifest": [
+    {
+      "path": "src/barometer_supervisor.c",
+      "sha256": "c68f46787695a40a7c3d26ff2dda6ac0a833f1b4acd48a47b0fd8efeeb243984"
+    },
+    {
+      "path": "src/eskf.c",
+      "sha256": "1d2500036bff3f729a644a18d046cb7a1139ffaad9153e28de30d362c497ec57"
+    },
+    {
+      "path": "src/eskf_adapter.c",
+      "sha256": "74419769e1422de120523c120c29360316067edbc0fb24f92d0ab06531e18dfb"
+    },
+    {
+      "path": "src/eskf_math.c",
+      "sha256": "11412cad83c735ab42e0c8ca2b1d2fea3cb5fe92dab738128f6b6d03302f060b"
+    },
+    {
+      "path": "src/eskf_models.c",
+      "sha256": "49d1698f8c6f01b1b8ca333f51b561cc65b875cda43e896d22b90ccfc805a800"
+    },
+    {
+      "path": "src/mag_gate.c",
+      "sha256": "d5b110f69c4f2508059e501869c400afdd3f49ccbc3f561dbd4923d551ab1169"
+    },
+    {
+      "path": "src/mahony.c",
+      "sha256": "33a3538974e61682b270637da9e186a12480140311c70bc0cec0b349b03e913a"
+    }
+  ],
+  "source_manifest_sha256": "408fc4eb4beb836c719f764bfc3aef27d0114b022d24fc0f9ac0b57a1b6a625d",
+  "status": "cross_compile_preflight_not_target_runtime_qualification",
+  "target": {
+    "cpu": "cortex-m7",
+    "floating_point_abi": "hard",
+    "fpu": "fpv5-d16",
+    "instruction_set": "thumb"
+  }
+}
