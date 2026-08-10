@@ -78,12 +78,14 @@ float CTest configuration. Behavioural API, covariance, transport, supervisor, a
 tests remain enabled; their tolerances are explicitly widened only for the candidate build.
 
 `validation/run_precision_comparison.py` replays byte-identical input through double and float
-runners and gates output health, state divergence, and score deltas. On a 12 s 400 Hz host run:
+runners and gates output health, state divergence, and score deltas. The float core uses
+type-matched scalar math; it no longer silently calls double `sin/cos/atan2/...` routines. On the
+reviewed 20 s, 400 Hz host run:
 
 | Scenario | Max attitude difference | Max position difference | Max velocity difference |
 | --- | ---: | ---: | ---: |
-| Clean motion | `0.001124 deg` | `0.001293 m` | `0.000229 m/s` |
-| Cold-start GNSS outage | `0.000242 deg` | `0.000048 m` | `0.000023 m/s` |
+| Clean motion | `0.001174 deg` | `0.003943 m` | `0.000670 m/s` |
+| Cold-start GNSS outage | `0.000097 deg` | `0.000026 m` | `0.000012 m/s` |
 
 Both float tracks were 100% healthy. Reproduce after building both runners:
 
@@ -93,6 +95,8 @@ python validation/run_precision_comparison.py \
   --float-runner build/float/aerakia_validation_runner
 ```
 
-This clears a narrow host numerical-equivalence gate, not STM32H7 qualification. Before selecting
-float for FCOne v2, measure prediction/update WCET, stack high-water mark, Flash/RAM, FPU ABI,
-DMA/cache contention, scheduler jitter, and multi-hour numerical health on the actual target.
+This clears a narrow host numerical-equivalence gate, not STM32H7 qualification. The companion
+[Cortex-M7 cross-compile preflight](cortex-m7-cross-compile.md) records the target ABI, portable
+layout, and remaining link dependencies. Before selecting float for FCOne v2, measure
+prediction/update WCET, stack high-water mark, final Flash/RAM, FPU ABI, DMA/cache contention,
+scheduler jitter, and multi-hour numerical health on the actual target.

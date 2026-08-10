@@ -51,6 +51,7 @@ is the stable navigation layer rather than a disruptive mass rename.
   and [PX4 bias A/B protocol](px4-bias-ab-protocol.md) keep engineering
   comparison separate from independent truth.
 - [Timing and precision validation](timing-and-precision-validation.md),
+  [Cortex-M7 cross-compile preflight](cortex-m7-cross-compile.md),
   [input integrity validation](input-integrity-validation.md), and
   [golden replay contract](golden-dataset.md) record transport and numerical
   coverage.

@@ -33,13 +33,13 @@ void eskf_vec3_scale(const eskf_float_t a[3], eskf_float_t s, eskf_float_t out[3
 }
 
 eskf_float_t eskf_vec3_norm(const eskf_float_t a[3]) {
-    return sqrt(a[0]*a[0] + a[1]*a[1] + a[2]*a[2]);
+    return ESKF_SQRT(a[0]*a[0] + a[1]*a[1] + a[2]*a[2]);
 }
 
 eskf_float_t eskf_vec3_normalize(eskf_float_t a[3]) {
     eskf_float_t n = eskf_vec3_norm(a);
-    if (n > ESKF_EPSILON) {
-        eskf_float_t inv_n = 1.0 / n;
+    if (n > ESKF_SCALAR(ESKF_EPSILON)) {
+        eskf_float_t inv_n = ESKF_SCALAR(1.0) / n;
         a[0] *= inv_n;
         a[1] *= inv_n;
         a[2] *= inv_n;
@@ -65,9 +65,9 @@ void eskf_vec3_copy(const eskf_float_t a[3], eskf_float_t out[3]) {
 }
 
 void eskf_vec3_zero(eskf_float_t a[3]) {
-    a[0] = 0.0;
-    a[1] = 0.0;
-    a[2] = 0.0;
+    a[0] = ESKF_SCALAR(0.0);
+    a[1] = ESKF_SCALAR(0.0);
+    a[2] = ESKF_SCALAR(0.0);
 }
 
 /* ============================================================================
@@ -76,16 +76,16 @@ void eskf_vec3_zero(eskf_float_t a[3]) {
  * ============================================================================ */
 
 void eskf_quat_identity(eskf_float_t q[4]) {
-    q[0] = 1.0;  /* w */
-    q[1] = 0.0;  /* x */
-    q[2] = 0.0;  /* y */
-    q[3] = 0.0;  /* z */
+    q[0] = ESKF_SCALAR(1.0);  /* w */
+    q[1] = ESKF_SCALAR(0.0);  /* x */
+    q[2] = ESKF_SCALAR(0.0);  /* y */
+    q[3] = ESKF_SCALAR(0.0);  /* z */
 }
 
 void eskf_quat_normalize(eskf_float_t q[4]) {
-    eskf_float_t n = sqrt(q[0]*q[0] + q[1]*q[1] + q[2]*q[2] + q[3]*q[3]);
-    if (n > ESKF_EPSILON) {
-        eskf_float_t inv_n = 1.0 / n;
+    eskf_float_t n = ESKF_SQRT(q[0]*q[0] + q[1]*q[1] + q[2]*q[2] + q[3]*q[3]);
+    if (n > ESKF_SCALAR(ESKF_EPSILON)) {
+        eskf_float_t inv_n = ESKF_SCALAR(1.0) / n;
         q[0] *= inv_n;
         q[1] *= inv_n;
         q[2] *= inv_n;
@@ -123,9 +123,9 @@ void eskf_quat_from_axis_angle(const eskf_float_t axis[3], eskf_float_t angle, e
      * Quaternion from axis-angle:
      * q = [cos(θ/2), sin(θ/2)*axis]
      */
-    eskf_float_t half_angle = 0.5 * angle;
-    eskf_float_t s = sin(half_angle);
-    out[0] = cos(half_angle);
+    eskf_float_t half_angle = ESKF_SCALAR(0.5) * angle;
+    eskf_float_t s = ESKF_SIN(half_angle);
+    out[0] = ESKF_COS(half_angle);
     out[1] = s * axis[0];
     out[2] = s * axis[1];
     out[3] = s * axis[2];
@@ -146,18 +146,18 @@ void eskf_quat_from_rotation_vector(const eskf_float_t theta[3], eskf_float_t ou
      */
     eskf_float_t theta_mag = eskf_vec3_norm(theta);
 
-    if (theta_mag < ESKF_EPSILON) {
+    if (theta_mag < ESKF_SCALAR(ESKF_EPSILON)) {
         /* Small angle approximation */
-        out[0] = 1.0;
-        out[1] = 0.5 * theta[0];
-        out[2] = 0.5 * theta[1];
-        out[3] = 0.5 * theta[2];
+        out[0] = ESKF_SCALAR(1.0);
+        out[1] = ESKF_SCALAR(0.5) * theta[0];
+        out[2] = ESKF_SCALAR(0.5) * theta[1];
+        out[3] = ESKF_SCALAR(0.5) * theta[2];
         eskf_quat_normalize(out);
     } else {
         /* Full computation */
-        eskf_float_t half_angle = 0.5 * theta_mag;
-        eskf_float_t s = sin(half_angle) / theta_mag;
-        out[0] = cos(half_angle);
+        eskf_float_t half_angle = ESKF_SCALAR(0.5) * theta_mag;
+        eskf_float_t s = ESKF_SIN(half_angle) / theta_mag;
+        out[0] = ESKF_COS(half_angle);
         out[1] = s * theta[0];
         out[2] = s * theta[1];
         out[3] = s * theta[2];
@@ -184,17 +184,17 @@ void eskf_quat_to_rot_mat3(const eskf_float_t q[4], eskf_float_t R[3][3]) {
     eskf_float_t wy = w * y;
     eskf_float_t wz = w * z;
 
-    R[0][0] = 1.0 - 2.0*(yy + zz);
-    R[0][1] = 2.0*(xy - wz);
-    R[0][2] = 2.0*(xz + wy);
+    R[0][0] = ESKF_SCALAR(1.0) - ESKF_SCALAR(2.0)*(yy + zz);
+    R[0][1] = ESKF_SCALAR(2.0)*(xy - wz);
+    R[0][2] = ESKF_SCALAR(2.0)*(xz + wy);
 
-    R[1][0] = 2.0*(xy + wz);
-    R[1][1] = 1.0 - 2.0*(xx + zz);
-    R[1][2] = 2.0*(yz - wx);
+    R[1][0] = ESKF_SCALAR(2.0)*(xy + wz);
+    R[1][1] = ESKF_SCALAR(1.0) - ESKF_SCALAR(2.0)*(xx + zz);
+    R[1][2] = ESKF_SCALAR(2.0)*(yz - wx);
 
-    R[2][0] = 2.0*(xz - wy);
-    R[2][1] = 2.0*(yz + wx);
-    R[2][2] = 1.0 - 2.0*(xx + yy);
+    R[2][0] = ESKF_SCALAR(2.0)*(xz - wy);
+    R[2][1] = ESKF_SCALAR(2.0)*(yz + wx);
+    R[2][2] = ESKF_SCALAR(1.0) - ESKF_SCALAR(2.0)*(xx + yy);
 }
 
 void eskf_quat_copy(const eskf_float_t q[4], eskf_float_t out[4]) {
@@ -209,9 +209,9 @@ void eskf_quat_copy(const eskf_float_t q[4], eskf_float_t out[4]) {
  * ============================================================================ */
 
 void eskf_mat3_identity(eskf_float_t m[3][3]) {
-    m[0][0] = 1.0; m[0][1] = 0.0; m[0][2] = 0.0;
-    m[1][0] = 0.0; m[1][1] = 1.0; m[1][2] = 0.0;
-    m[2][0] = 0.0; m[2][1] = 0.0; m[2][2] = 1.0;
+    m[0][0] = ESKF_SCALAR(1.0); m[0][1] = ESKF_SCALAR(0.0); m[0][2] = ESKF_SCALAR(0.0);
+    m[1][0] = ESKF_SCALAR(0.0); m[1][1] = ESKF_SCALAR(1.0); m[1][2] = ESKF_SCALAR(0.0);
+    m[2][0] = ESKF_SCALAR(0.0); m[2][1] = ESKF_SCALAR(0.0); m[2][2] = ESKF_SCALAR(1.0);
 }
 
 void eskf_mat3_zero(eskf_float_t m[3][3]) {
@@ -262,13 +262,13 @@ bool eskf_mat3_inv(eskf_float_t A[3][3], eskf_float_t out[3][3]) {
     /* Compute determinant */
     eskf_float_t det = A[0][0]*c00 + A[0][1]*c01 + A[0][2]*c02;
 
-    if (fabs(det) < ESKF_EPSILON) {
+    if (ESKF_ABS(det) < ESKF_SCALAR(ESKF_EPSILON)) {
         /* Singular matrix */
         eskf_mat3_identity(out);
         return false;
     }
 
-    eskf_float_t inv_det = 1.0 / det;
+    eskf_float_t inv_det = ESKF_SCALAR(1.0) / det;
 
     /* Adjugate matrix (transpose of cofactor) */
     out[0][0] = c00 * inv_det;
@@ -293,9 +293,9 @@ void eskf_mat3_skew(const eskf_float_t v[3], eskf_float_t out[3][3]) {
      *        |  v2   0   -v0 |
      *        | -v1   v0   0  |
      */
-    out[0][0] =  0.0;    out[0][1] = -v[2];   out[0][2] =  v[1];
-    out[1][0] =  v[2];   out[1][1] =  0.0;    out[1][2] = -v[0];
-    out[2][0] = -v[1];   out[2][1] =  v[0];   out[2][2] =  0.0;
+    out[0][0] = ESKF_SCALAR(0.0); out[0][1] = -v[2]; out[0][2] =  v[1];
+    out[1][0] =  v[2]; out[1][1] = ESKF_SCALAR(0.0); out[1][2] = -v[0];
+    out[2][0] = -v[1]; out[2][1] =  v[0]; out[2][2] = ESKF_SCALAR(0.0);
 }
 
 void eskf_mat3_scale(eskf_float_t A[3][3], eskf_float_t s, eskf_float_t out[3][3]) {
@@ -337,7 +337,7 @@ void eskf_mat15_zero(eskf_float_t m[15][15]) {
 void eskf_mat15_identity(eskf_float_t m[15][15]) {
     eskf_mat15_zero(m);
     for (int i = 0; i < 15; i++) {
-        m[i][i] = 1.0;
+        m[i][i] = ESKF_SCALAR(1.0);
     }
 }
 
@@ -414,7 +414,7 @@ void eskf_mat15_symmetrize(eskf_float_t P[15][15]) {
      */
     for (int i = 0; i < 15; i++) {
         for (int j = i + 1; j < 15; j++) {
-            eskf_float_t avg = 0.5 * (P[i][j] + P[j][i]);
+            eskf_float_t avg = ESKF_SCALAR(0.5) * (P[i][j] + P[j][i]);
             P[i][j] = avg;
             P[j][i] = avg;
         }

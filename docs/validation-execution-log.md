@@ -2059,3 +2059,49 @@ array's fallback state defined and allows the analyzer to verify the function
 without a suppression. The analyzer build completed with warnings-as-errors,
 then its complete `12/12` CTest suite passed. This is static host evidence only
 and does not replace target compiler or target-MCU verification.
+
+## 2026-08-10 — Cortex-M7 preflight and genuine float candidate
+
+### Reason
+
+FCOne v2 hardware is not present, but the project can still reject a false
+embedded-readiness assumption before integration. The old `float` candidate
+reduced covariance storage while the core still used double transcendental
+functions and double-promoting literals. On an STM32H7's single-precision FPU,
+that makes host results an unreliable proxy for its target timing advantage.
+
+### Method
+
+`validation/run_cortex_m7_cross_compile.py` now compiles all seven portable C
+units using `arm-none-eabi-gcc 14.2.1` for Cortex-M7 Thumb hard-float
+`fpv5-d16`, archives them, performs a relocatable internal link, probes the
+three public struct layouts, and classifies only final external dependencies.
+The float core is separately compiled with
+`-Wdouble-promotion -Werror=double-promotion`.
+
+The type-specific core math change was checked through fresh Release CTests in
+both profiles (`12/12` double, `11/11` float) and the byte-identical 20-second,
+400 Hz host differential pair. The public script helper has four toolchain-free
+unit tests, including path-safety checks that prohibit recursive cleanup outside
+its dedicated `build/` directory.
+
+A fresh whole-tree GCC analyzer run also found that the neutral FCOne navigation
+mock omitted `source_id`, `source_generation`, and `quality_sequence` when it
+constructed `AerakiaGpsObservation`. The mock now initializes and propagates
+those recovery-contract fields explicitly, and asserts their preservation.
+After that correction, the strict analyzer build and its `12/12` CTests passed.
+
+### Result and decision
+
+The strict float-core promotion check passes. The double/float portable text
+section sums are `24,954/23,580 B`; `AerakiaEskf` is `2,912/1,824 B` and
+`ESKF_Handle` is `2,136/1,068 B`. The clean-motion float-minus-double maxima
+are `0.0011745 deg`, `0.0039432 m`, and `0.0006704 m/s`, with both evaluated
+tracks 100% healthy.
+
+Float is now a valid *measurement candidate*, not a promoted FCOne profile.
+The default remains double until a complete target shadow image measures WCET,
+stack, Flash/RAM, numerical health, scheduling, and logging load. The compact
+artifact is [`cortex_m7_cross_compile_v1.json`](../validation/public/cortex_m7_cross_compile_v1.json);
+the focused method and limitations are in
+[Cortex-M7 cross-compile preflight](cortex-m7-cross-compile.md).

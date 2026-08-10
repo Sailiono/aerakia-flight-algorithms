@@ -36,6 +36,9 @@ portable C library and from FCOne-specific integration code.
   or sequential non-overlapping delayed-GNSS rewind/replay campaign. It proves
   only exact state/covariance equivalence to a zero-delay reference; it is not
   a product delayed-fusion API or a claim of generic overlapping OOSM support.
+- `run_cortex_m7_cross_compile.py`: strict Cortex-M7 hard-float compile,
+  internal-link, public-layout, and dependency preflight. It does not create
+  an FCOne image or measure target timing, stack, Flash/RAM, or runtime health.
 - `run_baro_outage_campaign.py` and `run_baro_outage_ab.py`: barometer source
   supervision experiments.
 - `run_px4_bias_ab_m0.py`: optional PX4 host comparison; it is blocked until a

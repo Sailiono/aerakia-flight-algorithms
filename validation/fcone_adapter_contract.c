@@ -33,6 +33,9 @@ typedef struct {
     AerakiaVec3f velocity_ned_m_s;
     float position_variance_m2;
     float velocity_variance_m2_s2;
+    uint32_t source_id;
+    uint32_t source_generation;
+    uint64_t quality_sequence;
 } MockFcOneNavigationPublication;
 
 static int failures;
@@ -76,12 +79,15 @@ static AerakiaGpsObservation adapt_mock_navigation(
     const MockFcOneNavigationPublication *publication
 )
 {
-    AerakiaGpsObservation observation;
+    AerakiaGpsObservation observation = {0};
     observation.timestamp_us = publication->physical_timestamp_us;
     observation.position_ned_m = publication->position_ned_m;
     observation.velocity_ned_m_s = publication->velocity_ned_m_s;
     observation.position_variance_m2 = publication->position_variance_m2;
     observation.velocity_variance_m2_s2 = publication->velocity_variance_m2_s2;
+    observation.source_id = publication->source_id;
+    observation.source_generation = publication->source_generation;
+    observation.quality_sequence = publication->quality_sequence;
     return observation;
 }
 
@@ -216,10 +222,17 @@ static void test_timestamped_aiding_contract(void)
     navigation.velocity_ned_m_s = (AerakiaVec3f){1.0f, -2.0f, 0.5f};
     navigation.position_variance_m2 = 1.0f;
     navigation.velocity_variance_m2_s2 = 0.1f;
+    navigation.source_id = 7U;
+    navigation.source_generation = 3U;
+    navigation.quality_sequence = 101U;
     gps = adapt_mock_navigation(&navigation);
     check_true(gps.position_ned_m.x == 12.0f && gps.position_ned_m.y == -34.0f
                && gps.position_ned_m.z == 5.0f && gps.velocity_ned_m_s.y == -2.0f,
                "NED position and velocity reach the public contract without axis changes");
+    check_true(gps.source_id == navigation.source_id
+               && gps.source_generation == navigation.source_generation
+               && gps.quality_sequence == navigation.quality_sequence,
+               "navigation source identity and quality sequence reach the recovery contract");
     check_true(aerakia_eskf_update_gps_observation(&filter, &gps)
                    == AERAKIA_STATUS_TIMESTAMP_ERROR,
                "future GNSS publication is rejected");

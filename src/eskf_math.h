@@ -23,6 +23,36 @@
  * Constants
  * ============================================================================ */
 
+/*
+ * Keep the implementation's arithmetic consistent with the selected core
+ * scalar type.  The public default remains double; the float candidate must
+ * not silently promote its hot-path math to double on a single-precision FPU.
+ * These are private implementation helpers, not public API macros.
+ */
+#define ESKF_SCALAR(value) ((eskf_float_t)(value))
+
+#if defined(AERAKIA_ESKF_CORE_USE_FLOAT)
+#define ESKF_ABS(value) fabsf(value)
+#define ESKF_ASIN(value) asinf(value)
+#define ESKF_ATAN2(y, x) atan2f((y), (x))
+#define ESKF_COS(value) cosf(value)
+#define ESKF_HYPOT(x, y) hypotf((x), (y))
+#define ESKF_MAX(x, y) fmaxf((x), (y))
+#define ESKF_MIN(x, y) fminf((x), (y))
+#define ESKF_SIN(value) sinf(value)
+#define ESKF_SQRT(value) sqrtf(value)
+#else
+#define ESKF_ABS(value) fabs(value)
+#define ESKF_ASIN(value) asin(value)
+#define ESKF_ATAN2(y, x) atan2((y), (x))
+#define ESKF_COS(value) cos(value)
+#define ESKF_HYPOT(x, y) hypot((x), (y))
+#define ESKF_MAX(x, y) fmax((x), (y))
+#define ESKF_MIN(x, y) fmin((x), (y))
+#define ESKF_SIN(value) sin(value)
+#define ESKF_SQRT(value) sqrt(value)
+#endif
+
 /* ============================================================================
  * Vector3 Operations
  * ============================================================================ */

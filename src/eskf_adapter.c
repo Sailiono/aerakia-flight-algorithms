@@ -5,6 +5,8 @@
 
 #include <aerakia/eskf_adapter.h>
 
+#include "eskf_math.h"
+
 #include <math.h>
 #include <stddef.h>
 #include <string.h>
@@ -22,7 +24,7 @@ static bool vector_is_finite(AerakiaVec3f vector)
 static bool state_is_finite_and_normalized(const ESKF_NominalState *state)
 {
     int axis;
-    eskf_float_t quaternion_norm_squared = 0.0;
+    eskf_float_t quaternion_norm_squared = ESKF_SCALAR(0.0);
     if (state == NULL) return false;
     for (axis = 0; axis < 3; ++axis) {
         if (!isfinite(state->p[axis]) || !isfinite(state->v[axis])
@@ -35,7 +37,8 @@ static bool state_is_finite_and_normalized(const ESKF_NominalState *state)
         quaternion_norm_squared += state->q[axis] * state->q[axis];
     }
     return isfinite(quaternion_norm_squared)
-        && fabs(quaternion_norm_squared - 1.0) <= 1.0e-3;
+        && ESKF_ABS(quaternion_norm_squared - ESKF_SCALAR(1.0))
+            <= ESKF_SCALAR(1.0e-3);
 }
 
 static float vector_norm(AerakiaVec3f vector)

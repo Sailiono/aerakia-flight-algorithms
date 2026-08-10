@@ -7,7 +7,7 @@
  * This file implements the ESKF algorithm with strict adherence to:
  *   - C99 standard
  *   - No dynamic memory allocation
- *   - Double precision floating point
+ *   - Reviewed double default with a separately evaluated float candidate
  *   - Explicit mathematical documentation
  *
  * Maintained by Aerakia contributors.
@@ -23,10 +23,10 @@
  * ============================================================================ */
 
 /** 99.7300204% chi-square limit for a scalar observation (equivalent to 3 sigma). */
-#define ESKF_NIS_LIMIT_1D_3SIGMA 9.0
+#define ESKF_NIS_LIMIT_1D_3SIGMA ESKF_SCALAR(9.0)
 
 /** 99.7300204% chi-square limit for a three-dimensional observation. */
-#define ESKF_NIS_LIMIT_3D_3SIGMA 14.1564136091267
+#define ESKF_NIS_LIMIT_3D_3SIGMA ESKF_SCALAR(14.1564136091267)
 
 /* ============================================================================
  * Private Helper Functions
@@ -110,7 +110,7 @@ static void _reset_error_covariance(ESKF_Handle *h, const eskf_float_t dx[15]) {
     eskf_mat15_identity(G);
     for (i = 0; i < 3; ++i) {
         for (j = 0; j < 3; ++j) {
-            G[i][j] -= 0.5 * skew[i][j];
+            G[i][j] -= ESKF_SCALAR(0.5) * skew[i][j];
         }
     }
     eskf_mat15_zero(Q_zero);
@@ -119,19 +119,19 @@ static void _reset_error_covariance(ESKF_Handle *h, const eskf_float_t dx[15]) {
 }
 
 static eskf_float_t _wrap_pi(eskf_float_t angle) {
-    return atan2(sin(angle), cos(angle));
+    return ESKF_ATAN2(ESKF_SIN(angle), ESKF_COS(angle));
 }
 
 static void _quaternion_from_euler(eskf_float_t roll,
                                    eskf_float_t pitch,
                                    eskf_float_t yaw,
                                    eskf_float_t q[4]) {
-    const eskf_float_t cr = cos(0.5 * roll);
-    const eskf_float_t sr = sin(0.5 * roll);
-    const eskf_float_t cp = cos(0.5 * pitch);
-    const eskf_float_t sp = sin(0.5 * pitch);
-    const eskf_float_t cy = cos(0.5 * yaw);
-    const eskf_float_t sy = sin(0.5 * yaw);
+    const eskf_float_t cr = ESKF_COS(ESKF_SCALAR(0.5) * roll);
+    const eskf_float_t sr = ESKF_SIN(ESKF_SCALAR(0.5) * roll);
+    const eskf_float_t cp = ESKF_COS(ESKF_SCALAR(0.5) * pitch);
+    const eskf_float_t sp = ESKF_SIN(ESKF_SCALAR(0.5) * pitch);
+    const eskf_float_t cy = ESKF_COS(ESKF_SCALAR(0.5) * yaw);
+    const eskf_float_t sy = ESKF_SIN(ESKF_SCALAR(0.5) * yaw);
     q[0] = cr * cp * cy + sr * sp * sy;
     q[1] = sr * cp * cy - cr * sp * sy;
     q[2] = cr * sp * cy + sr * cp * sy;
@@ -196,7 +196,7 @@ static bool _measurement_update_3d(ESKF_Handle *h,
     }
 
     /* --- 4. Innovation Gating (NIS Test) --- */
-    if (nis_limit > 0.0 || result != NULL) {
+    if (nis_limit > ESKF_SCALAR(0.0) || result != NULL) {
         /* Compute NIS = z^T * S_inv * z (Mahalanobis distance squared) */
         eskf_float_t S_inv_z[3];
         for (int i = 0; i < 3; i++) {
@@ -214,18 +214,18 @@ static bool _measurement_update_3d(ESKF_Handle *h,
             result->innov_var[2] = (float)S[2][2];
             result->nis = (float)nis;
             result->test_ratio =
-                (nis_limit > 0.0) ? (float)(nis / nis_limit) : 0.0f;
-            result->accepted = (nis_limit <= 0.0) || (nis <= nis_limit);
+                (nis_limit > ESKF_SCALAR(0.0)) ? (float)(nis / nis_limit) : 0.0f;
+            result->accepted = (nis_limit <= ESKF_SCALAR(0.0)) || (nis <= nis_limit);
         }
 
         /* Reject update if innovation exceeds gate */
-        if (nis_limit > 0.0 && nis > nis_limit) {
+        if (nis_limit > ESKF_SCALAR(0.0) && nis > nis_limit) {
             return false;  /* Measurement rejected by gate */
         }
     }
 
     /* --- 5. Compute Kalman Gain K = PHt * S_inv (15x3) --- */
-    eskf_float_t K[15][3] = {{0.0}};
+    eskf_float_t K[15][3] = {{0}};
     for (int i = 0; i < 15; i++) {
         for (int j = 0; j < 3; j++) {
             eskf_float_t sum = 0.0;
@@ -335,12 +335,12 @@ static bool _measurement_update_1d(ESKF_Handle *h,
     }
 
     /* --- 3. Check for singularity --- */
-    if (fabs(S) < ESKF_EPSILON) {
+    if (ESKF_ABS(S) < ESKF_SCALAR(ESKF_EPSILON)) {
         return false;
     }
 
     /* --- 4. Innovation Gating (NIS Test for scalar) --- */
-    if (nis_limit > 0.0 || result != NULL) {
+    if (nis_limit > ESKF_SCALAR(0.0) || result != NULL) {
         /* Compute NIS = z^2 / S (1-DOF chi-squared) */
         eskf_float_t nis = (z * z) / S;
 
@@ -354,18 +354,18 @@ static bool _measurement_update_1d(ESKF_Handle *h,
             result->innov_var[2] = 0.0f;
             result->nis = (float)nis;
             result->test_ratio =
-                (nis_limit > 0.0) ? (float)(nis / nis_limit) : 0.0f;
-            result->accepted = (nis_limit <= 0.0) || (nis <= nis_limit);
+                (nis_limit > ESKF_SCALAR(0.0)) ? (float)(nis / nis_limit) : 0.0f;
+            result->accepted = (nis_limit <= ESKF_SCALAR(0.0)) || (nis <= nis_limit);
         }
 
         /* Reject update if innovation exceeds gate */
-        if (nis_limit > 0.0 && nis > nis_limit) {
+        if (nis_limit > ESKF_SCALAR(0.0) && nis > nis_limit) {
             return false;  /* Measurement rejected by gate */
         }
     }
 
     /* --- 5. Compute Kalman Gain K = PHt / S (15x1) --- */
-    eskf_float_t S_inv = 1.0 / S;
+    eskf_float_t S_inv = ESKF_SCALAR(1.0) / S;
     eskf_float_t K[15];
     for (int i = 0; i < 15; i++) {
         K[i] = PHt[i] * S_inv;
@@ -459,31 +459,41 @@ void eskf_init(ESKF_Handle *h,
     /* Initialize covariance with reasonable defaults */
     eskf_mat15_zero(h->P);
     /* Attitude uncertainty: ~10 degrees ≈ 0.17 rad, variance ≈ 0.03 */
-    h->P[0][0] = 0.03; h->P[1][1] = 0.03; h->P[2][2] = 0.03;
+    h->P[0][0] = ESKF_SCALAR(0.03);
+    h->P[1][1] = ESKF_SCALAR(0.03);
+    h->P[2][2] = ESKF_SCALAR(0.03);
     /* Velocity uncertainty: ~1 m/s */
-    h->P[3][3] = 1.0; h->P[4][4] = 1.0; h->P[5][5] = 1.0;
+    h->P[3][3] = ESKF_SCALAR(1.0);
+    h->P[4][4] = ESKF_SCALAR(1.0);
+    h->P[5][5] = ESKF_SCALAR(1.0);
     /* Position uncertainty: ~10 m */
-    h->P[6][6] = 100.0; h->P[7][7] = 100.0; h->P[8][8] = 100.0;
+    h->P[6][6] = ESKF_SCALAR(100.0);
+    h->P[7][7] = ESKF_SCALAR(100.0);
+    h->P[8][8] = ESKF_SCALAR(100.0);
     /* Accel bias uncertainty: ~0.1 m/s² */
-    h->P[9][9] = 0.01; h->P[10][10] = 0.01; h->P[11][11] = 0.01;
+    h->P[9][9] = ESKF_SCALAR(0.01);
+    h->P[10][10] = ESKF_SCALAR(0.01);
+    h->P[11][11] = ESKF_SCALAR(0.01);
     /* Gyro bias uncertainty: ~0.01 rad/s */
-    h->P[12][12] = 0.0001; h->P[13][13] = 0.0001; h->P[14][14] = 0.0001;
+    h->P[12][12] = ESKF_SCALAR(0.0001);
+    h->P[13][13] = ESKF_SCALAR(0.0001);
+    h->P[14][14] = ESKF_SCALAR(0.0001);
 
     /* Default configuration (typical MEMS IMU values) */
-    h->cfg.sigma_acc = 0.1;        /* m/s²/√Hz */
-    h->cfg.sigma_gyr = 0.01;       /* rad/s/√Hz */
-    h->cfg.sigma_acc_bias = 0.001; /* m/s³/√Hz */
-    h->cfg.sigma_gyr_bias = 0.0001;/* rad/s²/√Hz */
+    h->cfg.sigma_acc = ESKF_SCALAR(0.1);        /* m/s²/√Hz */
+    h->cfg.sigma_gyr = ESKF_SCALAR(0.01);       /* rad/s/√Hz */
+    h->cfg.sigma_acc_bias = ESKF_SCALAR(0.001); /* m/s³/√Hz */
+    h->cfg.sigma_gyr_bias = ESKF_SCALAR(0.0001);/* rad/s²/√Hz */
 
     /* Gravity in NED frame: [0, 0, +g] (down is positive) */
-    h->gravity[0] = 0.0;
-    h->gravity[1] = 0.0;
-    h->gravity[2] = ESKF_GRAVITY;
+    h->gravity[0] = ESKF_SCALAR(0.0);
+    h->gravity[1] = ESKF_SCALAR(0.0);
+    h->gravity[2] = ESKF_SCALAR(ESKF_GRAVITY);
 
     /* Default magnetic reference: North */
-    h->mag_ref[0] = 1.0;
-    h->mag_ref[1] = 0.0;
-    h->mag_ref[2] = 0.0;
+    h->mag_ref[0] = ESKF_SCALAR(1.0);
+    h->mag_ref[1] = ESKF_SCALAR(0.0);
+    h->mag_ref[2] = ESKF_SCALAR(0.0);
 
     h->initialized = true;
 }
@@ -496,17 +506,17 @@ void eskf_set_config(ESKF_Handle *h, const ESKF_Config *cfg) {
 bool eskf_set_mag_reference(ESKF_Handle *h, const eskf_float_t mag_ref[3]) {
     const eskf_float_t horizontal_norm_squared = mag_ref != NULL
         ? mag_ref[0] * mag_ref[0] + mag_ref[1] * mag_ref[1]
-        : 0.0;
+        : ESKF_SCALAR(0.0);
     const eskf_float_t norm_squared = mag_ref != NULL
         ? horizontal_norm_squared + mag_ref[2] * mag_ref[2]
-        : 0.0;
+        : ESKF_SCALAR(0.0);
 
     /* A yaw observation has no defined datum for a vertical or malformed field. */
     if (h == NULL || mag_ref == NULL
         || !isfinite(mag_ref[0]) || !isfinite(mag_ref[1]) || !isfinite(mag_ref[2])
         || !isfinite(horizontal_norm_squared) || !isfinite(norm_squared)
-        || horizontal_norm_squared <= ESKF_EPSILON * ESKF_EPSILON
-        || norm_squared <= ESKF_EPSILON * ESKF_EPSILON) {
+        || horizontal_norm_squared <= ESKF_SCALAR(ESKF_EPSILON) * ESKF_SCALAR(ESKF_EPSILON)
+        || norm_squared <= ESKF_SCALAR(ESKF_EPSILON) * ESKF_SCALAR(ESKF_EPSILON)) {
         return false;
     }
     eskf_vec3_copy(mag_ref, h->mag_ref);
@@ -522,7 +532,7 @@ void eskf_predict(ESKF_Handle *h,
                   const eskf_float_t acc_m[3],
                   const eskf_float_t gyr_m[3],
                   eskf_float_t dt) {
-    if (!h || !h->initialized || !acc_m || !gyr_m || dt <= 0.0) return;
+    if (!h || !h->initialized || !acc_m || !gyr_m || dt <= ESKF_SCALAR(0.0)) return;
 
     /* ========================================
      * Step 1: De-bias IMU inputs
@@ -560,7 +570,7 @@ void eskf_predict(ESKF_Handle *h,
      * ======================================== */
 
     /* Position: p += v*dt + 0.5*a*dt² */
-    eskf_float_t dt2_half = 0.5 * dt * dt;
+    eskf_float_t dt2_half = ESKF_SCALAR(0.5) * dt * dt;
     h->state.p[0] += h->state.v[0] * dt + acc_total[0] * dt2_half;
     h->state.p[1] += h->state.v[1] * dt + acc_total[1] * dt2_half;
     h->state.p[2] += h->state.v[2] * dt + acc_total[2] * dt2_half;
@@ -620,7 +630,7 @@ void eskf_update_position(ESKF_Handle *h,
                           const eskf_float_t pos_m[3],
                           eskf_float_t R_pos,
                           ESKF_InnovResult *result) {
-    if (!h || !h->initialized || !pos_m || R_pos <= 0.0) return;
+    if (!h || !h->initialized || !pos_m || R_pos <= ESKF_SCALAR(0.0)) return;
 
     /* Residual: z = measurement - prediction */
     eskf_float_t z[3];
@@ -629,9 +639,9 @@ void eskf_update_position(ESKF_Handle *h,
     /* Jacobian H (3x15): H selects position error at indices 6-8 */
     eskf_float_t H[3][15];
     memset(H, 0, sizeof(H));
-    H[0][6] = 1.0;
-    H[1][7] = 1.0;
-    H[2][8] = 1.0;
+    H[0][6] = ESKF_SCALAR(1.0);
+    H[1][7] = ESKF_SCALAR(1.0);
+    H[2][8] = ESKF_SCALAR(1.0);
 
     /* Measurement noise R (3x3 diagonal) */
     eskf_float_t R[3][3];
@@ -650,13 +660,13 @@ void eskf_update_velocity(ESKF_Handle *h,
     eskf_float_t z[3];
     eskf_float_t H[3][15];
     eskf_float_t R[3][3];
-    if (!h || !h->initialized || !velocity_m_s || R_velocity <= 0.0) return;
+    if (!h || !h->initialized || !velocity_m_s || R_velocity <= ESKF_SCALAR(0.0)) return;
 
     eskf_vec3_sub(velocity_m_s, h->state.v, z);
     memset(H, 0, sizeof(H));
-    H[0][ESKF_IDX_DV + 0] = 1.0;
-    H[1][ESKF_IDX_DV + 1] = 1.0;
-    H[2][ESKF_IDX_DV + 2] = 1.0;
+    H[0][ESKF_IDX_DV + 0] = ESKF_SCALAR(1.0);
+    H[1][ESKF_IDX_DV + 1] = ESKF_SCALAR(1.0);
+    H[2][ESKF_IDX_DV + 2] = ESKF_SCALAR(1.0);
     eskf_mat3_zero(R);
     R[0][0] = R_velocity;
     R[1][1] = R_velocity;
@@ -668,12 +678,12 @@ void eskf_update_mag(ESKF_Handle *h,
                      const eskf_float_t mag_m[3],
                      eskf_float_t R_mag,
                      ESKF_InnovResult *result) {
-    if (!h || !h->initialized || !mag_m || R_mag <= 0.0) return;
+    if (!h || !h->initialized || !mag_m || R_mag <= ESKF_SCALAR(0.0)) return;
 
     /* Normalize measured magnetic field */
     eskf_float_t mag_norm[3];
     eskf_vec3_copy(mag_m, mag_norm);
-    if (eskf_vec3_normalize(mag_norm) < ESKF_EPSILON) return;
+    if (eskf_vec3_normalize(mag_norm) < ESKF_SCALAR(ESKF_EPSILON)) return;
 
     {
         eskf_float_t residual;
@@ -695,7 +705,8 @@ void eskf_update_heading(ESKF_Handle *h,
     eskf_float_t current_heading;
     eskf_float_t H[15];
     if (result != NULL) memset(result, 0, sizeof(*result));
-    if (!h || !h->initialized || !isfinite(heading_ned_rad) || R_heading <= 0.0) return;
+    if (!h || !h->initialized || !isfinite(heading_ned_rad)
+        || R_heading <= ESKF_SCALAR(0.0)) return;
 
     memset(H, 0, sizeof(H));
     if (!eskf_model_heading(
@@ -714,7 +725,7 @@ void eskf_update_baro(ESKF_Handle *h,
                       eskf_float_t baro_height_m,
                       eskf_float_t R_baro,
                       ESKF_InnovResult *result) {
-    if (!h || !h->initialized || R_baro <= 0.0) return;
+    if (!h || !h->initialized || R_baro <= ESKF_SCALAR(0.0)) return;
 
     /* Convert baro (up-positive) to NED (down-positive) */
     eskf_float_t meas_down = -baro_height_m;
@@ -725,26 +736,26 @@ void eskf_update_baro(ESKF_Handle *h,
     /* Jacobian H (1x15): H[8] = 1.0 for p_D */
     eskf_float_t H[15];
     memset(H, 0, sizeof(H));
-    H[ESKF_IDX_DP + 2] = 1.0;  /* Index 8 */
+    H[ESKF_IDX_DP + 2] = ESKF_SCALAR(1.0);  /* Index 8 */
 
     _measurement_update_1d(h, z, H, R_baro, ESKF_NIS_LIMIT_1D_3SIGMA, result);
 }
 
 void eskf_update_static_constraint(ESKF_Handle *h, eskf_float_t R_zupt) {
-    if (!h || !h->initialized || R_zupt <= 0.0) return;
+    if (!h || !h->initialized || R_zupt <= ESKF_SCALAR(0.0)) return;
 
     /* ZUPT: velocity = [0, 0, 0] */
     eskf_float_t z[3];
-    z[0] = 0.0 - h->state.v[0];
-    z[1] = 0.0 - h->state.v[1];
-    z[2] = 0.0 - h->state.v[2];
+    z[0] = ESKF_SCALAR(0.0) - h->state.v[0];
+    z[1] = ESKF_SCALAR(0.0) - h->state.v[1];
+    z[2] = ESKF_SCALAR(0.0) - h->state.v[2];
 
     /* Jacobian H (3x15): H selects velocity error at indices 3-5 */
     eskf_float_t H[3][15];
     memset(H, 0, sizeof(H));
-    H[0][3] = 1.0;
-    H[1][4] = 1.0;
-    H[2][5] = 1.0;
+    H[0][3] = ESKF_SCALAR(1.0);
+    H[1][4] = ESKF_SCALAR(1.0);
+    H[2][5] = ESKF_SCALAR(1.0);
 
     /* Measurement noise R (3x3 diagonal) */
     eskf_float_t R[3][3];
@@ -754,7 +765,7 @@ void eskf_update_static_constraint(ESKF_Handle *h, eskf_float_t R_zupt) {
     R[2][2] = R_zupt;
 
     /* No gating for ZUPT (gate=0, result=NULL) */
-    _measurement_update_3d(h, z, H, R, 0.0, NULL);
+    _measurement_update_3d(h, z, H, R, ESKF_SCALAR(0.0), NULL);
 }
 
 void eskf_reset_navigation(ESKF_Handle *h,
@@ -765,14 +776,15 @@ void eskf_reset_navigation(ESKF_Handle *h,
     int i;
     int j;
     if (!h || !h->initialized || !position_ned_m || !velocity_ned_m_s
-        || position_variance_m2 <= 0.0 || velocity_variance_m2_s2 <= 0.0) return;
+        || position_variance_m2 <= ESKF_SCALAR(0.0)
+        || velocity_variance_m2_s2 <= ESKF_SCALAR(0.0)) return;
 
     eskf_vec3_copy(position_ned_m, h->state.p);
     eskf_vec3_copy(velocity_ned_m_s, h->state.v);
     for (i = ESKF_IDX_DV; i < ESKF_IDX_DP + 3; ++i) {
         for (j = 0; j < ESKF_ERROR_STATE_DIM; ++j) {
-            h->P[i][j] = 0.0;
-            h->P[j][i] = 0.0;
+            h->P[i][j] = ESKF_SCALAR(0.0);
+            h->P[j][i] = ESKF_SCALAR(0.0);
         }
     }
     for (i = 0; i < 3; ++i) {
@@ -786,13 +798,14 @@ void eskf_reset_position(ESKF_Handle *h,
                          eskf_float_t position_variance_m2) {
     int i;
     int j;
-    if (!h || !h->initialized || !position_ned_m || position_variance_m2 <= 0.0) return;
+    if (!h || !h->initialized || !position_ned_m
+        || position_variance_m2 <= ESKF_SCALAR(0.0)) return;
 
     eskf_vec3_copy(position_ned_m, h->state.p);
     for (i = ESKF_IDX_DP; i < ESKF_IDX_DP + 3; ++i) {
         for (j = 0; j < ESKF_ERROR_STATE_DIM; ++j) {
-            h->P[i][j] = 0.0;
-            h->P[j][i] = 0.0;
+            h->P[i][j] = ESKF_SCALAR(0.0);
+            h->P[j][i] = ESKF_SCALAR(0.0);
         }
     }
     for (i = 0; i < 3; ++i) {
@@ -806,13 +819,13 @@ void eskf_reset_velocity(ESKF_Handle *h,
     int i;
     int j;
     if (!h || !h->initialized || !velocity_ned_m_s
-        || velocity_variance_m2_s2 <= 0.0) return;
+        || velocity_variance_m2_s2 <= ESKF_SCALAR(0.0)) return;
 
     eskf_vec3_copy(velocity_ned_m_s, h->state.v);
     for (i = ESKF_IDX_DV; i < ESKF_IDX_DV + 3; ++i) {
         for (j = 0; j < ESKF_ERROR_STATE_DIM; ++j) {
-            h->P[i][j] = 0.0;
-            h->P[j][i] = 0.0;
+            h->P[i][j] = ESKF_SCALAR(0.0);
+            h->P[j][i] = ESKF_SCALAR(0.0);
         }
     }
     for (i = 0; i < 3; ++i) {
@@ -837,12 +850,13 @@ bool eskf_align_static_tilt(ESKF_Handle *h,
         || !isfinite(acceleration_mean_m_s2[1])
         || !isfinite(acceleration_mean_m_s2[2])) return false;
 
-    horizontal = hypot(acceleration_mean_m_s2[1], acceleration_mean_m_s2[2]);
-    if (hypot(acceleration_mean_m_s2[0], horizontal) < ESKF_EPSILON) return false;
-    roll = atan2(-acceleration_mean_m_s2[1], -acceleration_mean_m_s2[2]);
-    pitch = atan2(acceleration_mean_m_s2[0], horizontal);
+    horizontal = ESKF_HYPOT(acceleration_mean_m_s2[1], acceleration_mean_m_s2[2]);
+    if (ESKF_HYPOT(acceleration_mean_m_s2[0], horizontal)
+        < ESKF_SCALAR(ESKF_EPSILON)) return false;
+    roll = ESKF_ATAN2(-acceleration_mean_m_s2[1], -acceleration_mean_m_s2[2]);
+    pitch = ESKF_ATAN2(acceleration_mean_m_s2[0], horizontal);
     eskf_quat_to_rot_mat3(h->state.q, R_nb);
-    yaw = atan2(R_nb[1][0], R_nb[0][0]);
+    yaw = ESKF_ATAN2(R_nb[1][0], R_nb[0][0]);
     _quaternion_from_euler(roll, pitch, yaw, q);
     eskf_quat_copy(q, h->state.q);
     return true;
@@ -862,18 +876,20 @@ bool eskf_align_static_heading(ESKF_Handle *h,
     if (!isfinite(magnetic_mean[0]) || !isfinite(magnetic_mean[1])
         || !isfinite(magnetic_mean[2])) return false;
     eskf_vec3_copy(magnetic_mean, magnetic_body);
-    if (eskf_vec3_normalize(magnetic_body) < ESKF_EPSILON) return false;
+    if (eskf_vec3_normalize(magnetic_body) < ESKF_SCALAR(ESKF_EPSILON)) return false;
     eskf_quat_to_rot_mat3(h->state.q, R_nb);
     eskf_mat3_mul_vec3(R_nb, magnetic_body, magnetic_ned);
-    if (hypot(magnetic_ned[0], magnetic_ned[1]) < ESKF_EPSILON
-        || hypot(h->mag_ref[0], h->mag_ref[1]) < ESKF_EPSILON) return false;
+    if (ESKF_HYPOT(magnetic_ned[0], magnetic_ned[1]) < ESKF_SCALAR(ESKF_EPSILON)
+        || ESKF_HYPOT(h->mag_ref[0], h->mag_ref[1]) < ESKF_SCALAR(ESKF_EPSILON)) return false;
 
-    roll = atan2(R_nb[2][1], R_nb[2][2]);
-    pitch = asin(fmax(-1.0, fmin(1.0, -R_nb[2][0])));
-    yaw = atan2(R_nb[1][0], R_nb[0][0]);
+    roll = ESKF_ATAN2(R_nb[2][1], R_nb[2][2]);
+    pitch = ESKF_ASIN(ESKF_MAX(
+        ESKF_SCALAR(-1.0), ESKF_MIN(ESKF_SCALAR(1.0), -R_nb[2][0])
+    ));
+    yaw = ESKF_ATAN2(R_nb[1][0], R_nb[0][0]);
     residual = _wrap_pi(
-        atan2(h->mag_ref[1], h->mag_ref[0])
-        - atan2(magnetic_ned[1], magnetic_ned[0])
+        ESKF_ATAN2(h->mag_ref[1], h->mag_ref[0])
+        - ESKF_ATAN2(magnetic_ned[1], magnetic_ned[0])
     );
     _quaternion_from_euler(roll, pitch, _wrap_pi(yaw + residual), q);
     eskf_quat_copy(q, h->state.q);
@@ -889,12 +905,12 @@ bool eskf_reset_attitude_covariance(
     if (!h || !h->initialized || !attitude_variance_rad2) return false;
     for (axis = 0; axis < 3; ++axis) {
         if (!isfinite(attitude_variance_rad2[axis])
-            || attitude_variance_rad2[axis] <= 0.0) return false;
+            || attitude_variance_rad2[axis] <= ESKF_SCALAR(0.0)) return false;
     }
     for (axis = 0; axis < 3; ++axis) {
         for (index = 0; index < ESKF_ERROR_STATE_DIM; ++index) {
-            h->P[axis][index] = 0.0;
-            h->P[index][axis] = 0.0;
+            h->P[axis][index] = ESKF_SCALAR(0.0);
+            h->P[index][axis] = ESKF_SCALAR(0.0);
         }
         h->P[axis][axis] = attitude_variance_rad2[axis];
     }
@@ -920,7 +936,7 @@ void eskf_align_static_biases(ESKF_Handle *h,
         gyr_mean[2] += gyr_buf[i][2];
     }
 
-    eskf_float_t inv_n = 1.0 / (eskf_float_t)n_samples;
+    eskf_float_t inv_n = ESKF_SCALAR(1.0) / (eskf_float_t)n_samples;
     eskf_vec3_scale(acc_mean, inv_n, acc_mean);
     eskf_vec3_scale(gyr_mean, inv_n, gyr_mean);
 
@@ -939,7 +955,7 @@ void eskf_align_static_bias_means(ESKF_Handle *h,
     eskf_vec3_copy(angular_rate_mean_rad_s, h->state.gb);
     eskf_quat_to_rot_mat3(h->state.q, R_nb);
     for (i = 0; i < 3; ++i) {
-        expected_specific_force_body[i] = -R_nb[2][i] * ESKF_GRAVITY;
+        expected_specific_force_body[i] = -R_nb[2][i] * ESKF_SCALAR(ESKF_GRAVITY);
         h->state.ab[i] = acceleration_mean_m_s2[i] - expected_specific_force_body[i];
     }
 
@@ -950,8 +966,8 @@ void eskf_align_static_bias_means(ESKF_Handle *h,
      * later GNSS-aided motion to correct it; marking all six biases equally
      * certain makes the filter inconsistent after a one-pose alignment.
      */
-    const eskf_float_t P_accel_bias = 4e-2; /* conservative 0.2 m/s^2 startup prior */
-    const eskf_float_t P_gyro_bias = 1e-4;  /* (0.01 rad/s)^2 */
+    const eskf_float_t P_accel_bias = ESKF_SCALAR(4e-2); /* conservative 0.2 m/s^2 startup prior */
+    const eskf_float_t P_gyro_bias = ESKF_SCALAR(1e-4);  /* (0.01 rad/s)^2 */
     h->P[9][9]   = P_accel_bias;
     h->P[10][10] = P_accel_bias;
     h->P[11][11] = P_accel_bias;
@@ -962,8 +978,8 @@ void eskf_align_static_bias_means(ESKF_Handle *h,
     /* Zero cross-correlations with biases */
     for (i = 0; i < 9; i++) {
         for (j = 9; j < 15; j++) {
-            h->P[i][j] = 0.0;
-            h->P[j][i] = 0.0;
+            h->P[i][j] = ESKF_SCALAR(0.0);
+            h->P[j][i] = ESKF_SCALAR(0.0);
         }
     }
 }

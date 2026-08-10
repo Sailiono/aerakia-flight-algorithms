@@ -11,13 +11,14 @@
 
 static eskf_float_t wrap_pi(eskf_float_t angle)
 {
-    return atan2(sin(angle), cos(angle));
+    return ESKF_ATAN2(ESKF_SIN(angle), ESKF_COS(angle));
 }
 
 /* Keep nominal threshold-boundary cases fail-closed despite round-off in q -> R. */
 static bool exceeds_observability_threshold(eskf_float_t value, eskf_float_t threshold)
 {
-    return isfinite(value) && value > threshold * (1.0 + 1.0e-12);
+    return isfinite(value)
+        && value > threshold * (ESKF_SCALAR(1.0) + ESKF_SCALAR(1.0e-12));
 }
 
 void eskf_model_transition(const eskf_float_t q[4],
@@ -35,7 +36,7 @@ void eskf_model_transition(const eskf_float_t q[4],
     eskf_float_t phi_skew[3][3];
     eskf_float_t phi_skew_squared[3][3];
     eskf_float_t right_jacobian[3][3];
-    const eskf_float_t half_dt_squared = 0.5 * dt * dt;
+    const eskf_float_t half_dt_squared = ESKF_SCALAR(0.5) * dt * dt;
     eskf_float_t theta;
     eskf_float_t coefficient_a;
     eskf_float_t coefficient_b;
@@ -53,12 +54,13 @@ void eskf_model_transition(const eskf_float_t q[4],
     eskf_mat3_skew(phi, phi_skew);
     eskf_mat3_mul_mat3(phi_skew, phi_skew, phi_skew_squared);
     theta = eskf_vec3_norm(phi);
-    if (theta < 1.0e-6) {
-        coefficient_a = 0.5 - theta * theta / 24.0;
-        coefficient_b = 1.0 / 6.0 - theta * theta / 120.0;
+    if (theta < ESKF_SCALAR(1.0e-6)) {
+        coefficient_a = ESKF_SCALAR(0.5) - theta * theta / ESKF_SCALAR(24.0);
+        coefficient_b = ESKF_SCALAR(1.0) / ESKF_SCALAR(6.0)
+            - theta * theta / ESKF_SCALAR(120.0);
     } else {
-        coefficient_a = (1.0 - cos(theta)) / (theta * theta);
-        coefficient_b = (theta - sin(theta)) / (theta * theta * theta);
+        coefficient_a = (ESKF_SCALAR(1.0) - ESKF_COS(theta)) / (theta * theta);
+        coefficient_b = (theta - ESKF_SIN(theta)) / (theta * theta * theta);
     }
     eskf_mat3_identity(right_jacobian);
     for (row = 0; row < 3; ++row) {
@@ -96,8 +98,8 @@ void eskf_model_process_noise(const ESKF_Config *config,
     const eskf_float_t sigma_acc_squared = config->sigma_acc * config->sigma_acc;
     const eskf_float_t q_theta = config->sigma_gyr * config->sigma_gyr * dt;
     const eskf_float_t q_v = sigma_acc_squared * dt;
-    const eskf_float_t q_vp = sigma_acc_squared * dt * dt * 0.5;
-    const eskf_float_t q_p = sigma_acc_squared * dt * dt * dt / 3.0;
+    const eskf_float_t q_vp = sigma_acc_squared * dt * dt * ESKF_SCALAR(0.5);
+    const eskf_float_t q_p = sigma_acc_squared * dt * dt * dt / ESKF_SCALAR(3.0);
     const eskf_float_t q_ab = config->sigma_acc_bias * config->sigma_acc_bias * dt;
     const eskf_float_t q_gb = config->sigma_gyr_bias * config->sigma_gyr_bias * dt;
     int axis;
@@ -118,7 +120,7 @@ static void body_x_heading_jacobian(eskf_float_t R_nb[3][3],
                                     eskf_float_t horizontal_squared,
                                     eskf_float_t H_theta[3])
 {
-    H_theta[0] = 0.0;
+    H_theta[0] = ESKF_SCALAR(0.0);
     H_theta[1] = (
         -R_nb[0][0] * R_nb[1][2] + R_nb[1][0] * R_nb[0][2]
     ) / horizontal_squared;
@@ -142,8 +144,8 @@ bool eskf_model_heading(const eskf_float_t q[4],
     if (q == NULL || heading_rad == NULL || H_theta == NULL) return false;
     eskf_quat_to_rot_mat3(q, R_nb);
     horizontal_squared = R_nb[0][0] * R_nb[0][0] + R_nb[1][0] * R_nb[1][0];
-    if (!exceeds_observability_threshold(horizontal_squared, 1.0e-4)) return false;
-    *heading_rad = atan2(R_nb[1][0], R_nb[0][0]);
+    if (!exceeds_observability_threshold(horizontal_squared, ESKF_SCALAR(1.0e-4))) return false;
+    *heading_rad = ESKF_ATAN2(R_nb[1][0], R_nb[0][0]);
     body_x_heading_jacobian(R_nb, horizontal_squared, H_theta);
     return true;
 }
@@ -163,18 +165,22 @@ bool eskf_model_magnetic_yaw_correction(const eskf_float_t q[4],
         || residual_rad == NULL || H_theta == NULL) return false;
     reference_horizontal_squared = mag_reference_ned[0] * mag_reference_ned[0]
         + mag_reference_ned[1] * mag_reference_ned[1];
-    if (!exceeds_observability_threshold(reference_horizontal_squared, ESKF_EPSILON)) {
+    if (!exceeds_observability_threshold(
+            reference_horizontal_squared, ESKF_SCALAR(ESKF_EPSILON)
+        )) {
         return false;
     }
     eskf_quat_to_rot_mat3(q, R_nb);
     eskf_mat3_mul_vec3(R_nb, mag_body, measured_ned);
     measured_horizontal_squared = measured_ned[0] * measured_ned[0]
         + measured_ned[1] * measured_ned[1];
-    if (!exceeds_observability_threshold(measured_horizontal_squared, ESKF_EPSILON)) return false;
+    if (!exceeds_observability_threshold(
+            measured_horizontal_squared, ESKF_SCALAR(ESKF_EPSILON)
+        )) return false;
 
     *residual_rad = wrap_pi(
-        atan2(mag_reference_ned[1], mag_reference_ned[0])
-        - atan2(measured_ned[1], measured_ned[0])
+        ESKF_ATAN2(mag_reference_ned[1], mag_reference_ned[0])
+        - ESKF_ATAN2(measured_ned[1], measured_ned[0])
     );
     ned_yaw_error_axis(R_nb, H_theta);
     return true;
