@@ -1986,3 +1986,22 @@ delays, delayed heading/barometer, source-arrival timing, multi-IMU switching,
 target CPU/RAM, or safety behavior. The compact evidence and full boundary are
 in [`delayed_gnss_repropagation_oracle_v1.json`](../validation/public/delayed_gnss_repropagation_oracle_v1.json)
 and [Delayed GNSS rewind/replay oracle](delayed-gnss-repropagation-oracle.md).
+
+## 2026-08-10 — final post-change host verification
+
+After the compact evidence and delayed-oracle boundary changes were committed,
+the tree was rebuilt from scratch for the final check. Release C99 CTest passed
+`11/11`; the Python discovery suite passed `174/174`. The float evaluation
+profile built with the same warnings-as-errors policy and passed its `10/10`
+CTest targets, including the 400 Hz / 150 ms replay boundary.
+
+The Debug sanitizer profile passed the ten non-long-running CTest targets under
+`ASAN_OPTIONS=detect_leaks=0` and `UBSAN_OPTIONS=halt_on_error=1`. The excluded
+input-integrity executable was then run separately under the same ASan/UBSan
+settings: `1,020,000` attempts, `0` invariant failures, and `0` unhealthy
+outputs. Leak detection remains unverified because LeakSanitizer cannot start in
+the managed traced desktop environment; no allocation-leak claim is made.
+
+These checks validate the current source and contracts only. They do not add
+physical sensor, thermal, target-MCU timing, multi-event transport, or flight
+evidence.
