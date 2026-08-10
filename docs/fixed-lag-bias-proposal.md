@@ -52,6 +52,11 @@ The compact, input/result-manifest-hashed evidence is
 It retains the campaign matrix and stratified aggregate statistics; raw replay
 CSVs and per-window details remain disposable build artifacts.
 
+The campaign runner defaults to one worker because every trial starts a source
+generator and native replay process. Parallelism is opt-in through `--jobs`
+after the target workstation has demonstrated stable completion; worker count
+does not change the frozen trial matrix or metrics.
+
 ## What must precede another correction candidate
 
 This result does not prove that joint tilt/bias correction is impossible. It

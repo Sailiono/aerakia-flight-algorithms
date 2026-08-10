@@ -1930,6 +1930,9 @@ hashes, aggregate statistics, and motion stratification:
 [`fixed_lag_bias_proposal_campaign.json`](../validation/public/fixed_lag_bias_proposal_campaign.json).
 The campaign runner now omits large per-window details by default; they are
 available only with `--include-trials` for local debugging and stay outside Git.
+It also defaults to a single worker so the official evidence path does not rely
+on uncontrolled generator/native-runner process fanout; `--jobs` remains an
+explicit workstation-specific opt-in.
 
 ### Next bounded experiment
 

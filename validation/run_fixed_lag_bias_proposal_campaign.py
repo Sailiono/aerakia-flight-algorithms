@@ -292,7 +292,10 @@ def main() -> int:
     parser.add_argument("--seed-count", type=int, default=8)
     parser.add_argument("--prior-scales", default="0.1,0.3,1.0")
     parser.add_argument("--score-threshold", type=float, default=0.004936251852866821)
-    parser.add_argument("--jobs", type=int, default=4)
+    # Each trial launches both a generator and native replay.  Keep the default
+    # serial so the durable evidence path is stable on constrained workstations;
+    # callers can opt into parallel workers after validating their environment.
+    parser.add_argument("--jobs", type=int, default=1)
     parser.add_argument("--keep-work", action="store_true")
     parser.add_argument(
         "--include-trials",
