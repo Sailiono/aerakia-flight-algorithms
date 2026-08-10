@@ -73,6 +73,8 @@ is the stable navigation layer rather than a disruptive mass rename.
   maneuver geometry screen and its limits.
 - [G0 score calibration](g0-score-calibration.md): disjoint stationary-null
   validation and noisy maneuver score campaign.
+- [Fixed-lag proposal](fixed-lag-bias-proposal.md): the no-injection solver
+  boundary before any embedded estimator candidate.
 - [Barometer source supervision](barometer-supervision-study.md) and
   [airspeed/barometer plan](airspeed-barometer-plan.md): vertical-aiding
   evidence, limits, and follow-up architecture.
