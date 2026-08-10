@@ -50,6 +50,13 @@ def fingerprint(path: Path) -> dict[str, object]:
     }
 
 
+def portable_path(path: Path) -> str:
+    """Keep public evidence independent of a workstation-specific root path."""
+
+    resolved = path.resolve()
+    return str(resolved.relative_to(ROOT)) if resolved.is_relative_to(ROOT) else path.name
+
+
 def parse_integer_list(value: str, label: str) -> tuple[int, ...]:
     try:
         values = tuple(int(item.strip()) for item in value.split(",") if item.strip())
@@ -414,7 +421,7 @@ def run_case(oracle: Path, rate_hz: int, delay_ms: int, scenario: str) -> dict[s
         "rate_hz": rate_hz,
         "delay_ms": delay_ms,
         "scenario": scenario,
-        "command": command,
+        "command": [portable_path(oracle), *command[1:]],
         "returncode": completed.returncode,
         "checks": checks,
         "passed": completed.returncode == 0 and all(check["passed"] for check in checks),

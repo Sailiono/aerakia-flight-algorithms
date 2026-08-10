@@ -123,6 +123,12 @@ def passing_overlap_payload() -> dict[str, object]:
 
 
 class DelayedGnssRepropagationOracleTest(unittest.TestCase):
+    def test_portable_path_removes_workstation_root(self) -> None:
+        self.assertEqual(
+            MODULE.portable_path(ROOT / "build" / "oracle"),
+            "build/oracle",
+        )
+
     def test_complete_case_passes_all_checks(self) -> None:
         checks = MODULE.validate_case(passing_payload())
         self.assertTrue(all(check["passed"] for check in checks))
