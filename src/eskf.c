@@ -225,7 +225,7 @@ static bool _measurement_update_3d(ESKF_Handle *h,
     }
 
     /* --- 5. Compute Kalman Gain K = PHt * S_inv (15x3) --- */
-    eskf_float_t K[15][3];
+    eskf_float_t K[15][3] = {{0.0}};
     for (int i = 0; i < 15; i++) {
         for (int j = 0; j < 3; j++) {
             eskf_float_t sum = 0.0;

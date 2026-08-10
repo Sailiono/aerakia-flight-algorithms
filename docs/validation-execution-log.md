@@ -2044,3 +2044,18 @@ This remains host-only replay correctness evidence. Overlapping/reordered
 pending events, delayed heading/barometer, mixed sensor types, interpolation,
 physical source-arrival timestamps, target resource limits, and flight policy
 are still open.
+
+## 2026-08-10 — GCC static-analysis hardening
+
+An additional GCC `-fanalyzer -Werror` build reported a potential read of an
+uninitialized entry in the local 15x3 Kalman-gain array inside the three-axis
+measurement update. The existing nested loops assign all entries before use,
+and ordinary CTest already exercised the path, but the warning is a useful
+maintenance hazard: a future loop-bound change could make the warning real.
+
+The local gain array is now explicitly zero-initialized at declaration. This
+does not change the normal computed gain or ESKF mathematics; it makes the
+array's fallback state defined and allows the analyzer to verify the function
+without a suppression. The analyzer build completed with warnings-as-errors,
+then its complete `12/12` CTest suite passed. This is static host evidence only
+and does not replace target compiler or target-MCU verification.
