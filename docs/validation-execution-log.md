@@ -2887,3 +2887,10 @@ The partial candidate's sensitivity loss is retained as a negative result;
 its safety constraints were not relaxed to improve the score. Graded evidence
 at age 3 s is only a provisional comparator from a small non-holdout screen;
 no v8 policy, age, threshold, estimator state, or FCOne authority is selected.
+
+The remaining misses were reviewed separately in
+`docs/airspeed-wind-residual-persistence-v8-failure-analysis.md`. The failure
+is an information/attribution boundary after the quiet boundary expires, not a
+numerical or transport defect. The next candidate must therefore separate a
+causal diagnostic anomaly from a control-qualified fault and add an independent
+regime/source transition before any supervisor authority is considered.
