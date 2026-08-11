@@ -1,0 +1,2148 @@
+{
+  "diagnostic_summary": {
+    "1s": {
+      "bounded_retry": {
+        "control_latch_count": 126,
+        "diagnostic_on_nominal_count": 0,
+        "diagnostic_on_structural_gap_count": 0,
+        "diagnostic_snapshot_by_case": {
+          "gap_then_tas_offset_pulse_1p0s": 0,
+          "nominal": 0,
+          "nominal_bounded_jitter": 0,
+          "nominal_high_noise_calibrated": 0,
+          "persistent_horizontal_wind_step": 19,
+          "persistent_tas_offset_negative": 24,
+          "persistent_tas_offset_negative_bounded_jitter": 24,
+          "persistent_tas_offset_positive": 19,
+          "persistent_tas_offset_positive_bounded_jitter": 19,
+          "persistent_tas_scale_negative": 20,
+          "persistent_tas_scale_positive": 21,
+          "persistent_vertical_wind": 13,
+          "tas_offset_pulse_0p25s": 0,
+          "tas_offset_pulse_0p5s": 0,
+          "tas_offset_pulse_1p0s": 0,
+          "tas_offset_pulse_1p5s": 0,
+          "tas_offset_pulse_2p0s": 18
+        },
+        "diagnostic_snapshot_count": 86,
+        "diagnostic_snapshot_count_all_cases": 177,
+        "diagnostic_snapshot_rate": 0.19196428571428573,
+        "diagnostic_snapshot_trials": 448,
+        "diagnostic_snapshot_trials_all_cases": 1088,
+        "diagnostic_without_control_count": 86,
+        "persistent_ambiguous_diagnostic_count": 0,
+        "persistent_ambiguous_diagnostic_members": [],
+        "persistent_clean_diagnostic_count": 86,
+        "persistent_clean_diagnostic_members": [
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74301
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74301
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74301
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74301
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74302
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74302
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74302
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74302
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74306
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74306
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74309
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74309
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74309
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74309
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74310
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74310
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74311
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74311
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74315
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74315
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74317
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74317
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74317
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74317
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74318
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74318
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74318
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74318
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74320
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74320
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74323
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74323
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74324
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74324
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74324
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74324
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74326
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74326
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74328
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74328
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74328
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74328
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74331
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74331
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74332
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74332
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74332
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74332
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74333
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74333
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74333
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74333
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74334
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74334
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74334
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74334
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74336
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74336
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74337
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74337
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74337
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74337
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74341
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74341
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74342
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74342
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74342
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74342
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74343
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74343
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74343
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74343
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74345
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74345
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74353
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74353
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74353
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74353
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74356
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74356
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74359
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74359
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74362
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74362
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74363
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74363
+          }
+        ],
+        "persistent_diagnostic_count": 86,
+        "persistent_diagnostic_trials": 256
+      },
+      "graded_evidence": {
+        "control_latch_count": 140,
+        "diagnostic_on_nominal_count": 0,
+        "diagnostic_on_structural_gap_count": 0,
+        "diagnostic_snapshot_by_case": {
+          "gap_then_tas_offset_pulse_1p0s": 0,
+          "nominal": 0,
+          "nominal_bounded_jitter": 0,
+          "nominal_high_noise_calibrated": 0,
+          "persistent_horizontal_wind_step": 18,
+          "persistent_tas_offset_negative": 20,
+          "persistent_tas_offset_negative_bounded_jitter": 20,
+          "persistent_tas_offset_positive": 17,
+          "persistent_tas_offset_positive_bounded_jitter": 17,
+          "persistent_tas_scale_negative": 19,
+          "persistent_tas_scale_positive": 19,
+          "persistent_vertical_wind": 13,
+          "tas_offset_pulse_0p25s": 0,
+          "tas_offset_pulse_0p5s": 0,
+          "tas_offset_pulse_1p0s": 0,
+          "tas_offset_pulse_1p5s": 0,
+          "tas_offset_pulse_2p0s": 18
+        },
+        "diagnostic_snapshot_count": 74,
+        "diagnostic_snapshot_count_all_cases": 161,
+        "diagnostic_snapshot_rate": 0.16517857142857142,
+        "diagnostic_snapshot_trials": 448,
+        "diagnostic_snapshot_trials_all_cases": 1088,
+        "diagnostic_without_control_count": 74,
+        "persistent_ambiguous_diagnostic_count": 0,
+        "persistent_ambiguous_diagnostic_members": [],
+        "persistent_clean_diagnostic_count": 74,
+        "persistent_clean_diagnostic_members": [
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74301
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74301
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74301
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74301
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74302
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74302
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74302
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74302
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74306
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74306
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74309
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74309
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74309
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74309
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74311
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74311
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74317
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74317
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74317
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74317
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74318
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74318
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74318
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74318
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74323
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74323
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74324
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74324
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74324
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74324
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74326
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74326
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74328
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74328
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74328
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74328
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74331
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74331
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74332
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74332
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74332
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74332
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74333
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74333
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74333
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74333
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74334
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74334
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74334
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74334
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74337
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74337
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74337
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74337
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74342
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74342
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74342
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74342
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74343
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74343
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74343
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74343
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74353
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74353
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74353
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74353
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74356
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74356
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74359
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74359
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74362
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74362
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74363
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74363
+          }
+        ],
+        "persistent_diagnostic_count": 74,
+        "persistent_diagnostic_trials": 256
+      },
+      "partial_quiet_probation": {
+        "control_latch_count": 154,
+        "diagnostic_on_nominal_count": 0,
+        "diagnostic_on_structural_gap_count": 0,
+        "diagnostic_snapshot_by_case": {
+          "gap_then_tas_offset_pulse_1p0s": 0,
+          "nominal": 0,
+          "nominal_bounded_jitter": 0,
+          "nominal_high_noise_calibrated": 0,
+          "persistent_horizontal_wind_step": 2,
+          "persistent_tas_offset_negative": 0,
+          "persistent_tas_offset_negative_bounded_jitter": 0,
+          "persistent_tas_offset_positive": 0,
+          "persistent_tas_offset_positive_bounded_jitter": 0,
+          "persistent_tas_scale_negative": 0,
+          "persistent_tas_scale_positive": 0,
+          "persistent_vertical_wind": 1,
+          "tas_offset_pulse_0p25s": 0,
+          "tas_offset_pulse_0p5s": 0,
+          "tas_offset_pulse_1p0s": 0,
+          "tas_offset_pulse_1p5s": 0,
+          "tas_offset_pulse_2p0s": 0
+        },
+        "diagnostic_snapshot_count": 0,
+        "diagnostic_snapshot_count_all_cases": 3,
+        "diagnostic_snapshot_rate": 0.0,
+        "diagnostic_snapshot_trials": 448,
+        "diagnostic_snapshot_trials_all_cases": 1088,
+        "diagnostic_without_control_count": 0,
+        "persistent_ambiguous_diagnostic_count": 0,
+        "persistent_ambiguous_diagnostic_members": [],
+        "persistent_clean_diagnostic_count": 0,
+        "persistent_clean_diagnostic_members": [],
+        "persistent_diagnostic_count": 0,
+        "persistent_diagnostic_trials": 256
+      },
+      "recent_boundary": {
+        "control_latch_count": 126,
+        "diagnostic_on_nominal_count": 0,
+        "diagnostic_on_structural_gap_count": 0,
+        "diagnostic_snapshot_by_case": {
+          "gap_then_tas_offset_pulse_1p0s": 0,
+          "nominal": 0,
+          "nominal_bounded_jitter": 0,
+          "nominal_high_noise_calibrated": 0,
+          "persistent_horizontal_wind_step": 19,
+          "persistent_tas_offset_negative": 24,
+          "persistent_tas_offset_negative_bounded_jitter": 24,
+          "persistent_tas_offset_positive": 19,
+          "persistent_tas_offset_positive_bounded_jitter": 19,
+          "persistent_tas_scale_negative": 20,
+          "persistent_tas_scale_positive": 21,
+          "persistent_vertical_wind": 13,
+          "tas_offset_pulse_0p25s": 0,
+          "tas_offset_pulse_0p5s": 0,
+          "tas_offset_pulse_1p0s": 0,
+          "tas_offset_pulse_1p5s": 0,
+          "tas_offset_pulse_2p0s": 18
+        },
+        "diagnostic_snapshot_count": 86,
+        "diagnostic_snapshot_count_all_cases": 177,
+        "diagnostic_snapshot_rate": 0.19196428571428573,
+        "diagnostic_snapshot_trials": 448,
+        "diagnostic_snapshot_trials_all_cases": 1088,
+        "diagnostic_without_control_count": 86,
+        "persistent_ambiguous_diagnostic_count": 0,
+        "persistent_ambiguous_diagnostic_members": [],
+        "persistent_clean_diagnostic_count": 86,
+        "persistent_clean_diagnostic_members": [
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74301
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74301
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74301
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74301
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74302
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74302
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74302
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74302
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74306
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74306
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74309
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74309
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74309
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74309
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74310
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74310
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74311
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74311
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74315
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74315
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74317
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74317
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74317
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74317
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74318
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74318
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74318
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74318
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74320
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74320
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74323
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74323
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74324
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74324
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74324
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74324
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74326
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74326
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74328
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74328
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74328
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74328
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74331
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74331
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74332
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74332
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74332
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74332
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74333
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74333
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74333
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74333
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74334
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74334
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74334
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74334
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74336
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74336
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74337
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74337
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74337
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74337
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74341
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74341
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74342
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74342
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74342
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74342
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74343
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74343
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74343
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74343
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74345
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74345
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74353
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74353
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74353
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74353
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74356
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74356
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74359
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74359
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74362
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74362
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74363
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74363
+          }
+        ],
+        "persistent_diagnostic_count": 86,
+        "persistent_diagnostic_trials": 256
+      }
+    },
+    "2s": {
+      "bounded_retry": {
+        "control_latch_count": 190,
+        "diagnostic_on_nominal_count": 0,
+        "diagnostic_on_structural_gap_count": 0,
+        "diagnostic_snapshot_by_case": {
+          "gap_then_tas_offset_pulse_1p0s": 0,
+          "nominal": 0,
+          "nominal_bounded_jitter": 0,
+          "nominal_high_noise_calibrated": 0,
+          "persistent_horizontal_wind_step": 7,
+          "persistent_tas_offset_negative": 9,
+          "persistent_tas_offset_negative_bounded_jitter": 9,
+          "persistent_tas_offset_positive": 11,
+          "persistent_tas_offset_positive_bounded_jitter": 11,
+          "persistent_tas_scale_negative": 6,
+          "persistent_tas_scale_positive": 8,
+          "persistent_vertical_wind": 9,
+          "tas_offset_pulse_0p25s": 0,
+          "tas_offset_pulse_0p5s": 0,
+          "tas_offset_pulse_1p0s": 0,
+          "tas_offset_pulse_1p5s": 0,
+          "tas_offset_pulse_2p0s": 6
+        },
+        "diagnostic_snapshot_count": 40,
+        "diagnostic_snapshot_count_all_cases": 76,
+        "diagnostic_snapshot_rate": 0.08928571428571429,
+        "diagnostic_snapshot_trials": 448,
+        "diagnostic_snapshot_trials_all_cases": 1088,
+        "diagnostic_without_control_count": 40,
+        "persistent_ambiguous_diagnostic_count": 0,
+        "persistent_ambiguous_diagnostic_members": [],
+        "persistent_clean_diagnostic_count": 40,
+        "persistent_clean_diagnostic_members": [
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74301
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74301
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74301
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74301
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74304
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74304
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74304
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74304
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74316
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74316
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74316
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74316
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74320
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74320
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74326
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74326
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74328
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74328
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74328
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74328
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74332
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74332
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74332
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74332
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74334
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74334
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74336
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74336
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74340
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74340
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74340
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74340
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74341
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74341
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74345
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74345
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74359
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74359
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74363
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74363
+          }
+        ],
+        "persistent_diagnostic_count": 40,
+        "persistent_diagnostic_trials": 256
+      },
+      "graded_evidence": {
+        "control_latch_count": 204,
+        "diagnostic_on_nominal_count": 0,
+        "diagnostic_on_structural_gap_count": 0,
+        "diagnostic_snapshot_by_case": {
+          "gap_then_tas_offset_pulse_1p0s": 0,
+          "nominal": 0,
+          "nominal_bounded_jitter": 0,
+          "nominal_high_noise_calibrated": 0,
+          "persistent_horizontal_wind_step": 7,
+          "persistent_tas_offset_negative": 6,
+          "persistent_tas_offset_negative_bounded_jitter": 6,
+          "persistent_tas_offset_positive": 8,
+          "persistent_tas_offset_positive_bounded_jitter": 8,
+          "persistent_tas_scale_negative": 6,
+          "persistent_tas_scale_positive": 6,
+          "persistent_vertical_wind": 9,
+          "tas_offset_pulse_0p25s": 0,
+          "tas_offset_pulse_0p5s": 0,
+          "tas_offset_pulse_1p0s": 0,
+          "tas_offset_pulse_1p5s": 0,
+          "tas_offset_pulse_2p0s": 6
+        },
+        "diagnostic_snapshot_count": 28,
+        "diagnostic_snapshot_count_all_cases": 62,
+        "diagnostic_snapshot_rate": 0.0625,
+        "diagnostic_snapshot_trials": 448,
+        "diagnostic_snapshot_trials_all_cases": 1088,
+        "diagnostic_without_control_count": 28,
+        "persistent_ambiguous_diagnostic_count": 0,
+        "persistent_ambiguous_diagnostic_members": [],
+        "persistent_clean_diagnostic_count": 28,
+        "persistent_clean_diagnostic_members": [
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74301
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74301
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74301
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74301
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74304
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74304
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74304
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74304
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74316
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74316
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74316
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74316
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74326
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74326
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74328
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74328
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74328
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74328
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74332
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74332
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74332
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74332
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74334
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74334
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74340
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74340
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74340
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74340
+          }
+        ],
+        "persistent_diagnostic_count": 28,
+        "persistent_diagnostic_trials": 256
+      },
+      "partial_quiet_probation": {
+        "control_latch_count": 154,
+        "diagnostic_on_nominal_count": 0,
+        "diagnostic_on_structural_gap_count": 0,
+        "diagnostic_snapshot_by_case": {
+          "gap_then_tas_offset_pulse_1p0s": 0,
+          "nominal": 0,
+          "nominal_bounded_jitter": 0,
+          "nominal_high_noise_calibrated": 0,
+          "persistent_horizontal_wind_step": 1,
+          "persistent_tas_offset_negative": 0,
+          "persistent_tas_offset_negative_bounded_jitter": 0,
+          "persistent_tas_offset_positive": 0,
+          "persistent_tas_offset_positive_bounded_jitter": 0,
+          "persistent_tas_scale_negative": 0,
+          "persistent_tas_scale_positive": 0,
+          "persistent_vertical_wind": 0,
+          "tas_offset_pulse_0p25s": 0,
+          "tas_offset_pulse_0p5s": 0,
+          "tas_offset_pulse_1p0s": 0,
+          "tas_offset_pulse_1p5s": 0,
+          "tas_offset_pulse_2p0s": 0
+        },
+        "diagnostic_snapshot_count": 0,
+        "diagnostic_snapshot_count_all_cases": 1,
+        "diagnostic_snapshot_rate": 0.0,
+        "diagnostic_snapshot_trials": 448,
+        "diagnostic_snapshot_trials_all_cases": 1088,
+        "diagnostic_without_control_count": 0,
+        "persistent_ambiguous_diagnostic_count": 0,
+        "persistent_ambiguous_diagnostic_members": [],
+        "persistent_clean_diagnostic_count": 0,
+        "persistent_clean_diagnostic_members": [],
+        "persistent_diagnostic_count": 0,
+        "persistent_diagnostic_trials": 256
+      },
+      "recent_boundary": {
+        "control_latch_count": 190,
+        "diagnostic_on_nominal_count": 0,
+        "diagnostic_on_structural_gap_count": 0,
+        "diagnostic_snapshot_by_case": {
+          "gap_then_tas_offset_pulse_1p0s": 0,
+          "nominal": 0,
+          "nominal_bounded_jitter": 0,
+          "nominal_high_noise_calibrated": 0,
+          "persistent_horizontal_wind_step": 7,
+          "persistent_tas_offset_negative": 9,
+          "persistent_tas_offset_negative_bounded_jitter": 9,
+          "persistent_tas_offset_positive": 11,
+          "persistent_tas_offset_positive_bounded_jitter": 11,
+          "persistent_tas_scale_negative": 6,
+          "persistent_tas_scale_positive": 8,
+          "persistent_vertical_wind": 9,
+          "tas_offset_pulse_0p25s": 0,
+          "tas_offset_pulse_0p5s": 0,
+          "tas_offset_pulse_1p0s": 0,
+          "tas_offset_pulse_1p5s": 0,
+          "tas_offset_pulse_2p0s": 6
+        },
+        "diagnostic_snapshot_count": 40,
+        "diagnostic_snapshot_count_all_cases": 76,
+        "diagnostic_snapshot_rate": 0.08928571428571429,
+        "diagnostic_snapshot_trials": 448,
+        "diagnostic_snapshot_trials_all_cases": 1088,
+        "diagnostic_without_control_count": 40,
+        "persistent_ambiguous_diagnostic_count": 0,
+        "persistent_ambiguous_diagnostic_members": [],
+        "persistent_clean_diagnostic_count": 40,
+        "persistent_clean_diagnostic_members": [
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74301
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74301
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74301
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74301
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74304
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74304
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74304
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74304
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74316
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74316
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74316
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74316
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74320
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74320
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74326
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74326
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74328
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74328
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74328
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74328
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74332
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74332
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74332
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74332
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74334
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74334
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74336
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74336
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74340
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74340
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74340
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74340
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74341
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74341
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74345
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74345
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74359
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74359
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74363
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74363
+          }
+        ],
+        "persistent_diagnostic_count": 40,
+        "persistent_diagnostic_trials": 256
+      }
+    },
+    "3s": {
+      "bounded_retry": {
+        "control_latch_count": 226,
+        "diagnostic_on_nominal_count": 0,
+        "diagnostic_on_structural_gap_count": 0,
+        "diagnostic_snapshot_by_case": {
+          "gap_then_tas_offset_pulse_1p0s": 0,
+          "nominal": 0,
+          "nominal_bounded_jitter": 0,
+          "nominal_high_noise_calibrated": 0,
+          "persistent_horizontal_wind_step": 4,
+          "persistent_tas_offset_negative": 5,
+          "persistent_tas_offset_negative_bounded_jitter": 5,
+          "persistent_tas_offset_positive": 5,
+          "persistent_tas_offset_positive_bounded_jitter": 5,
+          "persistent_tas_scale_negative": 4,
+          "persistent_tas_scale_positive": 4,
+          "persistent_vertical_wind": 10,
+          "tas_offset_pulse_0p25s": 0,
+          "tas_offset_pulse_0p5s": 0,
+          "tas_offset_pulse_1p0s": 0,
+          "tas_offset_pulse_1p5s": 0,
+          "tas_offset_pulse_2p0s": 4
+        },
+        "diagnostic_snapshot_count": 20,
+        "diagnostic_snapshot_count_all_cases": 46,
+        "diagnostic_snapshot_rate": 0.044642857142857144,
+        "diagnostic_snapshot_trials": 448,
+        "diagnostic_snapshot_trials_all_cases": 1088,
+        "diagnostic_without_control_count": 20,
+        "persistent_ambiguous_diagnostic_count": 0,
+        "persistent_ambiguous_diagnostic_members": [],
+        "persistent_clean_diagnostic_count": 20,
+        "persistent_clean_diagnostic_members": [
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74304
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74304
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74304
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74304
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74313
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74313
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74321
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74321
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74335
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74335
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74335
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74335
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74344
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74344
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74344
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74344
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74359
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74359
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74363
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74363
+          }
+        ],
+        "persistent_diagnostic_count": 20,
+        "persistent_diagnostic_trials": 256
+      },
+      "graded_evidence": {
+        "control_latch_count": 234,
+        "diagnostic_on_nominal_count": 0,
+        "diagnostic_on_structural_gap_count": 0,
+        "diagnostic_snapshot_by_case": {
+          "gap_then_tas_offset_pulse_1p0s": 0,
+          "nominal": 0,
+          "nominal_bounded_jitter": 0,
+          "nominal_high_noise_calibrated": 0,
+          "persistent_horizontal_wind_step": 4,
+          "persistent_tas_offset_negative": 4,
+          "persistent_tas_offset_negative_bounded_jitter": 4,
+          "persistent_tas_offset_positive": 3,
+          "persistent_tas_offset_positive_bounded_jitter": 3,
+          "persistent_tas_scale_negative": 4,
+          "persistent_tas_scale_positive": 4,
+          "persistent_vertical_wind": 9,
+          "tas_offset_pulse_0p25s": 0,
+          "tas_offset_pulse_0p5s": 0,
+          "tas_offset_pulse_1p0s": 0,
+          "tas_offset_pulse_1p5s": 0,
+          "tas_offset_pulse_2p0s": 4
+        },
+        "diagnostic_snapshot_count": 14,
+        "diagnostic_snapshot_count_all_cases": 39,
+        "diagnostic_snapshot_rate": 0.03125,
+        "diagnostic_snapshot_trials": 448,
+        "diagnostic_snapshot_trials_all_cases": 1088,
+        "diagnostic_without_control_count": 14,
+        "persistent_ambiguous_diagnostic_count": 0,
+        "persistent_ambiguous_diagnostic_members": [],
+        "persistent_clean_diagnostic_count": 14,
+        "persistent_clean_diagnostic_members": [
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74304
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74304
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74304
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74304
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74321
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74321
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74335
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74335
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74335
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74335
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74344
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74344
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74344
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74344
+          }
+        ],
+        "persistent_diagnostic_count": 14,
+        "persistent_diagnostic_trials": 256
+      },
+      "partial_quiet_probation": {
+        "control_latch_count": 154,
+        "diagnostic_on_nominal_count": 0,
+        "diagnostic_on_structural_gap_count": 0,
+        "diagnostic_snapshot_by_case": {
+          "gap_then_tas_offset_pulse_1p0s": 0,
+          "nominal": 0,
+          "nominal_bounded_jitter": 0,
+          "nominal_high_noise_calibrated": 0,
+          "persistent_horizontal_wind_step": 0,
+          "persistent_tas_offset_negative": 0,
+          "persistent_tas_offset_negative_bounded_jitter": 0,
+          "persistent_tas_offset_positive": 0,
+          "persistent_tas_offset_positive_bounded_jitter": 0,
+          "persistent_tas_scale_negative": 0,
+          "persistent_tas_scale_positive": 0,
+          "persistent_vertical_wind": 0,
+          "tas_offset_pulse_0p25s": 0,
+          "tas_offset_pulse_0p5s": 0,
+          "tas_offset_pulse_1p0s": 0,
+          "tas_offset_pulse_1p5s": 0,
+          "tas_offset_pulse_2p0s": 0
+        },
+        "diagnostic_snapshot_count": 0,
+        "diagnostic_snapshot_count_all_cases": 0,
+        "diagnostic_snapshot_rate": 0.0,
+        "diagnostic_snapshot_trials": 448,
+        "diagnostic_snapshot_trials_all_cases": 1088,
+        "diagnostic_without_control_count": 0,
+        "persistent_ambiguous_diagnostic_count": 0,
+        "persistent_ambiguous_diagnostic_members": [],
+        "persistent_clean_diagnostic_count": 0,
+        "persistent_clean_diagnostic_members": [],
+        "persistent_diagnostic_count": 0,
+        "persistent_diagnostic_trials": 256
+      },
+      "recent_boundary": {
+        "control_latch_count": 226,
+        "diagnostic_on_nominal_count": 0,
+        "diagnostic_on_structural_gap_count": 0,
+        "diagnostic_snapshot_by_case": {
+          "gap_then_tas_offset_pulse_1p0s": 0,
+          "nominal": 0,
+          "nominal_bounded_jitter": 0,
+          "nominal_high_noise_calibrated": 0,
+          "persistent_horizontal_wind_step": 4,
+          "persistent_tas_offset_negative": 5,
+          "persistent_tas_offset_negative_bounded_jitter": 5,
+          "persistent_tas_offset_positive": 6,
+          "persistent_tas_offset_positive_bounded_jitter": 6,
+          "persistent_tas_scale_negative": 4,
+          "persistent_tas_scale_positive": 4,
+          "persistent_vertical_wind": 9,
+          "tas_offset_pulse_0p25s": 0,
+          "tas_offset_pulse_0p5s": 0,
+          "tas_offset_pulse_1p0s": 0,
+          "tas_offset_pulse_1p5s": 0,
+          "tas_offset_pulse_2p0s": 4
+        },
+        "diagnostic_snapshot_count": 22,
+        "diagnostic_snapshot_count_all_cases": 47,
+        "diagnostic_snapshot_rate": 0.049107142857142856,
+        "diagnostic_snapshot_trials": 448,
+        "diagnostic_snapshot_trials_all_cases": 1088,
+        "diagnostic_without_control_count": 22,
+        "persistent_ambiguous_diagnostic_count": 0,
+        "persistent_ambiguous_diagnostic_members": [],
+        "persistent_clean_diagnostic_count": 22,
+        "persistent_clean_diagnostic_members": [
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74304
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74304
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74304
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74304
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74313
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74313
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74319
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74319
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74321
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74321
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74335
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74335
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74335
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74335
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74344
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74344
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74344
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74344
+          },
+          {
+            "case": "persistent_tas_offset_positive",
+            "seed": 74359
+          },
+          {
+            "case": "persistent_tas_offset_positive_bounded_jitter",
+            "seed": 74359
+          },
+          {
+            "case": "persistent_tas_offset_negative",
+            "seed": 74363
+          },
+          {
+            "case": "persistent_tas_offset_negative_bounded_jitter",
+            "seed": 74363
+          }
+        ],
+        "persistent_diagnostic_count": 22,
+        "persistent_diagnostic_trials": 256
+      }
+    }
+  },
+  "execution": {
+    "boundary_ages_s": [
+      1.0,
+      2.0,
+      3.0
+    ],
+    "full_trace_path": "build/airspeed_wind_residual_persistence_v8_diagnostic_lane_screen_74301_64.json",
+    "full_trace_sha256": "1d5efa87fe67f6152775f1e7018922c639ffbafe15fc4b0f01c7627ceb77259d",
+    "git_commit": "2bdb109ae9f6390a19f23189c3d58da3622d91ba",
+    "implementation_sha256": "1241ac3ed677f9a51935935679ae4966e0168875d0c9b044ca952d88e86117f6",
+    "jobs": 8,
+    "protocol_sha256": "8f5b40316b24b5a9db60f327f7409a67d3bdc8bbe4efafabbb5c4de1e37a2872",
+    "seed_count": 64,
+    "seed_end": 74364,
+    "seed_start": 74301
+  },
+  "interpretation": [
+    "A diagnostic snapshot is not a fault classification or control qualification.",
+    "Nominal and structural-gap diagnostic counts are retained as nuisance/continuity evidence, not hidden.",
+    "Persistent cases whose episode starts before the offline injection are ambiguous and are not credited as clean.",
+    "No policy, age, threshold, estimator state, FCOne authority, or flight-control action is promoted."
+  ],
+  "schema_version": 1,
+  "source_screen_manifest": {
+    "boundary_ages_s": [
+      1.0,
+      2.0,
+      3.0
+    ],
+    "case_names": [
+      "nominal",
+      "nominal_high_noise_calibrated",
+      "nominal_bounded_jitter",
+      "persistent_tas_offset_positive",
+      "persistent_tas_offset_negative",
+      "persistent_tas_offset_positive_bounded_jitter",
+      "persistent_tas_offset_negative_bounded_jitter",
+      "persistent_tas_scale_positive",
+      "persistent_tas_scale_negative",
+      "persistent_horizontal_wind_step",
+      "persistent_vertical_wind",
+      "tas_offset_pulse_0p25s",
+      "tas_offset_pulse_0p5s",
+      "tas_offset_pulse_1p0s",
+      "tas_offset_pulse_1p5s",
+      "tas_offset_pulse_2p0s",
+      "gap_then_tas_offset_pulse_1p0s"
+    ],
+    "protocol_path": "validation/airspeed_wind_residual_persistence_protocol_v7.json",
+    "protocol_sha256": "3fc033a98efbfd40fc3c459db79370ded3a2d1bdce240ae2e5a9d6801903695d",
+    "record_count": 1088,
+    "seed_count": 64,
+    "seed_end": 74364,
+    "seed_start": 74301
+  },
+  "status": "completed_non_promoting_diagnostic_screen",
+  "study_id": "aerakia-v8-diagnostic-lane-screen"
+}
