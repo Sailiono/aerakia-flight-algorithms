@@ -60,6 +60,10 @@ portable C library and from FCOne-specific integration code.
 - `run_airspeed_wind_observability_campaign.py`: two disjoint, frozen
   multi-seed replication windows for the same TAS/wind contract. It is a
   confirmation campaign, not a parameter-tuning loop or an estimator branch.
+- `run_airspeed_wind_mismatch_monitor.py`: v2 opened-development and v4
+  sealed-holdout residual-pattern monitor study for the retained vertical-wind
+  failure; the pre-release v3 smoke is explicitly invalidated. It has explicit
+  full-window coverage, impulse/gap controls, and no production ESKF/API effect.
 - `run_px4_bias_ab_m0.py`: optional PX4 host comparison; it is blocked until a
   matching PX4 source tree is supplied locally.
 

@@ -116,6 +116,16 @@ vertical-wind model assumption holds. The next source-contract revision must
 make its independently justified fixed-wing/regime qualification explicit and
 then validate it against physical air-data before any 17-state branch opens.
 
+The separate [residual-pattern monitor study](airspeed-wind-mismatch-monitor.md)
+does not change that conclusion. Its reviewed v1 prototype had zero nominal
+full-window coverage and was rejected before public evidence. A revised v2
+opened-development study passes explicit long-nominal, high-noise, impulse,
+gap, and persistent-mismatch controls; an invalidated v3 smoke is retained and
+a fresh v4 synthetic holdout is frozen. This
+can only test a narrow future source-supervisor *screen* under the stated
+synthetic contract. It cannot establish the `w_D = 0` assumption, physical
+air-data calibration, or a valid fixed-wing source/regime envelope.
+
 #### A2.1: isolated experimental branch
 
 - First run TAS with known wind to establish the model's upper bound.

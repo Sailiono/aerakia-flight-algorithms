@@ -115,6 +115,79 @@ and reviewed threshold checks. Its disposable manifest records the pending
 evidence/documentation commit; no executable source changed after the
 clean-provenance campaign artifact was generated.
 
+## 2026-08-11 — TAS residual-pattern monitor review and sealed holdout design
+
+### Reason
+
+The 480-case TAS/wind confirmation retained one unflagged vertical-wind false
+qualification. A proposed residual-history monitor was reviewed before being
+committed as evidence. The review found that its nominal control never formed
+a full four-observation window, while its first mismatch could latch from one
+large residual plus three nominal samples. Its reported `128/128` result was
+therefore development-only and invalid as a persistent-mismatch claim.
+
+### Changes
+
+- Retained the v1 review failure in `airspeed-wind-mismatch-monitor.md`; it
+  never enters `validation/public/` and changes no production ESKF code/API.
+- Added a v2 opened-development protocol that begins with the frozen
+  multi-heading source stream and requires at least 40 post-qualification
+  clean observations / 37 complete windows before any injection.
+- Added long nominal, high-noise nominal, single impulse, gap-plus-impulse,
+  persistent TAS-scale, horizontal-wind-step, and vertical-wind controls.
+- Added source/arrival timing to the host monitor, a `1.0 s` inter-sample gap
+  reset, `1.75 s` maximum four-sample span, clipped individual NIS, and a
+  multiple-contribution latch condition. This is a validation instrument, not
+  a private FCOne supervisor.
+- Added a development-only v2 protocol plus a separately fingerprinted sealed
+  protocol. The sealed protocol locks the base source protocol, base
+  oracle/generator, candidate runner, cases, parameters, and holdout seeds; it
+  refuses a dirty worktree.
+
+### Opened-development evidence and decision
+
+The first v2 parameter setting was correctly rejected in its opened 32-seed
+matrix: `170/224` cases passed, with nominal/impulse false latches and a
+high-noise bootstrap-boundary defect. Those failures selected the *development*
+revision only; no sealed seed was read.
+
+The second v2 setting passes `224/224` replications, covering 30,528 source
+observations and 17,723 complete monitor windows. All four non-latch controls
+remain unlatched across 32 seeds. Each of the three persistent mismatches
+latches across 32 seeds within its declared deadline; every trigger contains
+at least two injection-phase samples. The exact v2 development output remains
+disposable under `build/` because it is a selection window, not a holdout.
+
+This result is intentionally narrow. It demonstrates that the reviewed host
+screen no longer obtains a green nominal result from zero executable windows
+and does not latch on the declared one-off impulse controls. It does **not**
+make vertical wind observable, qualify physical air data, enable TAS in VTOL
+regimes, or unblock a 17-state wind branch. The source-policy blocker from the
+480-case wind confirmation remains in force.
+
+### Protocol-integrity incident and corrected next verification
+
+Before this source was committed, an independent implementation smoke ran all
+seven cases for intended-v3 seed `42001` in a temporary clean checkout. It
+reported `7/7`, but that number is discarded: opening even one originally
+sealed seed means v3 cannot honestly be called an unopened holdout. No parameter
+was adjusted from that result, the original worktree did not run v3, and no
+public artifact was written. The event is retained here rather than hidden.
+
+The v2 protocol is now explicitly development-only. The contaminated v3
+manifest is discarded, and a fresh v4 manifest uses only `43001--43128`, none
+of which were run during development or review. Commit the runner, tests,
+v1-review record, v2 development record, and v4 protocol. Then execute only:
+
+```bash
+python3 validation/run_airspeed_wind_mismatch_monitor.py \
+  --protocol validation/airspeed_wind_mismatch_monitor_protocol_v4.json \
+  --phase sealed_holdout --jobs 8
+```
+
+The compact clean result may be committed only after review. Any holdout
+failure remains evidence and may not be corrected by changing this v4 protocol.
+
 ## 2026-08-11 — full-state fixed-lag replay candidate rejected
 
 ### Reason

@@ -1,0 +1,93 @@
+{
+  "schema_version": 2,
+  "protocol_id": "aerakia-airspeed-wind-mismatch-monitor-v2",
+  "status": "development_only_validation",
+  "base_protocol_path": "validation/airspeed_wind_observability_protocol_v1.json",
+  "base_protocol_file_sha256": "98ea9d240e0d36b84a0fd6f3099afe25293bcfeb3b119f7eded04de4f913159d",
+  "base_oracle_runner_file_sha256": "4c7d723cfd7f9ee85e7abce9f9eb23d2258f12c180f2526f119f7ccd1302e024",
+  "candidate_runner_file_sha256": "development_only_not_a_release_artifact",
+  "scope": {
+    "production_eskf": "unchanged_16_nominal_15_error_state",
+    "candidate": "host_only_short_window_clipped_cumulative_nis_residual_pattern_screen",
+    "not_claimed": [
+      "This does not identify or estimate vertical wind.",
+      "This does not qualify a physical pitot, air-data source, or flight regime.",
+      "This does not add a TAS API, a wind state, or flight-control authority."
+    ]
+  },
+  "monitor": {
+    "window_observations": 4,
+    "maximum_window_elapsed_s": 1.75,
+    "maximum_inter_observation_gap_s": 1.0,
+    "per_observation_nis_cap": 6.0,
+    "contribution_nis_floor": 4.0,
+    "minimum_contributing_observations": 3,
+    "cumulative_nis_threshold": 18.0,
+    "latch_is_terminal_without_external_reauthorization": true,
+    "parameter_origin": "second opened-development choice after the first v2 parameters falsely latched on nominal/impulse controls: require three independently high contributions and cap one residual; values must not be changed from a later sealed holdout"
+  },
+  "stream": {
+    "base_case_name": "multi_heading_nominal",
+    "tail_heading_deg": 45.0,
+    "pre_injection_clean_observations": 64,
+    "persistent_injection_observations": 24,
+    "post_impulse_clean_observations": 24,
+    "gap_before_impulse_s": 4.0
+  },
+  "coverage": {
+    "minimum_pre_injection_eligible_observations": 40,
+    "minimum_pre_injection_completed_windows": 37
+  },
+  "seed_sets": {
+    "development": [32001, 32002, 32003, 32004, 32005, 32006, 32007, 32008, 32009, 32010, 32011, 32012, 32013, 32014, 32015, 32016, 32017, 32018, 32019, 32020, 32021, 32022, 32023, 32024, 32025, 32026, 32027, 32028, 32029, 32030, 32031, 32032]
+  },
+  "case_matrix": [
+    {
+      "name": "long_nominal",
+      "noise_multiplier": 1.0,
+      "injection": {"kind": "none"},
+      "expected": {"monitor_latched": false}
+    },
+    {
+      "name": "long_nominal_high_noise",
+      "noise_multiplier": 1.5,
+      "injection": {"kind": "none"},
+      "expected": {"monitor_latched": false}
+    },
+    {
+      "name": "single_tas_impulse",
+      "noise_multiplier": 1.0,
+      "injection": {"kind": "tas_impulse", "value": 12.0},
+      "expected": {"monitor_latched": false}
+    },
+    {
+      "name": "gap_then_single_tas_impulse",
+      "noise_multiplier": 1.0,
+      "injection": {"kind": "tas_impulse", "value": 12.0, "insert_gap_before": true},
+      "expected": {"monitor_latched": false, "minimum_inter_observation_gap_resets": 1}
+    },
+    {
+      "name": "persistent_tas_scale_bias",
+      "noise_multiplier": 1.0,
+      "injection": {"kind": "tas_offset", "value": 2.0},
+      "expected": {"monitor_latched": true, "minimum_latch_window_injection_observations": 2, "maximum_latch_delay_s": 8.0}
+    },
+    {
+      "name": "persistent_horizontal_wind_step",
+      "noise_multiplier": 1.0,
+      "injection": {"kind": "horizontal_wind_step", "value": 3.0},
+      "expected": {"monitor_latched": true, "minimum_latch_window_injection_observations": 2, "maximum_latch_delay_s": 8.0}
+    },
+    {
+      "name": "persistent_vertical_wind",
+      "noise_multiplier": 1.0,
+      "injection": {"kind": "vertical_wind", "value": 8.0},
+      "expected": {"monitor_latched": true, "minimum_latch_window_injection_observations": 2, "maximum_latch_delay_s": 8.0}
+    }
+  ],
+  "promotion_blockers_after_any_pass": [
+    "Measure false-latch probability and detection delay using calibrated physical TAS/GNSS data in a declared fixed-wing envelope.",
+    "Define a private source/regime authority rather than use this host monitor as a flight supervisor.",
+    "Use a separately sealed physical train/tune/holdout study before any 17-error-state wind experiment."
+  ]
+}

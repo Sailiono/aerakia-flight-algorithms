@@ -102,6 +102,10 @@ is the stable navigation layer rather than a disruptive mass rename.
 - [TAS/wind multi-seed confirmation](airspeed-wind-multiseed-confirmation.md):
   frozen-seed replication of that source contract, deliberately separate from
   any future physical train/tune/holdout study.
+- [TAS residual-pattern monitor study](airspeed-wind-mismatch-monitor.md):
+  v1 review failure retained, v2 opened-development selection recorded, an
+  invalidated v3 smoke disclosed, and a separate v4 synthetic holdout frozen;
+  still validation-only and not a wind-state promotion.
 - [Magnetic source supervision](magnetic-source-supervision.md) and
   [absolute-heading evidence](absolute-heading-evidence.md): why magnetic yaw
   is fail-safe by default and how trusted heading is qualified.
