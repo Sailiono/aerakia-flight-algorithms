@@ -43,6 +43,7 @@ PARAMETER_LABELS = (
 )
 PARAMETER_SCALES = np.asarray([0.05, 0.05, 0.15, 0.15, 0.15], dtype=np.float64)
 PARAMETER_EPSILON = np.asarray([1.0e-4, 1.0e-4, 1.0e-3, 1.0e-3, 1.0e-3], dtype=np.float64)
+TRUST_REGION_SCALES = (1.0, 0.5, 0.25, 0.125, 0.0625)
 ERROR_STATE_DIMENSION = 15
 ERROR_STATE_DTHETA = 0
 ERROR_STATE_DAB = 9
@@ -234,7 +235,32 @@ def _run_replay(
     """Run one cold-start replay with a complete pre-IMU error injection."""
 
     error_state = _error_state_from_correction(correction)
-    label = "-".join(f"{value:.12g}" for value in correction)
+    return _run_error_state_replay(
+        runner, input_path, work_dir, window_start_s, error_state, correction
+    )
+
+
+def _run_error_state_replay(
+    runner: Path,
+    input_path: Path,
+    work_dir: Path,
+    window_start_s: float,
+    error_state: np.ndarray,
+    label_values: np.ndarray | None = None,
+) -> ReplayTrace:
+    """Run a replay with an arbitrary finite 15D error-state injection."""
+
+    if error_state.shape != (ERROR_STATE_DIMENSION,) or not np.all(np.isfinite(error_state)):
+        raise ValueError("error_state must be a finite 15-vector")
+    if label_values is None:
+        label_values = error_state
+    if label_values.ndim != 1 or not np.all(np.isfinite(label_values)):
+        raise ValueError("label_values must be a finite vector")
+    label = "-".join(f"{value:.12g}" for value in label_values)
+    if len(label) > 120:
+        label = "state-" + hashlib.sha256(
+            np.asarray(label_values, dtype=np.float64).tobytes()
+        ).hexdigest()[:20]
     output_path = work_dir / f"replay-{label}.csv"
     command = [
         str(runner.resolve()),
@@ -434,28 +460,48 @@ def solve_window(
         correction, eigenvalues, weighted_post_residual = _solve_normalized(
             design, residual, variance, prior_information
         )
-        corrected = _run_replay(runner, input_path, root, window_start_s, correction)
-        schedule_matches = _schedule_matches(baseline, corrected, start_index, stop_index)
-        corrected_healthy = all(
-            _number(row, "eskf_healthy") >= 0.5
-            for row in corrected.result_rows[start_index:stop_index + 1]
-        )
         validation_baseline_norm = _weighted_innovation_norm(
             baseline, baseline_schedule, start_index, validation_start_index, stop_index
         )
-        validation_corrected_norm = _weighted_innovation_norm(
-            corrected, baseline_schedule, start_index, validation_start_index, stop_index
-        ) if schedule_matches else math.inf
-        validation_improved = (
-            math.isfinite(validation_baseline_norm)
-            and math.isfinite(validation_corrected_norm)
-            and validation_corrected_norm <= validation_baseline_norm
-        )
-        status = "proposal_computed_replayed"
-        if not schedule_matches or not corrected_healthy:
-            status = "proposal_rejected_corrected_replay_health_or_schedule"
-        elif not validation_improved:
-            status = "proposal_rejected_validation_innovation_worse"
+        candidates: list[tuple[float, ReplayTrace, float]] = []
+        rejected_scales: list[dict[str, object]] = []
+        for scale in TRUST_REGION_SCALES:
+            applied = correction * scale
+            corrected = _run_replay(runner, input_path, root, window_start_s, applied)
+            schedule_matches = _schedule_matches(baseline, corrected, start_index, stop_index)
+            corrected_healthy = all(
+                _number(row, "eskf_healthy") >= 0.5
+                for row in corrected.result_rows[start_index:stop_index + 1]
+            )
+            corrected_norm = _weighted_innovation_norm(
+                corrected, baseline_schedule, start_index, validation_start_index, stop_index
+            ) if schedule_matches else math.inf
+            if schedule_matches and corrected_healthy and math.isfinite(corrected_norm) \
+                    and corrected_norm <= validation_baseline_norm:
+                candidates.append((scale, corrected, corrected_norm))
+            else:
+                rejected_scales.append({
+                    "scale": scale,
+                    "schedule_matches": schedule_matches,
+                    "healthy": corrected_healthy,
+                    "validation_weighted_innovation_norm": corrected_norm,
+                })
+        if candidates:
+            applied_scale, corrected, validation_corrected_norm = min(
+                candidates, key=lambda item: item[2]
+            )
+            schedule_matches = True
+            corrected_healthy = True
+            validation_improved = True
+            status = "proposal_computed_replayed"
+        else:
+            applied_scale = None
+            validation_corrected_norm = math.inf
+            schedule_matches = False
+            corrected_healthy = False
+            validation_improved = False
+            status = "proposal_rejected_trust_region"
+        applied_correction = correction * applied_scale if applied_scale is not None else None
         return {
             "status": status,
             "method": "causal_preupdate_innovation_finite_difference_replay",
@@ -474,7 +520,11 @@ def solve_window(
             "prior_information_scale": prior_information_scale,
             "information_eigenvalues": eigenvalues.tolist(),
             "information_condition_number": float(eigenvalues[-1] / eigenvalues[0]),
-            "correction_physical": correction.tolist(),
+            "unconstrained_correction_physical": correction.tolist(),
+            "correction_physical": applied_correction.tolist() if applied_correction is not None else None,
+            "trust_region_scales": list(TRUST_REGION_SCALES),
+            "selected_trust_region_scale": applied_scale,
+            "rejected_trust_region_scales": rejected_scales,
             "correction_norm": float(np.linalg.norm(correction)),
             "weighted_residual_norm_before": float(np.linalg.norm(residual / np.sqrt(variance))),
             "weighted_residual_norm_after_linear": float(np.linalg.norm(weighted_post_residual)),

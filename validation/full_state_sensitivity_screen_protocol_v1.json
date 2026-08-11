@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "protocol_id": "aerakia-full-state-sensitivity-screen-v1",
+  "status": "frozen_development_screen_not_promotion",
+  "purpose": "Screen whether full 15D nuisance handling and a truth-free trust region improve on the rejected 5D replay candidate.",
+  "input_contract": {
+    "measurement_contract": "delta_interval_v2",
+    "acceleration_time_semantics": "interval_start_zoh",
+    "stationarity_source": "causal_imu_window",
+    "rate_hz": 100.0,
+    "accel_noise_density_m_s2_sqrt_hz": 0.002,
+    "gyro_noise_density_rad_s_sqrt_hz": 0.0000872664626,
+    "mag_noise_ut": 0.2,
+    "gps_position_noise_m": 0.5,
+    "gps_velocity_noise_m_s": 0.1
+  },
+  "solver": {
+    "window_duration_s": 20.0,
+    "window_stop_margin_s": 0.01,
+    "prior_information_scale": 1.0,
+    "trust_region_scales": [1.0, 0.5, 0.25, 0.125, 0.0625],
+    "accepted_schedule_must_match": true
+  },
+  "vectors": [
+    {"id": "zero", "bias_m_s2": [0.0, 0.0, 0.0]},
+    {"id": "x_neg", "bias_m_s2": [-0.15, 0.0, 0.0]},
+    {"id": "x_pos", "bias_m_s2": [0.15, 0.0, 0.0]},
+    {"id": "xy_neg_pos", "bias_m_s2": [-0.15, 0.15, 0.0]},
+    {"id": "xy_pos_neg", "bias_m_s2": [0.15, -0.15, 0.0]}
+  ],
+  "trajectories": [
+    {"id": "hover_axis_pulses", "motion": "bias_cv_hover_axis_pulses", "duration_s": 32.0, "seed_start": 0, "seed_stop": 4},
+    {"id": "takeoff_box_land", "motion": "bias_cv_takeoff_box_land", "duration_s": 38.0, "seed_start": 0, "seed_stop": 4},
+    {"id": "yaw_quadrant_hover", "motion": "bias_cv_yaw_quadrant_hover", "duration_s": 40.0, "seed_start": 1000, "seed_stop": 1004}
+  ],
+  "criteria": {
+    "terminal_window_s": 5.0,
+    "minimum_improved_nonzero_trial_fraction": 0.75,
+    "zero_bias_max_terminal_bias_regression_m_s2": 0.005,
+    "max_attitude_rmse_regression_deg": 0.05
+  },
+  "limits": [
+    "This screen has opened development inputs and cannot establish flight or release readiness.",
+    "Full boundary covariance is captured, but process/preintegration lag covariance and cross-source innovation covariance remain absent.",
+    "A passing screen only justifies a larger frozen train/tune protocol."
+  ]
+}

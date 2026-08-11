@@ -180,6 +180,59 @@ static int parse_cli_double(const char *text, double *value)
     return 1;
 }
 
+static int write_state_snapshot(
+    const char *path,
+    const AerakiaEskf *filter,
+    uint64_t timestamp_us,
+    long sequence
+)
+{
+    FILE *snapshot;
+    int row;
+    int column;
+    if (path == NULL || filter == NULL) return 0;
+    snapshot = open_portable_file(path, "w");
+    if (snapshot == NULL) return 0;
+    fprintf(
+        snapshot,
+        "{\n  \"schema_version\": 1,\n  \"timestamp_us\": %llu,\n"
+        "  \"sequence\": %ld,\n  \"state\": {\n",
+        (unsigned long long)timestamp_us, sequence
+    );
+    fputs("    \"p\": [", snapshot);
+    for (row = 0; row < 3; ++row) fprintf(snapshot, "%s%.17g", row == 0 ? "" : ", ", filter->core.state.p[row]);
+    fputs("],\n    \"v\": [", snapshot);
+    for (row = 0; row < 3; ++row) fprintf(snapshot, "%s%.17g", row == 0 ? "" : ", ", filter->core.state.v[row]);
+    fputs("],\n    \"q\": [", snapshot);
+    for (row = 0; row < 4; ++row) fprintf(snapshot, "%s%.17g", row == 0 ? "" : ", ", filter->core.state.q[row]);
+    fputs("],\n    \"ab\": [", snapshot);
+    for (row = 0; row < 3; ++row) fprintf(snapshot, "%s%.17g", row == 0 ? "" : ", ", filter->core.state.ab[row]);
+    fputs("],\n    \"gb\": [", snapshot);
+    for (row = 0; row < 3; ++row) fprintf(snapshot, "%s%.17g", row == 0 ? "" : ", ", filter->core.state.gb[row]);
+    fputs("]\n  },\n  \"P\": [\n", snapshot);
+    for (row = 0; row < ESKF_ERROR_STATE_DIM; ++row) {
+        fputs("    [", snapshot);
+        for (column = 0; column < ESKF_ERROR_STATE_DIM; ++column) {
+            fprintf(snapshot, "%s%.17g", column == 0 ? "" : ", ", filter->core.P[row][column]);
+        }
+        fprintf(snapshot, "]%s\n", row + 1 == ESKF_ERROR_STATE_DIM ? "" : ",");
+    }
+    fputs("  ]\n}\n", snapshot);
+    fclose(snapshot);
+    return 1;
+}
+
+static void apply_error_state(AerakiaEskf *filter, const double values[ESKF_ERROR_STATE_DIM])
+{
+    eskf_float_t error_state[ESKF_ERROR_STATE_DIM];
+    int index;
+    if (filter == NULL || values == NULL) return;
+    for (index = 0; index < ESKF_ERROR_STATE_DIM; ++index) {
+        error_state[index] = (eskf_float_t)values[index];
+    }
+    eskf_internal_apply_error_state(&filter->core, error_state);
+}
+
 static AerakiaVec3f parse_vector(
     char *columns[], int count, int x, int y, int z, double scale, int *ok
 )
@@ -323,10 +376,14 @@ int main(int argc, char *argv[])
     int compact_output = 0;
     int state_injection_enabled = 0;
     int state_injection_applied = 0;
+    int snapshot_enabled = 0;
+    int snapshot_written = 0;
     float stationary_gyro_threshold_rad_s = -1.0f;
     float maximum_aiding_age_s = NAN;
     double state_injection_at_s = NAN;
     double state_injection[ESKF_ERROR_STATE_DIM] = {0.0};
+    double snapshot_at_s = NAN;
+    const char *snapshot_output_path = NULL;
     int input_argument;
     int output_argument;
     int argument;
@@ -342,6 +399,7 @@ int main(int argc, char *argv[])
                 "[--inject-at-s VALUE --inject-error-state "
                 "DTHETA_X DTHETA_Y DTHETA_Z DV_X DV_Y DV_Z DP_X DP_Y DP_Z "
                 "DAB_X DAB_Y DAB_Z DGB_X DGB_Y DGB_Z] "
+                "[--snapshot-at-s VALUE --snapshot-out PATH] "
                 "INPUT_REPLAY_CSV OUTPUT_RESULTS_CSV\n",
                 argv[0]);
         return 2;
@@ -395,6 +453,21 @@ int main(int argc, char *argv[])
                 return 2;
             }
             state_injection_enabled = 1;
+        } else if (strcmp(argv[argument], "--snapshot-at-s") == 0) {
+            if (++argument >= input_argument
+                || !parse_cli_double(argv[argument], &snapshot_at_s)
+                || snapshot_at_s < 0.0) {
+                fputs("Invalid snapshot time\n", stderr);
+                return 2;
+            }
+            snapshot_enabled = 1;
+        } else if (strcmp(argv[argument], "--snapshot-out") == 0) {
+            if (++argument >= input_argument || argv[argument][0] == '\0') {
+                fputs("Invalid snapshot output path\n", stderr);
+                return 2;
+            }
+            snapshot_output_path = argv[argument];
+            snapshot_enabled = 1;
         } else if (strcmp(argv[argument], "--inject-error-state") == 0) {
             int axis;
             for (axis = 0; axis < ESKF_ERROR_STATE_DIM; ++axis) {
@@ -416,6 +489,10 @@ int main(int argc, char *argv[])
     }
     if (state_injection_enabled && !isfinite(state_injection_at_s)) {
         fputs("State injection requires --inject-at-s\n", stderr);
+        return 2;
+    }
+    if (snapshot_enabled && (!isfinite(snapshot_at_s) || snapshot_output_path == NULL)) {
+        fputs("Snapshot requires --snapshot-at-s and --snapshot-out\n", stderr);
         return 2;
     }
     input = open_portable_file(argv[input_argument], "r");
@@ -672,6 +749,19 @@ int main(int argc, char *argv[])
             mahony_reference_seeded = 1;
         }
 
+        if (snapshot_enabled && !snapshot_written
+            && (double)sample.timestamp_us * 1.0e-6 >= snapshot_at_s) {
+            if (!write_state_snapshot(
+                    snapshot_output_path, &eskf, sample.timestamp_us, sequence
+                )) {
+                fputs("Failed to write ESKF state snapshot\n", stderr);
+                fclose(input);
+                fclose(output);
+                return 2;
+            }
+            snapshot_written = 1;
+        }
+
         /*
          * Host-only correction experiments inject at an explicit pre-IMU,
          * pre-aiding boundary.  Reuse the core's complete nominal-state and
@@ -679,12 +769,7 @@ int main(int argc, char *argv[])
          */
         if (state_injection_enabled && !state_injection_applied
             && (double)sample.timestamp_us * 1.0e-6 >= state_injection_at_s) {
-            eskf_float_t error_state[ESKF_ERROR_STATE_DIM];
-            int error_index;
-            for (error_index = 0; error_index < ESKF_ERROR_STATE_DIM; ++error_index) {
-                error_state[error_index] = (eskf_float_t)state_injection[error_index];
-            }
-            eskf_internal_apply_error_state(&eskf.core, error_state);
+            apply_error_state(&eskf, state_injection);
             state_injection_applied = 1;
         }
 
