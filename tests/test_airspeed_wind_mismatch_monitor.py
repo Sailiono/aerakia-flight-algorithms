@@ -108,6 +108,55 @@ class AirspeedWindMismatchMonitorTests(unittest.TestCase):
         self.assertEqual(result["status"], "passed")
         self.assertEqual(result["totals"]["replication_cases"], 1)
 
+    def test_seed_selector_uses_only_canonical_contiguous_protocol_members(self) -> None:
+        self.assertEqual(
+            candidate.select_phase_seeds(self.protocol, "development", start_index=2, count=3),
+            [32003, 32004, 32005],
+        )
+        with self.assertRaisesRegex(ValueError, "empty or starts beyond"):
+            candidate.select_phase_seeds(self.protocol, "development", start_index=99, count=1)
+
+    def test_strict_shard_merge_requires_complete_raw_record_coverage(self) -> None:
+        minimal = copy.deepcopy(self.protocol)
+        minimal["seed_sets"]["development"] = [32001, 32002]
+        minimal["case_matrix"] = [
+            next(item for item in self.protocol["case_matrix"] if item["name"] == "long_nominal")
+        ]
+        shards = []
+        for seed in minimal["seed_sets"]["development"]:
+            result = candidate.run_protocol(
+                minimal,
+                self.base,
+                phase="development",
+                jobs=1,
+                selected_seeds=[seed],
+                include_records=True,
+            )
+            result["protocol"] = {"semantic_sha256": candidate.base.canonical_sha256(minimal)}
+            result["provenance"] = {
+                "runner_sha256": candidate.file_sha256(candidate.RUNNER_PATH),
+                "git_status": "",
+                "git_commit": "test-commit",
+            }
+            shards.append(result)
+        with tempfile.TemporaryDirectory() as temporary:
+            paths = []
+            for index, shard in enumerate(shards):
+                path = Path(temporary) / f"shard-{index}.json"
+                path.write_text(json.dumps(shard), encoding="utf-8")
+                paths.append(path)
+            merged = candidate.merge_shard_results(
+                minimal,
+                self.base,
+                phase="development",
+                shard_paths=paths,
+            )
+        self.assertEqual(merged["status"], "passed")
+        self.assertEqual(merged["seed_count"], 2)
+        self.assertEqual(merged["totals"]["replication_cases"], 2)
+        self.assertNotIn("records", merged)
+        self.assertEqual(merged["campaign_assembly"]["shard_count"], 2)
+
     def test_sealed_v4_exposes_only_the_unopened_holdout_set(self) -> None:
         sealed_path = ROOT / "validation" / "airspeed_wind_mismatch_monitor_protocol_v4.json"
         sealed = candidate.load_protocol(sealed_path)

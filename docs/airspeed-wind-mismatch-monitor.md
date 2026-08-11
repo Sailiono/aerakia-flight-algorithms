@@ -92,6 +92,16 @@ python3 validation/run_airspeed_wind_mismatch_monitor.py \
 restricted runners that do not allow child-process creation; a normal
 workstation may use more jobs without changing individual seed cases.
 
+If a restricted session cannot keep the complete campaign alive, split the
+already frozen v4 list only into explicit contiguous shards using
+`--seed-start-index`, `--seed-count`, and `--emit-records`, writing each raw
+record shard under `build/`. Then use the same frozen runner's `--merge-shards`
+mode once. It rejects a dirty source tree, an altered runner/protocol, mixed
+commits, overlapping/missing seeds, or any shard that lacks exactly one record
+per case/seed; the final compact artifact omits raw records. Sharding is
+execution transport, not a second opportunity to inspect a partial outcome or
+change v4 parameters.
+
 Only the clean, compact sealed result may be labelled a holdout and enter
 `validation/public/`; the v4 default is
 `validation/public/airspeed_wind_mismatch_monitor_v4.json`, so it cannot

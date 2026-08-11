@@ -202,6 +202,19 @@ parameter, result schema, or ESKF code. Normal workstations may still use the
 existing process pool. This is execution portability only, not additional
 algorithm evidence.
 
+The same runner also supports explicit contiguous raw-record shards followed
+by one strict merge. This is only a transport fallback for a session-duration
+limit: the merger requires every frozen seed exactly once, every case record,
+one clean source commit, and matching runner/protocol fingerprints. It emits a
+compact final summary and does not permit partial results to replace the sealed
+campaign.
+
+A direct long sequential rerun completed after later source edits and recorded
+a dirty worktree in its own provenance. That output was discarded and did not
+replace the clean `e672e5d` v2 development record. This demonstrates why the
+shard merger requires clean, matching source provenance rather than trusting a
+late file write.
+
 ## 2026-08-11 — full-state fixed-lag replay candidate rejected
 
 ### Reason

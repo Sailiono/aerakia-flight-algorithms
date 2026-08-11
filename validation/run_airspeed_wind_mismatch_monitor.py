@@ -676,56 +676,58 @@ def summarize_case(items: list[dict[str, object]], case: dict[str, Any]) -> dict
     }
 
 
-def run_protocol(
+def select_phase_seeds(
     protocol: dict[str, Any],
-    base_protocol: dict[str, Any],
-    *,
     phase: str,
-    jobs: int,
-) -> dict[str, object]:
+    *,
+    start_index: int = 0,
+    count: int | None = None,
+) -> list[int]:
+    """Select a canonical contiguous shard without inventing new seed order."""
+
     if phase not in ("development", "sealed_holdout"):
         raise ValueError("unknown mismatch-monitor campaign phase")
     if phase not in protocol["seed_sets"]:
         raise ValueError(f"mismatch-monitor protocol has no {phase!r} seed set")
-    if jobs <= 0:
-        raise ValueError("jobs must be positive")
-    cases = protocol["case_matrix"]
-    tasks = [
-        (case, protocol, base_protocol, seed)
-        for seed in protocol["seed_sets"][phase]
-        for case in cases
-    ]
+    if start_index < 0:
+        raise ValueError("seed start index must be non-negative")
+    if count is not None and count <= 0:
+        raise ValueError("seed count must be positive when supplied")
+    phase_seeds = [int(seed) for seed in protocol["seed_sets"][phase]]
+    selected = phase_seeds[start_index:] if count is None else phase_seeds[start_index : start_index + count]
+    if not selected:
+        raise ValueError("selected seed shard is empty or starts beyond the protocol seed set")
+    return selected
 
-    # A one-worker campaign has no parallelism to gain. Running it in-process
-    # keeps the validation path usable in restricted desktop/sandbox runners
-    # that intentionally terminate child-process creation. It also makes the
-    # smallest reproduction path independent of multiprocessing semantics.
-    if jobs == 1:
-        records = [evaluate_task(task) for task in tasks]
-    else:
-        # Python 3.14 defaults to ``forkserver`` on this Linux host, which is
-        # deliberately unavailable in the sandbox. Explicit ``fork`` keeps the
-        # independent seed cases parallel without affecting Windows, where
-        # spawn remains the only available method.
-        methods = multiprocessing.get_all_start_methods()
-        context = multiprocessing.get_context("fork") if "fork" in methods else None
-        with ProcessPoolExecutor(max_workers=jobs, mp_context=context) as executor:
-            records = list(executor.map(evaluate_task, tasks))
+
+def assemble_result(
+    protocol: dict[str, Any],
+    base_protocol: dict[str, Any],
+    *,
+    phase: str,
+    selected_seeds: list[int],
+    records: list[dict[str, object]],
+    include_records: bool,
+) -> dict[str, object]:
+    """Create a compact or shard result from evaluated case records."""
+
+    cases = protocol["case_matrix"]
     records.sort(key=lambda item: (str(item["name"]), int(item["synthetic_seed"])))
     grouped: dict[str, list[dict[str, object]]] = defaultdict(list)
-    by_name = {str(case["name"]): case for case in cases}
     for record in records:
         grouped[str(record["name"])].append(record)
     summaries = [summarize_case(grouped[str(case["name"])], case) for case in cases]
     failures = [record for record in records if not bool(record["passed"])]
-    return {
+    result: dict[str, object] = {
         "schema_version": 2,
         "study_id": protocol["protocol_id"],
         "phase": phase,
         "status": "passed" if not failures else "failed",
         "monitor": protocol["monitor"],
         "coverage": protocol["coverage"],
-        "seed_count": len(protocol["seed_sets"][phase]),
+        "seed_count": len(selected_seeds),
+        "selected_seeds": selected_seeds,
+        "selected_seed_canonical_sha256": base.canonical_sha256(selected_seeds),
         "case_summaries": summaries,
         "totals": {
             "replication_cases": len(records),
@@ -742,6 +744,168 @@ def run_protocol(
             "Replication-level zero-event bounds assume independent synthetic seeds; overlapping rolling windows are not treated as independent trials.",
         ],
     }
+    if include_records:
+        result["records"] = records
+    return result
+
+
+def run_protocol(
+    protocol: dict[str, Any],
+    base_protocol: dict[str, Any],
+    *,
+    phase: str,
+    jobs: int,
+    selected_seeds: list[int] | None = None,
+    include_records: bool = False,
+) -> dict[str, object]:
+    """Run one complete campaign or a contiguous, explicit seed shard."""
+
+    phase_seeds = select_phase_seeds(protocol, phase)
+    selected = phase_seeds if selected_seeds is None else [int(seed) for seed in selected_seeds]
+    canonical_selected = [seed for seed in phase_seeds if seed in set(selected)]
+    if selected != canonical_selected:
+        raise ValueError("selected seeds must be unique, protocol members, and in canonical protocol order")
+    if jobs <= 0:
+        raise ValueError("jobs must be positive")
+    cases = protocol["case_matrix"]
+    tasks = [(case, protocol, base_protocol, seed) for seed in selected for case in cases]
+
+    # A one-worker campaign has no parallelism to gain. Running it in-process
+    # keeps the validation path usable in restricted desktop/sandbox runners
+    # that intentionally terminate child-process creation. It also makes the
+    # smallest reproduction path independent of multiprocessing semantics.
+    if jobs == 1:
+        records = [evaluate_task(task) for task in tasks]
+    else:
+        # Python 3.14 defaults to ``forkserver`` on this Linux host, which is
+        # deliberately unavailable in the sandbox. Explicit ``fork`` keeps the
+        # independent seed cases parallel without affecting Windows, where
+        # spawn remains the only available method.
+        methods = multiprocessing.get_all_start_methods()
+        context = multiprocessing.get_context("fork") if "fork" in methods else None
+        with ProcessPoolExecutor(max_workers=jobs, mp_context=context) as executor:
+            records = list(executor.map(evaluate_task, tasks))
+    return assemble_result(
+        protocol,
+        base_protocol,
+        phase=phase,
+        selected_seeds=selected,
+        records=records,
+        include_records=include_records,
+    )
+
+
+def decorate_result(
+    result: dict[str, object],
+    *,
+    protocol_path: Path,
+    jobs: int,
+) -> None:
+    """Attach immutable source/provenance information before writing a result."""
+
+    result["protocol"] = {
+        "path": str(protocol_path.relative_to(ROOT)) if protocol_path.is_relative_to(ROOT) else str(protocol_path),
+        "file_sha256": file_sha256(protocol_path),
+        "semantic_sha256": base.canonical_sha256(load_protocol(protocol_path)),
+    }
+    result["provenance"] = {
+        "runner_sha256": file_sha256(RUNNER_PATH),
+        "base_oracle_runner_sha256": file_sha256(ROOT / "validation" / "run_airspeed_wind_observability.py"),
+        "git_commit": capture(["git", "rev-parse", "HEAD"]),
+        "git_status": capture(["git", "status", "--short"]),
+        "jobs": jobs,
+    }
+
+
+def merge_shard_results(
+    protocol: dict[str, Any],
+    base_protocol: dict[str, Any],
+    *,
+    phase: str,
+    shard_paths: list[Path],
+) -> dict[str, object]:
+    """Fail closed while reassembling compact evidence from raw-record shards."""
+
+    expected_seeds = select_phase_seeds(protocol, phase)
+    expected_cases = {str(case["name"]) for case in protocol["case_matrix"]}
+    expected_protocol_semantic_sha = base.canonical_sha256(protocol)
+    expected_runner_sha = file_sha256(RUNNER_PATH)
+    seen_seeds: set[int] = set()
+    all_records: list[dict[str, object]] = []
+    shard_manifest: list[dict[str, object]] = []
+    source_commit: str | None = None
+    for raw_path in shard_paths:
+        path = raw_path.resolve()
+        if not path.is_file():
+            raise ValueError(f"missing shard result: {path}")
+        item = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(item, dict):
+            raise ValueError("shard result must be a JSON object")
+        if item.get("study_id") != protocol["protocol_id"] or item.get("phase") != phase:
+            raise ValueError("shard belongs to a different study or phase")
+        if item.get("protocol", {}).get("semantic_sha256") != expected_protocol_semantic_sha:
+            raise ValueError("shard protocol semantic fingerprint differs from the merge protocol")
+        provenance = item.get("provenance")
+        if not isinstance(provenance, dict) or provenance.get("runner_sha256") != expected_runner_sha:
+            raise ValueError("shard runner fingerprint differs from the frozen merge runner")
+        if provenance.get("git_status") != "":
+            raise ValueError("shard was not generated from a clean Git worktree")
+        commit = provenance.get("git_commit")
+        if not isinstance(commit, str) or not commit:
+            raise ValueError("shard lacks a source Git commit")
+        if source_commit is None:
+            source_commit = commit
+        elif commit != source_commit:
+            raise ValueError("shards were generated from different Git commits")
+        seeds = item.get("selected_seeds")
+        records = item.get("records")
+        if not isinstance(seeds, list) or not seeds or not isinstance(records, list):
+            raise ValueError("shard must retain selected seeds and raw case records")
+        normalized_seeds = [int(seed) for seed in seeds]
+        if normalized_seeds != [seed for seed in expected_seeds if seed in set(normalized_seeds)]:
+            raise ValueError("shard seeds are not a canonical subset of this protocol")
+        if seen_seeds.intersection(normalized_seeds):
+            raise ValueError("shard seed sets overlap")
+        expected_keys = {(name, seed) for name in expected_cases for seed in normalized_seeds}
+        actual_keys: set[tuple[str, int]] = set()
+        normalized_records: list[dict[str, object]] = []
+        for record in records:
+            if not isinstance(record, dict):
+                raise ValueError("shard case record must be an object")
+            key = (str(record.get("name")), int(record.get("synthetic_seed")))
+            if key not in expected_keys or key in actual_keys:
+                raise ValueError("shard records are incomplete, foreign, or duplicated")
+            actual_keys.add(key)
+            normalized_records.append(record)
+        if actual_keys != expected_keys:
+            raise ValueError("shard does not contain exactly one record per case and selected seed")
+        seen_seeds.update(normalized_seeds)
+        all_records.extend(normalized_records)
+        shard_manifest.append(
+            {
+                "path": str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else str(path),
+                "file_sha256": file_sha256(path),
+                "seed_count": len(normalized_seeds),
+                "selected_seed_canonical_sha256": base.canonical_sha256(normalized_seeds),
+            }
+        )
+    if seen_seeds != set(expected_seeds):
+        raise ValueError("shards do not cover the complete frozen seed set exactly once")
+    result = assemble_result(
+        protocol,
+        base_protocol,
+        phase=phase,
+        selected_seeds=expected_seeds,
+        records=all_records,
+        include_records=False,
+    )
+    result["campaign_assembly"] = {
+        "mode": "strict_raw_record_shard_merge",
+        "source_git_commit": source_commit,
+        "shard_count": len(shard_manifest),
+        "shards": shard_manifest,
+    }
+    return result
 
 
 def main() -> int:
@@ -750,25 +914,57 @@ def main() -> int:
     parser.add_argument("--phase", choices=("development", "sealed_holdout"), default="development")
     parser.add_argument("--out", type=Path)
     parser.add_argument("--jobs", type=int, default=min(8, max(1, os.cpu_count() or 1)))
+    parser.add_argument("--seed-start-index", type=int, default=0)
+    parser.add_argument("--seed-count", type=int)
+    parser.add_argument(
+        "--emit-records",
+        action="store_true",
+        help="retain raw per-case records for a temporary shard merge",
+    )
+    parser.add_argument(
+        "--merge-shards",
+        type=Path,
+        nargs="+",
+        help="strictly merge clean, raw-record shard JSON files instead of evaluating seeds",
+    )
     args = parser.parse_args()
     protocol_path = args.protocol.resolve()
     protocol = load_protocol(protocol_path)
     base_protocol = resolve_base_protocol(protocol)
     if args.phase == "sealed_holdout":
         verify_sealed_holdout(protocol)
-    result = run_protocol(protocol, base_protocol, phase=args.phase, jobs=args.jobs)
-    result["protocol"] = {
-        "path": str(protocol_path.relative_to(ROOT)) if protocol_path.is_relative_to(ROOT) else str(protocol_path),
-        "file_sha256": file_sha256(protocol_path),
-        "semantic_sha256": base.canonical_sha256(protocol),
-    }
-    result["provenance"] = {
-        "runner_sha256": file_sha256(RUNNER_PATH),
-        "base_oracle_runner_sha256": file_sha256(ROOT / "validation" / "run_airspeed_wind_observability.py"),
-        "git_commit": capture(["git", "rev-parse", "HEAD"]),
-        "git_status": capture(["git", "status", "--short"]),
-        "jobs": args.jobs,
-    }
+    if args.merge_shards is not None:
+        if args.seed_start_index != 0 or args.seed_count is not None or args.emit_records:
+            raise ValueError("shard merge cannot also select seeds or request raw records")
+        result = merge_shard_results(
+            protocol,
+            base_protocol,
+            phase=args.phase,
+            shard_paths=args.merge_shards,
+        )
+    else:
+        selected_seeds = select_phase_seeds(
+            protocol,
+            args.phase,
+            start_index=args.seed_start_index,
+            count=args.seed_count,
+        )
+        full_seed_set = selected_seeds == select_phase_seeds(protocol, args.phase)
+        if not full_seed_set and args.out is None:
+            raise ValueError("partial seed shards require an explicit --out path")
+        result = run_protocol(
+            protocol,
+            base_protocol,
+            phase=args.phase,
+            jobs=args.jobs,
+            selected_seeds=selected_seeds,
+            include_records=args.emit_records,
+        )
+        result["campaign_partition"] = {
+            "kind": "complete_campaign" if full_seed_set else "raw_record_shard",
+            "phase_seed_count": len(select_phase_seeds(protocol, args.phase)),
+        }
+    decorate_result(result, protocol_path=protocol_path, jobs=args.jobs)
     if args.out is None:
         output = default_output_path(protocol, args.phase)
     else:
