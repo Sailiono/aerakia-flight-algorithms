@@ -188,6 +188,16 @@ python3 validation/run_airspeed_wind_mismatch_monitor.py \
 The compact clean result may be committed only after review. Any holdout
 failure remains evidence and may not be corrected by changing this v4 protocol.
 
+### Reproduction environment note
+
+The managed desktop sandbox terminates a forked `ProcessPoolExecutor` without
+diagnostic output after the campaign begins. The runner therefore has an
+explicit in-process `--jobs 1` path; it evaluates the same isolated case
+function in canonical task order and does not change any random seed, monitor
+parameter, result schema, or ESKF code. Normal workstations may still use the
+existing process pool. This is execution portability only, not additional
+algorithm evidence.
+
 ## 2026-08-11 — full-state fixed-lag replay candidate rejected
 
 ### Reason

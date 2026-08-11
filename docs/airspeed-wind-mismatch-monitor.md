@@ -81,12 +81,16 @@ precede any 17-error-state wind experiment.
 
 ```bash
 python3 -m unittest tests.test_airspeed_wind_mismatch_monitor -v
-python3 validation/run_airspeed_wind_mismatch_monitor.py --phase development --jobs 8
+python3 validation/run_airspeed_wind_mismatch_monitor.py --phase development --jobs 1
 # After the code, tests, v2 development record, and v4 protocol are committed:
 python3 validation/run_airspeed_wind_mismatch_monitor.py \
   --protocol validation/airspeed_wind_mismatch_monitor_protocol_v4.json \
   --phase sealed_holdout --jobs 8
 ```
+
+`--jobs 1` is the strictly sequential reproduction path and is required on
+restricted runners that do not allow child-process creation; a normal
+workstation may use more jobs without changing individual seed cases.
 
 Only the clean, compact sealed result may be labelled a holdout and enter
 `validation/public/`; the v4 default is

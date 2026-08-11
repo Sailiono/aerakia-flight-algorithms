@@ -5,7 +5,7 @@
   "base_protocol_path": "validation/airspeed_wind_observability_protocol_v1.json",
   "base_protocol_file_sha256": "98ea9d240e0d36b84a0fd6f3099afe25293bcfeb3b119f7eded04de4f913159d",
   "base_oracle_runner_file_sha256": "4c7d723cfd7f9ee85e7abce9f9eb23d2258f12c180f2526f119f7ccd1302e024",
-  "candidate_runner_file_sha256": "124fd263eb377976a508c13aa9d537c4c5bae266819df2f4647f5c5bdb42350b",
+  "candidate_runner_file_sha256": "07792a9b80b091d684e5bb7073274d8490b0bc54e1633fe50cbfb01a62d200c1",
   "scope": {
     "production_eskf": "unchanged_16_nominal_15_error_state",
     "candidate": "host_only_short_window_clipped_cumulative_nis_residual_pattern_screen",

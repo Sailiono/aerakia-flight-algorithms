@@ -98,6 +98,16 @@ class AirspeedWindMismatchMonitorTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "has no 'sealed_holdout' seed set"):
             candidate.run_protocol(self.protocol, self.base, phase="sealed_holdout", jobs=1)
 
+    def test_single_job_protocol_execution_does_not_need_a_worker_process(self) -> None:
+        minimal = copy.deepcopy(self.protocol)
+        minimal["seed_sets"]["development"] = [32001]
+        minimal["case_matrix"] = [
+            next(item for item in self.protocol["case_matrix"] if item["name"] == "long_nominal")
+        ]
+        result = candidate.run_protocol(minimal, self.base, phase="development", jobs=1)
+        self.assertEqual(result["status"], "passed")
+        self.assertEqual(result["totals"]["replication_cases"], 1)
+
     def test_sealed_v4_exposes_only_the_unopened_holdout_set(self) -> None:
         sealed_path = ROOT / "validation" / "airspeed_wind_mismatch_monitor_protocol_v4.json"
         sealed = candidate.load_protocol(sealed_path)

@@ -696,14 +696,21 @@ def run_protocol(
         for case in cases
     ]
 
-    # Python 3.14 defaults to ``forkserver`` on this Linux host, which is
-    # deliberately unavailable in the sandbox. Explicit ``fork`` keeps the
-    # independent seed cases parallel without affecting Windows, where spawn
-    # remains the only available method.
-    methods = multiprocessing.get_all_start_methods()
-    context = multiprocessing.get_context("fork") if "fork" in methods else None
-    with ProcessPoolExecutor(max_workers=jobs, mp_context=context) as executor:
-        records = list(executor.map(evaluate_task, tasks))
+    # A one-worker campaign has no parallelism to gain. Running it in-process
+    # keeps the validation path usable in restricted desktop/sandbox runners
+    # that intentionally terminate child-process creation. It also makes the
+    # smallest reproduction path independent of multiprocessing semantics.
+    if jobs == 1:
+        records = [evaluate_task(task) for task in tasks]
+    else:
+        # Python 3.14 defaults to ``forkserver`` on this Linux host, which is
+        # deliberately unavailable in the sandbox. Explicit ``fork`` keeps the
+        # independent seed cases parallel without affecting Windows, where
+        # spawn remains the only available method.
+        methods = multiprocessing.get_all_start_methods()
+        context = multiprocessing.get_context("fork") if "fork" in methods else None
+        with ProcessPoolExecutor(max_workers=jobs, mp_context=context) as executor:
+            records = list(executor.map(evaluate_task, tasks))
     records.sort(key=lambda item: (str(item["name"]), int(item["synthetic_seed"])))
     grouped: dict[str, list[dict[str, object]]] = defaultdict(list)
     by_name = {str(case["name"]): case for case in cases}
