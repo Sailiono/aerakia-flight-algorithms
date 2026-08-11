@@ -2773,8 +2773,24 @@ protocol, not a change to any historical v4/v5/v6 evidence.
 
 ### Current status
 
-No v7 train has been run yet. A true 20 Hz burst and arrival-only-gap campaign
-is deliberately not claimed: implementing those with a dedicated source-rate
-generator is a separate future item. The next permitted action is to commit
-this preflight from a clean tree, then run the one-time 512-family train. A
-failed train must remain as evidence and cannot generate a tune claim.
+The preflight was committed as `023a0a4` and pushed before execution. The
+single v7 train then ran once from that clean commit using eight workers. It
+completed 8,704 replays / 1,410,048 generated observations / 958,464
+NIS-fed observations and wrote
+[`airspeed_wind_residual_persistence_v7_train.json`](../validation/public/airspeed_wind_residual_persistence_v7_train.json)
+with an initially clean worktree provenance record.
+
+The status is `failed_train_development_checks`. Nuisance false latches were
+`3/512` (point `0.5859%`, 97.5% upper `1.7027%`) and met the registered
+`3%` upper-bound limit. The persistent `±2 m/s` family failed `292/512`
+(point `57.0313%`, 97.5% upper `61.3654%`), with only 220 fully successful
+families and a failure-sentinel family P95 of `6.001 s`. All deterministic
+contracts passed. The failure is dominated by no post-injection latch: 247
+positive and 234 negative aligned cases (with equal counts for bounded
+jitter); 11 positive and 14 negative cases per delivery profile were correctly
+classified as pre-existing/ambiguous.
+
+No v7 tune claim or tune run is permitted. A true 20 Hz burst and
+arrival-only-gap campaign is still deliberately not claimed. Any attempted
+improvement must begin as v8 with disjoint seeds, preserving the v7 protocol,
+code, result, and failure records exactly as executed.

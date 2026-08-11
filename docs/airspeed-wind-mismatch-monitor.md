@@ -209,9 +209,45 @@ being represented by a misleading 2 Hz approximation.
 
 V7 train seeds are `71101--71612` (512 families); tune seeds are
 `72101--73124` (1,024 families). Seed `71001` was used only for a preflight
-smoke and is permanently retired in the protocol registry. The train has not
-been run at this checkpoint. If the train fails, its artifact will be retained
-and no tune claim will be generated.
+smoke and is permanently retired in the protocol registry.
+
+## v7 train result (failed development evidence)
+
+The v7 train was executed once from clean commit `023a0a4` with eight workers.
+It completed all 512 seed families and 17 registered cases: 8,704 complete
+replays, 1,410,048 generated observations, and 958,464 NIS-fed observations.
+The immutable result is retained at
+[`airspeed_wind_residual_persistence_v7_train.json`](../validation/public/airspeed_wind_residual_persistence_v7_train.json)
+(SHA-256 `42e933461b9fdae3f38ec6787133193fc79ccb3a02be4e8714799760b5471dfc`).
+
+The result cleanly separates the two primary outcomes:
+
+- Nuisance false latches: `3/512 = 0.586%`; the 97.5% one-sided
+  Clopper--Pearson upper bound is `1.703%`, below the registered `3%` limit.
+- Persistent `±2 m/s` TAS-offset family: `292/512 = 57.031%` failures; the
+  97.5% upper bound is `61.365%` and the family P95 is the registered failure
+  sentinel `6.001 s`, not the `3.0 s` target. Only 220 complete seed families
+  satisfied all four sign/delivery members.
+
+The deterministic common-random pairing, gap/coverage trace, and pulse
+monotonicity contracts all passed. Aligned and bounded-jitter variants had the
+same persistent latch counts (positive `264/512`, negative `277/512` clean
+post-injection latches), so this limited 2 Hz jitter model did not explain the
+failure. The retained records instead show that the currently conservative
+quiet/high persistence rule often never forms a qualifying high episode for a
+`±2 m/s` step; 11--14 cases per sign were also correctly marked as
+pre-existing/ambiguous rather than credited after the injection. This is a
+monitor-characterization result, not evidence that the production ESKF or
+Mahony estimator failed.
+
+The high-noise descriptive case never became geometry-qualified and fed zero
+residuals. It is retained as a coverage observation, not counted as evidence
+of high-noise detection performance. The true 20 Hz burst and arrival-only-gap
+matrix remains unimplemented and unclaimed.
+
+V7 tune is prohibited because train did not pass. The next iteration must use
+a new v8 protocol and disjoint seed ranges; v7 data may be analyzed, but its
+thresholds, code, or train artifact must not be rewritten or rerun.
 
 ## Boundary
 
