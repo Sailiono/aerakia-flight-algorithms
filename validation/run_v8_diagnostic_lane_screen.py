@@ -93,6 +93,7 @@ def _candidate_summary(screen: dict[str, object], ages: Sequence[float]) -> dict
                 for seed in seeds
                 for case in NOMINAL_CASES + PERSISTENT_CASES + STRUCTURAL_CASES
             ]
+            all_results = [result_for(seed, case) for seed in seeds for case in SCREEN_CASES]
             persistent_results = [
                 result_for(seed, case) for seed in seeds for case in PERSISTENT_CASES
             ]
@@ -122,6 +123,17 @@ def _candidate_summary(screen: dict[str, object], ages: Sequence[float]) -> dict
                         clean_persistent_snapshots.append((seed, case))
 
             per_policy[policy.value] = {
+                "diagnostic_snapshot_count_all_cases": sum(
+                    result["diagnostic_snapshot"] is not None for result in all_results
+                ),
+                "diagnostic_snapshot_trials_all_cases": len(all_results),
+                "diagnostic_snapshot_by_case": {
+                    case: sum(
+                        result_for(seed, case)["diagnostic_snapshot"] is not None
+                        for seed in seeds
+                    )
+                    for case in SCREEN_CASES
+                },
                 "diagnostic_snapshot_count": len(diagnostic_snapshots),
                 "diagnostic_snapshot_trials": len(diagnostic_results),
                 "diagnostic_snapshot_rate": (
