@@ -678,7 +678,12 @@ def _build_observation(
     return observation, WindTruthSample((float(wind_ned_m_s[0]), float(wind_ned_m_s[1])))
 
 
-def generate_scenario(name: str, protocol: dict[str, Any]) -> tuple[list[TasWindObservation], list[WindTruthSample], int]:
+def generate_scenario(
+    name: str,
+    protocol: dict[str, Any],
+    *,
+    synthetic_seed: int | None = None,
+) -> tuple[list[TasWindObservation], list[WindTruthSample], int]:
     """Generate immutable measurement and truth lists; truth stays outside the oracle."""
 
     source = protocol["synthetic_source"]
@@ -687,7 +692,8 @@ def generate_scenario(name: str, protocol: dict[str, Any]) -> tuple[list[TasWind
     samples_per_segment = int(round(rate_hz * duration_s))
     if samples_per_segment <= 0:
         raise ValueError("synthetic source must produce at least one sample per segment")
-    seed = int(source["seed"]) ^ int.from_bytes(hashlib.sha256(name.encode("utf-8")).digest()[:4], "big")
+    seed_root = int(source["seed"]) if synthetic_seed is None else int(synthetic_seed)
+    seed = seed_root ^ int.from_bytes(hashlib.sha256(name.encode("utf-8")).digest()[:4], "big")
     rng = np.random.default_rng(seed)
     nominal_wind_ne = np.asarray(source["nominal_wind_ne_m_s"], dtype=np.float64)
     nominal_wind_ned = np.array((nominal_wind_ne[0], nominal_wind_ne[1], 0.0), dtype=np.float64)
@@ -807,9 +813,16 @@ def score_causal_oracle(
     }
 
 
-def evaluate_case(case: dict[str, Any], protocol: dict[str, Any]) -> dict[str, object]:
+def evaluate_case(
+    case: dict[str, Any],
+    protocol: dict[str, Any],
+    *,
+    synthetic_seed: int | None = None,
+) -> dict[str, object]:
     name = str(case["name"])
-    observations, truths, final_now_us = generate_scenario(name, protocol)
+    observations, truths, final_now_us = generate_scenario(
+        name, protocol, synthetic_seed=synthetic_seed
+    )
     oracle = CausalWindOracle(protocol)
     events = [oracle.step(observation) for observation in observations]
     causal = oracle.summary(final_now_us)
@@ -840,6 +853,7 @@ def evaluate_case(case: dict[str, Any], protocol: dict[str, Any]) -> dict[str, o
                 errors.append(f"required rejection {reason} was absent")
     return {
         "name": name,
+        "synthetic_seed": synthetic_seed,
         "role": case["role"],
         "passed": not errors,
         "errors": errors,

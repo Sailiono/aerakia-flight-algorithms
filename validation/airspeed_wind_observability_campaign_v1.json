@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "campaign_id": "aerakia-airspeed-wind-observability-confirmation-v1",
+  "status": "frozen-confirmation-only",
+  "base_protocol_path": "validation/airspeed_wind_observability_protocol_v1.json",
+  "base_protocol_file_sha256": "98ea9d240e0d36b84a0fd6f3099afe25293bcfeb3b119f7eded04de4f913159d",
+  "scenario_names": [
+    "multi_heading_nominal",
+    "straight_line",
+    "hover",
+    "low_tas",
+    "vtol_transition",
+    "rotor_wash",
+    "sideslip",
+    "blocked_pitot",
+    "stalled_pitot",
+    "delayed_tas",
+    "reordered_tas",
+    "gnss_outage",
+    "wind_shear",
+    "tas_scale_bias",
+    "vertical_wind"
+  ],
+  "confirmation_seed_splits": {
+    "replication_a": [17001, 17002, 17003, 17004, 17005, 17006, 17007, 17008, 17009, 17010, 17011, 17012, 17013, 17014, 17015, 17016],
+    "replication_b": [27001, 27002, 27003, 27004, 27005, 27006, 27007, 27008, 27009, 27010, 27011, 27012, 27013, 27014, 27015, 27016]
+  },
+  "acceptance_rules": [
+    "Every replication must satisfy the unchanged per-case rule in the base protocol.",
+    "No threshold, scenario, seed, or source contract may be changed after an observed result.",
+    "All declared fail-closed controls must remain non-qualified or retain their explicitly declared transport-control status.",
+    "This campaign is confirmation only: it does not tune a wind estimator or open a 17-error-state branch."
+  ],
+  "retention": {
+    "commit": "compact aggregate summaries, failed-case records if any, input count, and canonical record digest",
+    "do_not_commit": "per-sample source streams, full per-seed records, build logs, or plots"
+  }
+}

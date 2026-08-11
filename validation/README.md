@@ -57,6 +57,9 @@ portable C library and from FCOne-specific integration code.
   causal two-state wind-observability oracle. It intentionally does not call
   the production ESKF or add a TAS API/state; see
   [`../docs/airspeed-wind-observability.md`](../docs/airspeed-wind-observability.md).
+- `run_airspeed_wind_observability_campaign.py`: two disjoint, frozen
+  multi-seed replication windows for the same TAS/wind contract. It is a
+  confirmation campaign, not a parameter-tuning loop or an estimator branch.
 - `run_px4_bias_ab_m0.py`: optional PX4 host comparison; it is blocked until a
   matching PX4 source tree is supplied locally.
 

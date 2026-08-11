@@ -99,6 +99,9 @@ is the stable navigation layer rather than a disruptive mass rename.
 - [TAS/wind observability prerequisite](airspeed-wind-observability.md): the
   validation-only source, causal-information, and fail-closed boundary that
   precedes any 17-error-state horizontal-wind experiment.
+- [TAS/wind multi-seed confirmation](airspeed-wind-multiseed-confirmation.md):
+  frozen-seed replication of that source contract, deliberately separate from
+  any future physical train/tune/holdout study.
 - [Magnetic source supervision](magnetic-source-supervision.md) and
   [absolute-heading evidence](absolute-heading-evidence.md): why magnetic yaw
   is fail-safe by default and how trusted heading is qualified.
