@@ -1,0 +1,981 @@
+{
+  "all_record_canonical_sha256": "2ce714ab015ae7fd5cd0275be32ea67e46d2a9a5b854f77aebb7ea80b880f6d7",
+  "campaign_assembly": {
+    "mode": "strict_raw_record_shard_merge",
+    "shard_count": 4,
+    "shards": [
+      {
+        "file_sha256": "c9723c7ae6b501a6adb2ad7db77d046521d8a14b7673ac76d7a514ba97c1d189",
+        "path": "build/airspeed-wind-mismatch-monitor-v4-shards/shard-00.json",
+        "seed_count": 32,
+        "selected_seed_canonical_sha256": "efbd47f6f83b6080e9ed5d4797cbcf1e34cd49cf42136ea97cb8f1e3c46c8183"
+      },
+      {
+        "file_sha256": "c58dbf38772d940bdd3c22cda188cce739ce7ceab99893d7cb0bf711dee5d3bb",
+        "path": "build/airspeed-wind-mismatch-monitor-v4-shards/shard-1.json",
+        "seed_count": 32,
+        "selected_seed_canonical_sha256": "49c4c2e8a386498a6111747e65ef47ab03ae23e5ceb18a4a752b152c98313ba6"
+      },
+      {
+        "file_sha256": "fcccd77df785d571c00bb2dd658c6b906f316b658394e2b8ce9a642ccd0fa453",
+        "path": "build/airspeed-wind-mismatch-monitor-v4-shards/shard-2.json",
+        "seed_count": 32,
+        "selected_seed_canonical_sha256": "a40c804726f9974615694f0b314517d6acbbcfce423f3b3b3df7ef28b0f94e14"
+      },
+      {
+        "file_sha256": "566849120a8b3edb57807ac7fb1fe60962f889b493bb6b6b42f4181ba5e658d6",
+        "path": "build/airspeed-wind-mismatch-monitor-v4-shards/shard-3.json",
+        "seed_count": 32,
+        "selected_seed_canonical_sha256": "525948fdb3885d62ca7f81c7e493f927c4e0ce3bc5070ecf041300df711940aa"
+      }
+    ],
+    "source_git_commit": "f085488eb17a026a5a6ae67089df608c6862cadf"
+  },
+  "case_summaries": [
+    {
+      "expected_monitor_latched": false,
+      "failed_case_records": [],
+      "failed_replications": 0,
+      "input_observations": 17408,
+      "latch_delay_s": {
+        "maximum": null,
+        "minimum": null,
+        "p05": null,
+        "p50": null,
+        "p95": null
+      },
+      "latch_window_injection_observations": {
+        "maximum": 0.0,
+        "minimum": 0.0,
+        "p05": 0.0,
+        "p50": 0.0,
+        "p95": 0.0
+      },
+      "maximum_window_nis": {
+        "maximum": 16.365681221032112,
+        "minimum": 7.326637711537303,
+        "p05": 8.483824798711753,
+        "p50": 10.967621948960666,
+        "p95": 14.760514686826657
+      },
+      "monitor_completed_windows": {
+        "maximum": 88.0,
+        "minimum": 88.0,
+        "p05": 88.0,
+        "p50": 88.0,
+        "p95": 88.0
+      },
+      "monitor_latches": 0,
+      "monitor_non_latches": 128,
+      "name": "long_nominal",
+      "passed_replications": 128,
+      "pre_injection_completed_windows": {
+        "maximum": 88.0,
+        "minimum": 88.0,
+        "p05": 88.0,
+        "p50": 88.0,
+        "p95": 88.0
+      },
+      "pre_injection_eligible_observations": {
+        "maximum": 91.0,
+        "minimum": 91.0,
+        "p05": 91.0,
+        "p50": 91.0,
+        "p95": 91.0
+      },
+      "pre_injection_latches": 0,
+      "replications": 128,
+      "zero_detection_miss_one_sided_95_upper_bound": null,
+      "zero_false_latch_one_sided_95_upper_bound": 0.023132405251746757
+    },
+    {
+      "expected_monitor_latched": false,
+      "failed_case_records": [],
+      "failed_replications": 0,
+      "input_observations": 17408,
+      "latch_delay_s": {
+        "maximum": null,
+        "minimum": null,
+        "p05": null,
+        "p50": null,
+        "p95": null
+      },
+      "latch_window_injection_observations": {
+        "maximum": 0.0,
+        "minimum": 0.0,
+        "p05": 0.0,
+        "p50": 0.0,
+        "p95": 0.0
+      },
+      "maximum_window_nis": {
+        "maximum": 15.386565785152781,
+        "minimum": 6.764639130321255,
+        "p05": 8.23911963580492,
+        "p50": 10.813570915613285,
+        "p95": 14.24294429825844
+      },
+      "monitor_completed_windows": {
+        "maximum": 88.0,
+        "minimum": 88.0,
+        "p05": 88.0,
+        "p50": 88.0,
+        "p95": 88.0
+      },
+      "monitor_latches": 0,
+      "monitor_non_latches": 128,
+      "name": "long_nominal_high_noise",
+      "passed_replications": 128,
+      "pre_injection_completed_windows": {
+        "maximum": 88.0,
+        "minimum": 88.0,
+        "p05": 88.0,
+        "p50": 88.0,
+        "p95": 88.0
+      },
+      "pre_injection_eligible_observations": {
+        "maximum": 91.0,
+        "minimum": 91.0,
+        "p05": 91.0,
+        "p50": 91.0,
+        "p95": 91.0
+      },
+      "pre_injection_latches": 0,
+      "replications": 128,
+      "zero_detection_miss_one_sided_95_upper_bound": null,
+      "zero_false_latch_one_sided_95_upper_bound": 0.023132405251746757
+    },
+    {
+      "expected_monitor_latched": false,
+      "failed_case_records": [
+        {
+          "errors": [
+            "monitor_latched=True but expected=False"
+          ],
+          "expected_monitor_latched": false,
+          "input_observations": 137,
+          "maximum_raw_post_geometry_nis": 520.9590057608049,
+          "monitor_completed_windows": 67,
+          "monitor_eligible_observations": 70,
+          "monitor_first_latch_timestamp_us": 57000000,
+          "monitor_latch_delay_s": 1.0,
+          "monitor_latch_window_injection_observations": 1,
+          "monitor_latched": true,
+          "monitor_maximum_window_contributing_observations": 3,
+          "monitor_maximum_window_nis": 18.9644682236145,
+          "monitor_reset_reasons": {},
+          "monitor_time_span_trim_count": 0,
+          "name": "single_tas_impulse",
+          "passed": false,
+          "pre_injection_completed_windows": 64,
+          "pre_injection_eligible_observations": 67,
+          "raw_post_geometry_nis_observations": 92,
+          "shadow_terminal_status": "qualified",
+          "source_rejections": {},
+          "synthetic_seed": 43033
+        },
+        {
+          "errors": [
+            "monitor_latched=True but expected=False",
+            "monitor_latched_before_injection"
+          ],
+          "expected_monitor_latched": false,
+          "input_observations": 137,
+          "maximum_raw_post_geometry_nis": 407.67358222984035,
+          "monitor_completed_windows": 52,
+          "monitor_eligible_observations": 55,
+          "monitor_first_latch_timestamp_us": 49500000,
+          "monitor_latch_delay_s": -6.5,
+          "monitor_latch_window_injection_observations": 0,
+          "monitor_latched": true,
+          "monitor_maximum_window_contributing_observations": 3,
+          "monitor_maximum_window_nis": 18.425481895472185,
+          "monitor_reset_reasons": {},
+          "monitor_time_span_trim_count": 0,
+          "name": "single_tas_impulse",
+          "passed": false,
+          "pre_injection_completed_windows": 52,
+          "pre_injection_eligible_observations": 67,
+          "raw_post_geometry_nis_observations": 92,
+          "shadow_terminal_status": "qualified",
+          "source_rejections": {},
+          "synthetic_seed": 43108
+        }
+      ],
+      "failed_replications": 2,
+      "input_observations": 17536,
+      "latch_delay_s": {
+        "maximum": 1.0,
+        "minimum": -6.5,
+        "p05": -6.5,
+        "p50": -6.5,
+        "p95": -6.5
+      },
+      "latch_window_injection_observations": {
+        "maximum": 1.0,
+        "minimum": 0.0,
+        "p05": 0.0,
+        "p50": 0.0,
+        "p95": 0.0
+      },
+      "maximum_window_nis": {
+        "maximum": 18.9644682236145,
+        "minimum": 7.6137942008877175,
+        "p05": 9.200746905766733,
+        "p50": 12.171641231427213,
+        "p95": 16.15964010275247
+      },
+      "monitor_completed_windows": {
+        "maximum": 89.0,
+        "minimum": 52.0,
+        "p05": 89.0,
+        "p50": 89.0,
+        "p95": 89.0
+      },
+      "monitor_latches": 2,
+      "monitor_non_latches": 126,
+      "name": "single_tas_impulse",
+      "passed_replications": 126,
+      "pre_injection_completed_windows": {
+        "maximum": 64.0,
+        "minimum": 52.0,
+        "p05": 64.0,
+        "p50": 64.0,
+        "p95": 64.0
+      },
+      "pre_injection_eligible_observations": {
+        "maximum": 67.0,
+        "minimum": 67.0,
+        "p05": 67.0,
+        "p50": 67.0,
+        "p95": 67.0
+      },
+      "pre_injection_latches": 1,
+      "replications": 128,
+      "zero_detection_miss_one_sided_95_upper_bound": null,
+      "zero_false_latch_one_sided_95_upper_bound": null
+    },
+    {
+      "expected_monitor_latched": false,
+      "failed_case_records": [],
+      "failed_replications": 0,
+      "input_observations": 17536,
+      "latch_delay_s": {
+        "maximum": null,
+        "minimum": null,
+        "p05": null,
+        "p50": null,
+        "p95": null
+      },
+      "latch_window_injection_observations": {
+        "maximum": 0.0,
+        "minimum": 0.0,
+        "p05": 0.0,
+        "p50": 0.0,
+        "p95": 0.0
+      },
+      "maximum_window_nis": {
+        "maximum": 17.67481838937346,
+        "minimum": 8.12116445137524,
+        "p05": 8.769307929657982,
+        "p50": 11.52617898589807,
+        "p95": 14.715851109906549
+      },
+      "monitor_completed_windows": {
+        "maximum": 86.0,
+        "minimum": 86.0,
+        "p05": 86.0,
+        "p50": 86.0,
+        "p95": 86.0
+      },
+      "monitor_latches": 0,
+      "monitor_non_latches": 128,
+      "name": "gap_then_single_tas_impulse",
+      "passed_replications": 128,
+      "pre_injection_completed_windows": {
+        "maximum": 64.0,
+        "minimum": 64.0,
+        "p05": 64.0,
+        "p50": 64.0,
+        "p95": 64.0
+      },
+      "pre_injection_eligible_observations": {
+        "maximum": 67.0,
+        "minimum": 67.0,
+        "p05": 67.0,
+        "p50": 67.0,
+        "p95": 67.0
+      },
+      "pre_injection_latches": 0,
+      "replications": 128,
+      "zero_detection_miss_one_sided_95_upper_bound": null,
+      "zero_false_latch_one_sided_95_upper_bound": 0.023132405251746757
+    },
+    {
+      "expected_monitor_latched": true,
+      "failed_case_records": [
+        {
+          "errors": [
+            "insufficient_complete_window_coverage",
+            "monitor_latched_before_injection",
+            "latch_window_has_insufficient_injection_observations"
+          ],
+          "expected_monitor_latched": true,
+          "input_observations": 136,
+          "maximum_raw_post_geometry_nis": 17.963093569057992,
+          "monitor_completed_windows": 24,
+          "monitor_eligible_observations": 27,
+          "monitor_first_latch_timestamp_us": 35500000,
+          "monitor_latch_delay_s": -20.5,
+          "monitor_latch_window_injection_observations": 0,
+          "monitor_latched": true,
+          "monitor_maximum_window_contributing_observations": 3,
+          "monitor_maximum_window_nis": 20.7053156200361,
+          "monitor_reset_reasons": {},
+          "monitor_time_span_trim_count": 0,
+          "name": "persistent_tas_scale_bias",
+          "passed": false,
+          "pre_injection_completed_windows": 24,
+          "pre_injection_eligible_observations": 67,
+          "raw_post_geometry_nis_observations": 91,
+          "shadow_terminal_status": "qualified",
+          "source_rejections": {},
+          "synthetic_seed": 43061
+        }
+      ],
+      "failed_replications": 1,
+      "input_observations": 17408,
+      "latch_delay_s": {
+        "maximum": 2.0,
+        "minimum": -20.5,
+        "p05": 1.0,
+        "p50": 1.0,
+        "p95": 1.5
+      },
+      "latch_window_injection_observations": {
+        "maximum": 4.0,
+        "minimum": 0.0,
+        "p05": 3.0,
+        "p50": 3.0,
+        "p95": 4.0
+      },
+      "maximum_window_nis": {
+        "maximum": 23.73484984865075,
+        "minimum": 18.000089019287763,
+        "p05": 18.015893999581237,
+        "p50": 18.968161214362915,
+        "p95": 23.077966136589556
+      },
+      "monitor_completed_windows": {
+        "maximum": 69.0,
+        "minimum": 24.0,
+        "p05": 67.0,
+        "p50": 67.0,
+        "p95": 68.0
+      },
+      "monitor_latches": 128,
+      "monitor_non_latches": 0,
+      "name": "persistent_tas_scale_bias",
+      "passed_replications": 127,
+      "pre_injection_completed_windows": {
+        "maximum": 64.0,
+        "minimum": 24.0,
+        "p05": 64.0,
+        "p50": 64.0,
+        "p95": 64.0
+      },
+      "pre_injection_eligible_observations": {
+        "maximum": 67.0,
+        "minimum": 67.0,
+        "p05": 67.0,
+        "p50": 67.0,
+        "p95": 67.0
+      },
+      "pre_injection_latches": 1,
+      "replications": 128,
+      "zero_detection_miss_one_sided_95_upper_bound": 0.023132405251746757,
+      "zero_false_latch_one_sided_95_upper_bound": null
+    },
+    {
+      "expected_monitor_latched": true,
+      "failed_case_records": [
+        {
+          "errors": [
+            "latch_window_has_insufficient_injection_observations"
+          ],
+          "expected_monitor_latched": true,
+          "input_observations": 136,
+          "maximum_raw_post_geometry_nis": 39.0733056213946,
+          "monitor_completed_windows": 65,
+          "monitor_eligible_observations": 68,
+          "monitor_first_latch_timestamp_us": 56000000,
+          "monitor_latch_delay_s": 0.0,
+          "monitor_latch_window_injection_observations": 1,
+          "monitor_latched": true,
+          "monitor_maximum_window_contributing_observations": 3,
+          "monitor_maximum_window_nis": 18.2286355366992,
+          "monitor_reset_reasons": {},
+          "monitor_time_span_trim_count": 0,
+          "name": "persistent_horizontal_wind_step",
+          "passed": false,
+          "pre_injection_completed_windows": 64,
+          "pre_injection_eligible_observations": 67,
+          "raw_post_geometry_nis_observations": 91,
+          "shadow_terminal_status": "stale_no_fresh_gnss_tas",
+          "source_rejections": {},
+          "synthetic_seed": 43067
+        }
+      ],
+      "failed_replications": 1,
+      "input_observations": 17408,
+      "latch_delay_s": {
+        "maximum": 1.5,
+        "minimum": 0.0,
+        "p05": 1.0,
+        "p50": 1.0,
+        "p95": 1.5
+      },
+      "latch_window_injection_observations": {
+        "maximum": 4.0,
+        "minimum": 1.0,
+        "p05": 3.0,
+        "p50": 3.0,
+        "p95": 4.0
+      },
+      "maximum_window_nis": {
+        "maximum": 23.931247259946005,
+        "minimum": 18.00041343318577,
+        "p05": 18.00837909463779,
+        "p50": 18.692352166742737,
+        "p95": 22.416881363663276
+      },
+      "monitor_completed_windows": {
+        "maximum": 68.0,
+        "minimum": 65.0,
+        "p05": 67.0,
+        "p50": 67.0,
+        "p95": 68.0
+      },
+      "monitor_latches": 128,
+      "monitor_non_latches": 0,
+      "name": "persistent_horizontal_wind_step",
+      "passed_replications": 127,
+      "pre_injection_completed_windows": {
+        "maximum": 64.0,
+        "minimum": 64.0,
+        "p05": 64.0,
+        "p50": 64.0,
+        "p95": 64.0
+      },
+      "pre_injection_eligible_observations": {
+        "maximum": 67.0,
+        "minimum": 67.0,
+        "p05": 67.0,
+        "p50": 67.0,
+        "p95": 67.0
+      },
+      "pre_injection_latches": 0,
+      "replications": 128,
+      "zero_detection_miss_one_sided_95_upper_bound": 0.023132405251746757,
+      "zero_false_latch_one_sided_95_upper_bound": null
+    },
+    {
+      "expected_monitor_latched": true,
+      "failed_case_records": [
+        {
+          "errors": [
+            "monitor_latch_exceeded_deadline"
+          ],
+          "expected_monitor_latched": true,
+          "input_observations": 136,
+          "maximum_raw_post_geometry_nis": 14.860369382855534,
+          "monitor_completed_windows": 83,
+          "monitor_eligible_observations": 86,
+          "monitor_first_latch_timestamp_us": 65000000,
+          "monitor_latch_delay_s": 9.0,
+          "monitor_latch_window_injection_observations": 4,
+          "monitor_latched": true,
+          "monitor_maximum_window_contributing_observations": 3,
+          "monitor_maximum_window_nis": 18.843431681390257,
+          "monitor_reset_reasons": {},
+          "monitor_time_span_trim_count": 0,
+          "name": "persistent_vertical_wind",
+          "passed": false,
+          "pre_injection_completed_windows": 64,
+          "pre_injection_eligible_observations": 67,
+          "raw_post_geometry_nis_observations": 91,
+          "shadow_terminal_status": "qualified",
+          "source_rejections": {},
+          "synthetic_seed": 43065
+        },
+        {
+          "errors": [
+            "monitor_latched_before_injection",
+            "latch_window_has_insufficient_injection_observations"
+          ],
+          "expected_monitor_latched": true,
+          "input_observations": 136,
+          "maximum_raw_post_geometry_nis": 15.864853198413043,
+          "monitor_completed_windows": 39,
+          "monitor_eligible_observations": 42,
+          "monitor_first_latch_timestamp_us": 43000000,
+          "monitor_latch_delay_s": -13.0,
+          "monitor_latch_window_injection_observations": 0,
+          "monitor_latched": true,
+          "monitor_maximum_window_contributing_observations": 3,
+          "monitor_maximum_window_nis": 19.296193676244044,
+          "monitor_reset_reasons": {},
+          "monitor_time_span_trim_count": 0,
+          "name": "persistent_vertical_wind",
+          "passed": false,
+          "pre_injection_completed_windows": 39,
+          "pre_injection_eligible_observations": 67,
+          "raw_post_geometry_nis_observations": 91,
+          "shadow_terminal_status": "qualified",
+          "source_rejections": {},
+          "synthetic_seed": 43074
+        },
+        {
+          "errors": [
+            "monitor_latch_exceeded_deadline"
+          ],
+          "expected_monitor_latched": true,
+          "input_observations": 136,
+          "maximum_raw_post_geometry_nis": 18.06920496909982,
+          "monitor_completed_windows": 82,
+          "monitor_eligible_observations": 85,
+          "monitor_first_latch_timestamp_us": 64500000,
+          "monitor_latch_delay_s": 8.5,
+          "monitor_latch_window_injection_observations": 4,
+          "monitor_latched": true,
+          "monitor_maximum_window_contributing_observations": 4,
+          "monitor_maximum_window_nis": 21.864199718852877,
+          "monitor_reset_reasons": {},
+          "monitor_time_span_trim_count": 0,
+          "name": "persistent_vertical_wind",
+          "passed": false,
+          "pre_injection_completed_windows": 64,
+          "pre_injection_eligible_observations": 67,
+          "raw_post_geometry_nis_observations": 91,
+          "shadow_terminal_status": "qualified",
+          "source_rejections": {},
+          "synthetic_seed": 43102
+        }
+      ],
+      "failed_replications": 3,
+      "input_observations": 17408,
+      "latch_delay_s": {
+        "maximum": 9.0,
+        "minimum": -13.0,
+        "p05": 1.0,
+        "p50": 1.5,
+        "p95": 5.5
+      },
+      "latch_window_injection_observations": {
+        "maximum": 4.0,
+        "minimum": 0.0,
+        "p05": 3.0,
+        "p50": 4.0,
+        "p95": 4.0
+      },
+      "maximum_window_nis": {
+        "maximum": 23.674803680419146,
+        "minimum": 18.004483693973352,
+        "p05": 18.052304200791482,
+        "p50": 19.953330546421146,
+        "p95": 22.48213234989174
+      },
+      "monitor_completed_windows": {
+        "maximum": 83.0,
+        "minimum": 39.0,
+        "p05": 67.0,
+        "p50": 68.0,
+        "p95": 76.0
+      },
+      "monitor_latches": 128,
+      "monitor_non_latches": 0,
+      "name": "persistent_vertical_wind",
+      "passed_replications": 125,
+      "pre_injection_completed_windows": {
+        "maximum": 64.0,
+        "minimum": 39.0,
+        "p05": 64.0,
+        "p50": 64.0,
+        "p95": 64.0
+      },
+      "pre_injection_eligible_observations": {
+        "maximum": 67.0,
+        "minimum": 67.0,
+        "p05": 67.0,
+        "p50": 67.0,
+        "p95": 67.0
+      },
+      "pre_injection_latches": 1,
+      "replications": 128,
+      "zero_detection_miss_one_sided_95_upper_bound": 0.023132405251746757,
+      "zero_false_latch_one_sided_95_upper_bound": null
+    }
+  ],
+  "coverage": {
+    "minimum_pre_injection_completed_windows": 37,
+    "minimum_pre_injection_eligible_observations": 40
+  },
+  "failed_case_records": [
+    {
+      "errors": [
+        "latch_window_has_insufficient_injection_observations"
+      ],
+      "expected_monitor_latched": true,
+      "input_observations": 136,
+      "maximum_raw_post_geometry_nis": 39.0733056213946,
+      "monitor_completed_windows": 65,
+      "monitor_eligible_observations": 68,
+      "monitor_first_latch_timestamp_us": 56000000,
+      "monitor_latch_delay_s": 0.0,
+      "monitor_latch_window_injection_observations": 1,
+      "monitor_latched": true,
+      "monitor_maximum_window_contributing_observations": 3,
+      "monitor_maximum_window_nis": 18.2286355366992,
+      "monitor_reset_reasons": {},
+      "monitor_time_span_trim_count": 0,
+      "name": "persistent_horizontal_wind_step",
+      "passed": false,
+      "pre_injection_completed_windows": 64,
+      "pre_injection_eligible_observations": 67,
+      "raw_post_geometry_nis_observations": 91,
+      "shadow_terminal_status": "stale_no_fresh_gnss_tas",
+      "source_rejections": {},
+      "synthetic_seed": 43067
+    },
+    {
+      "errors": [
+        "insufficient_complete_window_coverage",
+        "monitor_latched_before_injection",
+        "latch_window_has_insufficient_injection_observations"
+      ],
+      "expected_monitor_latched": true,
+      "input_observations": 136,
+      "maximum_raw_post_geometry_nis": 17.963093569057992,
+      "monitor_completed_windows": 24,
+      "monitor_eligible_observations": 27,
+      "monitor_first_latch_timestamp_us": 35500000,
+      "monitor_latch_delay_s": -20.5,
+      "monitor_latch_window_injection_observations": 0,
+      "monitor_latched": true,
+      "monitor_maximum_window_contributing_observations": 3,
+      "monitor_maximum_window_nis": 20.7053156200361,
+      "monitor_reset_reasons": {},
+      "monitor_time_span_trim_count": 0,
+      "name": "persistent_tas_scale_bias",
+      "passed": false,
+      "pre_injection_completed_windows": 24,
+      "pre_injection_eligible_observations": 67,
+      "raw_post_geometry_nis_observations": 91,
+      "shadow_terminal_status": "qualified",
+      "source_rejections": {},
+      "synthetic_seed": 43061
+    },
+    {
+      "errors": [
+        "monitor_latch_exceeded_deadline"
+      ],
+      "expected_monitor_latched": true,
+      "input_observations": 136,
+      "maximum_raw_post_geometry_nis": 14.860369382855534,
+      "monitor_completed_windows": 83,
+      "monitor_eligible_observations": 86,
+      "monitor_first_latch_timestamp_us": 65000000,
+      "monitor_latch_delay_s": 9.0,
+      "monitor_latch_window_injection_observations": 4,
+      "monitor_latched": true,
+      "monitor_maximum_window_contributing_observations": 3,
+      "monitor_maximum_window_nis": 18.843431681390257,
+      "monitor_reset_reasons": {},
+      "monitor_time_span_trim_count": 0,
+      "name": "persistent_vertical_wind",
+      "passed": false,
+      "pre_injection_completed_windows": 64,
+      "pre_injection_eligible_observations": 67,
+      "raw_post_geometry_nis_observations": 91,
+      "shadow_terminal_status": "qualified",
+      "source_rejections": {},
+      "synthetic_seed": 43065
+    },
+    {
+      "errors": [
+        "monitor_latched_before_injection",
+        "latch_window_has_insufficient_injection_observations"
+      ],
+      "expected_monitor_latched": true,
+      "input_observations": 136,
+      "maximum_raw_post_geometry_nis": 15.864853198413043,
+      "monitor_completed_windows": 39,
+      "monitor_eligible_observations": 42,
+      "monitor_first_latch_timestamp_us": 43000000,
+      "monitor_latch_delay_s": -13.0,
+      "monitor_latch_window_injection_observations": 0,
+      "monitor_latched": true,
+      "monitor_maximum_window_contributing_observations": 3,
+      "monitor_maximum_window_nis": 19.296193676244044,
+      "monitor_reset_reasons": {},
+      "monitor_time_span_trim_count": 0,
+      "name": "persistent_vertical_wind",
+      "passed": false,
+      "pre_injection_completed_windows": 39,
+      "pre_injection_eligible_observations": 67,
+      "raw_post_geometry_nis_observations": 91,
+      "shadow_terminal_status": "qualified",
+      "source_rejections": {},
+      "synthetic_seed": 43074
+    },
+    {
+      "errors": [
+        "monitor_latch_exceeded_deadline"
+      ],
+      "expected_monitor_latched": true,
+      "input_observations": 136,
+      "maximum_raw_post_geometry_nis": 18.06920496909982,
+      "monitor_completed_windows": 82,
+      "monitor_eligible_observations": 85,
+      "monitor_first_latch_timestamp_us": 64500000,
+      "monitor_latch_delay_s": 8.5,
+      "monitor_latch_window_injection_observations": 4,
+      "monitor_latched": true,
+      "monitor_maximum_window_contributing_observations": 4,
+      "monitor_maximum_window_nis": 21.864199718852877,
+      "monitor_reset_reasons": {},
+      "monitor_time_span_trim_count": 0,
+      "name": "persistent_vertical_wind",
+      "passed": false,
+      "pre_injection_completed_windows": 64,
+      "pre_injection_eligible_observations": 67,
+      "raw_post_geometry_nis_observations": 91,
+      "shadow_terminal_status": "qualified",
+      "source_rejections": {},
+      "synthetic_seed": 43102
+    },
+    {
+      "errors": [
+        "monitor_latched=True but expected=False"
+      ],
+      "expected_monitor_latched": false,
+      "input_observations": 137,
+      "maximum_raw_post_geometry_nis": 520.9590057608049,
+      "monitor_completed_windows": 67,
+      "monitor_eligible_observations": 70,
+      "monitor_first_latch_timestamp_us": 57000000,
+      "monitor_latch_delay_s": 1.0,
+      "monitor_latch_window_injection_observations": 1,
+      "monitor_latched": true,
+      "monitor_maximum_window_contributing_observations": 3,
+      "monitor_maximum_window_nis": 18.9644682236145,
+      "monitor_reset_reasons": {},
+      "monitor_time_span_trim_count": 0,
+      "name": "single_tas_impulse",
+      "passed": false,
+      "pre_injection_completed_windows": 64,
+      "pre_injection_eligible_observations": 67,
+      "raw_post_geometry_nis_observations": 92,
+      "shadow_terminal_status": "qualified",
+      "source_rejections": {},
+      "synthetic_seed": 43033
+    },
+    {
+      "errors": [
+        "monitor_latched=True but expected=False",
+        "monitor_latched_before_injection"
+      ],
+      "expected_monitor_latched": false,
+      "input_observations": 137,
+      "maximum_raw_post_geometry_nis": 407.67358222984035,
+      "monitor_completed_windows": 52,
+      "monitor_eligible_observations": 55,
+      "monitor_first_latch_timestamp_us": 49500000,
+      "monitor_latch_delay_s": -6.5,
+      "monitor_latch_window_injection_observations": 0,
+      "monitor_latched": true,
+      "monitor_maximum_window_contributing_observations": 3,
+      "monitor_maximum_window_nis": 18.425481895472185,
+      "monitor_reset_reasons": {},
+      "monitor_time_span_trim_count": 0,
+      "name": "single_tas_impulse",
+      "passed": false,
+      "pre_injection_completed_windows": 52,
+      "pre_injection_eligible_observations": 67,
+      "raw_post_geometry_nis_observations": 92,
+      "shadow_terminal_status": "qualified",
+      "source_rejections": {},
+      "synthetic_seed": 43108
+    }
+  ],
+  "limitations": [
+    "This is a host-only synthetic residual-pattern screen, not a physical pitot, wind, or air-data source-quality qualification.",
+    "A pass does not make vertical wind independently observable and does not promote TAS, a wind state, or a private flight-supervisor decision.",
+    "Replication-level zero-event bounds assume independent synthetic seeds; overlapping rolling windows are not treated as independent trials."
+  ],
+  "monitor": {
+    "contribution_nis_floor": 4.0,
+    "cumulative_nis_threshold": 18.0,
+    "latch_is_terminal_without_external_reauthorization": true,
+    "maximum_inter_observation_gap_s": 1.0,
+    "maximum_window_elapsed_s": 1.75,
+    "minimum_contributing_observations": 3,
+    "parameter_origin": "frozen after opened v2 development window 32001--32032; the intended v3 42001 smoke was discarded before release, so this v4 holdout uses a new unexecuted 43001--43128 set and must not alter these values",
+    "per_observation_nis_cap": 6.0,
+    "window_observations": 4
+  },
+  "phase": "sealed_holdout",
+  "protocol": {
+    "file_sha256": "4589ea5abe816a1f75908be5ad422b51d4c1003bea3462cb2776d9587f6547b1",
+    "path": "validation/airspeed_wind_mismatch_monitor_protocol_v4.json",
+    "semantic_sha256": "0b31213d3f24cdc19a933484ec79dfc8e954fa9322304d8cc1aef851aac86d89"
+  },
+  "provenance": {
+    "base_oracle_runner_sha256": "4c7d723cfd7f9ee85e7abce9f9eb23d2258f12c180f2526f119f7ccd1302e024",
+    "git_commit": "f085488eb17a026a5a6ae67089df608c6862cadf",
+    "git_status": "",
+    "jobs": 8,
+    "runner_sha256": "72c1047882bdb945c08a03cd3a789a80fd4f817c8f15e84cc7368067e4a36579"
+  },
+  "schema_version": 2,
+  "seed_count": 128,
+  "selected_seed_canonical_sha256": "7c2ab2d729145b4a3f68fdf5ba96512863c30a651ae6992ba29bcfc8a17dda73",
+  "selected_seeds": [
+    43001,
+    43002,
+    43003,
+    43004,
+    43005,
+    43006,
+    43007,
+    43008,
+    43009,
+    43010,
+    43011,
+    43012,
+    43013,
+    43014,
+    43015,
+    43016,
+    43017,
+    43018,
+    43019,
+    43020,
+    43021,
+    43022,
+    43023,
+    43024,
+    43025,
+    43026,
+    43027,
+    43028,
+    43029,
+    43030,
+    43031,
+    43032,
+    43033,
+    43034,
+    43035,
+    43036,
+    43037,
+    43038,
+    43039,
+    43040,
+    43041,
+    43042,
+    43043,
+    43044,
+    43045,
+    43046,
+    43047,
+    43048,
+    43049,
+    43050,
+    43051,
+    43052,
+    43053,
+    43054,
+    43055,
+    43056,
+    43057,
+    43058,
+    43059,
+    43060,
+    43061,
+    43062,
+    43063,
+    43064,
+    43065,
+    43066,
+    43067,
+    43068,
+    43069,
+    43070,
+    43071,
+    43072,
+    43073,
+    43074,
+    43075,
+    43076,
+    43077,
+    43078,
+    43079,
+    43080,
+    43081,
+    43082,
+    43083,
+    43084,
+    43085,
+    43086,
+    43087,
+    43088,
+    43089,
+    43090,
+    43091,
+    43092,
+    43093,
+    43094,
+    43095,
+    43096,
+    43097,
+    43098,
+    43099,
+    43100,
+    43101,
+    43102,
+    43103,
+    43104,
+    43105,
+    43106,
+    43107,
+    43108,
+    43109,
+    43110,
+    43111,
+    43112,
+    43113,
+    43114,
+    43115,
+    43116,
+    43117,
+    43118,
+    43119,
+    43120,
+    43121,
+    43122,
+    43123,
+    43124,
+    43125,
+    43126,
+    43127,
+    43128
+  ],
+  "status": "failed",
+  "study_id": "aerakia-airspeed-wind-mismatch-monitor-v4",
+  "totals": {
+    "complete_monitor_windows": 70917,
+    "failed_replication_cases": 7,
+    "input_observations": 122112,
+    "passed_replication_cases": 889,
+    "replication_cases": 896
+  }
+}

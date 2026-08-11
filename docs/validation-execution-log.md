@@ -215,6 +215,33 @@ replace the clean `e672e5d` v2 development record. This demonstrates why the
 shard merger requires clean, matching source provenance rather than trusting a
 late file write.
 
+## 2026-08-11 — v4 sealed holdout executed and failed
+
+The fresh v4 seed set `43001--43128` was executed once after the runner,
+protocol, tests, and v2 development artifact were frozen. Four contiguous raw
+shards were merged with the strict provenance checker from clean commit
+`f085488`. The compact result is
+[`airspeed_wind_mismatch_monitor_v4.json`](../validation/public/airspeed_wind_mismatch_monitor_v4.json).
+
+The campaign processed `896` case/seed replications, `122,112` input
+observations, and `70,917` complete windows. It passed `889` and failed `7`.
+The failed records are retained verbatim in the JSON artifact:
+
+| Case | Seed(s) | Failure pattern |
+| --- | --- | --- |
+| `single_tas_impulse` | `43033`, `43108` | false latch; one seed latched before injection |
+| `persistent_tas_scale_bias` | `43061` | early latch before injection / insufficient injected evidence |
+| `persistent_horizontal_wind_step` | `43067` | latch window contained only one injected sample |
+| `persistent_vertical_wind` | `43065`, `43102` | detection exceeded the 8 s deadline |
+| `persistent_vertical_wind` | `43074` | early latch before injection / insufficient injected evidence |
+
+This is a valid failed holdout, not a partial run and not an algorithm
+promotion. The v4 parameters and seeds are frozen permanently. The result
+blocks promotion of this residual-pattern monitor to a runtime source
+supervisor; further work must begin with a new development protocol that
+explicitly addresses single-point dominance, minimum post-injection coverage,
+and the detection deadline. The production ESKF and public API were unchanged.
+
 ## 2026-08-11 — full-state fixed-lag replay candidate rejected
 
 ### Reason

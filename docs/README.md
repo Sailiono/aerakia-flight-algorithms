@@ -104,7 +104,7 @@ is the stable navigation layer rather than a disruptive mass rename.
   any future physical train/tune/holdout study.
 - [TAS residual-pattern monitor study](airspeed-wind-mismatch-monitor.md):
   v1 review failure retained, v2 opened-development selection recorded, an
-  invalidated v3 smoke disclosed, and a separate v4 synthetic holdout frozen;
+  invalidated v3 smoke disclosed, and a failed v4 sealed holdout (`889/896`);
   still validation-only and not a wind-state promotion.
 - [Magnetic source supervision](magnetic-source-supervision.md) and
   [absolute-heading evidence](absolute-heading-evidence.md): why magnetic yaw

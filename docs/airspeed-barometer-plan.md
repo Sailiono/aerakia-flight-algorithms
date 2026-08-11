@@ -121,7 +121,8 @@ does not change that conclusion. Its reviewed v1 prototype had zero nominal
 full-window coverage and was rejected before public evidence. A revised v2
 opened-development study passes explicit long-nominal, high-noise, impulse,
 gap, and persistent-mismatch controls; an invalidated v3 smoke is retained and
-a fresh v4 synthetic holdout is frozen. This
+the fresh v4 synthetic holdout was executed once but failed `889/896` cases.
+This
 can only test a narrow future source-supervisor *screen* under the stated
 synthetic contract. It cannot establish the `w_D = 0` assumption, physical
 air-data calibration, or a valid fixed-wing source/regime envelope.

@@ -62,7 +62,9 @@ portable C library and from FCOne-specific integration code.
   confirmation campaign, not a parameter-tuning loop or an estimator branch.
 - `run_airspeed_wind_mismatch_monitor.py`: v2 opened-development and v4
   sealed-holdout residual-pattern monitor study for the retained vertical-wind
-  failure; the pre-release v3 smoke is explicitly invalidated. It has explicit
+  failure; the pre-release v3 smoke is explicitly invalidated. The v4 holdout
+  was executed once and failed `889/896` replications; its compact artifact is
+  retained as evidence and must not be rerun for tuning. It has explicit
   full-window coverage, impulse/gap controls, and no production ESKF/API effect.
 - `run_px4_bias_ab_m0.py`: optional PX4 host comparison; it is blocked until a
   matching PX4 source tree is supplied locally.

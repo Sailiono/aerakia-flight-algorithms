@@ -68,11 +68,37 @@ That protocol locks the base JSON, base oracle/generator, candidate runner,
 parameters, cases, and seeds. Its run requires a clean Git worktree and cannot
 use a development seed set.
 
+## v4 sealed-holdout result
+
+The v4 protocol was executed exactly once from clean commit `f085488`, using
+four strict raw-record shards and one fail-closed merge. The result is retained
+at [`airspeed_wind_mismatch_monitor_v4.json`](../validation/public/airspeed_wind_mismatch_monitor_v4.json).
+It is a **failed holdout**, not a tuning input:
+
+- `889/896` replication cases passed (`99.21875%`); `7` failed.
+- The campaign processed `122,112` source observations and `70,917` complete
+  monitor windows.
+- The two nominal/non-persistent controls were mostly clean, but a single TAS
+  impulse produced two false latches (seeds `43033`, `43108`).
+- Persistent TAS scale bias latched before injection in one case (seed `43061`).
+- A horizontal-wind step latched from only one injected sample (seed `43067`).
+- Vertical-wind cases had one early latch and two late latches (seeds `43074`,
+  `43065`, `43102`).
+
+The monitor therefore **does not qualify as a source supervisor**. Do not
+rerun, retune, or reinterpret v4; any correction requires a new development
+protocol and a new, separately sealed holdout. The failures point to three
+development questions: whether one large residual still dominates the short
+window, whether low-coverage/bootstrap conditions must disable the screen, and
+whether the vertical-mismatch deadline is physically justified. None of these
+questions changes the production ESKF, its 15-error-state model, or the public
+TAS API.
+
 ## Boundary
 
-Even a clean v2 holdout pass would mean only that this frozen *synthetic*
-screen exercised the stated monitor behavior. It cannot identify vertical
-wind, qualify a pitot, infer source quality, enable TAS during hover or
+Even a clean v4 holdout pass would mean only that this frozen *synthetic*
+screen exercised the stated monitor behavior. The actual v4 result failed, and
+even a pass could not identify vertical wind, qualify a pitot, infer source quality, enable TAS during hover or
 transition, or prove fixed-wing GNSS-denied navigation. Physical calibrated
 TAS/GNSS data and a separately justified private source/regime authority still
 precede any 17-error-state wind experiment.
@@ -87,6 +113,10 @@ python3 validation/run_airspeed_wind_mismatch_monitor.py \
   --protocol validation/airspeed_wind_mismatch_monitor_protocol_v4.json \
   --phase sealed_holdout --jobs 8
 ```
+
+The currently committed v4 result is expected to return exit status `1`,
+because the sealed campaign failed. That status is evidence, not a runner
+error.
 
 `--jobs 1` is the strictly sequential reproduction path and is required on
 restricted runners that do not allow child-process creation; a normal
@@ -105,7 +135,9 @@ change v4 parameters.
 Only the clean, compact sealed result may be labelled a holdout and enter
 `validation/public/`; the v4 default is
 `validation/public/airspeed_wind_mismatch_monitor_v4.json`, so it cannot
-overwrite an earlier protocol's result. A separately named compact v2
+overwrite an earlier protocol's result. A failed result remains in the public
+record with `status: failed`; it must not be replaced by a later tuned run.
+A separately named compact v2
 development summary may also be retained there only with its `phase` and
 non-holdout status intact. Individual streams and other temporary artifacts
 remain under `build/` and are removed after review.
