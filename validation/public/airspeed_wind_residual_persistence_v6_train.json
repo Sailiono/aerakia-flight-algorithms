@@ -1,0 +1,357 @@
+{
+  "case_summaries": [
+    {
+      "clean_post_injection_latches": 0,
+      "generated_observations": 20736,
+      "geometry_qualified_replications": 128,
+      "monitor_armed_replications": 128,
+      "monitor_latches": 0,
+      "name": "nominal",
+      "nis_fed_observations": 14976,
+      "pre_injection_latches": 0,
+      "replications": 128,
+      "role": "nuisance_primary",
+      "source_detection_delay_s": {
+        "maximum": null,
+        "minimum": null,
+        "p50": null,
+        "p95": null
+      }
+    },
+    {
+      "clean_post_injection_latches": 0,
+      "generated_observations": 20736,
+      "geometry_qualified_replications": 0,
+      "monitor_armed_replications": 0,
+      "monitor_latches": 0,
+      "name": "nominal_high_noise_calibrated",
+      "nis_fed_observations": 0,
+      "pre_injection_latches": 0,
+      "replications": 128,
+      "role": "coverage_descriptive",
+      "source_detection_delay_s": {
+        "maximum": null,
+        "minimum": null,
+        "p50": null,
+        "p95": null
+      }
+    },
+    {
+      "clean_post_injection_latches": 0,
+      "generated_observations": 20736,
+      "geometry_qualified_replications": 128,
+      "monitor_armed_replications": 128,
+      "monitor_latches": 0,
+      "name": "tas_offset_pulse_0p25s",
+      "nis_fed_observations": 14976,
+      "paired_attributable_latches": 0,
+      "paired_null_latched_not_later": 0,
+      "pre_injection_latches": 0,
+      "replications": 128,
+      "role": "nuisance_primary",
+      "source_detection_delay_s": {
+        "maximum": null,
+        "minimum": null,
+        "p50": null,
+        "p95": null
+      }
+    },
+    {
+      "clean_post_injection_latches": 0,
+      "generated_observations": 20736,
+      "geometry_qualified_replications": 128,
+      "monitor_armed_replications": 128,
+      "monitor_latches": 0,
+      "name": "tas_offset_pulse_0p5s",
+      "nis_fed_observations": 14976,
+      "paired_attributable_latches": 0,
+      "paired_null_latched_not_later": 0,
+      "pre_injection_latches": 0,
+      "replications": 128,
+      "role": "nuisance_primary",
+      "source_detection_delay_s": {
+        "maximum": null,
+        "minimum": null,
+        "p50": null,
+        "p95": null
+      }
+    },
+    {
+      "clean_post_injection_latches": 0,
+      "generated_observations": 20736,
+      "geometry_qualified_replications": 128,
+      "monitor_armed_replications": 128,
+      "monitor_latches": 0,
+      "name": "tas_offset_pulse_1p0s",
+      "nis_fed_observations": 14976,
+      "paired_attributable_latches": 0,
+      "paired_null_latched_not_later": 0,
+      "pre_injection_latches": 0,
+      "replications": 128,
+      "role": "nuisance_primary",
+      "source_detection_delay_s": {
+        "maximum": null,
+        "minimum": null,
+        "p50": null,
+        "p95": null
+      }
+    },
+    {
+      "clean_post_injection_latches": 11,
+      "generated_observations": 20736,
+      "geometry_qualified_replications": 128,
+      "monitor_armed_replications": 128,
+      "monitor_latches": 11,
+      "name": "tas_offset_pulse_1p5s",
+      "nis_fed_observations": 14976,
+      "paired_attributable_latches": 11,
+      "paired_null_latched_not_later": 0,
+      "pre_injection_latches": 0,
+      "replications": 128,
+      "role": "pulse_curve",
+      "source_detection_delay_s": {
+        "maximum": 1.5,
+        "minimum": 1.0,
+        "p50": 1.5,
+        "p95": 1.5
+      }
+    },
+    {
+      "clean_post_injection_latches": 128,
+      "generated_observations": 20736,
+      "geometry_qualified_replications": 128,
+      "monitor_armed_replications": 128,
+      "monitor_latches": 128,
+      "name": "tas_offset_pulse_2p0s",
+      "nis_fed_observations": 14976,
+      "paired_attributable_latches": 128,
+      "paired_null_latched_not_later": 0,
+      "pre_injection_latches": 0,
+      "replications": 128,
+      "role": "pulse_curve",
+      "source_detection_delay_s": {
+        "maximum": 1.5,
+        "minimum": 1.0,
+        "p50": 1.5,
+        "p95": 1.5
+      }
+    },
+    {
+      "clean_post_injection_latches": 128,
+      "generated_observations": 20736,
+      "geometry_qualified_replications": 128,
+      "monitor_armed_replications": 128,
+      "monitor_latches": 128,
+      "name": "persistent_tas_offset_positive",
+      "nis_fed_observations": 14976,
+      "paired_attributable_latches": 128,
+      "paired_null_latched_not_later": 0,
+      "pre_injection_latches": 0,
+      "replications": 128,
+      "role": "persistent_primary",
+      "source_detection_delay_s": {
+        "maximum": 4.5,
+        "minimum": 1.0,
+        "p50": 1.5,
+        "p95": 3.5
+      }
+    },
+    {
+      "clean_post_injection_latches": 128,
+      "generated_observations": 20736,
+      "geometry_qualified_replications": 128,
+      "monitor_armed_replications": 128,
+      "monitor_latches": 128,
+      "name": "persistent_tas_offset_negative",
+      "nis_fed_observations": 14976,
+      "paired_attributable_latches": 128,
+      "paired_null_latched_not_later": 0,
+      "pre_injection_latches": 0,
+      "replications": 128,
+      "role": "persistent_primary",
+      "source_detection_delay_s": {
+        "maximum": 4.0,
+        "minimum": 1.0,
+        "p50": 1.5,
+        "p95": 3.5
+      }
+    },
+    {
+      "clean_post_injection_latches": 128,
+      "generated_observations": 20736,
+      "geometry_qualified_replications": 128,
+      "monitor_armed_replications": 128,
+      "monitor_latches": 128,
+      "name": "persistent_tas_scale_positive",
+      "nis_fed_observations": 14976,
+      "paired_attributable_latches": 128,
+      "paired_null_latched_not_later": 0,
+      "pre_injection_latches": 0,
+      "replications": 128,
+      "role": "descriptive",
+      "source_detection_delay_s": {
+        "maximum": 4.5,
+        "minimum": 1.0,
+        "p50": 1.5,
+        "p95": 3.5
+      }
+    },
+    {
+      "clean_post_injection_latches": 128,
+      "generated_observations": 20736,
+      "geometry_qualified_replications": 128,
+      "monitor_armed_replications": 128,
+      "monitor_latches": 128,
+      "name": "persistent_tas_scale_negative",
+      "nis_fed_observations": 14976,
+      "paired_attributable_latches": 128,
+      "paired_null_latched_not_later": 0,
+      "pre_injection_latches": 0,
+      "replications": 128,
+      "role": "descriptive",
+      "source_detection_delay_s": {
+        "maximum": 4.0,
+        "minimum": 1.0,
+        "p50": 1.5,
+        "p95": 1.5
+      }
+    },
+    {
+      "clean_post_injection_latches": 128,
+      "generated_observations": 20736,
+      "geometry_qualified_replications": 128,
+      "monitor_armed_replications": 128,
+      "monitor_latches": 128,
+      "name": "persistent_horizontal_wind_step",
+      "nis_fed_observations": 14976,
+      "paired_attributable_latches": 128,
+      "paired_null_latched_not_later": 0,
+      "pre_injection_latches": 0,
+      "replications": 128,
+      "role": "descriptive",
+      "source_detection_delay_s": {
+        "maximum": 4.0,
+        "minimum": 1.0,
+        "p50": 1.5,
+        "p95": 1.5
+      }
+    },
+    {
+      "clean_post_injection_latches": 119,
+      "generated_observations": 20736,
+      "geometry_qualified_replications": 128,
+      "monitor_armed_replications": 128,
+      "monitor_latches": 119,
+      "name": "persistent_vertical_wind",
+      "nis_fed_observations": 14976,
+      "paired_attributable_latches": 119,
+      "paired_null_latched_not_later": 0,
+      "pre_injection_latches": 0,
+      "replications": 128,
+      "role": "descriptive",
+      "source_detection_delay_s": {
+        "maximum": 11.5,
+        "minimum": 1.0,
+        "p50": 3.5,
+        "p95": 10.0
+      }
+    },
+    {
+      "clean_post_injection_latches": 0,
+      "generated_observations": 20736,
+      "geometry_qualified_replications": 128,
+      "monitor_armed_replications": 0,
+      "monitor_latches": 0,
+      "name": "gap_then_tas_offset_pulse_1p0s",
+      "nis_fed_observations": 14976,
+      "pre_injection_latches": 0,
+      "replications": 128,
+      "role": "structural_gap",
+      "source_detection_delay_s": {
+        "maximum": null,
+        "minimum": null,
+        "p50": null,
+        "p95": null
+      }
+    }
+  ],
+  "deterministic_contract": {
+    "common_random_stream_pairing": {
+      "passed": true,
+      "violations": []
+    },
+    "coverage_timing_gap_trace": {
+      "failures": [],
+      "passed": true
+    },
+    "passed": true,
+    "pulse_latch_rate_monotonicity": {
+      "passed": true,
+      "violations": []
+    }
+  },
+  "limitations": [
+    "Opened synthetic train/tune development evidence only; no v6 holdout exists.",
+    "The independent statistical unit is one complete seed/prefix family, not an observation or overlapping window.",
+    "A residual episode cannot classify TAS fault versus wind, sideslip, timing, GNSS velocity error, or model mismatch.",
+    "The result does not change the production ESKF, Mahony backup, public API, source policy, or control authority."
+  ],
+  "phase": "train",
+  "primary_endpoints": {
+    "nuisance_family_false_latch": {
+      "confidence": 0.975,
+      "events": 0,
+      "failed_seeds": [],
+      "one_sided_clopper_pearson_upper": 0.02840805344354386,
+      "passed": true,
+      "point_rate": 0.0,
+      "trials": 128
+    },
+    "persistent_offset_family_failure": {
+      "confidence": 0.975,
+      "events": 0,
+      "failed_seed_records": [],
+      "latency_gate_passed": false,
+      "one_sided_clopper_pearson_upper": 0.02840805344354386,
+      "passed": false,
+      "point_rate": 0.0,
+      "source_detection_delay_p95_s": 3.5,
+      "successes": 128,
+      "trials": 128
+    }
+  },
+  "protocol": {
+    "file_sha256": "ad384e58ee362a25075c41206eee0c4d0bf54823b5a4acae75f5c22e1f6968b6",
+    "path": "validation/airspeed_wind_residual_persistence_protocol_v6.json",
+    "semantic_sha256": "4877bc9e20780577eb9986c478f6d4abedb44102796a62ab5c8d1d47e44e3849"
+  },
+  "provenance": {
+    "base_oracle_runner_sha256": "4c7d723cfd7f9ee85e7abce9f9eb23d2258f12c180f2526f119f7ccd1302e024",
+    "git_commit": "2789bab2be6f7d7a88870f77bc158678fbf7aba0",
+    "git_status": "",
+    "jobs": 8,
+    "monitor_module_sha256": "77d6694496ac9651e1fb43460ad6cdf91904bed98fb29e0da1c731868ef198a0",
+    "numpy_version": "2.3.5",
+    "platform": "Linux-7.0.0-29-generic-x86_64-with-glibc2.43",
+    "python_version": "3.14.4",
+    "runner_sha256": "2998220912b61ea4e1e2fcfb86bf4f22c6bfe7dfdd44d9d2f45a44baa679025b"
+  },
+  "retained_failure_records": [],
+  "schema_version": 1,
+  "seed_count": 128,
+  "selected_seed_canonical_sha256": "6ecfb75b02a81e1183d15752515789c2742ad380047852fe589f1415c26fe295",
+  "selected_seed_range": {
+    "count": 128,
+    "end": 62128,
+    "start": 62001
+  },
+  "status": "failed_train_development_checks",
+  "study_id": "aerakia-airspeed-wind-residual-persistence-v6-development",
+  "totals": {
+    "generated_observations": 290304,
+    "nis_fed_observations": 194688,
+    "post_geometry_observations": 194688,
+    "replication_cases": 1792,
+    "source_valid_observations": 290304
+  }
+}
