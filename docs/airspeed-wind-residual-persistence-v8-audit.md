@@ -13,7 +13,7 @@ The current focused evidence is sound for its declared scope:
 
 - 60 hand-authored policy/scenario comparisons (`3` ages × `5` scenarios ×
   `4` policy shapes);
-- 11 focused Python tests, all passing;
+- 15 focused Python tests, all passing;
 - one read-only replay of v7 seed `71101`, with `117` monitor-fed samples;
 - no changes to the production ESKF, Mahony, public API, v7 protocol, v7
   scorer, or v7 train artifact.
@@ -128,6 +128,11 @@ or holdout.
 - one mid-band pulse with no persistent high: no latch;
 - retry exhaustion: finite retry budget is visible and cannot become an
   unlimited v6-style inheritance path;
+- boundary-age semantics: onset exactly at the age limit is admissible, onset
+  one microsecond later is rejected, and an admitted episode may complete after
+  the boundary age expires;
+- graded evidence follows source time under supported rate variation and
+  bounded arrival jitter;
 - repeated runs produce identical trigger hashes and telemetry.
 
 ### B. Fresh development screen (suggested initial size)

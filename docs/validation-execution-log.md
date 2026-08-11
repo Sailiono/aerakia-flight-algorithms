@@ -2894,3 +2894,14 @@ is an information/attribution boundary after the quiet boundary expires, not a
 numerical or transport defect. The next candidate must therefore separate a
 causal diagnostic anomaly from a control-qualified fault and add an independent
 regime/source transition before any supervisor authority is considered.
+
+### 2026-08-11 — v8 boundary and rate semantics locked
+
+Focused coverage was extended to lock the exact edge conditions identified by
+the failure review. At the configured 3 s boundary age, an episode starting at
+exactly 3.000000 s is admitted; an onset at 3.000001 s is rejected; and an
+episode admitted before expiry may finish after expiry because authorization is
+snapshotted at onset. Graded evidence was also exercised under irregular source
+spacing and bounded arrival jitter, confirming that the evidence threshold uses
+source time rather than sample count or arrival cadence. The v8 focused suite
+now passes `15/15`; these are contract tests, not new selection evidence.

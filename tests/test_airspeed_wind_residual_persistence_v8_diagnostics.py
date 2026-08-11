@@ -207,6 +207,81 @@ class ResidualPersistenceV8DiagnosticTests(unittest.TestCase):
         self.assertTrue(any(event.reason == "partial_boundary_retired_midband" for event in result.trace))
         self.assertTrue(any(event.reason == "no_recent_quiet_boundary" for event in result.trace))
 
+    @staticmethod
+    def _feed(probe: v8.CausalPolicyProbe, samples: list[tuple[float, float]]) -> v8.ProbeResult:
+        for source_s, nis in samples:
+            source_us = int(round(source_s * 1e6))
+            arrival_us = int(round((source_s + 0.05) * 1e6))
+            probe.observe(v8.ProbeInput(source_us, arrival_us, nis))
+        return probe.result()
+
+    def test_boundary_age_exactly_at_expiry_is_admissible(self) -> None:
+        for policy in (v8.PolicyKind.RECENT_BOUNDARY, v8.PolicyKind.GRADED_EVIDENCE):
+            with self.subTest(policy=policy.value):
+                probe = v8.CausalPolicyProbe(
+                    policy,
+                    v8.ProbeConfig(recent_quiet_boundary_max_age_s=3.0),
+                )
+                probe.reauthorize(0)
+                samples = [(t, 1.0) for t in (0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0)]
+                samples += [(5.0, 3.0), (6.0, 3.0)]
+                samples += [(7.0, 5.0), (7.5, 5.0), (8.0, 5.0), (8.5, 5.0)]
+                result = self._feed(probe, samples)
+                self.assertTrue(result.latched)
+                self.assertEqual(result.episode_start_source_timestamp_us, 7_000_000)
+                onset = next(event for event in result.trace if event.source_timestamp_us == 7_000_000)
+                self.assertAlmostEqual(onset.recent_boundary_age_s or -1.0, 3.0)
+
+    def test_boundary_age_just_past_expiry_is_rejected(self) -> None:
+        for policy in (v8.PolicyKind.RECENT_BOUNDARY, v8.PolicyKind.GRADED_EVIDENCE):
+            with self.subTest(policy=policy.value):
+                probe = v8.CausalPolicyProbe(
+                    policy,
+                    v8.ProbeConfig(recent_quiet_boundary_max_age_s=3.0),
+                )
+                probe.reauthorize(0)
+                samples = [(t, 1.0) for t in (0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0)]
+                samples += [(5.0, 3.0), (6.0, 3.0)]
+                onset = 7.000001
+                samples += [(onset + index * 0.5, 5.0) for index in range(4)]
+                result = self._feed(probe, samples)
+                self.assertFalse(result.latched)
+                self.assertTrue(any(event.reason == "no_recent_quiet_boundary" for event in result.trace))
+
+    def test_episode_onset_before_expiry_can_complete_after_expiry(self) -> None:
+        probe = v8.CausalPolicyProbe(
+            v8.PolicyKind.GRADED_EVIDENCE,
+            v8.ProbeConfig(recent_quiet_boundary_max_age_s=3.0),
+        )
+        probe.reauthorize(0)
+        samples = [(t, 1.0) for t in (0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0)]
+        samples += [(5.0, 3.0), (6.0, 3.0)]
+        samples += [(6.5, 5.0), (7.0, 5.0), (7.5, 5.0), (8.0, 5.0)]
+        result = self._feed(probe, samples)
+        self.assertTrue(result.latched)
+        self.assertEqual(result.episode_start_source_timestamp_us, 6_500_000)
+        self.assertEqual(result.latch_source_timestamp_us, 8_000_000)
+
+    def test_graded_evidence_uses_source_span_under_rate_and_arrival_jitter(self) -> None:
+        probe = v8.CausalPolicyProbe(
+            v8.PolicyKind.GRADED_EVIDENCE,
+            v8.ProbeConfig(recent_quiet_boundary_max_age_s=3.0),
+        )
+        probe.reauthorize(0)
+        for source_s in (index / 10.0 for index in range(36)):
+            source_us = int(round(source_s * 1e6))
+            arrival_offset = 0.02 + (0.03 if int(round(source_s * 10)) % 3 == 0 else 0.0)
+            probe.observe(v8.ProbeInput(source_us, int(round((source_s + arrival_offset) * 1e6)), 1.0))
+        high_times = (4.5, 4.63, 4.91, 5.37, 5.99, 6.18, 6.42, 6.63)
+        for index, source_s in enumerate(high_times):
+            source_us = int(round(source_s * 1e6))
+            arrival_offset = 0.03 + (0.07 if index % 2 else 0.0)
+            probe.observe(v8.ProbeInput(source_us, int(round((source_s + arrival_offset) * 1e6)), 5.0))
+        result = probe.result()
+        self.assertTrue(result.latched)
+        self.assertEqual(result.episode_start_source_timestamp_us, 4_500_000)
+        self.assertEqual(result.latch_source_timestamp_us, 6_180_000)
+
 
 if __name__ == "__main__":
     unittest.main()
