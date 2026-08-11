@@ -4,6 +4,54 @@ This append-only log records why each hardware-independent validation step was s
 changed, which evidence was produced, and what remains unresolved. Generated raw outputs stay under
 `build/`; reviewed conclusions and reproduction commands remain in Git.
 
+## 2026-08-11 — full-state fixed-lag replay candidate rejected
+
+### Reason
+
+The earlier 5D no-injection MAP proposal was rejected because it fit a closed
+window without mutating or replaying the ESKF. A second experiment was needed
+to determine whether the missing result came from the lack of a complete state
+transaction or from the correction hypothesis itself.
+
+### Changes
+
+- Added a private host-only helper that reuses the core nominal-state injection
+  and attitude covariance-reset Jacobian.
+- Moved validation injection to an explicit pre-IMU/pre-aiding boundary.
+- Recorded raw pre-update GNSS position/velocity innovations and diagonal
+  innovation variances in the native replay output.
+- Added symmetric finite-difference replays, a prior-regularized five-state
+  correction, full replay, and an innovation-only second-half holdout.
+- Added exact zero-injection, transaction symmetry, input validation, schedule,
+  and candidate-campaign tests.
+
+### Evidence
+
+The frozen development protocol ran 216 paired train/tune trials over three
+causal v2 motions, nine signed accelerometer-bias vectors, and eight seeds per
+split. The compact report is
+[`fixed_lag_replay_candidate_v1.json`](../validation/public/fixed_lag_replay_candidate_v1.json);
+the focused interpretation is in
+[`fixed-lag-replay-candidate.md`](fixed-lag-replay-candidate.md).
+
+- 91 candidates passed the innovation-only holdout and were externally scored;
+  125 were rejected by the holdout, schedule, or health checks.
+- Accepted train/tune terminal horizontal-bias P95 deltas were
+  `-0.00571/-0.00360 m/s2`.
+- Four zero-bias material regressions and twelve attitude-RMSE material
+  regressions remained; signed nonzero group improvement was `17/24`.
+- Every accepted replay remained numerically healthy with zero navigation
+  recoveries and an unchanged accepted P/V schedule.
+
+### Decision
+
+The candidate is rejected for promotion. The production ESKF, public API, and
+FCOne path remain unchanged. The experiment establishes an executable,
+auditable correction transaction and shows that the current local innovation
+fit still overfits residual/model effects. A future candidate must add full
+15x15 lag covariance, process/preintegration covariance, physical source/arrival
+timing, and a new sealed protocol before another correction is considered.
+
 ## 2026-07-18 — input integrity and timing audit started
 
 ### Reason

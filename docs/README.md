@@ -75,7 +75,11 @@ is the stable navigation layer rather than a disruptive mass rename.
 - [G0 score calibration](g0-score-calibration.md): disjoint stationary-null
   validation and noisy maneuver score campaign.
 - [Fixed-lag proposal](fixed-lag-bias-proposal.md): rejected no-injection
-  solver and the replay-oracle prerequisite before another estimator candidate.
+- [Fixed-lag replay candidate](fixed-lag-replay-candidate.md): complete
+  host-only correction/replay experiment, rejected for promotion after a
+  216-trial paired development matrix
+- The two documents together define the solver boundary and replay-oracle
+  prerequisite before another estimator candidate.
 - [Delayed GNSS replay oracle](delayed-gnss-repropagation-oracle.md): the
   host-only prerequisite for any future fixed-lag state correction.
 - [Barometer source supervision](barometer-supervision-study.md) and
