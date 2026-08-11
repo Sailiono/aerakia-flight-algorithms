@@ -89,6 +89,20 @@ class AirspeedWindMismatchMonitorV5Tests(unittest.TestCase):
         }
         self.assertEqual(len(fingerprints), 1)
 
+    def test_parallel_records_match_sequential_for_a_small_fixed_matrix(self) -> None:
+        protocol = copy.deepcopy(v5.load_protocol())
+        protocol["seed_sets"]["development"] = [52001]
+        protocol["case_matrix"] = protocol["case_matrix"][:2]
+        base_protocol = v5.resolve_base_protocol(protocol)
+        sequential = v5.run_records(protocol, base_protocol, jobs=1)
+        parallel = v5.run_records(protocol, base_protocol, jobs=2)
+        self.assertEqual(
+            v5.base.canonical_sha256(sequential),
+            v5.base.canonical_sha256(parallel),
+        )
+        with self.assertRaises(ValueError):
+            v5.run_records(protocol, base_protocol, jobs=0)
+
 
 if __name__ == "__main__":
     unittest.main()

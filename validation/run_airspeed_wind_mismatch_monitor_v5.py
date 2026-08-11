@@ -13,8 +13,11 @@ import copy
 import hashlib
 import json
 import math
+import multiprocessing
+import os
 import subprocess
 from collections import Counter, defaultdict, deque
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -579,6 +582,35 @@ def evaluate_case(
     }
 
 
+def evaluate_task(
+    task: tuple[dict[str, Any], dict[str, Any], dict[str, Any], int],
+) -> dict[str, object]:
+    """Top-level worker entry so one seed/case is safe to run in a process."""
+
+    case, protocol, base_protocol, seed = task
+    return evaluate_case(case, protocol, base_protocol, synthetic_seed=seed)
+
+
+def run_records(
+    protocol: dict[str, Any], base_protocol: dict[str, Any], *, jobs: int,
+) -> list[dict[str, object]]:
+    """Evaluate the fixed development matrix in canonical task order."""
+
+    if jobs <= 0:
+        raise ValueError("jobs must be positive")
+    tasks = [
+        (case, protocol, base_protocol, seed)
+        for seed in protocol["seed_sets"]["development"]
+        for case in protocol["case_matrix"]
+    ]
+    if jobs == 1:
+        return [evaluate_task(task) for task in tasks]
+    methods = multiprocessing.get_all_start_methods()
+    context = multiprocessing.get_context("fork") if "fork" in methods else None
+    with ProcessPoolExecutor(max_workers=jobs, mp_context=context) as executor:
+        return list(executor.map(evaluate_task, tasks))
+
+
 def percentile_summary(values: list[float | int]) -> dict[str, float | None]:
     if not values:
         return {"minimum": None, "p05": None, "p50": None, "p95": None, "maximum": None}
@@ -641,7 +673,13 @@ def check_common_prefixes(records: list[dict[str, object]]) -> list[dict[str, ob
     ]
 
 
-def assemble_result(protocol: dict[str, Any], records: list[dict[str, object]], protocol_path: Path) -> dict[str, object]:
+def assemble_result(
+    protocol: dict[str, Any],
+    records: list[dict[str, object]],
+    protocol_path: Path,
+    *,
+    jobs: int,
+) -> dict[str, object]:
     records.sort(key=lambda item: (str(item["name"]), int(item["synthetic_seed"])))
     groups: dict[str, list[dict[str, object]]] = defaultdict(list)
     for record in records:
@@ -664,7 +702,8 @@ def assemble_result(protocol: dict[str, Any], records: list[dict[str, object]], 
             "base_oracle_runner_sha256": file_sha256(ROOT / "validation" / "run_airspeed_wind_observability.py"),
             "git_commit": capture(["git", "rev-parse", "HEAD"]),
             "git_status": capture(["git", "status", "--short"]),
-            "execution_mode": "sequential",
+            "execution_mode": "sequential" if jobs == 1 else "process_pool",
+            "jobs": jobs,
         },
         "monitor": protocol["monitor"],
         "seed_count": len(protocol["seed_sets"]["development"]),
@@ -695,16 +734,13 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--protocol", type=Path, default=DEFAULT_PROTOCOL)
     parser.add_argument("--out", type=Path, default=Path("build/airspeed-wind-mismatch-monitor-v5-development.json"))
+    parser.add_argument("--jobs", type=int, default=min(8, max(1, os.cpu_count() or 1)))
     args = parser.parse_args()
     protocol_path = args.protocol.resolve()
     protocol = load_protocol(protocol_path)
     base_protocol = resolve_base_protocol(protocol)
-    records = [
-        evaluate_case(case, protocol, base_protocol, synthetic_seed=seed)
-        for seed in protocol["seed_sets"]["development"]
-        for case in protocol["case_matrix"]
-    ]
-    result = assemble_result(protocol, records, protocol_path)
+    records = run_records(protocol, base_protocol, jobs=args.jobs)
+    result = assemble_result(protocol, records, protocol_path, jobs=args.jobs)
     output = args.out.resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
