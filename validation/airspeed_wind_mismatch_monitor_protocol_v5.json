@@ -1,0 +1,141 @@
+{
+  "schema_version": 1,
+  "protocol_id": "aerakia-airspeed-wind-mismatch-monitor-v5-development",
+  "status": "development_only_diagnostic",
+  "base_protocol_path": "validation/airspeed_wind_observability_protocol_v1.json",
+  "base_protocol_file_sha256": "98ea9d240e0d36b84a0fd6f3099afe25293bcfeb3b119f7eded04de4f913159d",
+  "base_oracle_runner_file_sha256": "4c7d723cfd7f9ee85e7abce9f9eb23d2258f12c180f2526f119f7ccd1302e024",
+  "scope": {
+    "production_eskf": "unchanged_16_nominal_15_error_state",
+    "candidate": "host_only_consecutive_new_evidence_residual_diagnostic",
+    "not_claimed": [
+      "This does not identify a TAS fault versus wind, sideslip, or another model mismatch.",
+      "This does not qualify a physical pitot, air-data source, or flight regime.",
+      "This does not add a TAS API, wind state, or flight-control authority."
+    ]
+  },
+  "monitor": {
+    "warmup_eligible_observations": 40,
+    "maximum_inter_observation_gap_s": 1.0,
+    "maximum_episode_elapsed_s": 2.0,
+    "contribution_nis_floor": 4.0,
+    "per_observation_nis_cap": 6.0,
+    "minimum_consecutive_high_observations": 4,
+    "minimum_episode_elapsed_s": 1.5,
+    "cumulative_nis_threshold": 16.0,
+    "trace_observations": 12,
+    "parameter_origin": "v4 failed because a four-sample rolling window could combine pre-event high residuals with one new sample. v5 is an opened structural diagnostic: it requires four consecutive post-reset high observations over a minimum elapsed span, records paired common-noise prefixes, and is not a release or source-supervisor candidate."
+  },
+  "stream": {
+    "base_case_name": "multi_heading_nominal",
+    "tail_heading_deg": 45.0,
+    "pre_injection_clean_observations": 64,
+    "post_impulse_clean_observations": 24,
+    "persistent_injection_observations": 24,
+    "gap_before_impulse_s": 4.0
+  },
+  "seed_sets": {
+    "development": [52001, 52002, 52003, 52004, 52005, 52006, 52007, 52008, 52009, 52010, 52011, 52012, 52013, 52014, 52015, 52016, 52017, 52018, 52019, 52020, 52021, 52022, 52023, 52024, 52025, 52026, 52027, 52028, 52029, 52030, 52031, 52032, 52033, 52034, 52035, 52036, 52037, 52038, 52039, 52040, 52041, 52042, 52043, 52044, 52045, 52046, 52047, 52048, 52049, 52050, 52051, 52052, 52053, 52054, 52055, 52056, 52057, 52058, 52059, 52060, 52061, 52062, 52063, 52064],
+    "reserved_future_holdout": "No v5 holdout exists. Any later release candidate requires a separately named protocol, unexecuted seeds, and physical air-data evidence."
+  },
+  "case_matrix": [
+    {
+      "name": "long_nominal",
+      "paired_prefix_group": "standard_noise",
+      "noise_multiplier": 1.0,
+      "injection": {"kind": "none"},
+      "scoring": "required",
+      "expected": {"monitor_latched": false}
+    },
+    {
+      "name": "single_tas_impulse",
+      "paired_prefix_group": "standard_noise",
+      "noise_multiplier": 1.0,
+      "injection": {"kind": "tas_impulse_train", "value": 12.0, "count": 1},
+      "scoring": "required",
+      "expected": {"monitor_latched": false}
+    },
+    {
+      "name": "two_adjacent_tas_impulses",
+      "paired_prefix_group": "standard_noise",
+      "noise_multiplier": 1.0,
+      "injection": {"kind": "tas_impulse_train", "value": 12.0, "count": 2},
+      "scoring": "required",
+      "expected": {"monitor_latched": false}
+    },
+    {
+      "name": "three_adjacent_tas_impulses",
+      "paired_prefix_group": "standard_noise",
+      "noise_multiplier": 1.0,
+      "injection": {"kind": "tas_impulse_train", "value": 12.0, "count": 3},
+      "scoring": "required",
+      "expected": {"monitor_latched": false}
+    },
+    {
+      "name": "four_adjacent_tas_impulses",
+      "paired_prefix_group": "standard_noise",
+      "noise_multiplier": 1.0,
+      "injection": {"kind": "tas_impulse_train", "value": 12.0, "count": 4},
+      "scoring": "required",
+      "expected": {
+        "monitor_latched": true,
+        "minimum_latch_window_injection_observations": 4,
+        "maximum_latch_delay_s": 2.0
+      }
+    },
+    {
+      "name": "gap_then_single_tas_impulse",
+      "paired_prefix_group": "standard_noise",
+      "noise_multiplier": 1.0,
+      "injection": {"kind": "tas_impulse_train", "value": 12.0, "count": 1, "insert_gap_before": true},
+      "scoring": "required",
+      "expected": {"monitor_latched": false, "minimum_inter_observation_gap_resets": 1}
+    },
+    {
+      "name": "persistent_tas_scale_bias",
+      "paired_prefix_group": "standard_noise",
+      "noise_multiplier": 1.0,
+      "injection": {"kind": "tas_offset", "value": 2.0},
+      "scoring": "required",
+      "expected": {
+        "monitor_latched": true,
+        "minimum_latch_window_injection_observations": 4,
+        "maximum_latch_delay_s": 10.0
+      }
+    },
+    {
+      "name": "long_nominal_high_noise",
+      "paired_prefix_group": "high_noise",
+      "noise_multiplier": 1.5,
+      "injection": {"kind": "none"},
+      "scoring": "required",
+      "expected": {"monitor_latched": false}
+    },
+    {
+      "name": "persistent_horizontal_wind_step_stress",
+      "paired_prefix_group": "standard_noise",
+      "noise_multiplier": 1.0,
+      "injection": {"kind": "horizontal_wind_step", "value": 3.0},
+      "scoring": "descriptive",
+      "expected": {"monitor_latched": null}
+    },
+    {
+      "name": "persistent_vertical_wind_stress",
+      "paired_prefix_group": "standard_noise",
+      "noise_multiplier": 1.0,
+      "injection": {"kind": "vertical_wind", "value": 8.0},
+      "scoring": "descriptive",
+      "expected": {"monitor_latched": null}
+    }
+  ],
+  "development_questions": [
+    "Does an episode reset on a low residual prevent the v4 rolling-window mixing defect on paired null and impulse streams?",
+    "Does a four-sample / 1.5-second consecutive-evidence definition retain a detectable persistent TAS-offset signal in this synthetic contract?",
+    "How do horizontal and vertical wind stresses behave under a diagnostic that makes no source-fault attribution?"
+  ],
+  "promotion_blockers_after_any_result": [
+    "This development diagnostic is not a runtime source supervisor and cannot promote the 17-state wind branch.",
+    "Use calibrated physical TAS, GNSS Doppler velocity, source/arrival timing, fixed-wing regime evidence, and independent truth in a separately frozen physical train/tune/holdout study.",
+    "A private FCOne source/regime policy must distinguish source validity from residual diagnostics before flight use."
+  ]
+}
