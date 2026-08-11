@@ -78,6 +78,12 @@ portable C library and from FCOne-specific integration code.
   `3.0 s` limit. Do not run v6 tune. The v6 scorer also has a documented
   pre-existing-episode attribution gap; any correction belongs in a new v7
   protocol with disjoint seeds and a real one-shot tune gate.
+- `run_airspeed_wind_residual_persistence_v7.py`: new, not-yet-trained
+  source-time characterization with explicit onset attribution, evaluator
+  hashing, bounded-jitter delivery integration, family-level delay scoring,
+  an explicit required-null pairing contract, and an atomic single-use tune
+  receipt. V7 seeds are disjoint from all prior campaigns; do not call it a
+  pass until its train artifact is committed.
 - `run_px4_bias_ab_m0.py`: optional PX4 host comparison; it is blocked until a
   matching PX4 source tree is supplied locally.
 

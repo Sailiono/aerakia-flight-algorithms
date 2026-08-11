@@ -179,6 +179,40 @@ level, declare the residual-provider configuration, and enforce a committed
 single-use tune receipt. No result from v6 authorizes a 17-state branch or
 hardware flight.
 
+## v7 implementation preflight (before train)
+
+V7 is a new, unexecuted development protocol. It does not modify or overwrite
+any v4/v5/v6 file or result. Its preflight implementation now has 26 focused
+tests and a full host-suite compatibility check (`274` tests, with only the
+pre-existing optional PX4-source checks reported as blocked).
+
+The v7 candidate adds three audit protections before any large run:
+
+- the monitor records source/arrival episode onset and requires a fresh quiet
+  boundary; a mid-band residual or aborted high episode cannot inherit old
+  evidence;
+- the evaluator configuration, override, event ordering, and geometry-gate
+  semantics are explicit and hashed;
+- persistent delay is scored per complete seed family with a fixed ceil-based
+  order statistic and a failure sentinel, while a durable, atomic tune-start
+  receipt prevents concurrent or ordinary repeated tune execution.
+- every injected performance case must resolve exactly one delivery-matched
+  null during protocol loading. The one structural source-gap contract case is
+  explicitly marked `paired_null_required: false`, because it validates
+  fail-closed transport behavior rather than differential detection latency.
+
+The primary preflight matrix includes aligned and bounded-jitter 2 Hz delivery
+profiles with source-noise pairing preserved. A true 20 Hz burst/arrival-only
+gap campaign is intentionally not claimed yet: it requires a separate source
+rate and delivery generator and remains a v8/future robustness item rather than
+being represented by a misleading 2 Hz approximation.
+
+V7 train seeds are `71101--71612` (512 families); tune seeds are
+`72101--73124` (1,024 families). Seed `71001` was used only for a preflight
+smoke and is permanently retired in the protocol registry. The train has not
+been run at this checkpoint. If the train fails, its artifact will be retained
+and no tune claim will be generated.
+
 ## Boundary
 
 Even a clean v4 holdout pass would mean only that this frozen *synthetic*

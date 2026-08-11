@@ -2728,3 +2728,53 @@ development evidence. They are not patched into v6 and no v6 tune/holdout is
 permitted. A new v7 protocol with disjoint seeds must fix the attribution,
 family aggregation, evaluator provenance, one-shot tune gate, and at least a
 minimal arrival-timing integration matrix before any later promotion review.
+
+## 2026-08-11 — v7 residual-persistence preflight implementation
+
+### Scope and seed hygiene
+
+V7 was created as a new protocol after the v6 train was closed. No v4/v5/v6
+source, protocol, or result was rewritten. The preflight smoke used seed
+`71001`; it is recorded as retired, and v7 train/tune use disjoint ranges
+`71101--71612` and `72101--73124`.
+
+### Implementation and checks
+
+The v7 monitor now records immutable source/arrival episode onset and quiet
+boundary timestamps. Mid-band residuals, low-residual episode aborts, gaps,
+invalid samples, and epoch changes require fresh qualification. Gap facts are
+preserved in the returned decision even when the gap-ending event has no NIS.
+The residual evaluator override and geometry-gate ordering are declared in the
+protocol and represented by a canonical hash. Bounded-jitter delivery is
+generated separately from source noise and is exercised through the evaluator
+to monitor pipeline. Persistent delay scoring uses one family maximum per seed
+and includes a fixed failure sentinel in the primary P95. An exclusive
+`tune_started` receipt is created before any tune worker starts.
+
+Focused v7 tests pass `26/26`; the full Python suite passes `274/274`. A fresh
+Release CMake configuration also builds and runs `17/17` CTest targets. The
+optional PX4 comparison tests remain blocked only because their external PX4
+source tree is not present; they are not part of this v7 monitor result.
+
+The train entry point also rejects a dirty worktree, so its provenance commit
+cannot silently describe uncommitted protocol or runner changes.
+
+### Late aggregate-scoring audit fix
+
+Before the full v7 train, an aggregate-scoring inspection found that the sole
+`structural_gap` case intentionally has no nominal counterpart but the old
+loop still attempted paired-null attribution for every injected case. The v7
+protocol now marks that exception explicitly with `paired_null_required: false`.
+All other injected cases are required to resolve exactly one matched null during
+protocol loading; a focused aggregate test proves the structural-gap record is
+still scored for its own fail-closed contract without being mislabeled as a
+performance detection pair. This is a pre-train correction to a new v7
+protocol, not a change to any historical v4/v5/v6 evidence.
+
+### Current status
+
+No v7 train has been run yet. A true 20 Hz burst and arrival-only-gap campaign
+is deliberately not claimed: implementing those with a dedicated source-rate
+generator is a separate future item. The next permitted action is to commit
+this preflight from a clean tree, then run the one-time 512-family train. A
+failed train must remain as evidence and cannot generate a tune claim.
