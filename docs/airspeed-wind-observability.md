@@ -149,6 +149,12 @@ These numbers validate this synthetic contract and its failure behavior only.
 They do not measure a physical pitot, identify real wind, establish airspeed
 calibration, or quantify a 17-state ESKF benefit.
 
+The subsequent multi-seed confirmation reopens one part of the v1 boundary:
+the unflagged vertical-wind control is not reliably caught by residual NIS.
+See [the multi-seed result](airspeed-wind-multiseed-confirmation.md). The v1
+single-seed pass therefore remains a deterministic source-contract result, not
+a promotion of the vertical-wind detection policy.
+
 ## Reproduction and promotion boundary
 
 Run the deterministic source-contract matrix with:

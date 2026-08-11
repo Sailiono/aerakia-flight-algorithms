@@ -69,3 +69,34 @@ replicated across declared noise seeds. It does not provide physical TAS,
 wind, calibration, aerodynamic-model, target-compute, or GNSS-denied
 navigation evidence. A physical fixed-wing train/tune/holdout comparison is
 still required before a 17-error-state wind branch can be evaluated.
+
+## Reviewed v1 result: blocked, not tuned away
+
+The reviewed compact output is
+[`validation/public/airspeed_wind_observability_campaign_v1.json`](../validation/public/airspeed_wind_observability_campaign_v1.json).
+At commit `6cd1812b66f2548ed8c8e2e3b668ff4dd4b2efff`, the complete four-shard
+merge covered 480 replication cases and 23,552 source observations. It did
+**not** pass: 477/480 frozen case rules passed and all three failures were the
+unflagged vertical-wind negative control.
+
+- The 32 qualified multi-heading replications were stable: terminal wind-error
+  mean/P95/maximum `0.1374/0.2846/0.5237 m/s`; known-wind NIS-mean
+  P05/P95 `0.6324/1.3117` around mean `0.9685`.
+- Of 32 high vertical-wind injections, 30 ended source-latched, one ended stale
+  without the required completed latch, and **one ended qualified**. That is a
+  retained `unsafe_false_qualification`, not an acceptable result.
+- The remaining two failures distinguish a source-latch event-order reporting
+  gap (the final sample triggered the latch) from an incomplete-latch outcome.
+  They are less severe than a qualified output but remain failures of the
+  frozen v1 rule.
+
+The root cause is structural: with only scalar TAS and GNSS ground velocity,
+an unflagged vertical air-mass component is not reliably distinguishable from
+the model's assumed `w_D = 0` under all noise draws. Tightening NIS after seeing
+this result would be threshold fitting, not a proof of detectability.
+
+Therefore the action is **not** to force the matrix green. The current 15-state
+ESKF remains unchanged; a future wind branch must be restricted to a separately
+validated source/regime envelope with explicit upstream model qualification,
+then pass physical fixed-wing evidence. The frozen v1 protocol and its failed
+replications remain in Git as the reason for that block.

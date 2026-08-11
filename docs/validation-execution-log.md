@@ -62,6 +62,59 @@ and reviewed threshold checks. Its disposable manifest correctly records that
 the evidence/documentation files were being prepared for commit; no executable
 source changed between the compact oracle artifact and the regression.
 
+## 2026-08-11 — multi-seed TAS/wind confirmation blocks vertical-wind promotion
+
+### Reason
+
+The single frozen source-contract fixture passed, but a single noise seed is
+not enough to claim that residual NIS reliably catches air-data model mismatch.
+The next step repeated every frozen case in two disjoint confirmation windows
+without using the outcome to retune any rule.
+
+### Method
+
+The campaign fixed 32 seeds (`17001--17016`, `27001--27016`) and every one of
+the 15 v1 cases. Four eight-seed build shards retained compact individual
+records, and a merge checked exact non-overlap/completeness before producing a
+public aggregate. The source protocol's SHA-256 is part of the campaign
+contract; the runner rejects source-protocol drift.
+
+### Evidence and decision
+
+At commit `6cd1812b66f2548ed8c8e2e3b668ff4dd4b2efff`, the merged campaign
+covered 480 replication cases / 23,552 source observations. It returned
+**failed**, with 477 cases passing and three retained failures, all in the
+unflagged vertical-wind case:
+
+- 30/32 ended `source_latched`;
+- 1/32 ended stale without a completed required latch;
+- 1/32 ended `qualified`, an unsafe false qualification.
+
+The remaining source controls and the 32 qualified multi-heading replications
+were stable: terminal wind error mean/P95/maximum
+`0.13742/0.28459/0.52372 m/s`, with known-wind NIS-mean P05/P95
+`0.63245/1.31173` around `0.96845`.
+
+The result rejects the v1 proposition that residual NIS alone can guarantee
+detection of a vertical-wind model violation. The data cannot honestly support
+a threshold tweak: with only TAS magnitude and GNSS ground velocity, unflagged
+vertical air mass is not independently observable in all draws. The 15-state
+ESKF remains unchanged, and a 17-state wind branch remains blocked pending an
+explicit, independently justified fixed-wing source/regime envelope and
+physical evidence.
+
+### Verification
+
+The compact failed evidence is retained as
+[`airspeed_wind_observability_campaign_v1.json`](../validation/public/airspeed_wind_observability_campaign_v1.json),
+including all failed-case records, canonical digest, clean Git provenance, and
+shard completeness checks. The new shard/merge unit tests pass 5/5. A fresh
+post-review host regression passed 17/17 CTests, 211/211 Python tests, the
+1,020,000-attempt input-integrity campaign, deterministic-suite generation,
+and reviewed threshold checks. Its disposable manifest records the pending
+evidence/documentation commit; no executable source changed after the
+clean-provenance campaign artifact was generated.
+
 ## 2026-08-11 — full-state fixed-lag replay candidate rejected
 
 ### Reason

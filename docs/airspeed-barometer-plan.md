@@ -109,6 +109,13 @@ separates an offline known-wind model upper bound from a truth-free causal
 two-state information/least-squares oracle and retains positive plus
 fail-closed controls.  It does not modify the production 15-error-state ESKF.
 
+The first multi-seed confirmation retained a real blocker: an **unflagged**
+vertical-wind mismatch reached a qualified output in one of 32 draws. This is
+not fixed by retuning NIS; scalar TAS plus GNSS velocity cannot prove that the
+vertical-wind model assumption holds. The next source-contract revision must
+make its independently justified fixed-wing/regime qualification explicit and
+then validate it against physical air-data before any 17-state branch opens.
+
 #### A2.1: isolated experimental branch
 
 - First run TAS with known wind to establish the model's upper bound.

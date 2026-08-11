@@ -1,0 +1,556 @@
+{
+  "all_record_canonical_sha256": "9cb0b497c172546426a235f696db8bb5dbf8244b5188515203182f16c64869df",
+  "base_protocol": {
+    "file_sha256": "98ea9d240e0d36b84a0fd6f3099afe25293bcfeb3b119f7eded04de4f913159d",
+    "path": "validation/airspeed_wind_observability_protocol_v1.json",
+    "semantic_sha256": "ad64170ae803fd9cefcd134eada2d1f67717de02aa020f5399c8a688f543726b"
+  },
+  "campaign_protocol": {
+    "file_sha256": "7c7f5fe84924b8e55b31294a6c6efe4d32db6ad7816eba1ec67d803a2e15af99",
+    "path": "validation/airspeed_wind_observability_campaign_v1.json",
+    "semantic_sha256": "c5afe76499bafe5a7cd879efa06226b1f2c5a5a1b7906f079eb1ce1170ae8bf7"
+  },
+  "confirmation_seed_splits": {
+    "replication_a_1": [
+      17001,
+      17002,
+      17003,
+      17004,
+      17005,
+      17006,
+      17007,
+      17008
+    ],
+    "replication_a_2": [
+      17009,
+      17010,
+      17011,
+      17012,
+      17013,
+      17014,
+      17015,
+      17016
+    ],
+    "replication_b_1": [
+      27001,
+      27002,
+      27003,
+      27004,
+      27005,
+      27006,
+      27007,
+      27008
+    ],
+    "replication_b_2": [
+      27009,
+      27010,
+      27011,
+      27012,
+      27013,
+      27014,
+      27015,
+      27016
+    ]
+  },
+  "execution_backend": "merged_shards",
+  "failed_case_records": [
+    {
+      "accepted_events": 49,
+      "errors": [
+        "required rejection source_latched was absent"
+      ],
+      "input_observations": 52,
+      "known_wind_jacobian_finite_difference_max_error": 2.5207027576357177e-09,
+      "known_wind_nis_mean": 3.2930176254977157,
+      "passed": false,
+      "rejected_events": 3,
+      "rejection_counts": {
+        "innovation_nis": 3
+      },
+      "role": "negative",
+      "scenario": "vertical_wind",
+      "seed": 17015,
+      "split": "replication_a_2",
+      "terminal_status": "source_latched",
+      "terminal_wind_error_norm_m_s": 0.0590026237746621,
+      "terminal_wind_nees_2d_offline_truth_scored": 0.38055141419049715
+    },
+    {
+      "accepted_events": 49,
+      "errors": [
+        "terminal status stale_no_fresh_gnss_tas != source_latched",
+        "required rejection source_latched was absent"
+      ],
+      "input_observations": 52,
+      "known_wind_jacobian_finite_difference_max_error": 2.42978281939088e-09,
+      "known_wind_nis_mean": 2.6603322085774908,
+      "passed": false,
+      "rejected_events": 3,
+      "rejection_counts": {
+        "innovation_nis": 3
+      },
+      "role": "negative",
+      "scenario": "vertical_wind",
+      "seed": 27008,
+      "split": "replication_b_1",
+      "terminal_status": "stale_no_fresh_gnss_tas",
+      "terminal_wind_error_norm_m_s": 0.08046868991582995,
+      "terminal_wind_nees_2d_offline_truth_scored": 0.35901515635924774
+    },
+    {
+      "accepted_events": 49,
+      "errors": [
+        "terminal status qualified != source_latched",
+        "negative control ended qualified",
+        "required rejection source_latched was absent"
+      ],
+      "input_observations": 52,
+      "known_wind_jacobian_finite_difference_max_error": 2.4273043575107067e-09,
+      "known_wind_nis_mean": 2.80805264199526,
+      "passed": false,
+      "rejected_events": 3,
+      "rejection_counts": {
+        "innovation_nis": 3
+      },
+      "role": "negative",
+      "scenario": "vertical_wind",
+      "seed": 27016,
+      "split": "replication_b_2",
+      "terminal_status": "qualified",
+      "terminal_wind_error_norm_m_s": 0.1592502379085739,
+      "terminal_wind_nees_2d_offline_truth_scored": 1.4928421227784554
+    }
+  ],
+  "failure_categories": {
+    "latch_completion_gap_but_not_qualified": 1,
+    "latch_event_order_evidence_gap": 1,
+    "unsafe_false_qualification": 1
+  },
+  "limitations": [
+    "This is a seed-replication confirmation of a synthetic source-contract oracle, not a train/tune/holdout physical air-data evaluation.",
+    "The same frozen per-case rules are applied to every seed; no result is used to retune a threshold or source contract.",
+    "No production ESKF source/state/API or FCOne controller policy is changed by this campaign."
+  ],
+  "merged_shards": [
+    {
+      "path": "/home/clark/DevFiles/OneDev/aerakia-flight-algorithms/build/airspeed-wind-a1.json",
+      "record_count": 120,
+      "record_sha256": "88a14101e54a19951db85a1f6fe350b48131e879c23af49d990d203040a41e10",
+      "status": "passed"
+    },
+    {
+      "path": "/home/clark/DevFiles/OneDev/aerakia-flight-algorithms/build/airspeed-wind-a2.json",
+      "record_count": 120,
+      "record_sha256": "b107db058eff9c9a487f4f6b9bc1c15b77a761787c15a7f2f541448df6d12227",
+      "status": "failed"
+    },
+    {
+      "path": "/home/clark/DevFiles/OneDev/aerakia-flight-algorithms/build/airspeed-wind-b1.json",
+      "record_count": 120,
+      "record_sha256": "4273a64dff9be5ccaf067d456dc1805121c46fce27ad7d572e6a15dbc3f368db",
+      "status": "failed"
+    },
+    {
+      "path": "/home/clark/DevFiles/OneDev/aerakia-flight-algorithms/build/airspeed-wind-b2.json",
+      "record_count": 120,
+      "record_sha256": "b9e6ac24b98e9f3fc776230d6cb12153cd47bdafa03d8a63b02b61545ecee117",
+      "status": "failed"
+    }
+  ],
+  "provenance": {
+    "base_oracle_runner_sha256": "4c7d723cfd7f9ee85e7abce9f9eb23d2258f12c180f2526f119f7ccd1302e024",
+    "campaign_runner_sha256": "28fac72cee4e6132bd5d6de6aa624d1857017634526f9148b59469316f4bedee",
+    "git_commit": "6cd1812b66f2548ed8c8e2e3b668ff4dd4b2efff",
+    "git_status": "",
+    "jobs": 4
+  },
+  "scenario_summaries": [
+    {
+      "accepted_events": 1536,
+      "aggregate_rejection_counts": {},
+      "input_observations": 1536,
+      "name": "multi_heading_nominal",
+      "passed_replications": 32,
+      "positive_known_wind_nis_mean": {
+        "mean": 0.9684509987806821,
+        "p05": 0.6324489546077321,
+        "p95": 1.3117321828715571
+      },
+      "positive_terminal_wind_error_norm_m_s": {
+        "maximum": 0.5237184566589094,
+        "mean": 0.13741950720642218,
+        "p95": 0.2845903071010497
+      },
+      "rejected_events": 0,
+      "replications": 32,
+      "role": "positive",
+      "terminal_status_counts": {
+        "qualified": 32
+      }
+    },
+    {
+      "accepted_events": 1536,
+      "aggregate_rejection_counts": {},
+      "input_observations": 1536,
+      "name": "straight_line",
+      "passed_replications": 32,
+      "positive_known_wind_nis_mean": {
+        "mean": null,
+        "p05": null,
+        "p95": null
+      },
+      "positive_terminal_wind_error_norm_m_s": {
+        "maximum": null,
+        "mean": null,
+        "p95": null
+      },
+      "rejected_events": 0,
+      "replications": 32,
+      "role": "negative",
+      "terminal_status_counts": {
+        "not_observable": 32
+      }
+    },
+    {
+      "accepted_events": 0,
+      "aggregate_rejection_counts": {
+        "flight_regime": 1536
+      },
+      "input_observations": 1536,
+      "name": "hover",
+      "passed_replications": 32,
+      "positive_known_wind_nis_mean": {
+        "mean": null,
+        "p05": null,
+        "p95": null
+      },
+      "positive_terminal_wind_error_norm_m_s": {
+        "maximum": null,
+        "mean": null,
+        "p95": null
+      },
+      "rejected_events": 1536,
+      "replications": 32,
+      "role": "negative",
+      "terminal_status_counts": {
+        "not_observable": 32
+      }
+    },
+    {
+      "accepted_events": 0,
+      "aggregate_rejection_counts": {
+        "low_tas": 1536
+      },
+      "input_observations": 1536,
+      "name": "low_tas",
+      "passed_replications": 32,
+      "positive_known_wind_nis_mean": {
+        "mean": null,
+        "p05": null,
+        "p95": null
+      },
+      "positive_terminal_wind_error_norm_m_s": {
+        "maximum": null,
+        "mean": null,
+        "p95": null
+      },
+      "rejected_events": 1536,
+      "replications": 32,
+      "role": "negative",
+      "terminal_status_counts": {
+        "not_observable": 32
+      }
+    },
+    {
+      "accepted_events": 0,
+      "aggregate_rejection_counts": {
+        "flight_regime": 1536
+      },
+      "input_observations": 1536,
+      "name": "vtol_transition",
+      "passed_replications": 32,
+      "positive_known_wind_nis_mean": {
+        "mean": null,
+        "p05": null,
+        "p95": null
+      },
+      "positive_terminal_wind_error_norm_m_s": {
+        "maximum": null,
+        "mean": null,
+        "p95": null
+      },
+      "rejected_events": 1536,
+      "replications": 32,
+      "role": "negative",
+      "terminal_status_counts": {
+        "not_observable": 32
+      }
+    },
+    {
+      "accepted_events": 0,
+      "aggregate_rejection_counts": {
+        "rotor_wash": 1536
+      },
+      "input_observations": 1536,
+      "name": "rotor_wash",
+      "passed_replications": 32,
+      "positive_known_wind_nis_mean": {
+        "mean": null,
+        "p05": null,
+        "p95": null
+      },
+      "positive_terminal_wind_error_norm_m_s": {
+        "maximum": null,
+        "mean": null,
+        "p95": null
+      },
+      "rejected_events": 1536,
+      "replications": 32,
+      "role": "negative",
+      "terminal_status_counts": {
+        "not_observable": 32
+      }
+    },
+    {
+      "accepted_events": 0,
+      "aggregate_rejection_counts": {
+        "sideslip_unqualified": 1536
+      },
+      "input_observations": 1536,
+      "name": "sideslip",
+      "passed_replications": 32,
+      "positive_known_wind_nis_mean": {
+        "mean": null,
+        "p05": null,
+        "p95": null
+      },
+      "positive_terminal_wind_error_norm_m_s": {
+        "maximum": null,
+        "mean": null,
+        "p95": null
+      },
+      "rejected_events": 1536,
+      "replications": 32,
+      "role": "negative",
+      "terminal_status_counts": {
+        "not_observable": 32
+      }
+    },
+    {
+      "accepted_events": 0,
+      "aggregate_rejection_counts": {
+        "pitot_blocked": 1536
+      },
+      "input_observations": 1536,
+      "name": "blocked_pitot",
+      "passed_replications": 32,
+      "positive_known_wind_nis_mean": {
+        "mean": null,
+        "p05": null,
+        "p95": null
+      },
+      "positive_terminal_wind_error_norm_m_s": {
+        "maximum": null,
+        "mean": null,
+        "p95": null
+      },
+      "rejected_events": 1536,
+      "replications": 32,
+      "role": "negative",
+      "terminal_status_counts": {
+        "not_observable": 32
+      }
+    },
+    {
+      "accepted_events": 0,
+      "aggregate_rejection_counts": {
+        "pitot_stalled": 1536
+      },
+      "input_observations": 1536,
+      "name": "stalled_pitot",
+      "passed_replications": 32,
+      "positive_known_wind_nis_mean": {
+        "mean": null,
+        "p05": null,
+        "p95": null
+      },
+      "positive_terminal_wind_error_norm_m_s": {
+        "maximum": null,
+        "mean": null,
+        "p95": null
+      },
+      "rejected_events": 1536,
+      "replications": 32,
+      "role": "negative",
+      "terminal_status_counts": {
+        "not_observable": 32
+      }
+    },
+    {
+      "accepted_events": 0,
+      "aggregate_rejection_counts": {
+        "tas_delivery_delay": 1536
+      },
+      "input_observations": 1536,
+      "name": "delayed_tas",
+      "passed_replications": 32,
+      "positive_known_wind_nis_mean": {
+        "mean": null,
+        "p05": null,
+        "p95": null
+      },
+      "positive_terminal_wind_error_norm_m_s": {
+        "maximum": null,
+        "mean": null,
+        "p95": null
+      },
+      "rejected_events": 1536,
+      "replications": 32,
+      "role": "negative",
+      "terminal_status_counts": {
+        "not_observable": 32
+      }
+    },
+    {
+      "accepted_events": 1504,
+      "aggregate_rejection_counts": {
+        "tas_timestamp_not_monotonic": 32
+      },
+      "input_observations": 1536,
+      "name": "reordered_tas",
+      "passed_replications": 32,
+      "positive_known_wind_nis_mean": {
+        "mean": null,
+        "p05": null,
+        "p95": null
+      },
+      "positive_terminal_wind_error_norm_m_s": {
+        "maximum": null,
+        "mean": null,
+        "p95": null
+      },
+      "rejected_events": 32,
+      "replications": 32,
+      "role": "transport_control",
+      "terminal_status_counts": {
+        "qualified": 32
+      }
+    },
+    {
+      "accepted_events": 1536,
+      "aggregate_rejection_counts": {
+        "missing_gnss_velocity": 128
+      },
+      "input_observations": 1664,
+      "name": "gnss_outage",
+      "passed_replications": 32,
+      "positive_known_wind_nis_mean": {
+        "mean": null,
+        "p05": null,
+        "p95": null
+      },
+      "positive_terminal_wind_error_norm_m_s": {
+        "maximum": null,
+        "mean": null,
+        "p95": null
+      },
+      "rejected_events": 128,
+      "replications": 32,
+      "role": "negative",
+      "terminal_status_counts": {
+        "stale_no_fresh_gnss_tas": 32
+      }
+    },
+    {
+      "accepted_events": 1536,
+      "aggregate_rejection_counts": {
+        "innovation_nis": 96,
+        "source_latched": 32
+      },
+      "input_observations": 1664,
+      "name": "wind_shear",
+      "passed_replications": 32,
+      "positive_known_wind_nis_mean": {
+        "mean": null,
+        "p05": null,
+        "p95": null
+      },
+      "positive_terminal_wind_error_norm_m_s": {
+        "maximum": null,
+        "mean": null,
+        "p95": null
+      },
+      "rejected_events": 128,
+      "replications": 32,
+      "role": "negative",
+      "terminal_status_counts": {
+        "source_latched": 32
+      }
+    },
+    {
+      "accepted_events": 1536,
+      "aggregate_rejection_counts": {
+        "innovation_nis": 96,
+        "source_latched": 32
+      },
+      "input_observations": 1664,
+      "name": "tas_scale_bias",
+      "passed_replications": 32,
+      "positive_known_wind_nis_mean": {
+        "mean": null,
+        "p05": null,
+        "p95": null
+      },
+      "positive_terminal_wind_error_norm_m_s": {
+        "maximum": null,
+        "mean": null,
+        "p95": null
+      },
+      "rejected_events": 128,
+      "replications": 32,
+      "role": "negative",
+      "terminal_status_counts": {
+        "source_latched": 32
+      }
+    },
+    {
+      "accepted_events": 1539,
+      "aggregate_rejection_counts": {
+        "innovation_nis": 96,
+        "source_latched": 29
+      },
+      "input_observations": 1664,
+      "name": "vertical_wind",
+      "passed_replications": 29,
+      "positive_known_wind_nis_mean": {
+        "mean": null,
+        "p05": null,
+        "p95": null
+      },
+      "positive_terminal_wind_error_norm_m_s": {
+        "maximum": null,
+        "mean": null,
+        "p95": null
+      },
+      "rejected_events": 125,
+      "replications": 32,
+      "role": "negative",
+      "terminal_status_counts": {
+        "qualified": 1,
+        "source_latched": 30,
+        "stale_no_fresh_gnss_tas": 1
+      }
+    }
+  ],
+  "schema_version": 1,
+  "status": "failed",
+  "study_id": "aerakia-airspeed-wind-observability-confirmation-v1",
+  "totals": {
+    "accepted_events": 10723,
+    "failed_replication_cases": 3,
+    "input_observations": 23552,
+    "passed_replication_cases": 477,
+    "rejected_events": 12829,
+    "replication_cases": 480
+  }
+}
