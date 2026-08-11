@@ -155,8 +155,12 @@ The second v2 setting passes `224/224` replications, covering 30,528 source
 observations and 17,723 complete monitor windows. All four non-latch controls
 remain unlatched across 32 seeds. Each of the three persistent mismatches
 latches across 32 seeds within its declared deadline; every trigger contains
-at least two injection-phase samples. The exact v2 development output remains
-disposable under `build/` because it is a selection window, not a holdout.
+at least two injection-phase samples. The compact v2 development record
+[`airspeed_wind_mismatch_monitor_v2_development.json`](../validation/public/airspeed_wind_mismatch_monitor_v2_development.json)
+was generated from clean commit `e672e5d` with the then-frozen monitor runner;
+its `phase: development` remains part of the artifact, so it is selection
+evidence rather than a holdout result. Individual streams remain disposable
+under `build/`.
 
 This result is intentionally narrow. It demonstrates that the reviewed host
 screen no longer obtains a green nominal result from zero executable windows

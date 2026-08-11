@@ -1,0 +1,442 @@
+{
+  "all_record_canonical_sha256": "04243aca555dc477e5b7f199bdec0341d064d4defe0d926c14f27ee8cec80c08",
+  "case_summaries": [
+    {
+      "expected_monitor_latched": false,
+      "failed_case_records": [],
+      "failed_replications": 0,
+      "input_observations": 4352,
+      "latch_delay_s": {
+        "maximum": null,
+        "minimum": null,
+        "p05": null,
+        "p50": null,
+        "p95": null
+      },
+      "latch_window_injection_observations": {
+        "maximum": 0.0,
+        "minimum": 0.0,
+        "p05": 0.0,
+        "p50": 0.0,
+        "p95": 0.0
+      },
+      "maximum_window_nis": {
+        "maximum": 15.874168167438855,
+        "minimum": 7.9242001679228995,
+        "p05": 8.064255250875242,
+        "p50": 10.593404438295615,
+        "p95": 13.72656439382766
+      },
+      "monitor_completed_windows": {
+        "maximum": 88.0,
+        "minimum": 88.0,
+        "p05": 88.0,
+        "p50": 88.0,
+        "p95": 88.0
+      },
+      "monitor_latches": 0,
+      "monitor_non_latches": 32,
+      "name": "long_nominal",
+      "passed_replications": 32,
+      "pre_injection_completed_windows": {
+        "maximum": 88.0,
+        "minimum": 88.0,
+        "p05": 88.0,
+        "p50": 88.0,
+        "p95": 88.0
+      },
+      "pre_injection_eligible_observations": {
+        "maximum": 91.0,
+        "minimum": 91.0,
+        "p05": 91.0,
+        "p50": 91.0,
+        "p95": 91.0
+      },
+      "pre_injection_latches": 0,
+      "replications": 32,
+      "zero_detection_miss_one_sided_95_upper_bound": null,
+      "zero_false_latch_one_sided_95_upper_bound": 0.0893681989862648
+    },
+    {
+      "expected_monitor_latched": false,
+      "failed_case_records": [],
+      "failed_replications": 0,
+      "input_observations": 4352,
+      "latch_delay_s": {
+        "maximum": null,
+        "minimum": null,
+        "p05": null,
+        "p50": null,
+        "p95": null
+      },
+      "latch_window_injection_observations": {
+        "maximum": 0.0,
+        "minimum": 0.0,
+        "p05": 0.0,
+        "p50": 0.0,
+        "p95": 0.0
+      },
+      "maximum_window_nis": {
+        "maximum": 16.504969649395278,
+        "minimum": 7.275354270654554,
+        "p05": 8.241642470700565,
+        "p50": 11.005098127935092,
+        "p95": 13.726584519669627
+      },
+      "monitor_completed_windows": {
+        "maximum": 88.0,
+        "minimum": 88.0,
+        "p05": 88.0,
+        "p50": 88.0,
+        "p95": 88.0
+      },
+      "monitor_latches": 0,
+      "monitor_non_latches": 32,
+      "name": "long_nominal_high_noise",
+      "passed_replications": 32,
+      "pre_injection_completed_windows": {
+        "maximum": 88.0,
+        "minimum": 88.0,
+        "p05": 88.0,
+        "p50": 88.0,
+        "p95": 88.0
+      },
+      "pre_injection_eligible_observations": {
+        "maximum": 91.0,
+        "minimum": 91.0,
+        "p05": 91.0,
+        "p50": 91.0,
+        "p95": 91.0
+      },
+      "pre_injection_latches": 0,
+      "replications": 32,
+      "zero_detection_miss_one_sided_95_upper_bound": null,
+      "zero_false_latch_one_sided_95_upper_bound": 0.0893681989862648
+    },
+    {
+      "expected_monitor_latched": false,
+      "failed_case_records": [],
+      "failed_replications": 0,
+      "input_observations": 4384,
+      "latch_delay_s": {
+        "maximum": null,
+        "minimum": null,
+        "p05": null,
+        "p50": null,
+        "p95": null
+      },
+      "latch_window_injection_observations": {
+        "maximum": 0.0,
+        "minimum": 0.0,
+        "p05": 0.0,
+        "p50": 0.0,
+        "p95": 0.0
+      },
+      "maximum_window_nis": {
+        "maximum": 15.256270741664045,
+        "minimum": 9.51425110081453,
+        "p05": 9.691184310131677,
+        "p50": 12.69102960783395,
+        "p95": 15.113350490172168
+      },
+      "monitor_completed_windows": {
+        "maximum": 89.0,
+        "minimum": 89.0,
+        "p05": 89.0,
+        "p50": 89.0,
+        "p95": 89.0
+      },
+      "monitor_latches": 0,
+      "monitor_non_latches": 32,
+      "name": "single_tas_impulse",
+      "passed_replications": 32,
+      "pre_injection_completed_windows": {
+        "maximum": 64.0,
+        "minimum": 64.0,
+        "p05": 64.0,
+        "p50": 64.0,
+        "p95": 64.0
+      },
+      "pre_injection_eligible_observations": {
+        "maximum": 67.0,
+        "minimum": 67.0,
+        "p05": 67.0,
+        "p50": 67.0,
+        "p95": 67.0
+      },
+      "pre_injection_latches": 0,
+      "replications": 32,
+      "zero_detection_miss_one_sided_95_upper_bound": null,
+      "zero_false_latch_one_sided_95_upper_bound": 0.0893681989862648
+    },
+    {
+      "expected_monitor_latched": false,
+      "failed_case_records": [],
+      "failed_replications": 0,
+      "input_observations": 4384,
+      "latch_delay_s": {
+        "maximum": null,
+        "minimum": null,
+        "p05": null,
+        "p50": null,
+        "p95": null
+      },
+      "latch_window_injection_observations": {
+        "maximum": 0.0,
+        "minimum": 0.0,
+        "p05": 0.0,
+        "p50": 0.0,
+        "p95": 0.0
+      },
+      "maximum_window_nis": {
+        "maximum": 14.738074385126744,
+        "minimum": 7.082344906809786,
+        "p05": 8.653143623670744,
+        "p50": 11.544981757766651,
+        "p95": 13.803614923559374
+      },
+      "monitor_completed_windows": {
+        "maximum": 86.0,
+        "minimum": 86.0,
+        "p05": 86.0,
+        "p50": 86.0,
+        "p95": 86.0
+      },
+      "monitor_latches": 0,
+      "monitor_non_latches": 32,
+      "name": "gap_then_single_tas_impulse",
+      "passed_replications": 32,
+      "pre_injection_completed_windows": {
+        "maximum": 64.0,
+        "minimum": 64.0,
+        "p05": 64.0,
+        "p50": 64.0,
+        "p95": 64.0
+      },
+      "pre_injection_eligible_observations": {
+        "maximum": 67.0,
+        "minimum": 67.0,
+        "p05": 67.0,
+        "p50": 67.0,
+        "p95": 67.0
+      },
+      "pre_injection_latches": 0,
+      "replications": 32,
+      "zero_detection_miss_one_sided_95_upper_bound": null,
+      "zero_false_latch_one_sided_95_upper_bound": 0.0893681989862648
+    },
+    {
+      "expected_monitor_latched": true,
+      "failed_case_records": [],
+      "failed_replications": 0,
+      "input_observations": 4352,
+      "latch_delay_s": {
+        "maximum": 1.5,
+        "minimum": 1.0,
+        "p05": 1.0,
+        "p50": 1.0,
+        "p95": 1.5
+      },
+      "latch_window_injection_observations": {
+        "maximum": 4.0,
+        "minimum": 3.0,
+        "p05": 3.0,
+        "p50": 3.0,
+        "p95": 4.0
+      },
+      "maximum_window_nis": {
+        "maximum": 23.763881355587575,
+        "minimum": 18.000040946598922,
+        "p05": 18.004593453894763,
+        "p50": 18.851378367949817,
+        "p95": 22.799742842403614
+      },
+      "monitor_completed_windows": {
+        "maximum": 68.0,
+        "minimum": 67.0,
+        "p05": 67.0,
+        "p50": 67.0,
+        "p95": 68.0
+      },
+      "monitor_latches": 32,
+      "monitor_non_latches": 0,
+      "name": "persistent_tas_scale_bias",
+      "passed_replications": 32,
+      "pre_injection_completed_windows": {
+        "maximum": 64.0,
+        "minimum": 64.0,
+        "p05": 64.0,
+        "p50": 64.0,
+        "p95": 64.0
+      },
+      "pre_injection_eligible_observations": {
+        "maximum": 67.0,
+        "minimum": 67.0,
+        "p05": 67.0,
+        "p50": 67.0,
+        "p95": 67.0
+      },
+      "pre_injection_latches": 0,
+      "replications": 32,
+      "zero_detection_miss_one_sided_95_upper_bound": 0.0893681989862648,
+      "zero_false_latch_one_sided_95_upper_bound": null
+    },
+    {
+      "expected_monitor_latched": true,
+      "failed_case_records": [],
+      "failed_replications": 0,
+      "input_observations": 4352,
+      "latch_delay_s": {
+        "maximum": 1.5,
+        "minimum": 0.5,
+        "p05": 1.0,
+        "p50": 1.0,
+        "p95": 1.5
+      },
+      "latch_window_injection_observations": {
+        "maximum": 4.0,
+        "minimum": 2.0,
+        "p05": 3.0,
+        "p50": 3.0,
+        "p95": 4.0
+      },
+      "maximum_window_nis": {
+        "maximum": 22.799186179040078,
+        "minimum": 18.007429936180042,
+        "p05": 18.008378384624006,
+        "p50": 18.313333902116167,
+        "p95": 22.45421362752137
+      },
+      "monitor_completed_windows": {
+        "maximum": 68.0,
+        "minimum": 66.0,
+        "p05": 67.0,
+        "p50": 67.0,
+        "p95": 68.0
+      },
+      "monitor_latches": 32,
+      "monitor_non_latches": 0,
+      "name": "persistent_horizontal_wind_step",
+      "passed_replications": 32,
+      "pre_injection_completed_windows": {
+        "maximum": 64.0,
+        "minimum": 64.0,
+        "p05": 64.0,
+        "p50": 64.0,
+        "p95": 64.0
+      },
+      "pre_injection_eligible_observations": {
+        "maximum": 67.0,
+        "minimum": 67.0,
+        "p05": 67.0,
+        "p50": 67.0,
+        "p95": 67.0
+      },
+      "pre_injection_latches": 0,
+      "replications": 32,
+      "zero_detection_miss_one_sided_95_upper_bound": 0.0893681989862648,
+      "zero_false_latch_one_sided_95_upper_bound": null
+    },
+    {
+      "expected_monitor_latched": true,
+      "failed_case_records": [],
+      "failed_replications": 0,
+      "input_observations": 4352,
+      "latch_delay_s": {
+        "maximum": 5.0,
+        "minimum": 0.5,
+        "p05": 1.0,
+        "p50": 1.5,
+        "p95": 3.5
+      },
+      "latch_window_injection_observations": {
+        "maximum": 4.0,
+        "minimum": 2.0,
+        "p05": 3.0,
+        "p50": 4.0,
+        "p95": 4.0
+      },
+      "maximum_window_nis": {
+        "maximum": 22.279549938375332,
+        "minimum": 18.00265732737933,
+        "p05": 18.005125864830113,
+        "p50": 19.38902002663252,
+        "p95": 21.49322009127526
+      },
+      "monitor_completed_windows": {
+        "maximum": 75.0,
+        "minimum": 66.0,
+        "p05": 67.0,
+        "p50": 68.0,
+        "p95": 72.0
+      },
+      "monitor_latches": 32,
+      "monitor_non_latches": 0,
+      "name": "persistent_vertical_wind",
+      "passed_replications": 32,
+      "pre_injection_completed_windows": {
+        "maximum": 64.0,
+        "minimum": 64.0,
+        "p05": 64.0,
+        "p50": 64.0,
+        "p95": 64.0
+      },
+      "pre_injection_eligible_observations": {
+        "maximum": 67.0,
+        "minimum": 67.0,
+        "p05": 67.0,
+        "p50": 67.0,
+        "p95": 67.0
+      },
+      "pre_injection_latches": 0,
+      "replications": 32,
+      "zero_detection_miss_one_sided_95_upper_bound": 0.0893681989862648,
+      "zero_false_latch_one_sided_95_upper_bound": null
+    }
+  ],
+  "coverage": {
+    "minimum_pre_injection_completed_windows": 37,
+    "minimum_pre_injection_eligible_observations": 40
+  },
+  "failed_case_records": [],
+  "limitations": [
+    "This is a host-only synthetic residual-pattern screen, not a physical pitot, wind, or air-data source-quality qualification.",
+    "A pass does not make vertical wind independently observable and does not promote TAS, a wind state, or a private flight-supervisor decision.",
+    "Replication-level zero-event bounds assume independent synthetic seeds; overlapping rolling windows are not treated as independent trials."
+  ],
+  "monitor": {
+    "contribution_nis_floor": 4.0,
+    "cumulative_nis_threshold": 18.0,
+    "latch_is_terminal_without_external_reauthorization": true,
+    "maximum_inter_observation_gap_s": 1.0,
+    "maximum_window_elapsed_s": 1.75,
+    "minimum_contributing_observations": 3,
+    "parameter_origin": "second opened-development choice after the first v2 parameters falsely latched on nominal/impulse controls: require three independently high contributions and cap one residual; values must not be changed from a later sealed holdout",
+    "per_observation_nis_cap": 6.0,
+    "window_observations": 4
+  },
+  "phase": "development",
+  "protocol": {
+    "file_sha256": "619398fa76546c1033c6b262f18ef1648a50b92885cba767be32f0d531db5a3c",
+    "path": "validation/airspeed_wind_mismatch_monitor_protocol_v2.json",
+    "semantic_sha256": "82aebb6732613545513612b4f17b5c2fa3f219aec8c1079cffc15e52a2441f78"
+  },
+  "provenance": {
+    "base_oracle_runner_sha256": "4c7d723cfd7f9ee85e7abce9f9eb23d2258f12c180f2526f119f7ccd1302e024",
+    "git_commit": "e672e5d66a034348fdcef697b8c9672c1f31d3ca",
+    "git_status": "",
+    "jobs": 8,
+    "runner_sha256": "124fd263eb377976a508c13aa9d537c4c5bae266819df2f4647f5c5bdb42350b"
+  },
+  "schema_version": 2,
+  "seed_count": 32,
+  "status": "passed",
+  "study_id": "aerakia-airspeed-wind-mismatch-monitor-v2",
+  "totals": {
+    "complete_monitor_windows": 17723,
+    "failed_replication_cases": 0,
+    "input_observations": 30528,
+    "passed_replication_cases": 224,
+    "replication_cases": 224
+  }
+}
