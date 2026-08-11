@@ -80,8 +80,11 @@ is the stable navigation layer rather than a disruptive mass rename.
   216-trial paired development matrix
 - [Full-state sensitivity screen](full-state-sensitivity-screen.md): full 15D
   nuisance/covariance diagnostic, rejected after a frozen 60-trial screen
-- The two documents together define the solver boundary and replay-oracle
-  prerequisite before another estimator candidate.
+- [Fixed-lag covariance composition](fixed-lag-covariance-composition.md):
+  variable-rate full-state `Phi/Q` propagation prerequisite, verified without
+  adding a smoother or delayed-fusion feature
+- These records define the solver boundary and propagation/replay prerequisites
+  before another estimator candidate.
 - [Delayed GNSS replay oracle](delayed-gnss-repropagation-oracle.md): the
   host-only prerequisite for any future fixed-lag state correction.
 - [Barometer source supervision](barometer-supervision-study.md) and

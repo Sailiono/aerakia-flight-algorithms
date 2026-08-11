@@ -156,6 +156,18 @@ if(AERAKIA_BUILD_TESTS)
     )
     target_link_libraries(aerakia_fixed_lag_replay_contract PRIVATE Aerakia::Algorithms)
     add_test(NAME fixed_lag_replay_contract COMMAND aerakia_fixed_lag_replay_contract)
+
+    add_executable(aerakia_fixed_lag_covariance_composition
+        validation/fixed_lag_covariance_composition_oracle.c
+    )
+    target_include_directories(aerakia_fixed_lag_covariance_composition
+        PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_link_libraries(aerakia_fixed_lag_covariance_composition PRIVATE Aerakia::Algorithms)
+    add_test(
+        NAME fixed_lag_covariance_composition
+        COMMAND aerakia_fixed_lag_covariance_composition
+    )
 endif()
 
 if(AERAKIA_BUILD_VALIDATION)

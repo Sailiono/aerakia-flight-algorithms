@@ -80,6 +80,42 @@ sanitizer run used `ASAN_OPTIONS=detect_leaks=0` and therefore does not make a
 leak-detection claim. It still exercises AddressSanitizer and UndefinedBehavior
 Sanitizer for the covered tests.
 
+## 2026-08-11 — lag covariance composition prerequisite closed
+
+### Reason
+
+The rejected replay candidates used only a boundary covariance. A real
+fixed-lag formulation must carry the complete state transition and accumulated
+process covariance through every retained IMU interval before its measurement
+correlations or a backward pass can be trusted.
+
+### Evidence and decision
+
+A new validation-only oracle accumulated the production pre-integration
+transition and process covariance over `384` deterministic variable-rate
+chains (`4,592` IMU intervals) and compared the result with repeated
+`eskf_predict()` covariance propagation. The maximum endpoint difference was
+`7.81597009e-14` in the reviewed double build. A host float evaluation also
+passed its predeclared `5e-4` bound with a maximum difference of
+`6.10351562e-05`.
+
+This closes only the no-measurement `Phi/Q` composition identity. It does not
+promote a smoother or a correction candidate, and it does not relax the
+requirements for measurement-update cross covariance, ESKF relinearization,
+physical source/arrival timestamps, a clean protocol, or a sealed holdout.
+Full scope and reproduction commands are in
+[fixed-lag covariance composition](fixed-lag-covariance-composition.md).
+
+### Verification
+
+The release CTest suite passed `15/15`, including the new composition oracle,
+and the Python suite passed `197/197`. The host-float build passed the oracle's
+separate tolerance. The ASan/UBSan CTest suite also passed `15/15` with
+`ASAN_OPTIONS=detect_leaks=0`. LeakSanitizer cannot run under this desktop
+sandbox's ptrace model, so that sanitizer execution does not make a
+leak-detection claim; AddressSanitizer and UndefinedBehaviorSanitizer remained
+active for the covered tests.
+
 ## 2026-07-18 — input integrity and timing audit started
 
 ### Reason

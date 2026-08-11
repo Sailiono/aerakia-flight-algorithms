@@ -32,6 +32,9 @@ portable C library and from FCOne-specific integration code.
   compact evidence, and do not treat it as an estimator implementation. It
   defaults to one worker; `--jobs` is an explicitly validated workstation
   parallelism option.
+- `fixed_lag_covariance_composition_oracle.c` and `eskf_lag_covariance.h`:
+  validation-only variable-rate `Phi/Q` composition check for later smoother
+  work. They do not provide delayed fusion or a product history buffer.
 - `run_delayed_gnss_repropagation_oracle.py`: host-only isolated, sequential
   non-overlapping, and tightly bounded two-event overlapping/reordered
   delayed-GNSS rewind/replay campaigns. The overlap gate requires the newer

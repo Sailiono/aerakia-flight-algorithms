@@ -24,6 +24,13 @@ surveyed true-North accuracy, causal cold start, or flight safety. The causal ti
 supervisor are implemented, but neither is a promoted product gate. Barometer fault injection also
 shows that detection without an uncontaminated ESKF shadow cannot undo state/covariance pollution.
 
+The validation-only fixed-lag covariance composition prerequisite now passes
+384 variable-rate chains (4,592 IMU intervals), matching repeated production
+`F/Q` propagation to `7.82e-14` in the reviewed double build and passing the
+host-float bound. This closes no-measurement propagation only; it is not a
+smoother, delayed-fusion API, or bias correction. See [fixed-lag covariance
+composition](fixed-lag-covariance-composition.md).
+
 ## Evidence completed
 
 | Area | Evidence | Status |

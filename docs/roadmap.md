@@ -24,6 +24,12 @@ boundary are defined in [FCOne v2 algorithm closure](fcone-v2-algorithm-closure.
 
 ## P0 — hardware-independent closure
 
+The validation-only fixed-lag covariance composition prerequisite is now
+closed for the declared host scope: 384 variable-rate chains and 4,592 IMU
+intervals match repeated production `F/Q` propagation in double and host
+float. This does not close measurement cross covariance, relinearization,
+source/arrival timing, or a product smoother.
+
 | Work item | Acceptance evidence | Status |
 | --- | --- | --- |
 | One-command host regression | Configure, build, C tests, Python tests, deterministic scenarios, threshold checks, logs, and environment manifest complete from one command | Implemented by `validation/run_host_regression.py`; keep it passing |
