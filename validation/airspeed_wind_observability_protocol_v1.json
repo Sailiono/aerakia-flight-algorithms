@@ -1,0 +1,187 @@
+{
+  "schema_version": 1,
+  "protocol_id": "aerakia-airspeed-wind-observability-v1",
+  "status": "frozen-validation-only",
+  "scope": {
+    "production_eskf": "unchanged_16_nominal_15_error_state",
+    "oracle": "host_only_causal_two_state_horizontal_wind_information_and_least_squares",
+    "not_a_claim": [
+      "No production ESKF wind state or public airspeed API is added by this protocol.",
+      "A synthetic qualified result does not establish long-duration GNSS-denied navigation or flight readiness.",
+      "Known-wind scoring is an offline model upper bound, not an online source of information."
+    ]
+  },
+  "coordinate_contract": {
+    "navigation_frame": "NED",
+    "ground_velocity": "GNSS Doppler velocity in NED m/s at gnss_timestamp_us",
+    "wind": "horizontal air-mass velocity [North, East] in m/s",
+    "true_airspeed": "calibrated air-relative speed magnitude in m/s at tas_timestamp_us",
+    "measurement_model": "TAS = norm(v_ground_NED - [wind_N, wind_E, 0])"
+  },
+  "source_contract": {
+    "tas_type": "calibrated_true_airspeed_not_ias_or_cas",
+    "required_fields": [
+      "tas_timestamp_us",
+      "arrival_timestamp_us",
+      "gnss_timestamp_us",
+      "tas_m_s",
+      "tas_variance_m2_s2",
+      "gnss_velocity_ned_m_s",
+      "gnss_velocity_variance_m2_s2",
+      "flight_regime",
+      "source_qualified",
+      "pitot_blocked",
+      "pitot_stalled",
+      "rotor_wash",
+      "sideslip_qualified"
+    ],
+    "valid_flight_regimes": [
+      "fixed_wing_cruise",
+      "fixed_wing_climb",
+      "fixed_wing_descent"
+    ],
+    "minimum_tas_m_s": 12.0,
+    "maximum_delivery_delay_s": 0.25,
+    "maximum_gnss_age_s": 0.2,
+    "model_assumptions": [
+      "Horizontal wind only; vertical wind is outside the model.",
+      "The air-data adapter has already converted/calibrated the physical sensor to TAS.",
+      "The probe is not blocked, stalled, or under unqualified rotor/propeller wash.",
+      "No-sideslip quality is an upstream air-data/regime qualification, not an estimator assumption in hover or transition."
+    ]
+  },
+  "causal_oracle": {
+    "initial_wind_prior_std_m_s": 25.0,
+    "maximum_gauss_newton_iterations": 3,
+    "maximum_post_qualification_nis": 16.0,
+    "maximum_consecutive_post_qualification_innovation_rejections": 3,
+    "automatic_recovery_after_source_latch": false,
+    "minimum_accepted_measurements": 24,
+    "minimum_measurement_information_eigenvalue": 30.0,
+    "maximum_measurement_information_condition_number": 12.0,
+    "minimum_air_relative_direction_separation_deg": 35.0,
+    "minimum_distinct_air_relative_direction_clusters": 3,
+    "air_relative_direction_cluster_merge_deg": 20.0,
+    "minimum_bootstrap_measurements_after_direction_completion": 12,
+    "maximum_fresh_observation_age_s": 0.5
+  },
+  "synthetic_source": {
+    "seed": 20260811,
+    "sample_rate_hz": 2.0,
+    "segment_duration_s": 8.0,
+    "nominal_tas_m_s": 22.0,
+    "nominal_wind_ne_m_s": [4.5, -3.0],
+    "tas_noise_std_m_s": 0.45,
+    "gnss_velocity_noise_std_m_s": 0.3
+  },
+  "scenario_matrix": [
+    {
+      "name": "multi_heading_nominal",
+      "role": "positive",
+      "expected_terminal_status": "qualified",
+      "maximum_terminal_wind_error_m_s": 0.9,
+      "known_wind_nis_mean_range": [0.35, 1.9]
+    },
+    {
+      "name": "straight_line",
+      "role": "negative",
+      "expected_terminal_status": "not_observable",
+      "required_rejection_reasons": []
+    },
+    {
+      "name": "hover",
+      "role": "negative",
+      "expected_terminal_status": "not_observable",
+      "required_rejection_reasons": ["flight_regime"]
+    },
+    {
+      "name": "low_tas",
+      "role": "negative",
+      "expected_terminal_status": "not_observable",
+      "required_rejection_reasons": ["low_tas"]
+    },
+    {
+      "name": "vtol_transition",
+      "role": "negative",
+      "expected_terminal_status": "not_observable",
+      "required_rejection_reasons": ["flight_regime"]
+    },
+    {
+      "name": "rotor_wash",
+      "role": "negative",
+      "expected_terminal_status": "not_observable",
+      "required_rejection_reasons": ["rotor_wash"]
+    },
+    {
+      "name": "sideslip",
+      "role": "negative",
+      "expected_terminal_status": "not_observable",
+      "required_rejection_reasons": ["sideslip_unqualified"]
+    },
+    {
+      "name": "blocked_pitot",
+      "role": "negative",
+      "expected_terminal_status": "not_observable",
+      "required_rejection_reasons": ["pitot_blocked"]
+    },
+    {
+      "name": "stalled_pitot",
+      "role": "negative",
+      "expected_terminal_status": "not_observable",
+      "required_rejection_reasons": ["pitot_stalled"]
+    },
+    {
+      "name": "delayed_tas",
+      "role": "negative",
+      "expected_terminal_status": "not_observable",
+      "required_rejection_reasons": ["tas_delivery_delay"]
+    },
+    {
+      "name": "reordered_tas",
+      "role": "transport_control",
+      "expected_terminal_status": "qualified",
+      "required_rejection_reasons": ["tas_timestamp_not_monotonic"]
+    },
+    {
+      "name": "gnss_outage",
+      "role": "negative",
+      "expected_terminal_status": "stale_no_fresh_gnss_tas",
+      "required_rejection_reasons": ["missing_gnss_velocity"]
+    },
+    {
+      "name": "wind_shear",
+      "role": "negative",
+      "expected_terminal_status": "source_latched",
+      "required_rejection_reasons": ["innovation_nis", "source_latched"]
+    },
+    {
+      "name": "tas_scale_bias",
+      "role": "negative",
+      "expected_terminal_status": "source_latched",
+      "required_rejection_reasons": ["innovation_nis", "source_latched"]
+    },
+    {
+      "name": "vertical_wind",
+      "role": "negative",
+      "expected_terminal_status": "source_latched",
+      "required_rejection_reasons": ["innovation_nis", "source_latched"]
+    }
+  ],
+  "acceptance_policy": {
+    "positive": [
+      "The causal lane must qualify only after sufficient rank-2 causal information is present.",
+      "The hidden truth scorer must report terminal wind error within the frozen bound.",
+      "The known-wind upper bound must pass analytic versus finite-difference Jacobian agreement and the frozen nominal NIS range."
+    ],
+    "negative": [
+      "Every declared invalid, stale, delayed, or unobservable case must fail closed and must not finish qualified.",
+      "Invalid/rejected observations must not add measurement information or change the wind estimate.",
+      "GNSS outage must age the qualification; TAS alone must not continue to claim new wind observability."
+    ]
+  },
+  "promotion_blockers": [
+    "Freeze separate train/tune/holdout physical air-data datasets with source-time and calibration provenance.",
+    "Demonstrate benefit against the frozen 15-error-state baseline under qualified fixed-wing data, including GNSS outages and recovery.",
+    "Validate target precision, WCET, stack, memory, source gating, and shadow-flight behavior before a wind-state branch can affect FCOne control."
+  ]
+}

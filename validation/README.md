@@ -53,6 +53,10 @@ portable C library and from FCOne-specific integration code.
   an FCOne image or measure target timing, stack, Flash/RAM, or runtime health.
 - `run_baro_outage_campaign.py` and `run_baro_outage_ab.py`: barometer source
   supervision experiments.
+- `run_airspeed_wind_observability.py`: validation-only known-wind model and
+  causal two-state wind-observability oracle. It intentionally does not call
+  the production ESKF or add a TAS API/state; see
+  [`../docs/airspeed-wind-observability.md`](../docs/airspeed-wind-observability.md).
 - `run_px4_bias_ab_m0.py`: optional PX4 host comparison; it is blocked until a
   matching PX4 source tree is supplied locally.
 

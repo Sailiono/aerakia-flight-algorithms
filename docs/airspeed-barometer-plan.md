@@ -100,8 +100,19 @@ lane. Results, rejected threshold experiments, and the current capability bounda
 
 ### A2: airspeed upper bound and wind observability
 
+#### A2.0: validation-only source contract and observability oracle
+
+Before an estimator state or public TAS API exists, freeze the source-time,
+quality, and causal-observability boundary.  This is now implemented by the
+[TAS/wind observability prerequisite](airspeed-wind-observability.md): it
+separates an offline known-wind model upper bound from a truth-free causal
+two-state information/least-squares oracle and retains positive plus
+fail-closed controls.  It does not modify the production 15-error-state ESKF.
+
+#### A2.1: isolated experimental branch
+
 - First run TAS with known wind to establish the model's upper bound.
-- Implement an isolated 17-state wind branch and repeat with estimated wind.
+- Only after A2.0 passes, implement an isolated 17-error-state wind branch and repeat with estimated wind.
 - Use straight, multi-heading, climbing, descending, turning, gust, and sideslip-violation tracks.
 - Promote only after train and tune both show improvement and a sealed holdout passes.
 

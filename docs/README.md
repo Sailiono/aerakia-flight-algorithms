@@ -96,6 +96,9 @@ is the stable navigation layer rather than a disruptive mass rename.
 - [Barometer source supervision](barometer-supervision-study.md) and
   [airspeed/barometer plan](airspeed-barometer-plan.md): vertical-aiding
   evidence, limits, and follow-up architecture.
+- [TAS/wind observability prerequisite](airspeed-wind-observability.md): the
+  validation-only source, causal-information, and fail-closed boundary that
+  precedes any 17-error-state horizontal-wind experiment.
 - [Magnetic source supervision](magnetic-source-supervision.md) and
   [absolute-heading evidence](absolute-heading-evidence.md): why magnetic yaw
   is fail-safe by default and how trusted heading is qualified.
