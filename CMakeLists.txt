@@ -147,9 +147,19 @@ if(AERAKIA_BUILD_TESTS)
         COMMAND aerakia_delayed_gnss_reprop_oracle
             --rate-hz 400 --delay-ms 150 --scenario overlap
     )
+
+    add_executable(aerakia_fixed_lag_replay_contract
+        validation/fixed_lag_replay_contract.c
+    )
+    target_include_directories(aerakia_fixed_lag_replay_contract
+        PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_link_libraries(aerakia_fixed_lag_replay_contract PRIVATE Aerakia::Algorithms)
+    add_test(NAME fixed_lag_replay_contract COMMAND aerakia_fixed_lag_replay_contract)
 endif()
 
 if(AERAKIA_BUILD_VALIDATION)
     add_executable(aerakia_validation_runner validation/validation_runner.c)
+    target_include_directories(aerakia_validation_runner PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_link_libraries(aerakia_validation_runner PRIVATE Aerakia::Algorithms)
 endif()

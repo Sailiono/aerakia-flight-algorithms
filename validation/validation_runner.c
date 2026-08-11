@@ -8,6 +8,7 @@
 #include <aerakia/barometer_supervisor.h>
 
 #include "eskf_joint_covariance.h"
+#include "eskf_internal.h"
 
 #include <errno.h>
 #include <math.h>
@@ -167,6 +168,18 @@ static uint64_t parse_uint64(char *columns[], int count, int index, int *ok)
     return (uint64_t)value;
 }
 
+static int parse_cli_double(const char *text, double *value)
+{
+    char *end;
+    double parsed;
+    if (text == NULL || value == NULL || text[0] == '\0') return 0;
+    errno = 0;
+    parsed = strtod(text, &end);
+    if (errno != 0 || end == text || *end != '\0' || !isfinite(parsed)) return 0;
+    *value = parsed;
+    return 1;
+}
+
 static AerakiaVec3f parse_vector(
     char *columns[], int count, int x, int y, int z, double scale, int *ok
 )
@@ -308,8 +321,12 @@ int main(int argc, char *argv[])
     int reference_attitude_init = 0;
     int supervise_barometer = 0;
     int compact_output = 0;
+    int state_injection_enabled = 0;
+    int state_injection_applied = 0;
     float stationary_gyro_threshold_rad_s = -1.0f;
     float maximum_aiding_age_s = NAN;
+    double state_injection_at_s = NAN;
+    double state_injection[ESKF_ERROR_STATE_DIM] = {0.0};
     int input_argument;
     int output_argument;
     int argument;
@@ -322,6 +339,9 @@ int main(int argc, char *argv[])
                 "[--maximum-aiding-age-s VALUE] "
                 "[--supervise-barometer] "
                 "[--compact-output] "
+                "[--inject-at-s VALUE --inject-error-state "
+                "DTHETA_X DTHETA_Y DTHETA_Z DV_X DV_Y DV_Z DP_X DP_Y DP_Z "
+                "DAB_X DAB_Y DAB_Z DGB_X DGB_Y DGB_Z] "
                 "INPUT_REPLAY_CSV OUTPUT_RESULTS_CSV\n",
                 argv[0]);
         return 2;
@@ -367,6 +387,24 @@ int main(int argc, char *argv[])
             supervise_barometer = 1;
         } else if (strcmp(argv[argument], "--compact-output") == 0) {
             compact_output = 1;
+        } else if (strcmp(argv[argument], "--inject-at-s") == 0) {
+            if (++argument >= input_argument
+                || !parse_cli_double(argv[argument], &state_injection_at_s)
+                || state_injection_at_s < 0.0) {
+                fputs("Invalid state-injection time\n", stderr);
+                return 2;
+            }
+            state_injection_enabled = 1;
+        } else if (strcmp(argv[argument], "--inject-error-state") == 0) {
+            int axis;
+            for (axis = 0; axis < ESKF_ERROR_STATE_DIM; ++axis) {
+                if (++argument >= input_argument
+                    || !parse_cli_double(argv[argument], &state_injection[axis])) {
+                    fputs("Invalid ESKF error-state injection\n", stderr);
+                    return 2;
+                }
+            }
+            state_injection_enabled = 1;
         } else {
             fprintf(stderr, "Unknown option: %s\n", argv[argument]);
             return 2;
@@ -374,6 +412,10 @@ int main(int argc, char *argv[])
     }
     if (cold_start && reference_attitude_init) {
         fputs("--cold-start and --reference-attitude-init are mutually exclusive\n", stderr);
+        return 2;
+    }
+    if (state_injection_enabled && !isfinite(state_injection_at_s)) {
+        fputs("State injection requires --inject-at-s\n", stderr);
         return 2;
     }
     input = open_portable_file(argv[input_argument], "r");
@@ -477,7 +519,13 @@ int main(int argc, char *argv[])
         "eskf_accel_bias_cov_yz_m2_s4,eskf_accel_bias_cov_zz_m2_s4,"
         "eskf_gyro_bias_cov_xx_rad2_s2,eskf_gyro_bias_cov_xy_rad2_s2,"
         "eskf_gyro_bias_cov_xz_rad2_s2,eskf_gyro_bias_cov_yy_rad2_s2,"
-        "eskf_gyro_bias_cov_yz_rad2_s2,eskf_gyro_bias_cov_zz_rad2_s2\n",
+        "eskf_gyro_bias_cov_yz_rad2_s2,eskf_gyro_bias_cov_zz_rad2_s2,"
+        "eskf_position_innovation_n_m,eskf_position_innovation_e_m,"
+        "eskf_position_innovation_d_m,eskf_position_innovation_var_n_m2,"
+        "eskf_position_innovation_var_e_m2,eskf_position_innovation_var_d_m2,"
+        "eskf_velocity_innovation_n_m_s,eskf_velocity_innovation_e_m_s,"
+        "eskf_velocity_innovation_d_m_s,eskf_velocity_innovation_var_n_m2_s2,"
+        "eskf_velocity_innovation_var_e_m2_s2,eskf_velocity_innovation_var_d_m2_s2\n",
         output
     );
     }
@@ -622,6 +670,22 @@ int main(int argc, char *argv[])
                 fclose(input); fclose(output); return 2;
             }
             mahony_reference_seeded = 1;
+        }
+
+        /*
+         * Host-only correction experiments inject at an explicit pre-IMU,
+         * pre-aiding boundary.  Reuse the core's complete nominal-state and
+         * covariance-reset transaction; no partial state mutation is allowed.
+         */
+        if (state_injection_enabled && !state_injection_applied
+            && (double)sample.timestamp_us * 1.0e-6 >= state_injection_at_s) {
+            eskf_float_t error_state[ESKF_ERROR_STATE_DIM];
+            int error_index;
+            for (error_index = 0; error_index < ESKF_ERROR_STATE_DIM; ++error_index) {
+                error_state[error_index] = (eskf_float_t)state_injection[error_index];
+            }
+            eskf_internal_apply_error_state(&eskf.core, error_state);
+            state_injection_applied = 1;
         }
 
         (void)aerakia_mahony_update(&standard, &sample, &standard_estimate);
@@ -786,6 +850,8 @@ int main(int argc, char *argv[])
             "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,"
             "%.12g,%.12g,%.12g,%.12g,%.12g,%.12g,%.12g,%.12g,%.12g,"
             "%.12g,%.12g,%.12g,%.12g,%.12g,%.12g,"
+            "%.12g,%.12g,%.12g,%.12g,%.12g,%.12g,"
+            "%.12g,%.12g,%.12g,%.12g,%.12g,%.12g,"
             "%.12g,%.12g,%.12g,%.12g,%.12g,%.12g\n",
             sequence, (unsigned long long)sample.timestamp_us, truth_roll, truth_pitch, truth_yaw,
             radians_to_degrees(standard_estimate.euler_rad.x),
@@ -910,7 +976,19 @@ int main(int argc, char *argv[])
             eskf.core.P[ESKF_IDX_DGB + 0][ESKF_IDX_DGB + 2],
             eskf.core.P[ESKF_IDX_DGB + 1][ESKF_IDX_DGB + 1],
             eskf.core.P[ESKF_IDX_DGB + 1][ESKF_IDX_DGB + 2],
-            eskf.core.P[ESKF_IDX_DGB + 2][ESKF_IDX_DGB + 2]
+            eskf.core.P[ESKF_IDX_DGB + 2][ESKF_IDX_DGB + 2],
+            position_update ? eskf_estimate.last_position_innovation.innovation[0] : NAN,
+            position_update ? eskf_estimate.last_position_innovation.innovation[1] : NAN,
+            position_update ? eskf_estimate.last_position_innovation.innovation[2] : NAN,
+            position_update ? eskf_estimate.last_position_innovation.innov_var[0] : NAN,
+            position_update ? eskf_estimate.last_position_innovation.innov_var[1] : NAN,
+            position_update ? eskf_estimate.last_position_innovation.innov_var[2] : NAN,
+            velocity_update ? eskf_estimate.last_velocity_innovation.innovation[0] : NAN,
+            velocity_update ? eskf_estimate.last_velocity_innovation.innovation[1] : NAN,
+            velocity_update ? eskf_estimate.last_velocity_innovation.innovation[2] : NAN,
+            velocity_update ? eskf_estimate.last_velocity_innovation.innov_var[0] : NAN,
+            velocity_update ? eskf_estimate.last_velocity_innovation.innov_var[1] : NAN,
+            velocity_update ? eskf_estimate.last_velocity_innovation.innov_var[2] : NAN
         );
         }
         samples++;

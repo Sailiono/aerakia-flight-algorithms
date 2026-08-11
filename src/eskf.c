@@ -14,6 +14,7 @@
  */
 
 #include <aerakia/eskf.h>
+#include "eskf_internal.h"
 #include "eskf_math.h"
 #include "eskf_models.h"
 #include <string.h>
@@ -116,6 +117,15 @@ static void _reset_error_covariance(ESKF_Handle *h, const eskf_float_t dx[15]) {
     eskf_mat15_zero(Q_zero);
     eskf_mat15_propagate(h->P, G, Q_zero);
     eskf_mat15_symmetrize(h->P);
+}
+
+void eskf_internal_apply_error_state(
+    ESKF_Handle *h,
+    const eskf_float_t dx[ESKF_ERROR_STATE_DIM]
+) {
+    if (h == NULL || dx == NULL) return;
+    _inject_error(h, dx);
+    _reset_error_covariance(h, dx);
 }
 
 static eskf_float_t _wrap_pi(eskf_float_t angle) {
@@ -290,8 +300,7 @@ static bool _measurement_update_3d(ESKF_Handle *h,
     eskf_mat15_copy(P_new, h->P);
 
     /* --- 8. Inject error into nominal state --- */
-    _inject_error(h, dx);
-    _reset_error_covariance(h, dx);
+    eskf_internal_apply_error_state(h, dx);
 
     return true;
 }
@@ -416,8 +425,7 @@ static bool _measurement_update_1d(ESKF_Handle *h,
     eskf_mat15_copy(P_new, h->P);
 
     /* --- 8. Inject error into nominal state --- */
-    _inject_error(h, dx);
-    _reset_error_covariance(h, dx);
+    eskf_internal_apply_error_state(h, dx);
 
     return true;
 }
