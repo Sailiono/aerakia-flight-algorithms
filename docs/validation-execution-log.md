@@ -2938,3 +2938,28 @@ trace stays under `build/`; only a hash-linked compact summary is eligible for
 `validation/public/`. Control qualification remains unimplemented until an
 independently audited regime/source transition and corroborating source are
 defined and separately validated.
+
+### 2026-08-11 — v8 diagnostic-lane 64-family screen and attribution audit
+
+The frozen diagnostic implementation at `2bdb109` ran once on seeds
+`74301--74364`, `17` cases per seed, and three recent-boundary ages with eight
+workers. The campaign completed `1,088` replays. Its full `1.3 GiB` trace is
+kept only under `build/`; SHA-256 is
+`1d5efa87fe67f6152775f1e7018922c639ffbafe15fc4b0f01c7627ceb77259d`.
+The compact summary was retained in commit `f14bd76`.
+
+A separately committed streaming audit (`785d63d`) then verified the full
+trace hash and all `1,088` records without loading the artifact wholesale. It
+separates raw control latches, clean post-injection control attribution,
+pre-existing ambiguity, diagnostic-only persistence, and a descriptive union.
+For `graded_evidence @ 3 s`, raw control latches were `234/256`, but ten began
+before injection and cannot be credited. Clean control coverage is `224/256`
+members and `55/64` complete families. The diagnostic lane adds `14` clean
+members and rescues three complete families, producing a descriptive union of
+`238/256` members and `58/64` families. Six families remain unresolved.
+
+No nominal or bounded-jitter nominal case produced a diagnostic event; the
+calibrated-high-noise nominal and structural-gap cases also remained at zero.
+The result is retained as non-promoting development evidence. The descriptive
+union improves logging/triage coverage only and is explicitly not a control
+qualification, source selector, estimator reset, or FCOne authority.

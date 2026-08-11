@@ -92,6 +92,30 @@ The next protocol must score these two products separately:
 This preserves the safety boundary while allowing the diagnostic tool to report
 the cases that NIS alone can observe.
 
+## Diagnostic-lane screen result
+
+The proposed separation was implemented as a host-only orthogonal diagnostic
+lane and screened on fresh seeds `74301--74364` (`1,088` replays). It did not
+modify the normal policy latch or give the diagnostic state any authority.
+
+At `graded_evidence @ 3 s`, the raw `234/256` persistent-member latches contain
+`10` pre-existing ambiguous episodes and therefore reduce to `224/256` clean
+control members. The diagnostic lane adds `14` clean post-injection members,
+giving a descriptive union of `238/256`. At family level it raises complete
+coverage from `55/64` to `58/64`, not to the provisional `>=95%` target.
+Nominal, bounded-jitter nominal, calibrated-high-noise nominal, and structural-
+gap diagnostic counts are all zero in this screen.
+
+The six unresolved families are `74306`, `74321`, `74349`, `74352`, `74354`,
+and `74362`. Three complete families (`74304`, `74335`, `74344`) are rescued
+only in the diagnostic/descriptive lane. This confirms the intended split:
+the new lane preserves evidence that the primary path must reject, but cannot
+turn the information limit into a control-qualified fault.
+
+The machine-readable audit is
+`validation/public/airspeed_wind_residual_persistence_v8_diagnostic_lane_screen_74301_64_audit.json`.
+Its `descriptive_union_clean` field must never be read as control authority.
+
 ## Reproduction references
 
 - Full first screen: `build/airspeed_wind_residual_persistence_v8_screen_74101_32.json`

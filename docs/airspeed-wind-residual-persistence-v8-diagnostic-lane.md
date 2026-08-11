@@ -82,3 +82,39 @@ No production ESKF, Mahony, C API, FCOne adapter, selector, or supervisor code
 is changed by this experiment. Full traces remain under `build/`; only a
 compact, hash-linked summary may be committed under `validation/public/` after
 the preflight implementation and protocol are frozen.
+
+## 64-family development screen
+
+The frozen implementation at `2bdb109` was executed once on seeds
+`74301--74364`, `17` cases per seed, and recent-boundary ages `1/2/3 s`.
+This produced `1,088` stream replays. The `1.3 GiB` full trace remains under
+`build/` with SHA-256
+`1d5efa87fe67f6152775f1e7018922c639ffbafe15fc4b0f01c7627ceb77259d`;
+the compact screen and attribution audit are retained under
+`validation/public/`.
+
+The attribution audit separates raw latches from clean post-injection latches.
+For the strongest comparator, `graded_evidence @ 3 s`:
+
+| Metric | Result |
+| --- | ---: |
+| Raw control latches | `234/256` |
+| Clean control members | `224/256` |
+| Pre-existing ambiguous control latches | `10/256` |
+| Clean diagnostic-only members | `14/256` |
+| Clean descriptive union | `238/256` |
+| Clean control families | `55/64` |
+| Clean descriptive-union families | `58/64` |
+| Diagnostic events on nominal/aligned+jitter controls | `0` |
+| Diagnostic events after structural gap | `0` |
+
+The diagnostic lane rescued complete families `74304`, `74335`, and `74344`.
+Six families remained unresolved: `74306`, `74321`, `74349`, `74352`,
+`74354`, and `74362`. The descriptive-union family rate is therefore
+`90.625%`, still below the provisional `95%` development target.
+
+This is useful progress in observability and logging coverage, not a control
+promotion. The result proves that an expired-boundary persistent residual can
+be retained without weakening the primary fail-closed path. It does not prove
+which physical source is wrong, and the descriptive union cannot be used as a
+selector or controller qualification metric.
