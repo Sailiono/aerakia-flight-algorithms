@@ -71,6 +71,13 @@ portable C library and from FCOne-specific integration code.
   2026-08-11 matrix is retained as a failed structural result: the single
   impulse defect is removed, but nominal high evidence can still contaminate
   two/three-impulse onsets. It is not a holdout or source supervisor.
+- `run_airspeed_wind_residual_persistence_v6.py`: source-time residual-
+  persistence characterization. Its 128-seed train (1,792 replications) is
+  retained as failed development evidence: nuisance false latches were zero,
+  but the persistent-offset family P95 delay was `3.5 s` versus the registered
+  `3.0 s` limit. Do not run v6 tune. The v6 scorer also has a documented
+  pre-existing-episode attribution gap; any correction belongs in a new v7
+  protocol with disjoint seeds and a real one-shot tune gate.
 - `run_px4_bias_ab_m0.py`: optional PX4 host comparison; it is blocked until a
   matching PX4 source tree is supplied locally.
 

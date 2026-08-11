@@ -134,6 +134,51 @@ onset-boundary mechanism. No new holdout is allowed until that structure is
 stable, and no synthetic result removes the need for physical calibrated
 TAS/GNSS/regime evidence.
 
+## v6 source-time persistence characterization
+
+V6 was opened as a new development protocol rather than a repair of v4 or v5.
+It changed the monitor to source-time persistence with explicit warmup and
+quiet confirmation, separate source/arrival gap telemetry, immutable trigger
+snapshots, and statistical family-level scoring. The production ESKF, Mahony
+backup, public API, and wind-state boundary were unchanged.
+
+The train run used seeds `62001--62128`, 14 cases, and 1,792 complete
+replications. It processed 290,304 generated observations and 194,688
+observations delivered to the residual monitor. The deterministic contracts
+(common-random pairing, gap/coverage accounting, pulse monotonicity, and
+immutable trigger snapshots) all passed. The compact result is retained at
+[`airspeed_wind_residual_persistence_v6_train.json`](../validation/public/airspeed_wind_residual_persistence_v6_train.json),
+from commit `b83f30c` (runner/monitor candidate commit `2789bab`).
+
+The primary statistical results were mixed:
+
+- The nuisance family had zero false latches in 128 seed families. Its 97.5%
+  one-sided Clopper–Pearson upper bound was `2.8408%`, below the registered
+  `3%` development limit.
+- Both signs of the persistent `±2 m/s` TAS offset latched in all 128 seed
+  families, but the family P95 source-time detection delay was `3.5 s`, above
+  the registered `3.0 s` limit. Therefore the persistent endpoint failed and
+  the v6 train status is `failed_train_development_checks`.
+
+V6 tune was deliberately not run. Review after the train identified four
+additional audit blockers that must be fixed in a new protocol, not retrofitted
+into this result: an episode can begin before the injection and latch after it
+while being scored as a clean detection; the one-shot tune gate was not
+enforced by the runner; the delay P95 flattened two correlated signs instead
+of aggregating one worst delay per seed family; and the residual-provider
+override was not fully declared in the protocol. The campaign also used equal
+source and arrival timestamps, so its statistical result does not validate
+arrival jitter, burst delivery, or arrival-only gaps.
+
+V6 is consequently a retained synthetic diagnostic, not a source supervisor,
+TAS fault classifier, wind estimator qualification, or flight-control gate.
+The next iteration must be named v7, use disjoint seeds, record
+`episode_start_source_timestamp_us`, classify pre-existing episodes as
+ambiguous rather than successful detections, aggregate delay at the seed-family
+level, declare the residual-provider configuration, and enforce a committed
+single-use tune receipt. No result from v6 authorizes a 17-state branch or
+hardware flight.
+
 ## Boundary
 
 Even a clean v4 holdout pass would mean only that this frozen *synthetic*
@@ -150,6 +195,10 @@ python3 -m unittest tests.test_airspeed_wind_mismatch_monitor -v
 python3 -m unittest tests.test_airspeed_wind_mismatch_monitor_v5 -v
 python3 validation/run_airspeed_wind_mismatch_monitor.py --phase development --jobs 1
 python3 validation/run_airspeed_wind_mismatch_monitor_v5.py --jobs 8
+# v6 train (retained failed development evidence; do not run v6 tune):
+python3 -m unittest tests.test_airspeed_wind_residual_persistence_v6 -v
+python3 validation/run_airspeed_wind_residual_persistence_v6.py \
+  --phase train --jobs 8
 # After the code, tests, v2 development record, and v4 protocol are committed:
 python3 validation/run_airspeed_wind_mismatch_monitor.py \
   --protocol validation/airspeed_wind_mismatch_monitor_protocol_v4.json \

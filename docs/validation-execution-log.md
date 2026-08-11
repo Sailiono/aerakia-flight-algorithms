@@ -2684,3 +2684,47 @@ No new sealed holdout will be created until that structure is stable. The
 production 16-nominal/15-error-state ESKF, Mahony backup, public API, and TAS/
 wind state remain unchanged. The compact reviewed evidence is
 [`airspeed_wind_mismatch_monitor_v5_development.json`](../validation/public/airspeed_wind_mismatch_monitor_v5_development.json).
+
+## 2026-08-11 — TAS residual persistence v6 train
+
+### Reason and freeze boundary
+
+V6 was opened as a separately named source-time persistence
+characterization. It was not allowed to modify the production estimator,
+public sensor contract, Mahony backup, or wind-state API. The protocol fixed
+train seeds `62001--62128`, 14 cases, common-random paired streams, a 97.5%
+one-sided Clopper–Pearson score, a nuisance false-latch limit, a persistent
+`±2 m/s` TAS-offset deadline, and deterministic gap/trace/monotonicity
+contracts before execution.
+
+### Execution and result
+
+The run completed once from clean commit `2789bab` with eight workers. It
+processed 1,792 replications, 290,304 generated observations, and 194,688
+NIS-fed observations. The compact artifact was committed as `b83f30c`:
+[`airspeed_wind_residual_persistence_v6_train.json`](../validation/public/airspeed_wind_residual_persistence_v6_train.json).
+
+The nuisance family produced zero false latches in 128 seed families; its
+97.5% upper bound was `2.8408%` against the registered `3%` limit. Both signs
+of the persistent TAS offset latched in all 128 families, but family P95
+source-time detection delay was `3.5 s`, exceeding the registered `3.0 s`
+limit. The status is therefore `failed_train_development_checks`; no v6 tune
+was executed.
+
+### Audit findings after the run
+
+The result is retained without reinterpretation. A code/protocol audit found
+that v6 scoring still allows an episode that starts before the injection and
+latches after it to be counted as a clean post-injection detection. The tune
+runner also did not enforce committed-train provenance or single-use output,
+the delay P95 pooled two correlated signs instead of one worst delay per seed,
+and the runner's non-latching residual-provider override was not declared in
+the protocol. Finally, the full campaign used identical source and arrival
+timestamps; unit tests cover their separation, but this train does not
+validate arrival jitter, burst delivery, or arrival-only gaps.
+
+These findings change the evaluation contract, so v6 is closed as failed
+development evidence. They are not patched into v6 and no v6 tune/holdout is
+permitted. A new v7 protocol with disjoint seeds must fix the attribution,
+family aggregation, evaluator provenance, one-shot tune gate, and at least a
+minimal arrival-timing integration matrix before any later promotion review.
