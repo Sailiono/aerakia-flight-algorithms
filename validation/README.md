@@ -35,6 +35,9 @@ portable C library and from FCOne-specific integration code.
 - `fixed_lag_covariance_composition_oracle.c` and `eskf_lag_covariance.h`:
   validation-only variable-rate `Phi/Q` composition check for later smoother
   work. They do not provide delayed fusion or a product history buffer.
+- `fixed_lag_measurement_cross_covariance_oracle.c`: 30x30 host-only P/V
+  cross-covariance transaction check. It passes in the reviewed double build;
+  float intentionally fails its PSD gate and is retained as a design warning.
 - `run_delayed_gnss_repropagation_oracle.py`: host-only isolated, sequential
   non-overlapping, and tightly bounded two-event overlapping/reordered
   delayed-GNSS rewind/replay campaigns. The overlap gate requires the newer

@@ -83,6 +83,9 @@ is the stable navigation layer rather than a disruptive mass rename.
 - [Fixed-lag covariance composition](fixed-lag-covariance-composition.md):
   variable-rate full-state `Phi/Q` propagation prerequisite, verified without
   adding a smoother or delayed-fusion feature
+- [Fixed-lag measurement cross covariance](fixed-lag-measurement-cross-covariance.md):
+  double-precision P/V transaction passes; host float exposes an augmented-PSD
+  limitation that blocks a naive embedded lag implementation
 - These records define the solver boundary and propagation/replay prerequisites
   before another estimator candidate.
 - [Delayed GNSS replay oracle](delayed-gnss-repropagation-oracle.md): the

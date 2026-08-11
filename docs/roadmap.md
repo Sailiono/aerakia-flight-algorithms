@@ -30,6 +30,13 @@ intervals match repeated production `F/Q` propagation in double and host
 float. This does not close measurement cross covariance, relinearization,
 source/arrival timing, or a product smoother.
 
+The double-precision P/V cross-covariance transaction is also now verified by
+a 30x30 augmented oracle. Host float loses PSD in the deliberately near-
+singular joint covariance despite matching the live 15-state block, so a naive
+covariance-form fixed-lag implementation is not an acceptable STM32H7 path.
+Square-root/UD or bounded PSD-repair evidence is a prerequisite for that
+future target design.
+
 | Work item | Acceptance evidence | Status |
 | --- | --- | --- |
 | One-command host regression | Configure, build, C tests, Python tests, deterministic scenarios, threshold checks, logs, and environment manifest complete from one command | Implemented by `validation/run_host_regression.py`; keep it passing |

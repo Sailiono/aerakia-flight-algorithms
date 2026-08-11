@@ -168,6 +168,18 @@ if(AERAKIA_BUILD_TESTS)
         NAME fixed_lag_covariance_composition
         COMMAND aerakia_fixed_lag_covariance_composition
     )
+
+    add_executable(aerakia_fixed_lag_measurement_cross_covariance
+        validation/fixed_lag_measurement_cross_covariance_oracle.c
+    )
+    target_include_directories(aerakia_fixed_lag_measurement_cross_covariance
+        PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_link_libraries(aerakia_fixed_lag_measurement_cross_covariance PRIVATE Aerakia::Algorithms)
+    add_test(
+        NAME fixed_lag_measurement_cross_covariance
+        COMMAND aerakia_fixed_lag_measurement_cross_covariance
+    )
 endif()
 
 if(AERAKIA_BUILD_VALIDATION)

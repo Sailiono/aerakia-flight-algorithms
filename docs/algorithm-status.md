@@ -31,6 +31,13 @@ host-float bound. This closes no-measurement propagation only; it is not a
 smoother, delayed-fusion API, or bias correction. See [fixed-lag covariance
 composition](fixed-lag-covariance-composition.md).
 
+The double-precision P/V measurement cross-covariance transaction now also
+passes with a 30-state augmented oracle. Host float agrees in its live 15-state
+block but loses positive semidefiniteness in the near-singular joint covariance.
+Therefore a naive covariance-form lag buffer is explicitly blocked for STM32H7
+float until a square-root/UD or bounded PSD-repair policy is evidenced. See
+[fixed-lag measurement cross covariance](fixed-lag-measurement-cross-covariance.md).
+
 ## Evidence completed
 
 | Area | Evidence | Status |

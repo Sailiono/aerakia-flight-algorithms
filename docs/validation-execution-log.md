@@ -116,6 +116,44 @@ sandbox's ptrace model, so that sanitizer execution does not make a
 leak-detection claim; AddressSanitizer and UndefinedBehaviorSanitizer remained
 active for the covered tests.
 
+## 2026-08-11 — P/V lag cross-covariance float limitation found
+
+### Reason
+
+The composed `Phi/Q` prerequisite still lacked cross-covariance transport
+through accepted measurements and attitude-reset injection. This test used a
+joint live/boundary covariance rather than treating the boundary covariance as
+an isolated prior.
+
+### Evidence and decision
+
+The 30x30 augmented oracle completed 192 deterministic chains, 2,202 IMU
+intervals, and 1,150 accepted P/V updates. In the reviewed double build, its
+live 15x15 block matches production prediction/update covariance to
+`1.0658141e-14` / `7.10542736e-15`, exercised a maximum attitude-reset
+correction of `6.08450099e-04 rad`, and the joint covariance remained finite,
+symmetric, and PSD.
+
+The host float build is intentionally **not** promoted: its live block still
+matches the float ESKF to `3.81469727e-06` / `1.90734863e-06`, but 130 joint
+PSD checks failed with a worst Cholesky pivot of `-1.79939767e-05` after a
+maximum reset correction of `6.08450061e-04 rad`. The current naive covariance
+form is therefore disallowed for a float fixed-lag buffer.
+Future target work needs a square-root/UD representation or separately
+validated bounded PSD-repair policy. Full scope and commands are in
+[fixed-lag measurement cross covariance](fixed-lag-measurement-cross-covariance.md).
+
+### Verification
+
+The reviewed default release gate passed `16/16` CTest targets, including the
+new augmented-covariance oracle, and `197/197` Python tests. A fresh Debug
+AddressSanitizer/UndefinedBehaviorSanitizer build also passed `16/16` CTest
+targets; the exhaustive input-integrity campaign required `134.35 s` and the
+complete sanitizer CTest run required `157.80 s`. The managed desktop sandbox
+cannot run LeakSanitizer under its `ptrace` model, so the sanitizer command used
+`ASAN_OPTIONS=detect_leaks=0`; this result covers ASan and UBSan only and makes
+no leak-detection claim.
+
 ## 2026-07-18 — input integrity and timing audit started
 
 ### Reason
