@@ -4,7 +4,7 @@
 This file is intentionally *not* a v8 protocol, train runner, or flight
 component.  It leaves v7 source, protocol, scorer, and immutable train
 artifact untouched.  Its purpose is narrower: make the v7 quiet-boundary
-failure mode executable, then compare three causal policy shapes on tiny,
+failure mode executable, then compare four causal policy shapes on tiny,
 hand-authored traces before anyone freezes another development protocol.
 
 The probes accept only source/arrival timestamps, a residual NIS, validity,
@@ -42,6 +42,7 @@ class PolicyKind(str, Enum):
     RECENT_BOUNDARY = "recent_boundary"
     GRADED_EVIDENCE = "graded_evidence"
     BOUNDED_RETRY = "bounded_retry"
+    PARTIAL_QUIET_PROBATION = "partial_quiet_probation"
 
 
 class ProbeState(str, Enum):
@@ -78,6 +79,11 @@ class ProbeConfig:
     recent_quiet_boundary_max_age_s: float = 3.0
     graded_midband_decay_per_source_s: float = 0.5
     retry_max_aborts_after_boundary: int = 1
+    partial_retry_max_aborts_after_boundary: int = 1
+    partial_quiet_min_observations: int = 2
+    partial_quiet_min_source_span_s: float = 0.5
+    partial_high_min_observations: int = 5
+    partial_high_min_source_span_s: float = 2.0
 
     def __post_init__(self) -> None:
         if self.quiet_nis_threshold >= self.high_nis_threshold:
@@ -86,6 +92,8 @@ class ProbeConfig:
             "warmup_min_observations",
             "quiet_min_observations",
             "high_min_observations",
+            "partial_quiet_min_observations",
+            "partial_high_min_observations",
         ):
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, int) or value < 1:
@@ -96,6 +104,14 @@ class ProbeConfig:
             or self.retry_max_aborts_after_boundary < 0
         ):
             raise ValueError("retry_max_aborts_after_boundary must be an integer >= 0")
+        if (
+            isinstance(self.partial_retry_max_aborts_after_boundary, bool)
+            or not isinstance(self.partial_retry_max_aborts_after_boundary, int)
+            or self.partial_retry_max_aborts_after_boundary < 0
+        ):
+            raise ValueError(
+                "partial_retry_max_aborts_after_boundary must be an integer >= 0"
+            )
         for name in (
             "warmup_min_source_span_s",
             "quiet_min_source_span_s",
@@ -104,6 +120,8 @@ class ProbeConfig:
             "maximum_arrival_gap_s",
             "recent_quiet_boundary_max_age_s",
             "graded_midband_decay_per_source_s",
+            "partial_quiet_min_source_span_s",
+            "partial_high_min_source_span_s",
         ):
             value = float(getattr(self, name))
             if not math.isfinite(value) or value < 0.0:
@@ -136,6 +154,10 @@ class ProbeEvent:
     graded_evidence_s: float
     recent_boundary_age_s: float | None
     retry_aborts_used: int
+    boundary_is_partial: bool
+    partial_retry_aborts_used: int
+    partial_retry_exhausted: bool
+    full_boundary_seen: bool
 
 
 @dataclass(frozen=True)
@@ -148,8 +170,13 @@ class ProbeResult:
     latch_source_timestamp_us: int | None
     episode_start_source_timestamp_us: int | None
     boundary_source_timestamp_us: int | None
+    boundary_is_partial: bool
+    episode_boundary_is_partial: bool
+    full_boundary_seen: bool
     reset_count: int
     retry_aborts_used: int
+    partial_retry_aborts_used: int
+    partial_retry_exhausted: bool
     trace: tuple[ProbeEvent, ...]
 
 
@@ -164,7 +191,7 @@ def _duration_s(later_us: int, earlier_us: int) -> float:
 class CausalPolicyProbe:
     """Executable policy-shape model with v7-style fail-closed continuity.
 
-    The three candidates deliberately share all safety foundations:
+    The four candidates deliberately share all safety foundations:
 
     * explicit epoch authorization;
     * strictly monotonic source and arrival time;
@@ -189,6 +216,14 @@ class CausalPolicyProbe:
         A broken high episode may restart only a finite number of times before
         a fresh quiet boundary is required.  It prevents an unlimited retry
         loop from turning a stale boundary into eventual certainty.
+
+    ``PARTIAL_QUIET_PROBATION``
+        A short, explicitly bounded quiet run may create a probationary
+        boundary.  Any episode that starts from that boundary must satisfy a
+        stricter high-observation/source-span requirement.  It is only
+        admissible after one complete quiet boundary in the current epoch and
+        has its own finite retry budget.  This is a diagnostic candidate for
+        the v7 dead-end, not a relaxed qualification rule.
     """
 
     def __init__(self, policy: PolicyKind, config: ProbeConfig) -> None:
@@ -204,16 +239,28 @@ class CausalPolicyProbe:
         self.quiet_start_us: int | None = None
         self.quiet_observations = 0
         self.last_quiet_boundary_us: int | None = None
+        self.boundary_is_partial = False
+        # Partial probation cannot bootstrap the initial qualification.  A
+        # complete quiet boundary must be observed in this authorization epoch
+        # before any partial boundary is admissible.
+        self.full_boundary_seen = False
+        # A partial boundary is only available after a full boundary was
+        # degraded by a non-quiet event or an aborted episode.  This prevents
+        # the shortened quiet rule from becoming an alternative startup path.
+        self.partial_requalification_eligible = False
         self.high_start_us: int | None = None
         # Snapshot the boundary validity at episode onset.  A valid episode
         # must not be invalidated merely because its 1.5 s evidence window
         # crosses the boundary-age deadline; a *new* retry still has to pass
         # the age check.
         self.high_boundary_source_us: int | None = None
+        self.high_boundary_is_partial = False
         self.high_observations = 0
         self.graded_evidence_s = 0.0
         self.retry_aborts_used = 0
         self.retry_exhausted = False
+        self.partial_retry_aborts_used = 0
+        self.partial_retry_exhausted = False
         self.latch_source_timestamp_us: int | None = None
         self.reset_count = 0
         self.trace: list[ProbeEvent] = []
@@ -234,18 +281,26 @@ class CausalPolicyProbe:
         self.quiet_start_us = None
         self.quiet_observations = 0
         self.last_quiet_boundary_us = None
+        self.boundary_is_partial = False
+        self.full_boundary_seen = False
+        self.partial_requalification_eligible = False
         self.high_start_us = None
         self.high_boundary_source_us = None
+        self.high_boundary_is_partial = False
         self.high_observations = 0
         self.graded_evidence_s = 0.0
         self.retry_aborts_used = 0
         self.retry_exhausted = False
+        self.partial_retry_aborts_used = 0
+        self.partial_retry_exhausted = False
+        self.latch_source_timestamp_us = None
         if not keep_authorization:
             self.authorized_epoch = None
 
     def _clear_high_episode(self) -> None:
         self.high_start_us = None
         self.high_boundary_source_us = None
+        self.high_boundary_is_partial = False
         self.high_observations = 0
         self.graded_evidence_s = 0.0
         if self.state is not ProbeState.LATCHED:
@@ -268,6 +323,21 @@ class CausalPolicyProbe:
         self.reset_count += 1
         self._clear_all(keep_authorization=keep_authorization)
 
+    def _retire_boundary_for_partial_requalification(self) -> None:
+        """Drop a degraded boundary and require fresh causal quiet evidence.
+
+        The old full/partial boundary cannot authorize another high episode.
+        A partial quiet run becomes admissible only because this epoch has
+        already demonstrated one full boundary; a discontinuity clears that
+        historical fact in ``_clear_all``.
+        """
+
+        self.last_quiet_boundary_us = None
+        self.boundary_is_partial = False
+        self.partial_requalification_eligible = self.full_boundary_seen
+        if self.state is not ProbeState.LATCHED:
+            self.state = ProbeState.UNQUALIFIED
+
     def _event(self, item: ProbeInput, state_before: ProbeState, reason: str) -> ProbeEvent:
         age_s = self._boundary_age_s(item.source_timestamp_us)
         span_s = (
@@ -287,6 +357,10 @@ class CausalPolicyProbe:
             graded_evidence_s=self.graded_evidence_s,
             recent_boundary_age_s=age_s,
             retry_aborts_used=self.retry_aborts_used,
+            boundary_is_partial=self.boundary_is_partial,
+            partial_retry_aborts_used=self.partial_retry_aborts_used,
+            partial_retry_exhausted=self.partial_retry_exhausted,
+            full_boundary_seen=self.full_boundary_seen,
         )
         self.trace.append(event)
         return event
@@ -303,39 +377,70 @@ class CausalPolicyProbe:
             self.warmup_ready = True
         return self.warmup_ready
 
-    def _advance_quiet(self, source_us: int) -> bool:
+    def _advance_quiet(self, source_us: int) -> str | None:
         if self.quiet_start_us is None:
             self.quiet_start_us = source_us
             self.quiet_observations = 0
         self.quiet_observations += 1
-        if (
+        span_s = _duration_s(source_us, self.quiet_start_us)
+        full_confirmed = (
             self.quiet_observations >= self.config.quiet_min_observations
-            and _duration_s(source_us, self.quiet_start_us)
-            >= self.config.quiet_min_source_span_s
-        ):
+            and span_s >= self.config.quiet_min_source_span_s
+        )
+        partial_confirmed = (
+            self.policy is PolicyKind.PARTIAL_QUIET_PROBATION
+            and self.full_boundary_seen
+            and self.partial_requalification_eligible
+            and self.quiet_observations >= self.config.partial_quiet_min_observations
+            and span_s >= self.config.partial_quiet_min_source_span_s
+        )
+        if full_confirmed:
             # A running quiet interval is still a quiet interval.  Updating the
             # end time on each qualified quiet sample bounds recency by the most
             # recent causally observed baseline, not by its historical start.
             self.last_quiet_boundary_us = source_us
+            self.full_boundary_seen = True
+            self.boundary_is_partial = False
+            self.partial_requalification_eligible = False
             self.retry_aborts_used = 0
             self.retry_exhausted = False
+            self.partial_retry_aborts_used = 0
+            self.partial_retry_exhausted = False
             self._clear_high_episode()
             self.state = ProbeState.BOUNDARY_ACTIVE
-            return True
-        return False
+            return "full"
+        if partial_confirmed:
+            # This is a distinct boundary generation.  Its retry accounting
+            # belongs only to the partial path and cannot be refreshed by more
+            # sub-full quiet samples.
+            self.last_quiet_boundary_us = source_us
+            self.boundary_is_partial = True
+            self.partial_requalification_eligible = False
+            self.partial_retry_aborts_used = 0
+            self.partial_retry_exhausted = False
+            self._clear_high_episode()
+            self.state = ProbeState.BOUNDARY_ACTIVE
+            return "partial"
+        return None
 
     def _start_or_extend_contiguous_high(self, source_us: int) -> bool:
         if self.high_start_us is None:
             self.high_start_us = source_us
             self.high_boundary_source_us = self.last_quiet_boundary_us
+            self.high_boundary_is_partial = self.boundary_is_partial
             self.high_observations = 1
             self.state = ProbeState.HIGH_EPISODE
         else:
             self.high_observations += 1
+        minimum_observations = self.config.high_min_observations
+        minimum_span_s = self.config.high_min_source_span_s
+        if self.policy is PolicyKind.PARTIAL_QUIET_PROBATION and self.high_boundary_is_partial:
+            minimum_observations = self.config.partial_high_min_observations
+            minimum_span_s = self.config.partial_high_min_source_span_s
         if (
-            self.high_observations >= self.config.high_min_observations
+            self.high_observations >= minimum_observations
             and _duration_s(source_us, self.high_start_us)
-            >= self.config.high_min_source_span_s
+            >= minimum_span_s
         ):
             self.state = ProbeState.LATCHED
             self.latch_source_timestamp_us = source_us
@@ -364,11 +469,33 @@ class CausalPolicyProbe:
 
     def _abort_contiguous_high(self, *, is_midband: bool) -> None:
         had_high = self.high_start_us is not None
+        high_boundary_is_partial = self.high_boundary_is_partial
         self._clear_high_episode()
         if self.policy is PolicyKind.BOUNDED_RETRY and had_high and is_midband:
             self.retry_aborts_used += 1
             if self.retry_aborts_used > self.config.retry_max_aborts_after_boundary:
                 self.retry_exhausted = True
+            return
+        if self.policy is not PolicyKind.PARTIAL_QUIET_PROBATION or not is_midband:
+            return
+
+        if had_high and high_boundary_is_partial:
+            self.partial_retry_aborts_used += 1
+            if (
+                self.partial_retry_aborts_used
+                <= self.config.partial_retry_max_aborts_after_boundary
+            ):
+                # A direct retry is permitted only by this independent, finite
+                # budget.  It retains exactly this partial boundary and never
+                # creates fresh quiet evidence.
+                self.state = ProbeState.BOUNDARY_ACTIVE
+                return
+            self.partial_retry_exhausted = True
+
+        # A high episode that began from a full boundary, a mid-band without a
+        # high episode, or an exhausted partial retry cannot fall back to the
+        # historical full boundary.  The next high sample needs new quiet.
+        self._retire_boundary_for_partial_requalification()
 
     def observe(self, item: ProbeInput) -> ProbeEvent:
         """Consume a causal residual event; no labels or truth influence decisions."""
@@ -444,12 +571,23 @@ class CausalPolicyProbe:
             # through a quiet interval.  The boundary is refreshed only after
             # the configured quiet run completes.
             if self.high_start_us is not None:
+                if self.policy is PolicyKind.PARTIAL_QUIET_PROBATION:
+                    # A quiet termination begins a new qualification run; it
+                    # cannot reuse the full/partial boundary that started the
+                    # aborted episode.
+                    self._retire_boundary_for_partial_requalification()
                 self._clear_high_episode()
-            confirmed = self._advance_quiet(item.source_timestamp_us)
+            boundary_kind = self._advance_quiet(item.source_timestamp_us)
             return self._event(
                 item,
                 state_before,
-                "quiet_boundary_refreshed" if confirmed else "quiet_confirmation",
+                "quiet_boundary_refreshed"
+                if boundary_kind == "full"
+                else (
+                    "partial_quiet_boundary_confirmed"
+                    if boundary_kind == "partial"
+                    else "quiet_confirmation"
+                ),
             )
 
         # A nonquiet point cannot contribute to a new quiet run.  A previously
@@ -468,6 +606,11 @@ class CausalPolicyProbe:
         if nis >= self.config.high_nis_threshold:
             if self.policy is PolicyKind.BOUNDED_RETRY and self.retry_exhausted:
                 return self._event(item, state_before, "retry_budget_exhausted")
+            if (
+                self.policy is PolicyKind.PARTIAL_QUIET_PROBATION
+                and self.partial_retry_exhausted
+            ):
+                return self._event(item, state_before, "partial_retry_budget_exhausted")
             if self.policy is PolicyKind.GRADED_EVIDENCE:
                 latched = self._advance_graded_high(item.source_timestamp_us, elapsed_s)
                 return self._event(
@@ -482,9 +625,10 @@ class CausalPolicyProbe:
                 "high_episode_latched" if latched else "high_episode_accumulating",
             )
 
-        # Mid-band input is ambiguous, but unlike v7 it does not immediately
-        # erase a *recent* quiet boundary.  The three policy shapes diverge in
-        # how they handle unfinished high evidence.
+        # Mid-band input is ambiguous.  The first three diagnostic shapes keep
+        # their own bounded inheritance rules; partial probation instead retires
+        # the current boundary and requires a new quiet run (or its finite
+        # partial retry budget when an episode was already admitted).
         if self.policy is PolicyKind.GRADED_EVIDENCE:
             self.graded_evidence_s = max(
                 0.0,
@@ -497,6 +641,14 @@ class CausalPolicyProbe:
                 self.state = ProbeState.BOUNDARY_ACTIVE
             return self._event(item, state_before, "graded_evidence_decayed_midband")
         self._abort_contiguous_high(is_midband=True)
+        if self.policy is PolicyKind.PARTIAL_QUIET_PROBATION:
+            if self.partial_retry_exhausted:
+                reason = "partial_retry_budget_exhausted_midband"
+            elif self.last_quiet_boundary_us is not None and self.boundary_is_partial:
+                reason = "partial_retry_reserved_midband"
+            else:
+                reason = "partial_boundary_retired_midband"
+            return self._event(item, state_before, reason)
         return self._event(
             item,
             state_before,
@@ -513,8 +665,13 @@ class CausalPolicyProbe:
             latch_source_timestamp_us=self.latch_source_timestamp_us,
             episode_start_source_timestamp_us=self.high_start_us,
             boundary_source_timestamp_us=self.last_quiet_boundary_us,
+            boundary_is_partial=self.boundary_is_partial,
+            episode_boundary_is_partial=self.high_boundary_is_partial,
+            full_boundary_seen=self.full_boundary_seen,
             reset_count=self.reset_count,
             retry_aborts_used=self.retry_aborts_used,
+            partial_retry_aborts_used=self.partial_retry_aborts_used,
+            partial_retry_exhausted=self.partial_retry_exhausted,
             trace=tuple(self.trace),
         )
 
@@ -549,6 +706,7 @@ def diagnostic_scenarios() -> dict[str, tuple[ProbeInput, ...]]:
         _event_at(69.5, 11.371),
         _event_at(70.0, 29.723),
         _event_at(70.5, 12.601),
+        _event_at(71.0, 11.461),
     ]
 
     # No candidate may turn a distant quiet condition into an indefinitely
@@ -624,8 +782,13 @@ def _result_payload(result: ProbeResult) -> dict[str, object]:
         "latch_source_timestamp_us": result.latch_source_timestamp_us,
         "episode_start_source_timestamp_us": result.episode_start_source_timestamp_us,
         "boundary_source_timestamp_us": result.boundary_source_timestamp_us,
+        "boundary_is_partial": result.boundary_is_partial,
+        "episode_boundary_is_partial": result.episode_boundary_is_partial,
+        "full_boundary_seen": result.full_boundary_seen,
         "reset_count": result.reset_count,
         "retry_aborts_used": result.retry_aborts_used,
+        "partial_retry_aborts_used": result.partial_retry_aborts_used,
+        "partial_retry_exhausted": result.partial_retry_exhausted,
         "trace": [asdict(event) for event in result.trace],
     }
 

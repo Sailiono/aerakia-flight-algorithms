@@ -37,22 +37,37 @@ offline report. They never enter a policy decision. Every candidate resets on
 epoch changes, non-monotonic time, source/arrival gaps, invalid source data,
 or missing/invalid NIS.
 
-The three shapes are:
+The four shapes currently exposed by the diagnostic probe are:
 
 | Candidate | Causal rule | Risk to investigate |
 | --- | --- | --- |
 | `recent_boundary` | Preserve the last confirmed quiet boundary for a bounded age; a contiguous high episode may start only while that boundary is recent. The age is checked at episode onset and then snapshotted for the episode. | A longer age can inherit stale baseline evidence and raise nuisance latches. |
 | `graded_evidence` | Integrate high evidence in source time; mid-band evidence decays it; require the high observation count and source-time evidence threshold. A recent boundary is still required at onset. | Decay/threshold choices can turn slowly varying nuisance into a latch; rate and noise invariance must be demonstrated. |
 | `bounded_retry` | Permit at most a finite number of high-episode restarts after a mid-band interruption while the same boundary remains recent. Exhaustion requires a fresh quiet boundary. | A retry budget that is too large approximates the v6 optimistic inheritance; one that is too small misses intermittent faults. |
+| `partial_quiet_probation` | After one complete quiet boundary in the current epoch, a post-degradation quiet run spanning at least `0.5 s` may create a probationary boundary; an episode started from it must meet a stricter `5`-sample/`2 s` high-evidence requirement. A partial episode gets its own finite retry budget. | The extra post-degradation gate may reduce sensitivity, while a shorter quiet run may still admit nuisance structure; this shape needs independent false-latch and rate-invariance evidence. |
 
 The age snapshot is intentional: a valid episode that starts at age `2.0 s`
 must not be rejected merely because its required `1.5 s` evidence completes at
 age `3.5 s`. A *new* episode or retry must pass the age check again.
 
+The partial candidate has stricter boundary-generation semantics than the
+other three probes:
+
+- it cannot bootstrap the initial qualification; one complete quiet boundary
+  must be observed first;
+- any mid-band interruption or aborted high episode retires the current full
+  boundary, so a subsequent high episode cannot inherit it directly;
+- only a bounded post-degradation quiet run can establish a partial boundary;
+- a partial-boundary high episode consumes an independent finite retry budget,
+  and exhaustion requires new quiet evidence.
+
+These rules are deliberate safety constraints. They are not claims that the
+partial candidate is the preferred policy.
+
 ## Focused diagnostic matrix
 
-The script runs five hand-authored traces at recent-boundary ages `1, 2, 3 s`
-(`45` policy/scenario comparisons):
+The script runs five hand-authored traces at recent-boundary ages `1, 2, 3 s`.
+With the four current shapes this is `60` policy/scenario comparisons:
 
 1. mid-band then persistent high (the v7 root-cause shape);
 2. expired boundary followed by high residuals;
@@ -64,11 +79,11 @@ The current, intentionally unselected probe output is:
 
 | Trace | Age 1 s | Age 2 s | Age 3 s | Interpretation |
 | --- | --- | --- | --- | --- |
-| Mid-band → persistent high | all three reject | all three latch | all three latch | Age `1 s` is too short for the retained `71101` onset; `2 s` is the minimum of this toy trace. |
+| Mid-band → persistent high | partial only | all non-partial reject | all four latch | The probationary shape uses a 0.5 s partial quiet run and a stricter 2 s high episode. |
 | Expired boundary | all reject | all reject | all reject | No candidate accepts stale evidence beyond its age. |
-| Intermittent high/mid | graded only | all three | all three | Graded evidence bridges one interruption; this is a sensitivity result, not a promotion result. |
+| Intermittent high/mid | graded only | all non-partial | all four | Graded evidence bridges one interruption; this is a sensitivity result, not a promotion result. |
 | Gap → high | all reject | all reject | all reject | Continuity remains fail-closed. |
-| Retry exhaustion | bounded retry rejects | bounded retry rejects | bounded retry rejects | The finite retry budget is observable; recent/graded are intentionally more permissive in this adversarial trace. |
+| Retry exhaustion | bounded retry rejects | bounded retry rejects | partial/recent/graded may latch at the longest age | The finite retry budget is observable; permissive shapes remain diagnostic only. |
 
 As a read-only replay of the already retained v7 seed `71101` (one case,
 `117` monitor-fed observations), v7 remains unlatched. The unselected probe at
@@ -163,3 +178,30 @@ retained at
 `validation/public/airspeed_wind_residual_persistence_v8_screen_74101_32_summary.json`.
 It is explicitly non-promoting and records the full-trace SHA-256 plus the
 source-file hashes needed to identify this run.
+
+### Follow-up screen after partial-policy safety fixes
+
+The partial candidate was then screened on a new disjoint range,
+`74201--74216` (`16` families, the same `16` cases per family, `256` replays).
+The run was performed after adding the startup prohibition, mandatory
+post-degradation quiet evidence, and an independent finite partial retry
+budget. It did not modify or rerun v7.
+
+All candidates produced `0/16` nominal false latches and `0/16` structural-gap
+latches at every tested age. Clean persistent-family passes were:
+
+| Recent-boundary age | Recent boundary | Graded evidence | Bounded retry | Partial quiet probation |
+| --- | ---: | ---: | ---: | ---: |
+| `1 s` | 8/16 | 9/16 | 8/16 | 5/16 |
+| `2 s` | 13/16 | 15/16 | 13/16 | 5/16 |
+| `3 s` | 15/16 | 16/16 | 15/16 | 5/16 |
+
+This is still a development screen, not a promotion result. The safety fix
+made the partial candidate materially less sensitive; it is therefore rejected
+for the next v8 protocol rather than being rescued by relaxing its rules. The
+best provisional comparator is `graded_evidence` at age `3 s`, but it remains
+below the required evidence standard because this screen is small and not a
+protected holdout. The full trace remains under
+`build/airspeed_wind_residual_persistence_v8_screen_74201_16.json`; the compact
+non-promoting summary is
+`validation/public/airspeed_wind_residual_persistence_v8_screen_74201_16_summary.json`.

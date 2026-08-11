@@ -11,15 +11,17 @@ pitot-fault classifier, wind estimator, or flight-control gate.
 
 The current focused evidence is sound for its declared scope:
 
-- 45 hand-authored policy/scenario comparisons (`3` ages × `5` scenarios ×
-  `3` policy shapes);
-- 6 focused Python tests, all passing;
+- 60 hand-authored policy/scenario comparisons (`3` ages × `5` scenarios ×
+  `4` policy shapes);
+- 11 focused Python tests, all passing;
 - one read-only replay of v7 seed `71101`, with `117` monitor-fed samples;
 - no changes to the production ESKF, Mahony, public API, v7 protocol, v7
   scorer, or v7 train artifact.
 
 The focused result supports opening v8 design work, but does not select an
-age, decay rate, retry budget, or policy.
+age, decay rate, retry budget, or policy. The follow-up
+`partial_quiet_probation` candidate is also diagnostic-only and does not rewrite
+the earlier three-policy screen.
 
 ## What the probe establishes
 
@@ -82,9 +84,11 @@ an implementation accident.
 ### 3. Boundary refresh and retry budget need separate semantics
 
 The probe refreshes the boundary on every newly completed quiet run and resets
-the retry budget. A mid-band event preserves a recent boundary, while a high
-episode abort can retry under the recent-boundary and bounded-retry shapes.
-This is the intended design space, but the v8 protocol must distinguish:
+the relevant retry budget. For the recent-boundary, graded-evidence, and
+bounded-retry comparators, a mid-band event preserves a recent boundary while
+a high episode abort can retry. The partial candidate intentionally differs:
+it retires the boundary after degradation and requires a new quiet run. The v8
+protocol must distinguish:
 
 - boundary age at first episode onset;
 - age of a retry after an aborted episode;
@@ -94,6 +98,18 @@ This is the intended design space, but the v8 protocol must distinguish:
 
 Every latch record should expose these values so a later result cannot hide
 optimistic inheritance behind a single `latched` bit.
+
+### 4. Partial probation must not become a startup shortcut
+
+The partial candidate was tightened before its fresh screen. It now requires a
+complete quiet boundary in the current authorized epoch before partial
+probation is eligible. A mid-band interruption or aborted high episode retires
+the current full/partial boundary; a new high episode cannot directly reuse it.
+Only a bounded post-degradation quiet run can create a partial boundary, and a
+partial-boundary high episode uses an independent finite retry budget. The
+focused suite includes startup, post-mid-band, and retry-exhaustion sentinels.
+This is the required fail-closed interpretation; a sensitivity loss is not a
+reason to remove these constraints.
 
 ## Proposed v8 focused acceptance gate
 
@@ -168,9 +184,33 @@ continuing through it, so a later latch is correctly rejected as clean
 post-injection evidence. This case must remain an ambiguity failure unless a
 future causal policy can establish a new onset without importing truth.
 
+### Follow-up partial-policy screen
+
+After the safety tightening, a new disjoint screen used seeds `74201--74216`,
+the same `16` cases per family, and `256` stream replays. Every candidate had
+zero nominal false latches and zero structural-gap latches at ages `1`, `2`,
+and `3 s`. Clean persistent-family passes were:
+
+| Age | Recent boundary | Graded evidence | Bounded retry | Partial quiet probation |
+| --- | ---: | ---: | ---: | ---: |
+| `1 s` | 8/16 | 9/16 | 8/16 | 5/16 |
+| `2 s` | 13/16 | 15/16 | 13/16 | 5/16 |
+| `3 s` | 15/16 | 16/16 | 15/16 | 5/16 |
+
+The partial candidate's lower sensitivity is expected from the newly enforced
+post-degradation quiet requirement and is retained as a negative result. The
+best comparator in this small screen is graded evidence at age `3 s`, but it
+is not selected or promoted: the screen is not a protected holdout and remains
+well short of the provisional evidence plan for a production authority.
+The full trace is ignored build data at
+`build/airspeed_wind_residual_persistence_v8_screen_74201_16.json`; its compact
+summary is committed at
+`validation/public/airspeed_wind_residual_persistence_v8_screen_74201_16_summary.json`.
+
 ## Recommended selection order
 
-1. Fix the two semantic findings above and extend focused tests.
+1. Freeze the clarified startup, gap, boundary, and retry semantics in a new
+   protocol document and extend focused tests.
 2. Compare `recent_boundary` first; it is the smallest change that addresses
    the v7 dead-end.
 3. Evaluate `graded_evidence` only with an explicit integration/decay rule and
@@ -180,6 +220,22 @@ future causal policy can establish a new onset without importing truth.
 5. Freeze one candidate, one parameter set, one new protocol, and disjoint
    train/tune/holdout seeds only after the focused screen meets the registered
    error budgets.
+
+## Partial-quiet probation candidate
+
+After the 32-family screen, a fourth shape was added for a bounded follow-up
+diagnostic. It first requires a complete quiet boundary in the current epoch;
+only after a mid-band/degraded event can two quiet samples spanning at least
+`0.5 s` create a probationary boundary. An episode started from that partial
+boundary requires five high observations spanning `2.0 s`, and its retries use
+an independent finite budget. Full quiet boundaries retain the ordinary
+four-observation/`1.5 s` requirement. The candidate records whether the
+boundary and episode onset were partial, so later scoring cannot hide the
+distinction behind a single latch bit.
+
+This is a causal hypothesis, not a selected solution. It must be evaluated on
+fresh seeds and compared against the same nuisance, ambiguity, gap, and pulse
+budgets; no existing screen result is retroactively re-scored.
 
 ## Boundary of the conclusion
 

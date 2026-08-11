@@ -2850,3 +2850,40 @@ or age is selected, and no v8 train/tune/holdout has been opened.
 The large trace remains under `build/` only. A compact summary with the full
 trace SHA-256, source hashes, seed manifest, and aggregate counts is retained
 in `validation/public/airspeed_wind_residual_persistence_v8_screen_74101_32_summary.json`.
+
+### 2026-08-11 — partial-quiet probation candidate opened
+
+The first screen showed that many misses occur after a short post-mid-band
+quiet run that is too short for v7's full one-second boundary. A separate
+diagnostic shape was therefore added without changing the prior screen or v7:
+two quiet observations spanning `0.5 s` may create a probationary boundary, but
+an episode started from that boundary must contain at least five high samples
+over `2.0 s`. Full boundaries keep the ordinary four-sample/`1.5 s` rule.
+Boundary quality and episode-onset quality are now exported explicitly.
+
+The focused contract remains deterministic and now covers four policy shapes.
+Before the fresh screen, the partial candidate was tightened so it cannot
+bootstrap initial qualification, cannot reuse a full boundary after a
+post-degradation interruption, and has an independent finite retry budget.
+
+### 2026-08-11 — v8 partial-policy follow-up screen
+
+A new, disjoint screen ran on seeds `74201--74216` with the same 16 cases per
+family (`256` stream replays, ages `1/2/3 s`). The full trace is retained only
+under `build/airspeed_wind_residual_persistence_v8_screen_74201_16.json`; the
+compact summary is committed at
+`validation/public/airspeed_wind_residual_persistence_v8_screen_74201_16_summary.json`.
+
+All four candidates had zero nominal false latches and zero structural-gap
+latches at every age. Clean persistent-family passes were:
+
+```text
+age 1 s: recent 8/16, graded 9/16, bounded 8/16, partial 5/16
+age 2 s: recent 13/16, graded 15/16, bounded 13/16, partial 5/16
+age 3 s: recent 15/16, graded 16/16, bounded 15/16, partial 5/16
+```
+
+The partial candidate's sensitivity loss is retained as a negative result;
+its safety constraints were not relaxed to improve the score. Graded evidence
+at age 3 s is only a provisional comparator from a small non-holdout screen;
+no v8 policy, age, threshold, estimator state, or FCOne authority is selected.

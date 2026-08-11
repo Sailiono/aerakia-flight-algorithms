@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "study_id": "aerakia-v8-fresh-development-screen",
+  "status": "completed_non_promoting_development_screen",
+  "full_screen_artifact_sha256": "fd353ef27b05fa92fbf210233755d5d3070a44eccde0ae0f6cc15ac3bf696203",
+  "manifest": {
+    "seed_start": 74201,
+    "seed_end": 74216,
+    "seed_count": 16,
+    "record_count": 256,
+    "boundary_ages_s": [1.0, 2.0, 3.0],
+    "case_count": 16,
+    "case_names": [
+      "nominal",
+      "nominal_high_noise_calibrated",
+      "persistent_tas_offset_positive",
+      "persistent_tas_offset_negative",
+      "persistent_tas_offset_positive_bounded_jitter",
+      "persistent_tas_offset_negative_bounded_jitter",
+      "persistent_tas_scale_positive",
+      "persistent_tas_scale_negative",
+      "persistent_horizontal_wind_step",
+      "persistent_vertical_wind",
+      "tas_offset_pulse_0p25s",
+      "tas_offset_pulse_0p5s",
+      "tas_offset_pulse_1p0s",
+      "tas_offset_pulse_1p5s",
+      "tas_offset_pulse_2p0s",
+      "gap_then_tas_offset_pulse_1p0s"
+    ],
+    "protocol_path": "validation/airspeed_wind_residual_persistence_protocol_v7.json",
+    "protocol_sha256": "3fc033a98efbfd40fc3c459db79370ded3a2d1bdce240ae2e5a9d6801903695d"
+  },
+  "summary": {
+    "1s": {
+      "recent_boundary": {"persistent_family_passes": 8, "persistent_family_trials": 16, "persistent_member_latches": 36, "persistent_member_trials": 64, "nominal_false_latches": 0, "gap_structural_latches": 0, "pulse_latches": {"1.0s": 0, "1.5s": 0, "2.0s": 10}},
+      "graded_evidence": {"persistent_family_passes": 9, "persistent_family_trials": 16, "persistent_member_latches": 38, "persistent_member_trials": 64, "nominal_false_latches": 0, "gap_structural_latches": 0, "pulse_latches": {"1.0s": 0, "1.5s": 0, "2.0s": 10}},
+      "bounded_retry": {"persistent_family_passes": 8, "persistent_family_trials": 16, "persistent_member_latches": 36, "persistent_member_trials": 64, "nominal_false_latches": 0, "gap_structural_latches": 0, "pulse_latches": {"1.0s": 0, "1.5s": 0, "2.0s": 10}},
+      "partial_quiet_probation": {"persistent_family_passes": 5, "persistent_family_trials": 16, "persistent_member_latches": 30, "persistent_member_trials": 64, "nominal_false_latches": 0, "gap_structural_latches": 0, "pulse_latches": {"1.0s": 0, "1.5s": 0, "2.0s": 10}}
+    },
+    "2s": {
+      "recent_boundary": {"persistent_family_passes": 13, "persistent_family_trials": 16, "persistent_member_latches": 56, "persistent_member_trials": 64, "nominal_false_latches": 0, "gap_structural_latches": 0, "pulse_latches": {"1.0s": 0, "1.5s": 0, "2.0s": 15}},
+      "graded_evidence": {"persistent_family_passes": 15, "persistent_family_trials": 16, "persistent_member_latches": 60, "persistent_member_trials": 64, "nominal_false_latches": 0, "gap_structural_latches": 0, "pulse_latches": {"1.0s": 0, "1.5s": 0, "2.0s": 15}},
+      "bounded_retry": {"persistent_family_passes": 13, "persistent_family_trials": 16, "persistent_member_latches": 56, "persistent_member_trials": 64, "nominal_false_latches": 0, "gap_structural_latches": 0, "pulse_latches": {"1.0s": 0, "1.5s": 0, "2.0s": 15}},
+      "partial_quiet_probation": {"persistent_family_passes": 5, "persistent_family_trials": 16, "persistent_member_latches": 30, "persistent_member_trials": 64, "nominal_false_latches": 0, "gap_structural_latches": 0, "pulse_latches": {"1.0s": 0, "1.5s": 0, "2.0s": 10}}
+    },
+    "3s": {
+      "recent_boundary": {"persistent_family_passes": 15, "persistent_family_trials": 16, "persistent_member_latches": 62, "persistent_member_trials": 64, "nominal_false_latches": 0, "gap_structural_latches": 0, "pulse_latches": {"1.0s": 0, "1.5s": 0, "2.0s": 16}},
+      "graded_evidence": {"persistent_family_passes": 16, "persistent_family_trials": 16, "persistent_member_latches": 64, "persistent_member_trials": 64, "nominal_false_latches": 0, "gap_structural_latches": 0, "pulse_latches": {"1.0s": 0, "1.5s": 0, "2.0s": 16}},
+      "bounded_retry": {"persistent_family_passes": 15, "persistent_family_trials": 16, "persistent_member_latches": 62, "persistent_member_trials": 64, "nominal_false_latches": 0, "gap_structural_latches": 0, "pulse_latches": {"1.0s": 0, "1.5s": 0, "2.0s": 16}},
+      "partial_quiet_probation": {"persistent_family_passes": 5, "persistent_family_trials": 16, "persistent_member_latches": 30, "persistent_member_trials": 64, "nominal_false_latches": 0, "gap_structural_latches": 0, "pulse_latches": {"1.0s": 0, "1.5s": 0, "2.0s": 10}}
+    }
+  },
+  "interpretation": [
+    "All four candidates had 0/16 nominal false latches and 0/16 structural-gap latches at every tested age.",
+    "The best clean-family result was graded_evidence at age 3 s: 16/16, but this is a 16-family development screen, not a promotion result or protected holdout.",
+    "partial_quiet_probation remained substantially less sensitive (5/16 at every age) after the safety fix requiring post-degradation quiet evidence; it is rejected as a candidate for the next protocol.",
+    "No age, threshold, policy, estimator state, source authority, or FCOne behavior is promoted by this artifact."
+  ],
+  "provenance": {
+    "full_trace_path": "build/airspeed_wind_residual_persistence_v8_screen_74201_16.json",
+    "git_commit_before_artifact_commit": "cd1c137cd2faf4fce44c1dad62b44d9f57692e5c",
+    "source_sha256": {
+      "diagnostic_runner": "fd754b9d53ac0b12e0aead7daf4955d9b96761e0f3a34e20f4f833fdb6804eda",
+      "focused_tests": "70845063e68b4c8642e38648d38ecb802826e346bd16240e0e84ca01bd30c4b3",
+      "design_doc": "6899174bb0d7d10cd2c2d3a9ad666650b7b7d2b4373b4b0bdaedb028792aac1d"
+    }
+  },
+  "limitations": [
+    "Fresh disjoint development screen, not a frozen v8 train, tune, or holdout.",
+    "The v7 residual oracle is used only as a host-side synthetic NIS provider.",
+    "The full 247 MB trace remains under build/ and is intentionally not committed.",
+    "Persistent cases are residual-persistence demonstrations, not proof of TAS fault, wind observability, or flight safety."
+  ]
+}

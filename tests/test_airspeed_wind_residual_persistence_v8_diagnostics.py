@@ -1,9 +1,9 @@
 """Focused semantic checks for the independent v8 policy-shape probe.
 
 These tests intentionally do not invoke the v7 campaign runner, touch its
-protocol, or create a public validation artifact.  They only prove that the
-new diagnostic keeps continuity fail-closed and that the recent-boundary age
-comparison is observable before a v8 train is frozen.
+protocol, or create a public validation artifact.  They prove that the four
+diagnostic policy shapes keep continuity fail-closed and that the
+recent-boundary age comparison is observable before a v8 train is frozen.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ class ResidualPersistenceV8DiagnosticTests(unittest.TestCase):
         report = v8.run_handcrafted_diagnostics(boundary_ages_s=(1.0, 2.0, 3.0))
         self.assertEqual(report["status"], "completed_handcrafted_development_diagnostic_only")
         self.assertEqual(report["boundary_age_sweep"], [1.0, 2.0, 3.0])
-        self.assertEqual(report["policy_comparison_count"], 45)
+        self.assertEqual(report["policy_comparison_count"], 60)
 
         policies = report["policies"]
         for age in ("1s", "2s", "3s"):
@@ -32,9 +32,18 @@ class ResidualPersistenceV8DiagnosticTests(unittest.TestCase):
             expired = policies[age]["expired_boundary"]
             gap = policies[age]["gap_then_high"]
             if age == "1s":
-                self.assertTrue(all(not result["latched"] for result in root_cause.values()))
+                self.assertTrue(
+                    all(
+                        not result["latched"]
+                        for name, result in root_cause.items()
+                        if name != "partial_quiet_probation"
+                    )
+                )
+                self.assertTrue(root_cause["partial_quiet_probation"]["latched"])
             else:
-                self.assertTrue(all(result["latched"] for result in root_cause.values()))
+                self.assertTrue(
+                    all(result["latched"] for result in root_cause.values())
+                )
             self.assertTrue(all(not result["latched"] for result in expired.values()))
             self.assertTrue(all(not result["latched"] for result in gap.values()))
 
@@ -101,6 +110,102 @@ class ResidualPersistenceV8DiagnosticTests(unittest.TestCase):
         self.assertFalse(result.latched)
         self.assertEqual(result.retry_aborts_used, 2)
         self.assertTrue(any(event.reason == "retry_budget_exhausted" for event in result.trace))
+
+    def test_partial_quiet_probation_requires_stricter_high_episode(self) -> None:
+        result = v8.run_probe(
+            v8.PolicyKind.PARTIAL_QUIET_PROBATION,
+            v8.diagnostic_scenarios()["midband_then_persistent_high"],
+            v8.ProbeConfig(recent_quiet_boundary_max_age_s=1.0),
+        )
+        self.assertTrue(result.latched)
+        self.assertTrue(result.episode_boundary_is_partial)
+        self.assertEqual(result.latch_source_timestamp_us, 71_000_000)
+        self.assertEqual(result.episode_start_source_timestamp_us, 69_000_000)
+        self.assertEqual(result.trace[-1].high_observations, 5)
+
+    def test_partial_probation_cannot_bootstrap_initial_qualification(self) -> None:
+        config = v8.ProbeConfig(recent_quiet_boundary_max_age_s=3.0)
+        result = v8.run_probe(
+            v8.PolicyKind.PARTIAL_QUIET_PROBATION,
+            [
+                *[
+                    v8.ProbeInput(int(t * 1e6), int((t + 0.05) * 1e6), 1.0)
+                    for t in (0.0, 0.5, 1.0, 1.5, 2.0)
+                ],
+                *[
+                    v8.ProbeInput(int(t * 1e6), int((t + 0.05) * 1e6), 5.0)
+                    for t in (2.5, 3.0, 3.5, 4.0, 4.5)
+                ],
+            ],
+            config,
+        )
+        self.assertFalse(result.latched)
+        self.assertFalse(result.full_boundary_seen)
+        self.assertTrue(any(event.reason == "no_recent_quiet_boundary" for event in result.trace))
+
+    def test_partial_policy_has_independent_finite_retry_budget(self) -> None:
+        config = v8.ProbeConfig(
+            recent_quiet_boundary_max_age_s=3.0,
+            partial_retry_max_aborts_after_boundary=0,
+        )
+        result = v8.run_probe(
+            v8.PolicyKind.PARTIAL_QUIET_PROBATION,
+            [
+                *[
+                    v8.ProbeInput(int(t * 1e6), int((t + 0.05) * 1e6), 1.0)
+                    for t in (0.0, 0.5, 1.0, 1.5, 2.0, 2.5)
+                ],
+                # Retire a complete boundary, then establish a distinct
+                # partial boundary from new quiet observations.
+                v8.ProbeInput(3_000_000, 3_050_000, 3.0),
+                v8.ProbeInput(3_500_000, 3_550_000, 1.0),
+                v8.ProbeInput(4_000_000, 4_050_000, 1.0),
+                v8.ProbeInput(4_500_000, 4_550_000, 5.0),
+                v8.ProbeInput(5_000_000, 5_050_000, 5.0),
+                # With a zero retry budget, this abort exhausts the partial
+                # boundary and subsequent high residuals cannot reuse it.
+                v8.ProbeInput(5_500_000, 5_550_000, 3.0),
+                *[
+                    v8.ProbeInput(int(t * 1e6), int((t + 0.05) * 1e6), 5.0)
+                    for t in (6.0, 6.5, 7.0, 7.5, 8.0)
+                ],
+            ],
+            config,
+        )
+        self.assertFalse(result.latched)
+        self.assertEqual(result.retry_aborts_used, 0)
+        self.assertEqual(result.partial_retry_aborts_used, 1)
+        self.assertTrue(result.partial_retry_exhausted)
+        self.assertTrue(
+            any(
+                event.reason == "partial_retry_budget_exhausted_midband"
+                for event in result.trace
+            )
+        )
+
+    def test_partial_probation_requires_new_quiet_after_midband(self) -> None:
+        result = v8.run_probe(
+            v8.PolicyKind.PARTIAL_QUIET_PROBATION,
+            [
+                *[
+                    v8.ProbeInput(int(t * 1e6), int((t + 0.05) * 1e6), 1.0)
+                    for t in (0.0, 0.5, 1.0, 1.5, 2.0, 2.5)
+                ],
+                # A mid-band sample retires the full boundary.  High evidence
+                # alone cannot start a probationary episode; it needs a new
+                # post-mid-band partial quiet run first.
+                v8.ProbeInput(3_000_000, 3_050_000, 3.0),
+                *[
+                    v8.ProbeInput(int(t * 1e6), int((t + 0.05) * 1e6), 5.0)
+                    for t in (3.5, 4.0, 4.5, 5.0, 5.5, 6.0)
+                ],
+            ],
+            v8.ProbeConfig(recent_quiet_boundary_max_age_s=3.0),
+        )
+        self.assertFalse(result.latched)
+        self.assertTrue(result.full_boundary_seen)
+        self.assertTrue(any(event.reason == "partial_boundary_retired_midband" for event in result.trace))
+        self.assertTrue(any(event.reason == "no_recent_quiet_boundary" for event in result.trace))
 
 
 if __name__ == "__main__":
