@@ -26,7 +26,8 @@
       "current source epoch is authorized",
       "current source and arrival stream is continuous and valid",
       "the epoch has previously established one complete quiet boundary",
-      "the current quiet boundary is older than the bounded recent-boundary horizon"
+      "the current quiet boundary is older than the bounded recent-boundary horizon",
+      "the last full quiet timestamp is retained only as diagnostic provenance after normal authority expires"
     ],
     "evidence": {
       "nis_threshold": "high_nis_threshold",
@@ -34,6 +35,7 @@
       "minimum_high_source_span_s": "high_min_source_span_s",
       "strict_high_only": true,
       "midband_or_low_interrupts_episode": true,
+      "normal_boundary_retirement_does_not_erase_diagnostic_provenance": true,
       "one_immutable_snapshot_per_authorized_epoch": true
     },
     "meaning": "A persistent residual was observed without fresh causal authority; it is diagnostic evidence only.",

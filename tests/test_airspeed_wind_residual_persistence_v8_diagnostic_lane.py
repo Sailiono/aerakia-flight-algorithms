@@ -121,11 +121,52 @@ class ResidualPersistenceV8DiagnosticLaneTests(unittest.TestCase):
         events = self._stale_boundary_stream()[:11]  # through 6 s mid-band
         events.extend(self._input(t, 5.0) for t in (7.000001, 7.500001, 8.000001))
         events.append(self._input(8.500001, 3.0))
-        events.extend(self._input(t, 5.0) for t in (9.000001, 9.500001, 10.000001, 10.500001))
+        events.extend(self._input(t, 5.0) for t in (9.000001, 9.500001, 10.000001))
         result = self._run(events)
         self.assertFalse(result.latched)
         self.assertEqual(result.diagnostic_status, v8.DiagnosticResidualStatus.NONE.value)
         self.assertIsNone(result.diagnostic_snapshot)
+
+    def test_expired_boundary_provenance_survives_midband_before_high(self) -> None:
+        events = [
+            self._input(t, 1.0)
+            for t in (0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0)
+        ]
+        # The boundary first expires on a mid-band point.  That point must
+        # retire normal authority without erasing diagnostic provenance.
+        events.extend(self._input(t, 3.0) for t in (5.0, 6.0, 7.000001))
+        events.extend(self._input(t, 5.0) for t in (7.500001, 8.000001, 8.500001, 9.000001))
+        result = self._run(events)
+        self.assertFalse(result.latched)
+        self.assertEqual(
+            result.diagnostic_status,
+            v8.DiagnosticResidualStatus.UNQUALIFIED_PERSISTENT_RESIDUAL.value,
+        )
+        self.assertIsNotNone(result.diagnostic_snapshot)
+        assert result.diagnostic_snapshot is not None
+        self.assertEqual(
+            result.diagnostic_snapshot.prior_quiet_boundary_source_timestamp_us,
+            4_000_000,
+        )
+        self.assertEqual(
+            result.diagnostic_snapshot.episode_start_source_timestamp_us,
+            7_500_001,
+        )
+
+    def test_midband_interruption_requires_a_new_complete_diagnostic_run(self) -> None:
+        events = self._stale_boundary_stream()[:11]
+        events.extend(self._input(t, 5.0) for t in (7.000001, 7.500001, 8.000001))
+        events.append(self._input(8.500001, 3.0))
+        events.extend(self._input(t, 5.0) for t in (9.000001, 9.500001, 10.000001, 10.500001))
+        result = self._run(events)
+        self.assertFalse(result.latched)
+        self.assertIsNotNone(result.diagnostic_snapshot)
+        assert result.diagnostic_snapshot is not None
+        self.assertEqual(
+            result.diagnostic_snapshot.episode_start_source_timestamp_us,
+            9_000_001,
+        )
+        self.assertEqual(result.diagnostic_snapshot.high_observations, 4)
 
     def test_boundary_age_splits_control_and_diagnostic_paths(self) -> None:
         exact = self._run(self._stale_boundary_stream(onset_s=7.0))

@@ -40,6 +40,14 @@ it cannot bridge evidence. The first completed diagnostic episode in an
 authorized epoch creates one immutable snapshot containing the prior quiet
 boundary, episode onset, latch time, observation count, and source span.
 
+The last complete quiet timestamp is retained in a separate diagnostic-only
+field after the normal lane retires an expired boundary. This timestamp cannot
+reactivate `ProbeState.BOUNDARY_ACTIVE`; it only preserves provenance if a
+strict-high episode begins after an intervening stale mid-band sample. The
+first 64-family audit exposed this distinction: several long high episodes
+were invisible because the normal lane correctly erased authority and the
+diagnostic lane accidentally erased provenance with it.
+
 The snapshot is cleared by a transport/validity/epoch reset. A newly completed
 quiet boundary clears the *current* diagnostic status but does not rewrite the
 historical snapshot. This is intentionally a small audit surface, not a

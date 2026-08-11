@@ -302,6 +302,7 @@ class CausalPolicyProbe:
         self.diagnostic_status = DiagnosticResidualStatus.NONE
         self.diagnostic_high_start_us: int | None = None
         self.diagnostic_high_observations = 0
+        self.diagnostic_reference_quiet_boundary_us: int | None = None
         self.diagnostic_prior_quiet_boundary_us: int | None = None
         self.diagnostic_snapshot: DiagnosticResidualSnapshot | None = None
         self.reset_count = 0
@@ -339,6 +340,7 @@ class CausalPolicyProbe:
         self.diagnostic_status = DiagnosticResidualStatus.NONE
         self.diagnostic_high_start_us = None
         self.diagnostic_high_observations = 0
+        self.diagnostic_reference_quiet_boundary_us = None
         self.diagnostic_prior_quiet_boundary_us = None
         self.diagnostic_snapshot = None
         if not keep_authorization:
@@ -387,14 +389,21 @@ class CausalPolicyProbe:
         if self.diagnostic_snapshot is not None:
             return False
         if self.diagnostic_high_start_us is None:
-            # ``last_quiet_boundary_us`` is present on the first stale sample.
-            # Later samples in the same contiguous episode retain this local
-            # provenance even after the normal lane drops the expired boundary.
-            if not self.full_boundary_seen or self.last_quiet_boundary_us is None:
+            # The normal qualification lane is allowed to drop an expired
+            # boundary before the later strict-high episode begins.  Retain a
+            # separate, non-authoritative timestamp for diagnostic provenance;
+            # it never reactivates the normal boundary or authorizes control.
+            reference_us = self.diagnostic_reference_quiet_boundary_us
+            if not self.full_boundary_seen or reference_us is None:
+                return False
+            if (
+                _duration_s(source_us, reference_us)
+                <= self.config.recent_quiet_boundary_max_age_s
+            ):
                 return False
             self.diagnostic_high_start_us = source_us
             self.diagnostic_high_observations = 1
-            self.diagnostic_prior_quiet_boundary_us = self.last_quiet_boundary_us
+            self.diagnostic_prior_quiet_boundary_us = reference_us
         else:
             self.diagnostic_high_observations += 1
         high_span_s = self._diagnostic_high_span_s(source_us)
@@ -518,6 +527,7 @@ class CausalPolicyProbe:
             # end time on each qualified quiet sample bounds recency by the most
             # recent causally observed baseline, not by its historical start.
             self.last_quiet_boundary_us = source_us
+            self.diagnostic_reference_quiet_boundary_us = source_us
             self.full_boundary_seen = True
             self.boundary_is_partial = False
             self.partial_requalification_eligible = False
