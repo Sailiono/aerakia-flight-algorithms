@@ -245,6 +245,33 @@ residuals. It is retained as a coverage observation, not counted as evidence
 of high-noise detection performance. The true 20 Hz burst and arrival-only-gap
 matrix remains unimplemented and unclaimed.
 
+### Root-cause diagnosis
+
+The v7 scorer is behaving as intended; the failure is a monitor-policy
+limitation, not a numerical or aggregation defect. At 2 Hz, a `1.5 s`
+source-time episode requires four consecutive high residuals even though the
+minimum-observation count is three. More importantly, v7 clears its quiet
+boundary for any mid-band residual (`2 <= NIS < 4`) and returns to
+`UNQUALIFIED` after an aborted high episode. A persistent fault then has no
+way to create a new quiet run after it begins.
+
+For example, seed `71101` with a `+2 m/s` step has a mid-band NIS of `2.075`
+at source `67.5 s`; the subsequent two quiet samples cover only `0.5 s` before
+the injection at `69.0 s`. Although the next four NIS values are
+`10.685`, `11.371`, `29.723`, and `12.601`, v7 correctly stays unqualified and
+does not latch. A passing seed (`71103`) had a valid quiet boundary immediately
+before four high samples and latched at `70.5 s`. Replaying the failed stream
+through the historical v6 monitor is diagnostic only: v6 latches it because it
+retains a quiet boundary across mid-band evidence, which is exactly the
+optimistic onset inheritance that v7 was designed to reject.
+
+V8 must therefore test a separately justified, causal **recent-boundary or
+graded-evidence** policy. It must retain explicit episode onset, bounded quiet
+boundary age, fail-closed gaps/invalid data, and family-level scoring, while
+avoiding the logical dead-end in which one benign mid-band sample makes a
+subsequent persistent fault undetectable. That is a new candidate, not a v7
+threshold adjustment.
+
 V7 tune is prohibited because train did not pass. The next iteration must use
 a new v8 protocol and disjoint seed ranges; v7 data may be analyzed, but its
 thresholds, code, or train artifact must not be rewritten or rerun.

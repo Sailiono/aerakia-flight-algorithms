@@ -2794,3 +2794,22 @@ No v7 tune claim or tune run is permitted. A true 20 Hz burst and
 arrival-only-gap campaign is still deliberately not claimed. Any attempted
 improvement must begin as v8 with disjoint seeds, preserving the v7 protocol,
 code, result, and failure records exactly as executed.
+
+### Post-run root-cause replay
+
+A read-only same-stream replay distinguishes a monitor-policy limitation from
+a scorer defect. In failed positive seed `71101`, injection begins at source
+`69.0 s`. A pre-injection NIS of `2.075` at `67.5 s` is mid-band, so v7 clears
+its quiet boundary. The quiet samples at `68.0` and `68.5 s` span only `0.5 s`,
+below the required `1.0 s`; the following high residuals therefore arrive
+while `UNQUALIFIED` and cannot form an episode. This behavior is deliberate:
+at 2 Hz a `1.5 s` episode requires four high samples, and v7 cannot recreate a
+quiet boundary after a persistent fault starts. The historical v6 monitor
+latches the identical stream only because it preserves its old quiet boundary
+across mid-band evidence; that is not an acceptable v7 attribution shortcut.
+
+The v8 design question is therefore not “how to make v7 pass.” It is whether a
+bounded recent quiet boundary or graded causal evidence can improve sensitivity
+without restoring pre-onset episode inheritance. That hypothesis requires a
+new protocol, candidate code, disjoint seed ranges, and fresh pre-registered
+tests.
