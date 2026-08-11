@@ -1,0 +1,160 @@
+{
+  "schema_version": 1,
+  "study_id": "aerakia-airspeed-wind-mismatch-monitor-v5-development",
+  "phase": "development",
+  "status": "failed_required_development_checks",
+  "execution_date": "2026-08-11",
+  "protocol": {
+    "path": "validation/airspeed_wind_mismatch_monitor_protocol_v5.json",
+    "file_sha256": "78d1f4ea7ea20e7568948be4ce2f525f2df013702cbfd09b9c203ae4d4859ed5",
+    "semantic_sha256": "628ad64421add7b530226476b7913711ca6624ef6d145e758f20050f1de562c4"
+  },
+  "provenance": {
+    "git_commit": "06168b8245ef45c0209722e1088047008b95bc8a",
+    "git_status": "",
+    "runner_sha256": "042f3be4d3cc6f40056c7c65a920eed41aa4d15373a1c74e4062a90d7859b4b8",
+    "base_oracle_runner_sha256": "4c7d723cfd7f9ee85e7abce9f9eb23d2258f12c180f2526f119f7ccd1302e024",
+    "execution_mode": "process_pool",
+    "jobs": 8,
+    "raw_build_artifact_sha256": "80d14bbf6eaa5e5f0800e45dd93509c9799d3ed5f865874eff8ab62ebfa1d3d8",
+    "raw_build_artifact_bytes": 4107113,
+    "raw_build_artifact_retained_in_git": false
+  },
+  "seed_count": 64,
+  "selected_seed_canonical_sha256": "ff14cff500509ad0deaeadb26bf17108d96709df4b33cd1028c6bb3413ccde9d",
+  "common_prefix_pairing": {
+    "status": "passed",
+    "violations": 0
+  },
+  "totals": {
+    "replication_cases": 640,
+    "required_replication_cases": 512,
+    "descriptive_replication_cases": 128,
+    "input_observations": 87744,
+    "raw_required_failures": 71,
+    "instrumentation_contract_failures": 62,
+    "candidate_behavior_failures": 9
+  },
+  "case_summary": [
+    {
+      "name": "long_nominal",
+      "scoring": "required",
+      "replications": 64,
+      "monitor_latches": 0,
+      "required_failures": 0
+    },
+    {
+      "name": "single_tas_impulse",
+      "scoring": "required",
+      "replications": 64,
+      "monitor_latches": 0,
+      "required_failures": 0
+    },
+    {
+      "name": "two_adjacent_tas_impulses",
+      "scoring": "required",
+      "replications": 64,
+      "monitor_latches": 1,
+      "required_failures": 1,
+      "failed_seeds": [52038]
+    },
+    {
+      "name": "three_adjacent_tas_impulses",
+      "scoring": "required",
+      "replications": 64,
+      "monitor_latches": 4,
+      "required_failures": 4,
+      "failed_seeds": [52028, 52038, 52050, 52061]
+    },
+    {
+      "name": "four_adjacent_tas_impulses",
+      "scoring": "required",
+      "replications": 64,
+      "monitor_latches": 64,
+      "required_failures": 2,
+      "failed_seeds": [52038, 52061],
+      "failure": "latch episode included only two or three injected observations"
+    },
+    {
+      "name": "gap_then_single_tas_impulse",
+      "scoring": "required",
+      "replications": 64,
+      "monitor_latches": 0,
+      "raw_required_failures": 62,
+      "reviewed_candidate_behavior_failures": 0
+    },
+    {
+      "name": "persistent_tas_scale_bias",
+      "scoring": "required",
+      "replications": 64,
+      "monitor_latches": 64,
+      "required_failures": 2,
+      "failed_seeds": [52038, 52061],
+      "latch_delay_s": {
+        "minimum": 0.5,
+        "p50": 1.5,
+        "p95": 3.0,
+        "maximum": 5.5
+      }
+    },
+    {
+      "name": "long_nominal_high_noise",
+      "scoring": "required",
+      "replications": 64,
+      "monitor_latches": 0,
+      "required_failures": 0
+    },
+    {
+      "name": "persistent_horizontal_wind_step_stress",
+      "scoring": "descriptive",
+      "replications": 64,
+      "monitor_latches": 64,
+      "latch_delay_s": {
+        "minimum": 0.5,
+        "p50": 1.5,
+        "p95": 2.0,
+        "maximum": 3.5
+      }
+    },
+    {
+      "name": "persistent_vertical_wind_stress",
+      "scoring": "descriptive",
+      "replications": 64,
+      "monitor_latches": 54,
+      "latch_delay_s": {
+        "minimum": 1.5,
+        "p50": 3.0,
+        "p95": 8.0,
+        "maximum": 10.0
+      }
+    }
+  ],
+  "failure_classification": {
+    "instrumentation_contract": {
+      "count": 62,
+      "case": "gap_then_single_tas_impulse",
+      "cause": "The v5 counter increments only when a gap clears a non-empty evidence episode. All 64 streams contained the declared gap, but only seeds 52038 and 52061 had an unfinished episode to clear. The scorer incorrectly treated an empty-episode gap as an absent gap.",
+      "candidate_effect": "none; every gap-plus-single-impulse control remained unlatched",
+      "required_fix": "separate observed gap events from episode-clear events"
+    },
+    "candidate_behavior": {
+      "count": 9,
+      "cause": "A nominal high-residual run immediately before injection can still be extended by two or three injected highs. Consecutive evidence removed arbitrary rolling-window mixing, but it did not establish a causal episode onset.",
+      "failed_seed_union": [52028, 52038, 52050, 52061]
+    }
+  },
+  "decision": {
+    "v5_candidate": "rejected",
+    "production_eskf": "unchanged_16_nominal_15_error_state",
+    "tas_api": "not_added",
+    "wind_state": "not_added",
+    "runtime_source_supervisor": "not_authorized",
+    "next_development_requirement": "Use a separately named opened protocol with explicit onset-boundary semantics, separate gap telemetry, latch-episode preservation, and no new sealed holdout until the structure is stable."
+  },
+  "limitations": [
+    "This is opened synthetic development evidence, not a sealed holdout.",
+    "Residual behavior cannot identify TAS fault versus wind, sideslip, timing, or model mismatch.",
+    "The descriptive wind cases do not qualify a physical air-data source or a 17-state wind estimator.",
+    "Physical calibrated TAS, GNSS Doppler velocity, timing, regime, and independent truth remain mandatory."
+  ]
+}

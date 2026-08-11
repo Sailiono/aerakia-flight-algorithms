@@ -66,6 +66,11 @@ portable C library and from FCOne-specific integration code.
   was executed once and failed `889/896` replications; its compact artifact is
   retained as evidence and must not be rerun for tuning. It has explicit
   full-window coverage, impulse/gap controls, and no production ESKF/API effect.
+- `run_airspeed_wind_mismatch_monitor_v5.py`: independent opened-development
+  consecutive-evidence diagnostic with common-noise paired prefixes. Its
+  2026-08-11 matrix is retained as a failed structural result: the single
+  impulse defect is removed, but nominal high evidence can still contaminate
+  two/three-impulse onsets. It is not a holdout or source supervisor.
 - `run_px4_bias_ab_m0.py`: optional PX4 host comparison; it is blocked until a
   matching PX4 source tree is supplied locally.
 

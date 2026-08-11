@@ -2625,3 +2625,62 @@ completion, so a full sanitizer result for that one unchanged campaign is not
 claimed in this checkpoint. The new reordered oracle is included in the
 passing sanitizer set. Leak detection remains disabled because the managed
 traced environment cannot start LeakSanitizer.
+
+## 2026-08-11 — TAS residual monitor v5 opened diagnostic
+
+### Reason
+
+The frozen v4 holdout failed `7/896` cases because a rolling window could mix
+old residuals with a new impulse, latch before injection, or meet a deadline
+that had no physical justification. V4 remains frozen and was not rerun. V5
+was opened only to test a structural alternative: evidence must be consecutive
+after a low-residual, timing-gap, or maximum-span reset.
+
+### Method
+
+The v5 protocol fixes 64 development seeds (`52001--52064`), ten cases, and
+common-random-number prefixes for paired streams. It requires 40 eligible
+warmup observations, four consecutive NIS contributions `>=4`, per-sample cap
+`6`, cumulative score `>=16`, and `1.5--2.0 s` episode duration. Long nominal,
+high-noise nominal, one/two/three/four TAS impulses, gap plus impulse, and
+persistent TAS bias are required checks; horizontal and vertical wind are
+descriptive stresses only.
+
+The first serial execution was stopped before producing output after a measured
+single-case runtime of `3.37 s` implied roughly 40 minutes for 640 cases. No
+result was discarded. A deterministic process-pool path was added; a small
+fixed matrix produced identical sequential/parallel canonical hashes. The full
+matrix then ran once from clean commit `06168b8` with eight workers.
+
+### Result and cause
+
+The matrix processed 640 replications and 87,744 observations. Common-prefix
+pairing passed. Raw status is failed with 71 required failures:
+
+- 62 are a scorer/instrumentation contract error in the gap control. Every
+  stream had the declared gap and remained unlatched, but the counter increments
+  only when a gap clears a non-empty episode. Only seeds `52038` and `52061`
+  had evidence to clear; the other 62 were wrongly reported as missing a gap.
+- nine are real candidate failures. Seed `52038` latched on two adjacent
+  impulses; seeds `52028`, `52038`, `52050`, and `52061` latched on three.
+  Four-impulse and persistent-bias cases at `52038`/`52061` latched with only
+  two or three injected observations. A nominal high run immediately before
+  injection was still able to extend into the new event.
+
+Long nominal, high-noise nominal, and one-impulse controls stayed unlatched in
+all 64 seeds. Persistent TAS bias latched in all 64, with P50/P95 delay
+`1.5/3.0 s`, but its two contaminated onset windows prevent promotion.
+Horizontal-wind stress latched `64/64`; vertical-wind stress latched `54/64`
+with P50/P95 delay `3.0/8.0 s`. Those cases remain descriptive because the
+residual cannot distinguish wind from source, timing, sideslip, or model error.
+
+### Decision
+
+V5 is rejected as a runtime monitor. Consecutive evidence fixes the arbitrary
+v4 rolling window but not causal onset. The next opened diagnostic must record
+gap observations separately from episode clears, preserve the exact latch
+episode after terminal latch, and evaluate an explicit onset-boundary rule.
+No new sealed holdout will be created until that structure is stable. The
+production 16-nominal/15-error-state ESKF, Mahony backup, public API, and TAS/
+wind state remain unchanged. The compact reviewed evidence is
+[`airspeed_wind_mismatch_monitor_v5_development.json`](../validation/public/airspeed_wind_mismatch_monitor_v5_development.json).

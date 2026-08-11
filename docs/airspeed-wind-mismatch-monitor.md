@@ -94,6 +94,46 @@ whether the vertical-mismatch deadline is physically justified. None of these
 questions changes the production ESKF, its 15-error-state model, or the public
 TAS API.
 
+## v5 opened structural diagnostic
+
+The separately named v5 protocol uses development seeds `52001--52064` and
+common-random-number prefixes across paired controls. It replaces the rolling
+window with a consecutive-evidence episode: low residuals, source-time gaps,
+and excessive episode span clear unfinished evidence. Four high residuals over
+at least `1.5 s` are required. The candidate, protocol, and process-pool
+execution path were committed before the full run at source commit `06168b8`.
+
+The 2026-08-11 matrix executed 640 replications and 87,744 observations. Its
+compact reviewed record is
+[`airspeed_wind_mismatch_monitor_v5_development.json`](../validation/public/airspeed_wind_mismatch_monitor_v5_development.json).
+The raw scorer reported 71 required failures, which review separates into two
+classes:
+
+- 62 were an instrumentation-contract defect in the gap control. All 64
+  streams contained the declared gap and all 64 stayed unlatched, but the
+  counter recorded a gap only when it cleared a non-empty episode. The scorer
+  incorrectly treated an empty-episode gap as an absent gap.
+- nine were genuine candidate-behavior failures. One two-impulse and four
+  three-impulse streams latched. Two four-impulse and two persistent-bias
+  streams latched using only two or three injected samples. Seeds `52038` and
+  `52061` repeatedly exposed the same cause: a consecutive nominal high run
+  immediately before injection was extended by new injected highs.
+
+Long nominal, high-noise nominal, and single-impulse controls stayed unlatched
+in `64/64` replications each. Persistent TAS bias latched in `64/64`, but the
+two contaminated onset windows make v5 non-promotable. The descriptive
+horizontal-wind stress latched `64/64`; vertical wind latched `54/64`, with
+P50/P95 delay `3.0/8.0 s`. These stress results demonstrate residual response,
+not source attribution or vertical-wind observability.
+
+V5 is rejected. Its structural improvement removes the v4 arbitrary rolling
+window, but “consecutive” alone does not define a causal episode onset. A next
+opened protocol must separate observed gaps from actual episode clears,
+preserve the latch-trigger trace after terminal latch, and test an explicit
+onset-boundary mechanism. No new holdout is allowed until that structure is
+stable, and no synthetic result removes the need for physical calibrated
+TAS/GNSS/regime evidence.
+
 ## Boundary
 
 Even a clean v4 holdout pass would mean only that this frozen *synthetic*
@@ -107,7 +147,9 @@ precede any 17-error-state wind experiment.
 
 ```bash
 python3 -m unittest tests.test_airspeed_wind_mismatch_monitor -v
+python3 -m unittest tests.test_airspeed_wind_mismatch_monitor_v5 -v
 python3 validation/run_airspeed_wind_mismatch_monitor.py --phase development --jobs 1
+python3 validation/run_airspeed_wind_mismatch_monitor_v5.py --jobs 8
 # After the code, tests, v2 development record, and v4 protocol are committed:
 python3 validation/run_airspeed_wind_mismatch_monitor.py \
   --protocol validation/airspeed_wind_mismatch_monitor_protocol_v4.json \
