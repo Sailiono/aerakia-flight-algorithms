@@ -1,0 +1,1141 @@
+{
+  "cases": [
+    {
+      "accepted_events": 48,
+      "causal_two_state_wind_oracle": {
+        "accepted_measurements": 48,
+        "direction_completion_accepted_measurement": 33,
+        "distinct_air_relative_direction_clusters": 3,
+        "estimate_ne_m_s": [
+          4.618009416244199,
+          -2.806597076596375
+        ],
+        "geometry_qualified_before_freshness": true,
+        "last_accepted_arrival_timestamp_us": 23500000,
+        "maximum_acute_air_relative_direction_separation_deg": 89.9936095503027,
+        "measurement_information": [
+          [
+            82.15927635529869,
+            26.25882856376701
+          ],
+          [
+            26.25882856376701,
+            81.90741767536113
+          ]
+        ],
+        "measurement_information_condition_number": 1.9416225694271934,
+        "measurement_information_minimum_eigenvalue": 55.77421649392895,
+        "measurement_information_rank": 2,
+        "range_difference_initializer_used": true,
+        "rejection_counts": {},
+        "source_latched": false,
+        "terminal_status": "qualified",
+        "wind_covariance_m2_s2": [
+          [
+            0.01356066772606174,
+            -0.004347350989364597
+          ],
+          [
+            -0.004347350989364597,
+            0.01360236486722505
+          ]
+        ]
+      },
+      "errors": [],
+      "input_observations": 48,
+      "known_wind_upper_bound": {
+        "accepted_measurements": 48,
+        "maximum_jacobian_finite_difference_error": 2.871300308626701e-09,
+        "nis_mean": 1.041252144871733,
+        "rejection_counts": {},
+        "residual_rmse_m_s": 0.5518752144959781
+      },
+      "name": "multi_heading_nominal",
+      "offline_truth_score": {
+        "terminal_wind_error_ne_m_s": [
+          0.11800941624419892,
+          0.19340292340362497
+        ],
+        "terminal_wind_error_norm_m_s": 0.2265632651233757,
+        "terminal_wind_nees_2d_offline_truth_scored": 5.406601823498507,
+        "terminal_wind_truth_ne_m_s": [
+          4.5,
+          -3.0
+        ]
+      },
+      "passed": true,
+      "rejected_events": 0,
+      "role": "positive"
+    },
+    {
+      "accepted_events": 48,
+      "causal_two_state_wind_oracle": {
+        "accepted_measurements": 48,
+        "direction_completion_accepted_measurement": null,
+        "distinct_air_relative_direction_clusters": 1,
+        "estimate_ne_m_s": [
+          42.40554427981037,
+          17.14514482206379
+        ],
+        "geometry_qualified_before_freshness": false,
+        "last_accepted_arrival_timestamp_us": 23500000,
+        "maximum_acute_air_relative_direction_separation_deg": 3.2912396391875465,
+        "measurement_information": [
+          [
+            93.3710074521568,
+            81.22247735153275
+          ],
+          [
+            81.22247735153275,
+            70.69820384161113
+          ]
+        ],
+        "measurement_information_condition_number": 6609.186342909105,
+        "measurement_information_minimum_eigenvalue": 0.02482066356113677,
+        "measurement_information_rank": 2,
+        "range_difference_initializer_used": false,
+        "rejection_counts": {},
+        "source_latched": false,
+        "terminal_status": "not_observable",
+        "wind_covariance_m2_s2": [
+          [
+            16.312062153173162,
+            -18.739883660230383
+          ],
+          [
+            -18.739883660230383,
+            21.543196634259747
+          ]
+        ]
+      },
+      "errors": [],
+      "input_observations": 48,
+      "known_wind_upper_bound": {
+        "accepted_measurements": 48,
+        "maximum_jacobian_finite_difference_error": 3.569400552905222e-09,
+        "nis_mean": 1.2678308961240248,
+        "rejection_counts": {},
+        "residual_rmse_m_s": 0.6089667783354665
+      },
+      "name": "straight_line",
+      "offline_truth_score": {
+        "terminal_wind_error_ne_m_s": [
+          37.90554427981037,
+          20.14514482206379
+        ],
+        "terminal_wind_error_norm_m_s": 42.92618253526149,
+        "terminal_wind_nees_2d_offline_truth_scored": 286897.496829068,
+        "terminal_wind_truth_ne_m_s": [
+          4.5,
+          -3.0
+        ]
+      },
+      "passed": true,
+      "rejected_events": 0,
+      "role": "negative"
+    },
+    {
+      "accepted_events": 0,
+      "causal_two_state_wind_oracle": {
+        "accepted_measurements": 0,
+        "direction_completion_accepted_measurement": null,
+        "distinct_air_relative_direction_clusters": 0,
+        "estimate_ne_m_s": [
+          0.0,
+          0.0
+        ],
+        "geometry_qualified_before_freshness": false,
+        "last_accepted_arrival_timestamp_us": null,
+        "maximum_acute_air_relative_direction_separation_deg": 0.0,
+        "measurement_information": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0
+          ]
+        ],
+        "measurement_information_condition_number": Infinity,
+        "measurement_information_minimum_eigenvalue": 0.0,
+        "measurement_information_rank": 0,
+        "range_difference_initializer_used": false,
+        "rejection_counts": {
+          "flight_regime": 48
+        },
+        "source_latched": false,
+        "terminal_status": "not_observable",
+        "wind_covariance_m2_s2": [
+          [
+            625.0,
+            0.0
+          ],
+          [
+            0.0,
+            625.0
+          ]
+        ]
+      },
+      "errors": [],
+      "input_observations": 48,
+      "known_wind_upper_bound": {
+        "accepted_measurements": 0,
+        "maximum_jacobian_finite_difference_error": null,
+        "nis_mean": null,
+        "rejection_counts": {
+          "flight_regime": 48
+        },
+        "residual_rmse_m_s": null
+      },
+      "name": "hover",
+      "offline_truth_score": {
+        "terminal_wind_error_ne_m_s": [
+          -4.5,
+          3.0
+        ],
+        "terminal_wind_error_norm_m_s": 5.408326913195984,
+        "terminal_wind_nees_2d_offline_truth_scored": 0.046799999999999994,
+        "terminal_wind_truth_ne_m_s": [
+          4.5,
+          -3.0
+        ]
+      },
+      "passed": true,
+      "rejected_events": 48,
+      "role": "negative"
+    },
+    {
+      "accepted_events": 0,
+      "causal_two_state_wind_oracle": {
+        "accepted_measurements": 0,
+        "direction_completion_accepted_measurement": null,
+        "distinct_air_relative_direction_clusters": 0,
+        "estimate_ne_m_s": [
+          0.0,
+          0.0
+        ],
+        "geometry_qualified_before_freshness": false,
+        "last_accepted_arrival_timestamp_us": null,
+        "maximum_acute_air_relative_direction_separation_deg": 0.0,
+        "measurement_information": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0
+          ]
+        ],
+        "measurement_information_condition_number": Infinity,
+        "measurement_information_minimum_eigenvalue": 0.0,
+        "measurement_information_rank": 0,
+        "range_difference_initializer_used": false,
+        "rejection_counts": {
+          "low_tas": 48
+        },
+        "source_latched": false,
+        "terminal_status": "not_observable",
+        "wind_covariance_m2_s2": [
+          [
+            625.0,
+            0.0
+          ],
+          [
+            0.0,
+            625.0
+          ]
+        ]
+      },
+      "errors": [],
+      "input_observations": 48,
+      "known_wind_upper_bound": {
+        "accepted_measurements": 0,
+        "maximum_jacobian_finite_difference_error": null,
+        "nis_mean": null,
+        "rejection_counts": {
+          "low_tas": 48
+        },
+        "residual_rmse_m_s": null
+      },
+      "name": "low_tas",
+      "offline_truth_score": {
+        "terminal_wind_error_ne_m_s": [
+          -4.5,
+          3.0
+        ],
+        "terminal_wind_error_norm_m_s": 5.408326913195984,
+        "terminal_wind_nees_2d_offline_truth_scored": 0.046799999999999994,
+        "terminal_wind_truth_ne_m_s": [
+          4.5,
+          -3.0
+        ]
+      },
+      "passed": true,
+      "rejected_events": 48,
+      "role": "negative"
+    },
+    {
+      "accepted_events": 0,
+      "causal_two_state_wind_oracle": {
+        "accepted_measurements": 0,
+        "direction_completion_accepted_measurement": null,
+        "distinct_air_relative_direction_clusters": 0,
+        "estimate_ne_m_s": [
+          0.0,
+          0.0
+        ],
+        "geometry_qualified_before_freshness": false,
+        "last_accepted_arrival_timestamp_us": null,
+        "maximum_acute_air_relative_direction_separation_deg": 0.0,
+        "measurement_information": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0
+          ]
+        ],
+        "measurement_information_condition_number": Infinity,
+        "measurement_information_minimum_eigenvalue": 0.0,
+        "measurement_information_rank": 0,
+        "range_difference_initializer_used": false,
+        "rejection_counts": {
+          "flight_regime": 48
+        },
+        "source_latched": false,
+        "terminal_status": "not_observable",
+        "wind_covariance_m2_s2": [
+          [
+            625.0,
+            0.0
+          ],
+          [
+            0.0,
+            625.0
+          ]
+        ]
+      },
+      "errors": [],
+      "input_observations": 48,
+      "known_wind_upper_bound": {
+        "accepted_measurements": 0,
+        "maximum_jacobian_finite_difference_error": null,
+        "nis_mean": null,
+        "rejection_counts": {
+          "flight_regime": 48
+        },
+        "residual_rmse_m_s": null
+      },
+      "name": "vtol_transition",
+      "offline_truth_score": {
+        "terminal_wind_error_ne_m_s": [
+          -4.5,
+          3.0
+        ],
+        "terminal_wind_error_norm_m_s": 5.408326913195984,
+        "terminal_wind_nees_2d_offline_truth_scored": 0.046799999999999994,
+        "terminal_wind_truth_ne_m_s": [
+          4.5,
+          -3.0
+        ]
+      },
+      "passed": true,
+      "rejected_events": 48,
+      "role": "negative"
+    },
+    {
+      "accepted_events": 0,
+      "causal_two_state_wind_oracle": {
+        "accepted_measurements": 0,
+        "direction_completion_accepted_measurement": null,
+        "distinct_air_relative_direction_clusters": 0,
+        "estimate_ne_m_s": [
+          0.0,
+          0.0
+        ],
+        "geometry_qualified_before_freshness": false,
+        "last_accepted_arrival_timestamp_us": null,
+        "maximum_acute_air_relative_direction_separation_deg": 0.0,
+        "measurement_information": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0
+          ]
+        ],
+        "measurement_information_condition_number": Infinity,
+        "measurement_information_minimum_eigenvalue": 0.0,
+        "measurement_information_rank": 0,
+        "range_difference_initializer_used": false,
+        "rejection_counts": {
+          "rotor_wash": 48
+        },
+        "source_latched": false,
+        "terminal_status": "not_observable",
+        "wind_covariance_m2_s2": [
+          [
+            625.0,
+            0.0
+          ],
+          [
+            0.0,
+            625.0
+          ]
+        ]
+      },
+      "errors": [],
+      "input_observations": 48,
+      "known_wind_upper_bound": {
+        "accepted_measurements": 0,
+        "maximum_jacobian_finite_difference_error": null,
+        "nis_mean": null,
+        "rejection_counts": {
+          "rotor_wash": 48
+        },
+        "residual_rmse_m_s": null
+      },
+      "name": "rotor_wash",
+      "offline_truth_score": {
+        "terminal_wind_error_ne_m_s": [
+          -4.5,
+          3.0
+        ],
+        "terminal_wind_error_norm_m_s": 5.408326913195984,
+        "terminal_wind_nees_2d_offline_truth_scored": 0.046799999999999994,
+        "terminal_wind_truth_ne_m_s": [
+          4.5,
+          -3.0
+        ]
+      },
+      "passed": true,
+      "rejected_events": 48,
+      "role": "negative"
+    },
+    {
+      "accepted_events": 0,
+      "causal_two_state_wind_oracle": {
+        "accepted_measurements": 0,
+        "direction_completion_accepted_measurement": null,
+        "distinct_air_relative_direction_clusters": 0,
+        "estimate_ne_m_s": [
+          0.0,
+          0.0
+        ],
+        "geometry_qualified_before_freshness": false,
+        "last_accepted_arrival_timestamp_us": null,
+        "maximum_acute_air_relative_direction_separation_deg": 0.0,
+        "measurement_information": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0
+          ]
+        ],
+        "measurement_information_condition_number": Infinity,
+        "measurement_information_minimum_eigenvalue": 0.0,
+        "measurement_information_rank": 0,
+        "range_difference_initializer_used": false,
+        "rejection_counts": {
+          "sideslip_unqualified": 48
+        },
+        "source_latched": false,
+        "terminal_status": "not_observable",
+        "wind_covariance_m2_s2": [
+          [
+            625.0,
+            0.0
+          ],
+          [
+            0.0,
+            625.0
+          ]
+        ]
+      },
+      "errors": [],
+      "input_observations": 48,
+      "known_wind_upper_bound": {
+        "accepted_measurements": 0,
+        "maximum_jacobian_finite_difference_error": null,
+        "nis_mean": null,
+        "rejection_counts": {
+          "sideslip_unqualified": 48
+        },
+        "residual_rmse_m_s": null
+      },
+      "name": "sideslip",
+      "offline_truth_score": {
+        "terminal_wind_error_ne_m_s": [
+          -4.5,
+          3.0
+        ],
+        "terminal_wind_error_norm_m_s": 5.408326913195984,
+        "terminal_wind_nees_2d_offline_truth_scored": 0.046799999999999994,
+        "terminal_wind_truth_ne_m_s": [
+          4.5,
+          -3.0
+        ]
+      },
+      "passed": true,
+      "rejected_events": 48,
+      "role": "negative"
+    },
+    {
+      "accepted_events": 0,
+      "causal_two_state_wind_oracle": {
+        "accepted_measurements": 0,
+        "direction_completion_accepted_measurement": null,
+        "distinct_air_relative_direction_clusters": 0,
+        "estimate_ne_m_s": [
+          0.0,
+          0.0
+        ],
+        "geometry_qualified_before_freshness": false,
+        "last_accepted_arrival_timestamp_us": null,
+        "maximum_acute_air_relative_direction_separation_deg": 0.0,
+        "measurement_information": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0
+          ]
+        ],
+        "measurement_information_condition_number": Infinity,
+        "measurement_information_minimum_eigenvalue": 0.0,
+        "measurement_information_rank": 0,
+        "range_difference_initializer_used": false,
+        "rejection_counts": {
+          "pitot_blocked": 48
+        },
+        "source_latched": false,
+        "terminal_status": "not_observable",
+        "wind_covariance_m2_s2": [
+          [
+            625.0,
+            0.0
+          ],
+          [
+            0.0,
+            625.0
+          ]
+        ]
+      },
+      "errors": [],
+      "input_observations": 48,
+      "known_wind_upper_bound": {
+        "accepted_measurements": 0,
+        "maximum_jacobian_finite_difference_error": null,
+        "nis_mean": null,
+        "rejection_counts": {
+          "pitot_blocked": 48
+        },
+        "residual_rmse_m_s": null
+      },
+      "name": "blocked_pitot",
+      "offline_truth_score": {
+        "terminal_wind_error_ne_m_s": [
+          -4.5,
+          3.0
+        ],
+        "terminal_wind_error_norm_m_s": 5.408326913195984,
+        "terminal_wind_nees_2d_offline_truth_scored": 0.046799999999999994,
+        "terminal_wind_truth_ne_m_s": [
+          4.5,
+          -3.0
+        ]
+      },
+      "passed": true,
+      "rejected_events": 48,
+      "role": "negative"
+    },
+    {
+      "accepted_events": 0,
+      "causal_two_state_wind_oracle": {
+        "accepted_measurements": 0,
+        "direction_completion_accepted_measurement": null,
+        "distinct_air_relative_direction_clusters": 0,
+        "estimate_ne_m_s": [
+          0.0,
+          0.0
+        ],
+        "geometry_qualified_before_freshness": false,
+        "last_accepted_arrival_timestamp_us": null,
+        "maximum_acute_air_relative_direction_separation_deg": 0.0,
+        "measurement_information": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0
+          ]
+        ],
+        "measurement_information_condition_number": Infinity,
+        "measurement_information_minimum_eigenvalue": 0.0,
+        "measurement_information_rank": 0,
+        "range_difference_initializer_used": false,
+        "rejection_counts": {
+          "pitot_stalled": 48
+        },
+        "source_latched": false,
+        "terminal_status": "not_observable",
+        "wind_covariance_m2_s2": [
+          [
+            625.0,
+            0.0
+          ],
+          [
+            0.0,
+            625.0
+          ]
+        ]
+      },
+      "errors": [],
+      "input_observations": 48,
+      "known_wind_upper_bound": {
+        "accepted_measurements": 0,
+        "maximum_jacobian_finite_difference_error": null,
+        "nis_mean": null,
+        "rejection_counts": {
+          "pitot_stalled": 48
+        },
+        "residual_rmse_m_s": null
+      },
+      "name": "stalled_pitot",
+      "offline_truth_score": {
+        "terminal_wind_error_ne_m_s": [
+          -4.5,
+          3.0
+        ],
+        "terminal_wind_error_norm_m_s": 5.408326913195984,
+        "terminal_wind_nees_2d_offline_truth_scored": 0.046799999999999994,
+        "terminal_wind_truth_ne_m_s": [
+          4.5,
+          -3.0
+        ]
+      },
+      "passed": true,
+      "rejected_events": 48,
+      "role": "negative"
+    },
+    {
+      "accepted_events": 0,
+      "causal_two_state_wind_oracle": {
+        "accepted_measurements": 0,
+        "direction_completion_accepted_measurement": null,
+        "distinct_air_relative_direction_clusters": 0,
+        "estimate_ne_m_s": [
+          0.0,
+          0.0
+        ],
+        "geometry_qualified_before_freshness": false,
+        "last_accepted_arrival_timestamp_us": null,
+        "maximum_acute_air_relative_direction_separation_deg": 0.0,
+        "measurement_information": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0
+          ]
+        ],
+        "measurement_information_condition_number": Infinity,
+        "measurement_information_minimum_eigenvalue": 0.0,
+        "measurement_information_rank": 0,
+        "range_difference_initializer_used": false,
+        "rejection_counts": {
+          "tas_delivery_delay": 48
+        },
+        "source_latched": false,
+        "terminal_status": "not_observable",
+        "wind_covariance_m2_s2": [
+          [
+            625.0,
+            0.0
+          ],
+          [
+            0.0,
+            625.0
+          ]
+        ]
+      },
+      "errors": [],
+      "input_observations": 48,
+      "known_wind_upper_bound": {
+        "accepted_measurements": 0,
+        "maximum_jacobian_finite_difference_error": null,
+        "nis_mean": null,
+        "rejection_counts": {
+          "tas_delivery_delay": 48
+        },
+        "residual_rmse_m_s": null
+      },
+      "name": "delayed_tas",
+      "offline_truth_score": {
+        "terminal_wind_error_ne_m_s": [
+          -4.5,
+          3.0
+        ],
+        "terminal_wind_error_norm_m_s": 5.408326913195984,
+        "terminal_wind_nees_2d_offline_truth_scored": 0.046799999999999994,
+        "terminal_wind_truth_ne_m_s": [
+          4.5,
+          -3.0
+        ]
+      },
+      "passed": true,
+      "rejected_events": 48,
+      "role": "negative"
+    },
+    {
+      "accepted_events": 47,
+      "causal_two_state_wind_oracle": {
+        "accepted_measurements": 47,
+        "direction_completion_accepted_measurement": 33,
+        "distinct_air_relative_direction_clusters": 3,
+        "estimate_ne_m_s": [
+          4.613135610432024,
+          -3.113355556144892
+        ],
+        "geometry_qualified_before_freshness": true,
+        "last_accepted_arrival_timestamp_us": 23000000,
+        "maximum_acute_air_relative_direction_separation_deg": 89.99953038828751,
+        "measurement_information": [
+          [
+            80.69718645366393,
+            25.484002295378637
+          ],
+          [
+            25.484002295378637,
+            79.96410768916525
+          ]
+        ],
+        "measurement_information_condition_number": 1.929422872213337,
+        "measurement_information_minimum_eigenvalue": 54.844008922972904,
+        "measurement_information_rank": 2,
+        "range_difference_initializer_used": true,
+        "rejection_counts": {
+          "tas_timestamp_not_monotonic": 1
+        },
+        "source_latched": false,
+        "terminal_status": "qualified",
+        "wind_covariance_m2_s2": [
+          [
+            0.013778398473044844,
+            -0.004390991444465033
+          ],
+          [
+            -0.004390991444465033,
+            0.013904710758914337
+          ]
+        ]
+      },
+      "errors": [],
+      "input_observations": 48,
+      "known_wind_upper_bound": {
+        "accepted_measurements": 47,
+        "maximum_jacobian_finite_difference_error": 2.876362592552084e-09,
+        "nis_mean": 1.1066095844403552,
+        "rejection_counts": {
+          "tas_timestamp_not_monotonic": 1
+        },
+        "residual_rmse_m_s": 0.5689317212537932
+      },
+      "name": "reordered_tas",
+      "offline_truth_score": {
+        "terminal_wind_error_ne_m_s": [
+          0.1131356104320238,
+          -0.11335555614489179
+        ],
+        "terminal_wind_error_norm_m_s": 0.16015351528063432,
+        "terminal_wind_nees_2d_offline_truth_scored": 1.4067937462311697,
+        "terminal_wind_truth_ne_m_s": [
+          4.5,
+          -3.0
+        ]
+      },
+      "passed": true,
+      "rejected_events": 1,
+      "role": "transport_control"
+    },
+    {
+      "accepted_events": 48,
+      "causal_two_state_wind_oracle": {
+        "accepted_measurements": 48,
+        "direction_completion_accepted_measurement": 33,
+        "distinct_air_relative_direction_clusters": 3,
+        "estimate_ne_m_s": [
+          4.54518941222294,
+          -3.0241743547085638
+        ],
+        "geometry_qualified_before_freshness": true,
+        "last_accepted_arrival_timestamp_us": 23500000,
+        "maximum_acute_air_relative_direction_separation_deg": 89.99852524483768,
+        "measurement_information": [
+          [
+            82.28649067307397,
+            27.369415903868024
+          ],
+          [
+            27.369415903868024,
+            81.77822899319933
+          ]
+        ],
+        "measurement_information_condition_number": 2.0014530685515135,
+        "measurement_information_minimum_eigenvalue": 54.6617641252842,
+        "measurement_information_rank": 2,
+        "range_difference_initializer_used": true,
+        "rejection_counts": {
+          "missing_gnss_velocity": 4
+        },
+        "source_latched": false,
+        "terminal_status": "stale_no_fresh_gnss_tas",
+        "wind_covariance_m2_s2": [
+          [
+            0.013674593848920988,
+            -0.004576503166798224
+          ],
+          [
+            -0.004576503166798224,
+            0.013759581456828969
+          ]
+        ]
+      },
+      "errors": [],
+      "input_observations": 52,
+      "known_wind_upper_bound": {
+        "accepted_measurements": 48,
+        "maximum_jacobian_finite_difference_error": 2.4582761382063723e-09,
+        "nis_mean": 0.7325257742412843,
+        "rejection_counts": {
+          "missing_gnss_velocity": 4
+        },
+        "residual_rmse_m_s": 0.46288636722804405
+      },
+      "name": "gnss_outage",
+      "offline_truth_score": {
+        "terminal_wind_error_ne_m_s": [
+          0.04518941222293993,
+          -0.024174354708563772
+        ],
+        "terminal_wind_error_norm_m_s": 0.051249218556288764,
+        "terminal_wind_nees_2d_offline_truth_scored": 0.15603313248805611,
+        "terminal_wind_truth_ne_m_s": [
+          4.5,
+          -3.0
+        ]
+      },
+      "passed": true,
+      "rejected_events": 4,
+      "role": "negative"
+    },
+    {
+      "accepted_events": 48,
+      "causal_two_state_wind_oracle": {
+        "accepted_measurements": 48,
+        "direction_completion_accepted_measurement": 33,
+        "distinct_air_relative_direction_clusters": 3,
+        "estimate_ne_m_s": [
+          4.37588833597435,
+          -3.1034855883732253
+        ],
+        "geometry_qualified_before_freshness": true,
+        "last_accepted_arrival_timestamp_us": 23500000,
+        "maximum_acute_air_relative_direction_separation_deg": 89.99175985309549,
+        "measurement_information": [
+          [
+            81.67051878898036,
+            27.76932560454808
+          ],
+          [
+            27.76932560454808,
+            82.40584545470193
+          ]
+        ],
+        "measurement_information_condition_number": 2.023533817993889,
+        "measurement_information_minimum_eigenvalue": 54.26642270948594,
+        "measurement_information_rank": 2,
+        "range_difference_initializer_used": true,
+        "rejection_counts": {
+          "innovation_nis": 3,
+          "source_latched": 1
+        },
+        "source_latched": true,
+        "terminal_status": "source_latched",
+        "wind_covariance_m2_s2": [
+          [
+            0.013828480620098832,
+            -0.0046598651230705885
+          ],
+          [
+            -0.0046598651230705885,
+            0.013705088243472352
+          ]
+        ]
+      },
+      "errors": [],
+      "input_observations": 52,
+      "known_wind_upper_bound": {
+        "accepted_measurements": 52,
+        "maximum_jacobian_finite_difference_error": 2.3838846452406415e-09,
+        "nis_mean": 1.0228935203518719,
+        "rejection_counts": {},
+        "residual_rmse_m_s": 0.5469884411054063
+      },
+      "name": "wind_shear",
+      "offline_truth_score": {
+        "terminal_wind_error_ne_m_s": [
+          -7.62411166402565,
+          -0.1034855883732253
+        ],
+        "terminal_wind_error_norm_m_s": 7.62481396051949,
+        "terminal_wind_nees_2d_offline_truth_scored": 4792.063397530822,
+        "terminal_wind_truth_ne_m_s": [
+          12.0,
+          -3.0
+        ]
+      },
+      "passed": true,
+      "rejected_events": 4,
+      "role": "negative"
+    },
+    {
+      "accepted_events": 48,
+      "causal_two_state_wind_oracle": {
+        "accepted_measurements": 48,
+        "direction_completion_accepted_measurement": 33,
+        "distinct_air_relative_direction_clusters": 3,
+        "estimate_ne_m_s": [
+          4.667391997923072,
+          -2.934873060110812
+        ],
+        "geometry_qualified_before_freshness": true,
+        "last_accepted_arrival_timestamp_us": 23500000,
+        "maximum_acute_air_relative_direction_separation_deg": 89.99891682547732,
+        "measurement_information": [
+          [
+            82.33701150889831,
+            26.622426147848333
+          ],
+          [
+            26.622426147848333,
+            81.73632819311531
+          ]
+        ],
+        "measurement_information_condition_number": 1.9609418964597087,
+        "measurement_information_minimum_eigenvalue": 55.412549600581556,
+        "measurement_information_rank": 2,
+        "range_difference_initializer_used": true,
+        "rejection_counts": {
+          "innovation_nis": 3,
+          "source_latched": 1
+        },
+        "source_latched": true,
+        "terminal_status": "source_latched",
+        "wind_covariance_m2_s2": [
+          [
+            0.013574495542673285,
+            -0.004421276793623881
+          ],
+          [
+            -0.004421276793623881,
+            0.013674253062504102
+          ]
+        ]
+      },
+      "errors": [],
+      "input_observations": 52,
+      "known_wind_upper_bound": {
+        "accepted_measurements": 52,
+        "maximum_jacobian_finite_difference_error": 2.5118200852602968e-09,
+        "nis_mean": 4.889363621879315,
+        "rejection_counts": {},
+        "residual_rmse_m_s": 1.1958841329324927
+      },
+      "name": "tas_scale_bias",
+      "offline_truth_score": {
+        "terminal_wind_error_ne_m_s": [
+          0.16739199792307158,
+          0.06512693988918805
+        ],
+        "terminal_wind_error_norm_m_s": 0.1796151420899906,
+        "terminal_wind_nees_2d_offline_truth_scored": 3.2342884078730902,
+        "terminal_wind_truth_ne_m_s": [
+          4.5,
+          -3.0
+        ]
+      },
+      "passed": true,
+      "rejected_events": 4,
+      "role": "negative"
+    },
+    {
+      "accepted_events": 48,
+      "causal_two_state_wind_oracle": {
+        "accepted_measurements": 48,
+        "direction_completion_accepted_measurement": 33,
+        "distinct_air_relative_direction_clusters": 3,
+        "estimate_ne_m_s": [
+          4.563211375909143,
+          -3.338492867366727
+        ],
+        "geometry_qualified_before_freshness": true,
+        "last_accepted_arrival_timestamp_us": 23500000,
+        "maximum_acute_air_relative_direction_separation_deg": 89.98243600717996,
+        "measurement_information": [
+          [
+            82.71747168777716,
+            28.538241819004227
+          ],
+          [
+            28.538241819004227,
+            81.35539536864063
+          ]
+        ],
+        "measurement_information_condition_number": 2.067352074485958,
+        "measurement_information_minimum_eigenvalue": 53.49006669992845,
+        "measurement_information_rank": 2,
+        "range_difference_initializer_used": true,
+        "rejection_counts": {
+          "innovation_nis": 3,
+          "source_latched": 1
+        },
+        "source_latched": true,
+        "terminal_status": "source_latched",
+        "wind_covariance_m2_s2": [
+          [
+            0.01375355295236164,
+            -0.004824443408295626
+          ],
+          [
+            -0.004824443408295626,
+            0.01398381451371255
+          ]
+        ]
+      },
+      "errors": [],
+      "input_observations": 52,
+      "known_wind_upper_bound": {
+        "accepted_measurements": 52,
+        "maximum_jacobian_finite_difference_error": 2.5849362650376406e-09,
+        "nis_mean": 3.873375609330633,
+        "rejection_counts": {},
+        "residual_rmse_m_s": 1.0644070488911703
+      },
+      "name": "vertical_wind",
+      "offline_truth_score": {
+        "terminal_wind_error_ne_m_s": [
+          0.06321137590914283,
+          -0.3384928673667269
+        ],
+        "terminal_wind_error_norm_m_s": 0.34434444863025676,
+        "terminal_wind_nees_2d_offline_truth_scored": 8.430950826184112,
+        "terminal_wind_truth_ne_m_s": [
+          4.5,
+          -3.0
+        ]
+      },
+      "passed": true,
+      "rejected_events": 4,
+      "role": "negative"
+    }
+  ],
+  "causal_oracle": {
+    "air_relative_direction_cluster_merge_deg": 20.0,
+    "automatic_recovery_after_source_latch": false,
+    "initial_wind_prior_std_m_s": 25.0,
+    "maximum_consecutive_post_qualification_innovation_rejections": 3,
+    "maximum_fresh_observation_age_s": 0.5,
+    "maximum_gauss_newton_iterations": 3,
+    "maximum_measurement_information_condition_number": 12.0,
+    "maximum_post_qualification_nis": 16.0,
+    "minimum_accepted_measurements": 24,
+    "minimum_air_relative_direction_separation_deg": 35.0,
+    "minimum_bootstrap_measurements_after_direction_completion": 12,
+    "minimum_distinct_air_relative_direction_clusters": 3,
+    "minimum_measurement_information_eigenvalue": 30.0
+  },
+  "limitations": [
+    "The causal oracle is a host-only 2D wind information/least-squares diagnostic, not the production ESKF.",
+    "The oracle observes only qualified fixed-wing TAS plus fresh GNSS velocity; it never claims new wind information during a GNSS outage.",
+    "Synthetic source qualification flags stand in for physical calibration, sideslip, vertical-wind, and rotor-wash detection that must be implemented and validated privately.",
+    "Truth is held outside CausalWindOracle and is used only by the final scorer."
+  ],
+  "protocol": {
+    "file_sha256": "98ea9d240e0d36b84a0fd6f3099afe25293bcfeb3b119f7eded04de4f913159d",
+    "path": "validation/airspeed_wind_observability_protocol_v1.json",
+    "semantic_sha256": "ad64170ae803fd9cefcd134eada2d1f67717de02aa020f5399c8a688f543726b"
+  },
+  "provenance": {
+    "git_commit": "127349485d4de3869bb1e8dfae904a0ebe7067ee",
+    "git_status": "",
+    "runner_sha256": "1e65774a89243f26ed8d832de9f6f3b9be08f90f740213c4ab8f7522ad150c0e"
+  },
+  "schema_version": 1,
+  "scope": {
+    "not_a_claim": [
+      "No production ESKF wind state or public airspeed API is added by this protocol.",
+      "A synthetic qualified result does not establish long-duration GNSS-denied navigation or flight readiness.",
+      "Known-wind scoring is an offline model upper bound, not an online source of information."
+    ],
+    "oracle": "host_only_causal_two_state_horizontal_wind_information_and_least_squares",
+    "production_eskf": "unchanged_16_nominal_15_error_state"
+  },
+  "source_contract": {
+    "maximum_delivery_delay_s": 0.25,
+    "maximum_gnss_age_s": 0.2,
+    "minimum_tas_m_s": 12.0,
+    "model_assumptions": [
+      "Horizontal wind only; vertical wind is outside the model.",
+      "The air-data adapter has already converted/calibrated the physical sensor to TAS.",
+      "The probe is not blocked, stalled, or under unqualified rotor/propeller wash.",
+      "No-sideslip quality is an upstream air-data/regime qualification, not an estimator assumption in hover or transition."
+    ],
+    "required_fields": [
+      "tas_timestamp_us",
+      "arrival_timestamp_us",
+      "gnss_timestamp_us",
+      "tas_m_s",
+      "tas_variance_m2_s2",
+      "gnss_velocity_ned_m_s",
+      "gnss_velocity_variance_m2_s2",
+      "flight_regime",
+      "source_qualified",
+      "pitot_blocked",
+      "pitot_stalled",
+      "rotor_wash",
+      "sideslip_qualified"
+    ],
+    "tas_type": "calibrated_true_airspeed_not_ias_or_cas",
+    "valid_flight_regimes": [
+      "fixed_wing_cruise",
+      "fixed_wing_climb",
+      "fixed_wing_descent"
+    ]
+  },
+  "status": "passed",
+  "study_id": "aerakia-airspeed-wind-observability-v1",
+  "totals": {
+    "cases": 15,
+    "input_observations": 736,
+    "negative_cases": 13,
+    "passed_cases": 15,
+    "positive_cases": 1,
+    "transport_control_cases": 1
+  }
+}

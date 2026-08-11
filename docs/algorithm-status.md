@@ -65,6 +65,7 @@ float until a square-root/UD or bounded PSD-repair policy is evidenced. See
 | Host regression | Strict C99 warnings-as-errors build, public API tests, deterministic synthetic fault suite | Passing reviewed thresholds |
 | Input/transport integrity | Exhaustive required-IMU non-finite checks; timestamp order/gap behavior; optional-mag isolation; timestamped GNSS/heading/barometer freshness and recovery | Passing 100 seeds, 1,020,000 IMU attempts, 2,100 aiding attempts, and burst lengths through 100 with zero invariant/health failures |
 | Barometer degraded navigation | Four-arm IMU-only/raw/supervised/shadow-failover synthetic study with physical timestamp, innovation/NIS, two-stage source commit, quantization-aware freeze handling, step/delay and reset-delta diagnostics | Complete `600/600` v1 matrix: nominal baro holds 120 s vertical RMSE to `0.1008/0.1014 m` raw/supervised versus `41.6243 m` IMU-only; physical 0.60 s delay is rejected. The old partial output mux remains non-promotable, while a separate 100/200/400 Hz host contract now verifies all-state/covariance shadow-image transfer and fail-closed handoff preconditions. Datum bias, physical sources, scheduling, and controller reset handling remain open. |
+| TAS/wind observability prerequisite | Offline known-wind model/Jacobian upper bound plus a truth-free causal two-state horizontal-wind information oracle, with source-time/quality contract and explicit negative controls | All 15/15 deterministic source-contract cases pass over 736 observations. A qualified 48-observation multi-heading fixture reaches `0.2266 m/s` hidden-truth terminal wind error; straight, hover/transition, low TAS, source faults, delay, GNSS loss, and persistent model mismatch fail closed. This does **not** add a wind state/API or demonstrate real degraded-navigation benefit. See [TAS/wind observability prerequisite](airspeed-wind-observability.md). |
 | Estimator supervision | ESKF-primary startup, hard-invalid immediate response, soft observability hysteresis, continuity-gated and time-bounded Mahony attitude-only degradation, navigation invalidation, continuity-gated recovery, and transition evidence | Passing executable public contract; private FCOne policy and actuator interaction remain open |
 | Output qualification | Numerical health is distinct from independently aged horizontal position/velocity, heading, vertical-position, and vertical-velocity validity; only accepted applicable constraints refresh each age | Passing public API and UrbanNav outage gates; position-only, velocity-only, and ZUPT semantics are explicit, and startup alignment is not treated as continuing observability |
 | FCOne-neutral adapter | Physical timestamp preservation, FRD sentinel axes, g/deg/s/gauss conversion, independent validity bits, missing data, duplicate/gap recovery, and future/stale aiding | Passing executable mock-publication contract; exact v2 message and scheduler remain open |
@@ -108,6 +109,10 @@ float until a square-root/UD or bounded PSD-repair policy is evidenced. See
    tune a single residual threshold further. The remaining work is private target scheduling,
    source selection, controller reset semantics, and a pre-registered sealed physical-source
    campaign after those policies are fixed.
+7. The TAS/wind v1 source contract now has a causal observability prerequisite, but it is not a
+   17-state experiment. Next, obtain fixed-wing TAS plus Doppler-velocity data with air-data
+   calibration, timing, multiple headings, wind excitation, GNSS outage/recovery, and independent
+   truth; freeze train/tune/holdout before comparing any wind branch to the 15-error-state baseline.
 
 ## P1 work when the new hardware is available
 

@@ -4,6 +4,64 @@ This append-only log records why each hardware-independent validation step was s
 changed, which evidence was produced, and what remains unresolved. Generated raw outputs stay under
 `build/`; reviewed conclusions and reproduction commands remain in Git.
 
+## 2026-08-11 — TAS/wind causal observability prerequisite
+
+### Reason
+
+FCOne v2 will have an airspeed source, but adding horizontal wind states before
+proving source semantics and flight-regime observability would turn invalid
+pitot/transition data into a covariance-confidence failure. The first task is
+therefore not a 17-state implementation: it is an executable boundary for when
+TAS plus GNSS velocity can, and cannot, claim two-dimensional wind information.
+
+### Changes
+
+- Added a frozen hardware-neutral TAS source contract with physical source and
+  delivery timestamps, fresh GNSS Doppler-velocity timestamp/variance, regime,
+  block/stall/wash, and sideslip qualification fields.
+- Added separate known-wind upper-bound and truth-free causal two-state
+  information/least-squares lanes. Truth is held outside the causal oracle and
+  is read only by the final scorer.
+- Required three direction clusters plus a 12-sample bootstrap after the third
+  cluster, because two scalar range centres retain a mirror ambiguity despite
+  local rank two.
+- Added fail-closed source/NIS latch behavior and controls for no excitation,
+  invalid regime, source faults, delay/reorder, GNSS loss, wind shear, TAS
+  scale/bias, and vertical-wind model mismatch.
+
+### Evidence and decision
+
+At commit `127349485d4de3869bb1e8dfae904a0ebe7067ee`, all 15/15 frozen
+deterministic cases passed over 736 source observations. The qualified
+48-observation multi-heading case had hidden-truth terminal wind error
+`0.22656 m/s`, information minimum eigenvalue `55.7742`, condition number
+`1.9416`, and known-wind NIS mean `1.0413`; the TAS Jacobian finite-difference
+maximum error was `2.87e-9`.
+
+Straight flight remained unobservable. Hover, low TAS, transition, rotor
+wash, sideslip, blocked/stalled pitot, and excessive delay rejected their
+source data. GNSS outage aged to `stale_no_fresh_gnss_tas`; wind shear, TAS
+scale/bias, and vertical-wind mismatch each reached the no-auto-recovery source
+latch. A reordered source sample was rejected without state/information
+mutation while the preceding valid estimate remained qualified.
+
+This closes an A2.0 validation prerequisite only. The production ESKF/API is
+unchanged, no airspeed or wind state is promoted, and the result does not prove
+physical air-data quality or GNSS-denied navigation. The next gate is a
+separate pre-registered physical fixed-wing train/tune/holdout comparison
+against the frozen 15-error-state baseline.
+
+### Verification
+
+`python3 validation/run_airspeed_wind_observability.py` produced the compact
+artifact [`airspeed_wind_observability_v1.json`](../validation/public/airspeed_wind_observability_v1.json)
+with a clean source state and runner SHA-256. Focused Python tests passed 9/9.
+A subsequent fresh host regression passed 17/17 CTests, 206/206 Python tests,
+the 1,020,000-attempt input-integrity campaign, deterministic-suite generation,
+and reviewed threshold checks. Its disposable manifest correctly records that
+the evidence/documentation files were being prepared for commit; no executable
+source changed between the compact oracle artifact and the regression.
+
 ## 2026-08-11 — full-state fixed-lag replay candidate rejected
 
 ### Reason

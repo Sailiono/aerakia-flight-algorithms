@@ -124,6 +124,31 @@ A reordered sample is a transport control: an otherwise valid prior estimate
 may remain qualified, but the duplicated/reordered sample itself must be
 rejected with exactly zero state/information mutation.
 
+## Reviewed v1 result
+
+The first deterministic protocol result is retained in
+[`validation/public/airspeed_wind_observability_v1.json`](../validation/public/airspeed_wind_observability_v1.json).
+At source commit `127349485d4de3869bb1e8dfae904a0ebe7067ee`, all 15/15
+predeclared cases passed across 736 source observations:
+
+- The 48-observation qualified multi-heading case reached rank 2, a minimum
+  information eigenvalue of `55.7742`, condition number `1.9416`, and three
+  direction clusters. Its hidden-truth terminal wind error was `0.2266 m/s`.
+- The offline known-wind lane gave NIS mean `1.0413`; its largest analytic vs
+  finite-difference Jacobian difference was `2.87e-9`.
+- Straight flight remained `not_observable`; hover, low TAS, transition,
+  rotor-wash, sideslip, blocked/stalled pitot, and excessive delay all rejected
+  their source observations.
+- TAS-only during GNSS loss ended `stale_no_fresh_gnss_tas`. The three
+  persistent model-mismatch controls (wind shear, TAS scale/bias, vertical
+  wind) each reached the three-rejection source latch; no automatic recovery
+  occurred. A single reordered timestamp was rejected without mutation while
+  the preceding valid source remained qualified.
+
+These numbers validate this synthetic contract and its failure behavior only.
+They do not measure a physical pitot, identify real wind, establish airspeed
+calibration, or quantify a 17-state ESKF benefit.
+
 ## Reproduction and promotion boundary
 
 Run the deterministic source-contract matrix with:
