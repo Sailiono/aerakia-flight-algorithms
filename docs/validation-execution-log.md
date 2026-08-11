@@ -154,6 +154,72 @@ cannot run LeakSanitizer under its `ptrace` model, so the sanitizer command used
 `ASAN_OPTIONS=detect_leaks=0`; this result covers ASan and UBSan only and makes
 no leak-detection claim.
 
+## 2026-08-11 — complete barometer shadow-lane handoff contract
+
+### Reason
+
+The complete barometer campaign showed a source-latch boundary but retained an
+offline diagnostic mux that selected only vertical position, vertical velocity,
+and health. That cannot be a flight-estimator transaction: earlier accepted
+barometer data can alter bias and all correlated covariance blocks, and a
+partial splice would leave the output internally inconsistent.
+
+### Changes
+
+- Added a host-only two-lane contract driven by the same audited IMU, position,
+  velocity, and trusted-heading event stream; the active lane alone receives
+  barometer observations.
+- Used the existing causal barometer supervisor to reach a real repeated-value
+  freeze latch, then permit one active-to-shadow image transfer.
+- Required an all-or-nothing transfer of the pointer-free `AerakiaEskf` image,
+  rather than a component or covariance blend, and recorded attitude, position,
+  velocity, accelerometer-bias, gyro-bias, and covariance reset deltas.
+- Added fail-closed cases for missing latch, automatic return, timestamp skew,
+  common-input provenance mismatch, configuration mismatch, source-generation
+  mismatch, incomplete alignment, finite-but-unhealthy attitude, non-finite
+  covariance, and duplicate switching.
+
+### Evidence and decision
+
+The success matrix passed at 100, 200, and 400 Hz. Every path completed static
+alignment, triggered the actual supervisor latch, transferred the complete
+shadow image, and remained byte-equivalent to the shadow after another common
+IMU event. The representative 400 Hz path carried 158 IMU events plus two each
+of position, velocity, and heading observations. Its logged reset deltas were
+`0 rad` attitude, `0.10191299 m` position norm, `0.0106834192 m/s` velocity
+norm, and `0.0982111301` maximum absolute covariance entry.
+
+The zero attitude reset is expected for the level vertical fixture. The nonzero
+position, velocity, and covariance values demonstrate why the earlier vertical
+output mux is not a valid handoff. The precondition mutations all blocked the
+transaction and preserved the preexisting output image.
+
+This closes a host transaction prerequisite only. It does not promote the
+public barometer supervisor to FCOne control authority, implement a private
+atomic/scheduler handoff, authorize recovery to a barometer lane, or replace
+physical pressure, temperature, vibration, source-reset, redundant-voting, and
+controller-reset testing.
+
+### Verification
+
+The reviewed release gate passed `17/17` CTest targets and `197/197` Python
+tests. A separate host-float build passed the handoff contract at all three
+rates; its representative 400 Hz position/velocity/covariance reset diagnostics
+were `0.101912946 m`, `0.0106832981 m/s`, and `0.0982105508`.
+
+The one-command `validation/run_host_regression.py` workflow was also rerun
+from a clean release build directory. It configured, strictly built, passed
+`17/17` CTest and `197/197` Python tests, re-executed the 1,020,000-attempt
+input campaign, regenerated the deterministic suite, and passed the reviewed
+threshold checker. Its disposable run manifest records all seven command lines,
+durations, tool versions, and the uncommitted source state used for the review.
+
+A fresh ASan/UBSan Debug build passed all `17/17` CTest targets in `157.27 s`;
+the 1,020,000-attempt input-integrity campaign consumed `133.88 s`. The
+managed desktop sandbox cannot run LeakSanitizer under its `ptrace` model, so
+the command used `ASAN_OPTIONS=detect_leaks=0`. This is an ASan/UBSan result,
+not a leak-detection claim.
+
 ## 2026-07-18 — input integrity and timing audit started
 
 ### Reason

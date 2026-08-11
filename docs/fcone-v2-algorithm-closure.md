@@ -28,6 +28,7 @@ without confusing PC confidence with in-air safety.
 | Independent truth replays | EuRoC, Blackbird, UrbanNav, electrical-infrastructure UAV RTK track, physical-magnetometer INSANE tracks, and private PX4 ULog replays are separately scoped in `algorithm-status.md` | Closed as evidence, not pooled into one accuracy claim |
 | Same-input PX4 baseline | Pinned official `ecl_EKF` and Aerakia use one immutable 65 s / 100 Hz synthetic stream and identical delayed fusion horizons | Closed as host transport/provenance evidence; both filters remain healthy but neither meets the absolute bias-settling gate, so G2 non-inferiority is still open |
 | Magnetic fail-safe behavior | Invalid references are rejected; bad magnetic data can be isolated; magnetometer fusion remains disabled by default after physical slow-datum failures | Closed fail-safe policy; source-quality promotion remains open |
+| Barometer shadow handoff | A synchronized barometer-free complete ESKF shadow lane replaces a latched barometer lane as one image, with reset deltas and fail-closed input/configuration/timestamp/health checks | Closed as a 100/200/400 Hz host transaction contract; private scheduling, source selection, controller reset handling, and physical pressure evidence remain open |
 | State choice | Current `p,v,q,b_a,b_g` model is documented, tested, and matched to VTOL-hover shadow work | Closed for first v2 shadow profile |
 
 The detailed quantitative results, data provenance, and retained adverse cases
@@ -54,6 +55,10 @@ flight comparison is credited:
 5. ESKF, robust Mahony, and source-health diagnostics run in parallel during
    the first bench/HIL/flight campaigns. The controller initially consumes the
    incumbent qualified source, while Aerakia writes comparison logs.
+6. A latched barometer lane may only yield to a synchronized healthy shadow as
+   a complete nominal-state/covariance/metadata transaction. Component splices,
+   covariance blending, and automatic return to the contaminated lane are
+   prohibited; controller reset deltas must be logged by the private layer.
 
 The executable portable adapter tests are necessary but not sufficient: exact
 v2 DMA timing, sensor selection, calibration, scheduler latency, and source

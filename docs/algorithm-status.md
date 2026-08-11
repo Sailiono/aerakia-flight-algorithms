@@ -64,7 +64,7 @@ float until a square-root/UD or bounded PSD-repair policy is evidenced. See
 | Same-input PX4 M0 | Official pinned `ecl_EKF` and Aerakia run on one immutable 65 s / 100 Hz synthetic event CSV, with PX4 delayed-fusion horizons driving Aerakia export | 6,489 exact horizons, 100% numerical health each; bias RMSE `0.113687/0.122453 m/s²` (Aerakia/PX4), and neither meets the 35 s absolute convergence gate. This validates transport/fairness plumbing only; it is not parity, non-inferiority, or flight-readiness evidence. |
 | Host regression | Strict C99 warnings-as-errors build, public API tests, deterministic synthetic fault suite | Passing reviewed thresholds |
 | Input/transport integrity | Exhaustive required-IMU non-finite checks; timestamp order/gap behavior; optional-mag isolation; timestamped GNSS/heading/barometer freshness and recovery | Passing 100 seeds, 1,020,000 IMU attempts, 2,100 aiding attempts, and burst lengths through 100 with zero invariant/health failures |
-| Barometer degraded navigation | Four-arm IMU-only/raw/supervised/shadow-failover synthetic study with physical timestamp, innovation/NIS, two-stage source commit, quantization-aware freeze handling, step/delay and reset-delta diagnostics | Complete `600/600` v1 matrix: nominal baro holds 120 s vertical RMSE to `0.1008/0.1014 m` raw/supervised versus `41.6243 m` IMU-only; physical 0.60 s delay is rejected. Freeze/weather-step and late false-latch results prove that the partial offline mux is not a complete failover. Datum bias remains unobservable. |
+| Barometer degraded navigation | Four-arm IMU-only/raw/supervised/shadow-failover synthetic study with physical timestamp, innovation/NIS, two-stage source commit, quantization-aware freeze handling, step/delay and reset-delta diagnostics | Complete `600/600` v1 matrix: nominal baro holds 120 s vertical RMSE to `0.1008/0.1014 m` raw/supervised versus `41.6243 m` IMU-only; physical 0.60 s delay is rejected. The old partial output mux remains non-promotable, while a separate 100/200/400 Hz host contract now verifies all-state/covariance shadow-image transfer and fail-closed handoff preconditions. Datum bias, physical sources, scheduling, and controller reset handling remain open. |
 | Estimator supervision | ESKF-primary startup, hard-invalid immediate response, soft observability hysteresis, continuity-gated and time-bounded Mahony attitude-only degradation, navigation invalidation, continuity-gated recovery, and transition evidence | Passing executable public contract; private FCOne policy and actuator interaction remain open |
 | Output qualification | Numerical health is distinct from independently aged horizontal position/velocity, heading, vertical-position, and vertical-velocity validity; only accepted applicable constraints refresh each age | Passing public API and UrbanNav outage gates; position-only, velocity-only, and ZUPT semantics are explicit, and startup alignment is not treated as continuing observability |
 | FCOne-neutral adapter | Physical timestamp preservation, FRD sentinel axes, g/deg/s/gauss conversion, independent validity bits, missing data, duplicate/gap recovery, and future/stale aiding | Passing executable mock-publication contract; exact v2 message and scheduler remain open |
@@ -103,10 +103,11 @@ float until a square-root/UD or bounded PSD-repair policy is evidenced. See
    has no receiver velocity, heading, magnetometer, or aircraft motion. The UAV electrical survey
    adds aircraft position aiding and an RTK velocity reference, but still does not expose physical
    drone-GPS velocity as estimator input.
-6. Replace the diagnostic offline barometer shadow mux with an executable synchronized multi-lane
-   state/reset contract. The v1 5--120 s matrix is complete at 20 seeds per cell; do not tune a
-   single residual threshold further. Pre-register a new sealed physical-source campaign only after
-   the vertical-reference and handoff design are fixed.
+6. The diagnostic offline barometer shadow mux now has a host-only executable synchronized
+   multi-lane state/reset contract. The v1 5--120 s matrix is complete at 20 seeds per cell; do not
+   tune a single residual threshold further. The remaining work is private target scheduling,
+   source selection, controller reset semantics, and a pre-registered sealed physical-source
+   campaign after those policies are fixed.
 
 ## P1 work when the new hardware is available
 

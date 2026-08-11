@@ -180,6 +180,17 @@ if(AERAKIA_BUILD_TESTS)
         NAME fixed_lag_measurement_cross_covariance
         COMMAND aerakia_fixed_lag_measurement_cross_covariance
     )
+
+    add_executable(aerakia_barometer_multilane_handoff_contract
+        validation/barometer_multilane_handoff_contract.c
+    )
+    target_link_libraries(aerakia_barometer_multilane_handoff_contract
+        PRIVATE Aerakia::Algorithms
+    )
+    add_test(
+        NAME barometer_multilane_handoff_contract
+        COMMAND aerakia_barometer_multilane_handoff_contract
+    )
 endif()
 
 if(AERAKIA_BUILD_VALIDATION)

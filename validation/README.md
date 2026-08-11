@@ -38,6 +38,10 @@ portable C library and from FCOne-specific integration code.
 - `fixed_lag_measurement_cross_covariance_oracle.c`: 30x30 host-only P/V
   cross-covariance transaction check. It passes in the reviewed double build;
   float intentionally fails its PSD gate and is retained as a design warning.
+- `barometer_multilane_handoff_contract.c`: host-only complete ESKF shadow-lane
+  handoff contract after a causal barometer-source latch. It checks full image
+  transfer and fail-closed timestamp/provenance/configuration/health cases; it
+  is not a private FCOne controller policy.
 - `run_delayed_gnss_repropagation_oracle.py`: host-only isolated, sequential
   non-overlapping, and tightly bounded two-event overlapping/reordered
   delayed-GNSS rewind/replay campaigns. The overlap gate requires the newer

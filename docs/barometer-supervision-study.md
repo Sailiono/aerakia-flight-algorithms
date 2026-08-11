@@ -120,6 +120,15 @@ The current offline mux explicitly reports `shadow_full_state_verified=false` an
 `shadow_reset_semantics_verified=false`; its RMSE is an architectural upper bound, not evidence that
 this private handoff exists.
 
+A separate [multi-lane handoff contract](barometer-multilane-handoff-contract.md)
+now closes the host-only transaction prerequisite: three deterministic IMU-rate
+paths copy the complete synchronized shadow `AerakiaEskf` image after a real
+freeze latch and block timestamp, provenance, configuration, source-generation,
+alignment, health, non-finite, duplicate-switch, and automatic-return failures.
+It does **not** retroactively turn this Python output mux into a complete-state
+handoff or a flight-control implementation; this study's existing RMSE results
+remain an offline architecture diagnostic.
+
 ## Current capability boundary
 
 - Nominal barometric height materially improves vertical position during synthetic 5--30 second
