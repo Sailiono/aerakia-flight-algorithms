@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "protocol_id": "aerakia-airspeed-wind-residual-persistence-v8-diagnostic-lane",
+  "status": "focused_contract_only_no_train_or_holdout",
+  "purpose": "Separate causal diagnostic persistence from control qualification after the v8 boundary-attribution failure.",
+  "runtime_input": {
+    "fields": [
+      "source_timestamp_us",
+      "arrival_timestamp_us",
+      "source_epoch",
+      "source_valid",
+      "finite_nonnegative_innovation_nis"
+    ],
+    "truth_or_injection_labels_allowed": false,
+    "continuity": {
+      "source_and_arrival_monotonic": true,
+      "source_gap_fail_closed": true,
+      "arrival_gap_fail_closed": true,
+      "invalid_or_missing_nis_fail_closed": true,
+      "epoch_change_fail_closed": true
+    }
+  },
+  "diagnostic_lane": {
+    "status": "UNQUALIFIED_PERSISTENT_RESIDUAL",
+    "preconditions": [
+      "current source epoch is authorized",
+      "current source and arrival stream is continuous and valid",
+      "the epoch has previously established one complete quiet boundary",
+      "the current quiet boundary is older than the bounded recent-boundary horizon"
+    ],
+    "evidence": {
+      "nis_threshold": "high_nis_threshold",
+      "minimum_high_observations": "high_min_observations",
+      "minimum_high_source_span_s": "high_min_source_span_s",
+      "strict_high_only": true,
+      "midband_or_low_interrupts_episode": true,
+      "one_immutable_snapshot_per_authorized_epoch": true
+    },
+    "meaning": "A persistent residual was observed without fresh causal authority; it is diagnostic evidence only.",
+    "forbidden_interpretations": [
+      "pitot or TAS fault classification",
+      "wind or vertical-wind classification",
+      "sensor selection or switching authority",
+      "estimator reset or automatic reauthorization",
+      "flight-control or envelope authority"
+    ]
+  },
+  "control_qualification": {
+    "status": "not_implemented_in_public_v8_probe",
+    "required_before_private_supervisor_authority": [
+      "fresh residual episode onset",
+      "independently audited causal regime/source transition",
+      "independent corroboration such as air-data/GNSS pairing or source-health transition",
+      "bounded probation and recovery semantics",
+      "train, tune, and protected holdout with pre-registered error budgets"
+    ],
+    "diagnostic_status_is_not_control_authority": true
+  },
+  "focused_contract": {
+    "required_cases": [
+      "expired boundary with persistent high residual",
+      "fresh boundary normal latch without diagnostic status",
+      "startup high without any complete boundary",
+      "midband interruption",
+      "source or arrival gap",
+      "invalid or missing NIS",
+      "epoch reset",
+      "exact and just-past boundary age",
+      "source-rate and arrival-jitter variation",
+      "immutable diagnostic snapshot"
+    ],
+    "minimum_pass_rule": "100 percent deterministic contract cases; no production API or FCOne authority change"
+  },
+  "artifacts": {
+    "implementation": "validation/diagnose_airspeed_wind_residual_persistence_v8.py",
+    "tests": "tests/test_airspeed_wind_residual_persistence_v8_diagnostic_lane.py",
+    "full_traces": "build/ only",
+    "compact_summary": "validation/public/airspeed_wind_residual_persistence_v8_diagnostic_lane_screen_summary.json"
+  }
+}

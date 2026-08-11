@@ -2905,3 +2905,36 @@ snapshotted at onset. Graded evidence was also exercised under irregular source
 spacing and bounded arrival jitter, confirming that the evidence threshold uses
 source time rather than sample count or arrival cadence. The v8 focused suite
 now passes `15/15`; these are contract tests, not new selection evidence.
+
+### 2026-08-11 — v8 diagnostic/control-qualification boundary preflight
+
+The v8 screens showed that NIS and timing alone cannot causally identify the
+start of a persistent air-data/model mismatch once the quiet boundary has
+expired. Extending that stale boundary would import pre-onset ambiguity into
+control authority. The next step was therefore implemented as a host-only,
+orthogonal diagnostic lane rather than another permissive policy candidate.
+
+`CausalPolicyProbe` now records an immutable
+`UNQUALIFIED_PERSISTENT_RESIDUAL` snapshot only when the authorized epoch has
+previously completed a full quiet boundary, the boundary is no longer recent,
+the source/arrival stream remains continuous and valid, and strict high NIS
+count/span requirements are met. The normal `ProbeState` and `latched` result
+are unchanged; the new status cannot switch a source, reset the estimator, or
+affect a controller. Low/mid-band interruptions and transport/epoch faults
+clear unfinished diagnostic evidence fail-closed.
+
+The contract is frozen in
+`validation/airspeed_wind_residual_persistence_v8_diagnostic_lane_protocol.json`
+and documented in
+`docs/airspeed-wind-residual-persistence-v8-diagnostic-lane.md`. Ten new
+focused tests cover stale-boundary diagnosis, normal fresh-boundary latching,
+startup prohibition, interruption, gaps, exact/just-past age, source-time
+count/span, snapshot immutability, and the non-authority invariant. The v8
+comparator suite plus the new lane suite pass `25/25`; repository CTest remains
+`17/17`. No production C, ESKF, Mahony, adapter, or FCOne code changed.
+
+The next execution is a disjoint, non-promoting diagnostic screen. Its full
+trace stays under `build/`; only a hash-linked compact summary is eligible for
+`validation/public/`. Control qualification remains unimplemented until an
+independently audited regime/source transition and corroborating source are
+defined and separately validated.

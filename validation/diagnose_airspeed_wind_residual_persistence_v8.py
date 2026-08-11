@@ -54,6 +54,21 @@ class ProbeState(str, Enum):
     LATCHED = "LATCHED"
 
 
+class DiagnosticResidualStatus(str, Enum):
+    """Host-only, non-authoritative residual diagnosis.
+
+    This status is deliberately orthogonal to :class:`ProbeState`.  It records
+    a persistent high-NIS episode which occurs after a once-valid quiet
+    baseline has expired, so the episode has no causal source/control
+    authority.  It is not a TAS-fault, wind, sideslip, GNSS, or estimator
+    classification, and it is never a request to switch a source, reset an
+    estimator, or change a controller mode.
+    """
+
+    NONE = "NONE"
+    UNQUALIFIED_PERSISTENT_RESIDUAL = "UNQUALIFIED_PERSISTENT_RESIDUAL"
+
+
 @dataclass(frozen=True)
 class ProbeConfig:
     """Source-time parameters shared by the candidate-shape probes.
@@ -158,6 +173,22 @@ class ProbeEvent:
     partial_retry_aborts_used: int
     partial_retry_exhausted: bool
     full_boundary_seen: bool
+    diagnostic_status: DiagnosticResidualStatus
+    diagnostic_high_observations: int
+    diagnostic_high_source_span_s: float
+    diagnostic_latch_source_timestamp_us: int | None
+
+
+@dataclass(frozen=True)
+class DiagnosticResidualSnapshot:
+    """Immutable record of one diagnostic-only stale-boundary episode."""
+
+    source_epoch: int
+    prior_quiet_boundary_source_timestamp_us: int
+    episode_start_source_timestamp_us: int
+    latch_source_timestamp_us: int
+    high_observations: int
+    high_source_span_s: float
 
 
 @dataclass(frozen=True)
@@ -177,6 +208,8 @@ class ProbeResult:
     retry_aborts_used: int
     partial_retry_aborts_used: int
     partial_retry_exhausted: bool
+    diagnostic_status: str
+    diagnostic_snapshot: DiagnosticResidualSnapshot | None
     trace: tuple[ProbeEvent, ...]
 
 
@@ -262,6 +295,15 @@ class CausalPolicyProbe:
         self.partial_retry_aborts_used = 0
         self.partial_retry_exhausted = False
         self.latch_source_timestamp_us: int | None = None
+        # This lane is intentionally independent from ``ProbeState``.  It is
+        # eligible only after the current epoch has demonstrated a full quiet
+        # baseline, then that baseline becomes too old to authorize a normal
+        # latch.  Its snapshot is host-side diagnostic evidence only.
+        self.diagnostic_status = DiagnosticResidualStatus.NONE
+        self.diagnostic_high_start_us: int | None = None
+        self.diagnostic_high_observations = 0
+        self.diagnostic_prior_quiet_boundary_us: int | None = None
+        self.diagnostic_snapshot: DiagnosticResidualSnapshot | None = None
         self.reset_count = 0
         self.trace: list[ProbeEvent] = []
 
@@ -294,6 +336,11 @@ class CausalPolicyProbe:
         self.partial_retry_aborts_used = 0
         self.partial_retry_exhausted = False
         self.latch_source_timestamp_us = None
+        self.diagnostic_status = DiagnosticResidualStatus.NONE
+        self.diagnostic_high_start_us = None
+        self.diagnostic_high_observations = 0
+        self.diagnostic_prior_quiet_boundary_us = None
+        self.diagnostic_snapshot = None
         if not keep_authorization:
             self.authorized_epoch = None
 
@@ -309,6 +356,69 @@ class CausalPolicyProbe:
                 if self.last_quiet_boundary_us is not None
                 else ProbeState.UNQUALIFIED
             )
+
+    def _clear_diagnostic_high_episode(self) -> None:
+        """Forget only unfinished stale-boundary diagnostic evidence.
+
+        A diagnostic snapshot, once created, is immutable until a transport
+        discontinuity or epoch/authorization reset.  This avoids retroactive
+        reinterpretation of an observed episode while still requiring each
+        unfinished high run to be contiguous.
+        """
+
+        self.diagnostic_high_start_us = None
+        self.diagnostic_high_observations = 0
+        self.diagnostic_prior_quiet_boundary_us = None
+
+    def _diagnostic_high_span_s(self, source_us: int) -> float:
+        if self.diagnostic_high_start_us is None:
+            return 0.0
+        return _duration_s(source_us, self.diagnostic_high_start_us)
+
+    def _advance_unqualified_diagnostic_high(self, source_us: int) -> bool:
+        """Record a strict high-only episode after qualification expires.
+
+        This deliberately does *not* reuse graded evidence, retries, partial
+        quiet boundaries, or a stale boundary as authority.  It merely says
+        that a causally continuous epoch which once had a full quiet baseline
+        now exhibits a high residual for the ordinary count/span threshold.
+        """
+
+        if self.diagnostic_snapshot is not None:
+            return False
+        if self.diagnostic_high_start_us is None:
+            # ``last_quiet_boundary_us`` is present on the first stale sample.
+            # Later samples in the same contiguous episode retain this local
+            # provenance even after the normal lane drops the expired boundary.
+            if not self.full_boundary_seen or self.last_quiet_boundary_us is None:
+                return False
+            self.diagnostic_high_start_us = source_us
+            self.diagnostic_high_observations = 1
+            self.diagnostic_prior_quiet_boundary_us = self.last_quiet_boundary_us
+        else:
+            self.diagnostic_high_observations += 1
+        high_span_s = self._diagnostic_high_span_s(source_us)
+        if (
+            self.diagnostic_high_observations >= self.config.high_min_observations
+            and high_span_s >= self.config.high_min_source_span_s
+        ):
+            assert self.authorized_epoch is not None
+            assert self.diagnostic_prior_quiet_boundary_us is not None
+            self.diagnostic_status = (
+                DiagnosticResidualStatus.UNQUALIFIED_PERSISTENT_RESIDUAL
+            )
+            self.diagnostic_snapshot = DiagnosticResidualSnapshot(
+                source_epoch=self.authorized_epoch,
+                prior_quiet_boundary_source_timestamp_us=(
+                    self.diagnostic_prior_quiet_boundary_us
+                ),
+                episode_start_source_timestamp_us=self.diagnostic_high_start_us,
+                latch_source_timestamp_us=source_us,
+                high_observations=self.diagnostic_high_observations,
+                high_source_span_s=high_span_s,
+            )
+            return True
+        return False
 
     def _boundary_age_s(self, source_us: int) -> float | None:
         if self.last_quiet_boundary_us is None:
@@ -345,6 +455,7 @@ class CausalPolicyProbe:
             if self.high_start_us is None
             else _duration_s(item.source_timestamp_us, self.high_start_us)
         )
+        diagnostic_span_s = self._diagnostic_high_span_s(item.source_timestamp_us)
         event = ProbeEvent(
             source_timestamp_us=item.source_timestamp_us,
             arrival_timestamp_us=item.arrival_timestamp_us,
@@ -361,6 +472,14 @@ class CausalPolicyProbe:
             partial_retry_aborts_used=self.partial_retry_aborts_used,
             partial_retry_exhausted=self.partial_retry_exhausted,
             full_boundary_seen=self.full_boundary_seen,
+            diagnostic_status=self.diagnostic_status,
+            diagnostic_high_observations=self.diagnostic_high_observations,
+            diagnostic_high_source_span_s=diagnostic_span_s,
+            diagnostic_latch_source_timestamp_us=(
+                None
+                if self.diagnostic_snapshot is None
+                else self.diagnostic_snapshot.latch_source_timestamp_us
+            ),
         )
         self.trace.append(event)
         return event
@@ -577,7 +696,14 @@ class CausalPolicyProbe:
                     # aborted episode.
                     self._retire_boundary_for_partial_requalification()
                 self._clear_high_episode()
+            # A low/mid interruption cannot contribute to the strict
+            # diagnostic high-only episode either.  A fully re-established
+            # quiet baseline also clears the *current* diagnostic status,
+            # while retaining its immutable historical snapshot for audit.
+            self._clear_diagnostic_high_episode()
             boundary_kind = self._advance_quiet(item.source_timestamp_us)
+            if boundary_kind == "full":
+                self.diagnostic_status = DiagnosticResidualStatus.NONE
             return self._event(
                 item,
                 state_before,
@@ -599,8 +725,20 @@ class CausalPolicyProbe:
         # The age limit applies again only when starting a new episode/retry.
         episode_in_progress = self.high_start_us is not None
         if not episode_in_progress and not self._boundary_is_recent(item.source_timestamp_us):
+            if nis >= self.config.high_nis_threshold:
+                self._advance_unqualified_diagnostic_high(
+                    item.source_timestamp_us
+                )
+            else:
+                # Mid-band is not strict high evidence and must not bridge a
+                # stale-boundary diagnostic episode.
+                self._clear_diagnostic_high_episode()
             self.last_quiet_boundary_us = None
             self._clear_high_episode()
+            # Preserve the v8 comparator's primary reason vocabulary.  The
+            # orthogonal diagnostic fields below carry the additional
+            # diagnostic-only meaning without changing policy-state semantics
+            # or invalidating existing traces/tests.
             return self._event(item, state_before, "no_recent_quiet_boundary")
 
         if nis >= self.config.high_nis_threshold:
@@ -630,6 +768,7 @@ class CausalPolicyProbe:
         # the current boundary and requires a new quiet run (or its finite
         # partial retry budget when an episode was already admitted).
         if self.policy is PolicyKind.GRADED_EVIDENCE:
+            self._clear_diagnostic_high_episode()
             self.graded_evidence_s = max(
                 0.0,
                 self.graded_evidence_s
@@ -640,6 +779,7 @@ class CausalPolicyProbe:
                 self.high_observations = 0
                 self.state = ProbeState.BOUNDARY_ACTIVE
             return self._event(item, state_before, "graded_evidence_decayed_midband")
+        self._clear_diagnostic_high_episode()
         self._abort_contiguous_high(is_midband=True)
         if self.policy is PolicyKind.PARTIAL_QUIET_PROBATION:
             if self.partial_retry_exhausted:
@@ -672,6 +812,8 @@ class CausalPolicyProbe:
             retry_aborts_used=self.retry_aborts_used,
             partial_retry_aborts_used=self.partial_retry_aborts_used,
             partial_retry_exhausted=self.partial_retry_exhausted,
+            diagnostic_status=self.diagnostic_status.value,
+            diagnostic_snapshot=self.diagnostic_snapshot,
             trace=tuple(self.trace),
         )
 
@@ -789,6 +931,12 @@ def _result_payload(result: ProbeResult) -> dict[str, object]:
         "retry_aborts_used": result.retry_aborts_used,
         "partial_retry_aborts_used": result.partial_retry_aborts_used,
         "partial_retry_exhausted": result.partial_retry_exhausted,
+        "diagnostic_status": result.diagnostic_status,
+        "diagnostic_snapshot": (
+            None
+            if result.diagnostic_snapshot is None
+            else asdict(result.diagnostic_snapshot)
+        ),
         "trace": [asdict(event) for event in result.trace],
     }
 
