@@ -1,0 +1,226 @@
+{
+  "schema_version": 1,
+  "protocol_id": "aerakia-airspeed-wind-residual-persistence-v6-development",
+  "status": "opened_train_tune_no_holdout",
+  "dependencies": {
+    "base_protocol_path": "validation/airspeed_wind_observability_protocol_v1.json",
+    "base_protocol_file_sha256": "98ea9d240e0d36b84a0fd6f3099afe25293bcfeb3b119f7eded04de4f913159d",
+    "base_oracle_runner_path": "validation/run_airspeed_wind_observability.py",
+    "base_oracle_runner_file_sha256": "4c7d723cfd7f9ee85e7abce9f9eb23d2258f12c180f2526f119f7ccd1302e024"
+  },
+  "scope": {
+    "candidate": "host_only_source_time_normalized_residual_persistence_characterization",
+    "production_eskf": "unchanged_16_nominal_15_error_state",
+    "mahony_backup": "unchanged",
+    "public_api": "unchanged_no_tas_or_wind_state",
+    "allowed_output": [
+      "residual_consistency_state",
+      "coverage_and_timing_counters",
+      "immutable_trigger_snapshot"
+    ],
+    "forbidden_claims": [
+      "pitot fault classification",
+      "wind or vertical-wind fault classification",
+      "sensor selection or switching authority",
+      "estimator reset or automatic reauthorization",
+      "17-state wind estimator promotion",
+      "flight-control or envelope authority"
+    ]
+  },
+  "monitor": {
+    "warmup_valid_source_time_s": 20.0,
+    "minimum_warmup_coverage_fraction": 0.75,
+    "initial_quiet_source_time_s": 1.0,
+    "quiet_nis_threshold": 2.0,
+    "high_nis_threshold": 4.0,
+    "minimum_high_episode_source_time_s": 1.5,
+    "minimum_high_observations": 3,
+    "source_gap_periods": 2.5,
+    "minimum_source_gap_s": 0.3,
+    "arrival_gap_periods": 2.5,
+    "minimum_arrival_gap_s": 0.3,
+    "pre_trigger_trace_observations": 24,
+    "post_trigger_trace_observations": 8,
+    "parameter_origin": "V4 rolling-window and v5 injection-label failures require source-time persistence, explicit coverage, separate source/arrival clocks, and statistical rather than zero-error scoring."
+  },
+  "scenario": {
+    "monitor_nominal_rate_hz": 2.0,
+    "base_segment_duration_s": 8.0,
+    "pre_injection_duration_s": 45.0,
+    "post_injection_duration_s": 12.0,
+    "tail_heading_deg": 45.0,
+    "gap_before_injection_s": 4.0,
+    "minimum_pre_injection_active_source_time_s": 8.0
+  },
+  "seed_ranges": {
+    "train": {
+      "start": 62001,
+      "count": 128,
+      "purpose": "candidate development and failure analysis"
+    },
+    "tune": {
+      "start": 63001,
+      "count": 256,
+      "purpose": "single-use opened-development replication after the candidate and train record are frozen"
+    },
+    "holdout": "No v6 holdout exists. Physical air-data evidence is required before any later holdout or product promotion."
+  },
+  "noise_profiles": {
+    "nominal": {
+      "tas_actual_std_multiplier": 1.0,
+      "gnss_actual_std_multiplier": 1.0,
+      "tas_declared_std_multiplier": 1.0,
+      "gnss_declared_std_multiplier": 1.0
+    },
+    "high_noise_calibrated": {
+      "tas_actual_std_multiplier": 1.5,
+      "gnss_actual_std_multiplier": 1.5,
+      "tas_declared_std_multiplier": 1.5,
+      "gnss_declared_std_multiplier": 1.5
+    }
+  },
+  "case_matrix": [
+    {
+      "name": "nominal",
+      "paired_stream_group": "nominal_rate2",
+      "noise_profile": "nominal",
+      "injection": {"kind": "none"},
+      "role": "nuisance_primary"
+    },
+    {
+      "name": "nominal_high_noise_calibrated",
+      "paired_stream_group": "high_noise_rate2",
+      "noise_profile": "high_noise_calibrated",
+      "injection": {"kind": "none"},
+      "role": "coverage_descriptive"
+    },
+    {
+      "name": "tas_offset_pulse_0p25s",
+      "paired_stream_group": "nominal_rate2",
+      "noise_profile": "nominal",
+      "injection": {"kind": "tas_offset_pulse", "value_m_s": 12.0, "duration_s": 0.25},
+      "role": "nuisance_primary"
+    },
+    {
+      "name": "tas_offset_pulse_0p5s",
+      "paired_stream_group": "nominal_rate2",
+      "noise_profile": "nominal",
+      "injection": {"kind": "tas_offset_pulse", "value_m_s": 12.0, "duration_s": 0.5},
+      "role": "nuisance_primary"
+    },
+    {
+      "name": "tas_offset_pulse_1p0s",
+      "paired_stream_group": "nominal_rate2",
+      "noise_profile": "nominal",
+      "injection": {"kind": "tas_offset_pulse", "value_m_s": 12.0, "duration_s": 1.0},
+      "role": "nuisance_primary"
+    },
+    {
+      "name": "tas_offset_pulse_1p5s",
+      "paired_stream_group": "nominal_rate2",
+      "noise_profile": "nominal",
+      "injection": {"kind": "tas_offset_pulse", "value_m_s": 12.0, "duration_s": 1.5},
+      "role": "pulse_curve"
+    },
+    {
+      "name": "tas_offset_pulse_2p0s",
+      "paired_stream_group": "nominal_rate2",
+      "noise_profile": "nominal",
+      "injection": {"kind": "tas_offset_pulse", "value_m_s": 12.0, "duration_s": 2.0},
+      "role": "pulse_curve"
+    },
+    {
+      "name": "persistent_tas_offset_positive",
+      "paired_stream_group": "nominal_rate2",
+      "noise_profile": "nominal",
+      "injection": {"kind": "tas_offset_step", "value_m_s": 2.0},
+      "role": "persistent_primary",
+      "maximum_source_detection_delay_s": 6.0
+    },
+    {
+      "name": "persistent_tas_offset_negative",
+      "paired_stream_group": "nominal_rate2",
+      "noise_profile": "nominal",
+      "injection": {"kind": "tas_offset_step", "value_m_s": -2.0},
+      "role": "persistent_primary",
+      "maximum_source_detection_delay_s": 6.0
+    },
+    {
+      "name": "persistent_tas_scale_positive",
+      "paired_stream_group": "nominal_rate2",
+      "noise_profile": "nominal",
+      "injection": {"kind": "tas_scale_step", "factor": 1.1},
+      "role": "descriptive"
+    },
+    {
+      "name": "persistent_tas_scale_negative",
+      "paired_stream_group": "nominal_rate2",
+      "noise_profile": "nominal",
+      "injection": {"kind": "tas_scale_step", "factor": 0.9},
+      "role": "descriptive"
+    },
+    {
+      "name": "persistent_horizontal_wind_step",
+      "paired_stream_group": "nominal_rate2",
+      "noise_profile": "nominal",
+      "injection": {"kind": "horizontal_wind_step", "north_delta_m_s": 3.0},
+      "role": "descriptive"
+    },
+    {
+      "name": "persistent_vertical_wind",
+      "paired_stream_group": "nominal_rate2",
+      "noise_profile": "nominal",
+      "injection": {"kind": "vertical_wind", "down_m_s": 8.0},
+      "role": "descriptive"
+    },
+    {
+      "name": "gap_then_tas_offset_pulse_1p0s",
+      "paired_stream_group": "gap_rate2",
+      "noise_profile": "nominal",
+      "injection": {
+        "kind": "tas_offset_pulse",
+        "value_m_s": 12.0,
+        "duration_s": 1.0,
+        "source_gap_before": true
+      },
+      "role": "structural_gap"
+    }
+  ],
+  "scoring": {
+    "confidence": 0.975,
+    "independent_unit": "synthetic_seed_complete_paired_stream_family",
+    "nuisance_family": {
+      "case_roles": ["nuisance_primary"],
+      "maximum_point_false_latch_rate": 0.01,
+      "maximum_one_sided_clopper_pearson_upper_rate": 0.03
+    },
+    "persistent_offset_family": {
+      "case_role": "persistent_primary",
+      "failure_if_either_sign_misses_or_exceeds_deadline": true,
+      "maximum_point_failure_rate": 0.02,
+      "maximum_one_sided_clopper_pearson_upper_rate": 0.05,
+      "maximum_family_p95_source_detection_delay_s": 3.0
+    },
+    "deterministic_contract": {
+      "require_common_random_stream_pairing": true,
+      "require_monitor_armed": true,
+      "require_minimum_pre_injection_active_source_time": true,
+      "maximum_unexpected_source_rejections": 0,
+      "require_gap_event_without_terminal_latch": true,
+      "require_pulse_latch_rate_monotonicity": true,
+      "require_immutable_trigger_snapshots": true
+    }
+  },
+  "tune_execution_rules": [
+    "Tune may run only after the train result is committed and the current runner/protocol hashes match that train artifact.",
+    "Tune runs once from a clean worktree and its result is retained whether it passes or fails.",
+    "A tune failure requires a separately named v7 development protocol; v6 tune seeds are never retuned.",
+    "A tune pass remains synthetic development evidence and does not authorize a source supervisor or wind-state branch."
+  ],
+  "future_robustness_matrix": [
+    "1, 1.5, 2, 5, 10, and 20 Hz source rates",
+    "source jitter, arrival jitter, burst delivery, dropout, and timestamp reordering",
+    "covariance underestimation, colored noise, heavy tails, slow drift, and true scale error",
+    "source epoch reset, invalid/recovery, GNSS/TAS qualification loss, sideslip, AoA, and timing mismatch"
+  ]
+}
