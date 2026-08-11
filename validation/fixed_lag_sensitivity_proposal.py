@@ -313,6 +313,27 @@ def _schedule_matches(
     )
 
 
+def _weighted_innovation_norm(
+    trace: ReplayTrace,
+    schedule: tuple[tuple[bool, bool], ...],
+    schedule_start_index: int,
+    start_index: int,
+    stop_index: int,
+) -> float:
+    values: list[float] = []
+    for index in range(start_index, stop_index + 1):
+        position_accepted, velocity_accepted = schedule[index - schedule_start_index]
+        for kind, accepted in (("position", position_accepted), ("velocity", velocity_accepted)):
+            if not accepted:
+                continue
+            innovation = _vector(trace.result_rows[index], INNOVATION_COLUMNS[kind])
+            variance = _vector(trace.result_rows[index], INNOVATION_VARIANCE_COLUMNS[kind])
+            if np.any(variance <= 0.0) or not np.all(np.isfinite(innovation)):
+                return math.inf
+            values.extend((innovation / np.sqrt(variance)).tolist())
+    return float(np.linalg.norm(np.asarray(values, dtype=np.float64))) if values else math.inf
+
+
 def solve_window(
     runner: Path,
     input_path: Path,
@@ -345,6 +366,8 @@ def solve_window(
 
     prior_covariance = _prior_covariance(baseline.result_rows[start_index - 1])
     prior_information = _prior_information(prior_covariance, prior_information_scale)
+    fit_stop_index = start_index + max(1, (stop_index - start_index) // 2)
+    validation_start_index = fit_stop_index + 1
     owns_work_dir = work_dir is None
     temporary = tempfile.TemporaryDirectory(prefix="aerakia-fixed-lag-") if owns_work_dir else None
     root = Path(temporary.name) if temporary is not None else work_dir
@@ -376,7 +399,7 @@ def solve_window(
         residual_rows: list[float] = []
         variance_rows: list[float] = []
         event_count = 0
-        for index in range(start_index, stop_index + 1):
+        for index in range(start_index, fit_stop_index + 1):
             position_accepted, velocity_accepted = baseline_schedule[index - start_index]
             for kind, accepted in (("position", position_accepted), ("velocity", velocity_accepted)):
                 if not accepted:
@@ -417,17 +440,31 @@ def solve_window(
             _number(row, "eskf_healthy") >= 0.5
             for row in corrected.result_rows[start_index:stop_index + 1]
         )
+        validation_baseline_norm = _weighted_innovation_norm(
+            baseline, baseline_schedule, start_index, validation_start_index, stop_index
+        )
+        validation_corrected_norm = _weighted_innovation_norm(
+            corrected, baseline_schedule, start_index, validation_start_index, stop_index
+        ) if schedule_matches else math.inf
+        validation_improved = (
+            math.isfinite(validation_baseline_norm)
+            and math.isfinite(validation_corrected_norm)
+            and validation_corrected_norm <= validation_baseline_norm
+        )
+        status = "proposal_computed_replayed"
+        if not schedule_matches or not corrected_healthy:
+            status = "proposal_rejected_corrected_replay_health_or_schedule"
+        elif not validation_improved:
+            status = "proposal_rejected_validation_innovation_worse"
         return {
-            "status": (
-                "proposal_computed_replayed"
-                if schedule_matches and corrected_healthy
-                else "proposal_rejected_corrected_replay_health_or_schedule"
-            ),
+            "status": status,
             "method": "causal_preupdate_innovation_finite_difference_replay",
             "truth_used_by_solver": False,
             "window_start_s": window_start_s,
             "window_stop_s": window_stop_s,
             "window_start_index": start_index,
+            "fit_stop_index": fit_stop_index,
+            "validation_start_index": validation_start_index,
             "window_stop_index": stop_index,
             "measurement_rows": len(residual_rows),
             "event_count": event_count,
@@ -443,6 +480,9 @@ def solve_window(
             "weighted_residual_norm_after_linear": float(np.linalg.norm(weighted_post_residual)),
             "schedule_matches_after_replay": schedule_matches,
             "corrected_replay_healthy": corrected_healthy,
+            "validation_weighted_innovation_norm_before": validation_baseline_norm,
+            "validation_weighted_innovation_norm_after": validation_corrected_norm,
+            "validation_innovation_improved": validation_improved,
             "limitations": [
                 "The finite-difference model is local and host-only.",
                 "The innovation weighting uses diagonal S entries and omits cross-axis covariance.",

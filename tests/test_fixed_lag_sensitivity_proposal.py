@@ -42,6 +42,15 @@ class FixedLagSensitivityProposalTests(unittest.TestCase):
                 np.ones((2, 5)), np.ones(2), np.asarray([1.0, 0.0]), np.eye(5)
             )
 
+    def test_empty_validation_window_is_not_called_an_improvement(self) -> None:
+        self.assertEqual(
+            candidate._weighted_innovation_norm(
+                candidate.ReplayTrace(({},), ({},), np.asarray([0.0])),
+                ((False, False),), 0, 0, 0,
+            ),
+            float("inf"),
+        )
+
     def test_schedule_requires_transaction_success_and_each_accepted_update(self) -> None:
         accepted = {
             "input_gps_status": "0",

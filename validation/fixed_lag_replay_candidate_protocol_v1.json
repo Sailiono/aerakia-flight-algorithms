@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "protocol_id": "aerakia-fixed-lag-replay-candidate-development-v1",
+  "status": "frozen_development_not_promotion",
+  "purpose": "Evaluate a complete host-only joint tilt/accelerometer-bias correction and replay transaction before any production ESKF change.",
+  "solver_boundary": {
+    "truth_used_by_solver": false,
+    "target_state": ["right_tilt_x", "right_tilt_y", "accel_bias_x", "accel_bias_y", "accel_bias_z"],
+    "window_duration_s": 20.0,
+    "fit_fraction": 0.5,
+    "window_stop_margin_s": 0.01,
+    "prior_information_scale": 1.0,
+    "accepted_event_schedule_must_match": true,
+    "state_transaction": "complete 15D nominal-state injection plus attitude reset Jacobian followed by canonical replay"
+  },
+  "input_contract": {
+    "measurement_contract": "delta_interval_v2",
+    "acceleration_time_semantics": "interval_start_zoh",
+    "stationarity_source": "causal_imu_window",
+    "truth_derived_stationarity": false,
+    "rate_hz": 100.0,
+    "accel_noise_density_m_s2_sqrt_hz": 0.002,
+    "gyro_noise_density_rad_s_sqrt_hz": 0.0000872664626,
+    "mag_noise_ut": 0.2,
+    "gps_position_noise_m": 0.5,
+    "gps_velocity_noise_m_s": 0.1
+  },
+  "residual_bias_contract": {
+    "accelerometer_sigma_m_s2": 0.05,
+    "vectors": [
+      {"id": "zero", "accel_sigma_multipliers": [0, 0, 0]},
+      {"id": "x_neg", "accel_sigma_multipliers": [-3, 0, 0]},
+      {"id": "x_pos", "accel_sigma_multipliers": [3, 0, 0]},
+      {"id": "y_neg", "accel_sigma_multipliers": [0, -3, 0]},
+      {"id": "y_pos", "accel_sigma_multipliers": [0, 3, 0]},
+      {"id": "xy_neg_neg", "accel_sigma_multipliers": [-3, -3, 0]},
+      {"id": "xy_neg_pos", "accel_sigma_multipliers": [-3, 3, 0]},
+      {"id": "xy_pos_neg", "accel_sigma_multipliers": [3, -3, 0]},
+      {"id": "xy_pos_pos", "accel_sigma_multipliers": [3, 3, 0]}
+    ]
+  },
+  "trajectories": [
+    {"id": "hover_axis_pulses", "motion": "bias_cv_hover_axis_pulses", "split": "train", "duration_s": 32.0, "seed_start": 0, "seed_stop": 8},
+    {"id": "takeoff_box_land", "motion": "bias_cv_takeoff_box_land", "split": "train", "duration_s": 38.0, "seed_start": 0, "seed_stop": 8},
+    {"id": "yaw_quadrant_hover", "motion": "bias_cv_yaw_quadrant_hover", "split": "tune", "duration_s": 40.0, "seed_start": 1000, "seed_stop": 1008}
+  ],
+  "metrics": {
+    "terminal_window_s": 5.0,
+    "material_horizontal_bias_regression_m_s2": 0.005,
+    "material_attitude_rmse_regression_deg": 0.05,
+    "minimum_mean_horizontal_bias_improvement_m_s2": 0.005,
+    "minimum_signed_nonzero_vector_improvement_fraction": 0.75
+  },
+  "development_acceptance": [
+    "Every trial executes and every candidate replay remains healthy with zero navigation recovery.",
+    "The corrected replay preserves the baseline accepted position/velocity event schedule.",
+    "Train and tune each improve mean terminal horizontal-bias P95 by at least 0.005 m/s2.",
+    "At least 75% of signed nonzero trajectory/vector groups improve.",
+    "No zero-bias trial regresses terminal horizontal-bias P95 by more than 0.005 m/s2.",
+    "No trial regresses post-correction attitude RMSE by more than 0.05 deg."
+  ],
+  "limits": [
+    "This is an opened development matrix and cannot serve as a sealed release holdout.",
+    "The solver uses diagonal innovation covariance and idealized synthetic GNSS timing.",
+    "No thermal drift, bias random walk, vibration, lever arm, selector switch, or target timing is represented.",
+    "Passing permits a separately frozen candidate, not production or control authority."
+  ]
+}
