@@ -30,6 +30,17 @@ def result(
 
 
 class V8DiagnosticLaneScreenAuditTests(unittest.TestCase):
+    def test_clopper_pearson_volume_matches_registered_zero_event_bound(self) -> None:
+        self.assertAlmostEqual(
+            audit.clopper_pearson_upper(0, 128, 0.975),
+            0.02840805344354386,
+            places=14,
+        )
+        self.assertGreater(
+            audit.clopper_pearson_upper(0, 64, 0.975),
+            0.03,
+        )
+
     def test_clean_control_latch_is_not_diagnostic_only(self) -> None:
         flags = audit.classify_member(
             result=result(latched=True, episode_start_us=10_000_000, delay_s=1.5),

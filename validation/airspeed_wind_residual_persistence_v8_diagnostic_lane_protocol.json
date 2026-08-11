@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "protocol_id": "aerakia-airspeed-wind-residual-persistence-v8-diagnostic-lane",
-  "status": "focused_contract_only_no_train_or_holdout",
+  "status": "fresh_confirmation_pre_registered_no_control_promotion",
   "purpose": "Separate causal diagnostic persistence from control qualification after the v8 boundary-attribution failure.",
   "runtime_input": {
     "fields": [
@@ -73,10 +73,75 @@
     ],
     "minimum_pass_rule": "100 percent deterministic contract cases; no production API or FCOne authority change"
   },
+  "fresh_confirmation": {
+    "kind": "single_use_opened_development_confirmation_not_holdout",
+    "seed_start": 74401,
+    "seed_count": 128,
+    "seed_end": 74528,
+    "selected_comparator": {
+      "policy": "graded_evidence",
+      "recent_quiet_boundary_max_age_s": 3.0
+    },
+    "boundary_age_comparators_s": [1.0, 2.0, 3.0],
+    "case_names": [
+      "nominal",
+      "nominal_high_noise_calibrated",
+      "nominal_bounded_jitter",
+      "persistent_tas_offset_positive",
+      "persistent_tas_offset_negative",
+      "persistent_tas_offset_positive_bounded_jitter",
+      "persistent_tas_offset_negative_bounded_jitter",
+      "persistent_tas_scale_positive",
+      "persistent_tas_scale_negative",
+      "persistent_horizontal_wind_step",
+      "persistent_vertical_wind",
+      "tas_offset_pulse_0p25s",
+      "tas_offset_pulse_0p5s",
+      "tas_offset_pulse_1p0s",
+      "tas_offset_pulse_1p5s",
+      "tas_offset_pulse_2p0s",
+      "gap_then_tas_offset_pulse_1p0s"
+    ],
+    "confidence": 0.975,
+    "diagnostic_nuisance_family": {
+      "case_names": [
+        "nominal",
+        "nominal_high_noise_calibrated",
+        "nominal_bounded_jitter"
+      ],
+      "independent_unit": "synthetic_seed_family",
+      "maximum_point_diagnostic_rate": 0.01,
+      "maximum_one_sided_clopper_pearson_upper_rate": 0.03
+    },
+    "persistent_descriptive_union": {
+      "case_names": [
+        "persistent_tas_offset_positive",
+        "persistent_tas_offset_negative",
+        "persistent_tas_offset_positive_bounded_jitter",
+        "persistent_tas_offset_negative_bounded_jitter"
+      ],
+      "minimum_complete_family_rate": 0.95,
+      "preexisting_episode_is_failure": true,
+      "diagnostic_union_is_not_control_authority": true
+    },
+    "deterministic_boundaries": {
+      "maximum_structural_gap_diagnostic_events": 0,
+      "maximum_1p5s_pulse_diagnostic_events": 0,
+      "2p0s_pulse_is_descriptive_only": true,
+      "primary_policy_output_may_not_be_reinterpreted_as_diagnostic_authority": true
+    },
+    "execution_rules": [
+      "Run once from a clean commit after the protocol, implementation, runner, and scorer are pushed.",
+      "Retain the result whether it passes or fails; do not retune on seeds 74401--74528.",
+      "The confirmation is not a protected holdout and cannot authorize FCOne, source switching, estimator reset, or control authority.",
+      "Physical air-data and independent corroboration remain mandatory before any private supervisor promotion."
+    ]
+  },
   "artifacts": {
     "implementation": "validation/diagnose_airspeed_wind_residual_persistence_v8.py",
     "tests": "tests/test_airspeed_wind_residual_persistence_v8_diagnostic_lane.py",
     "full_traces": "build/ only",
-    "compact_summary": "validation/public/airspeed_wind_residual_persistence_v8_diagnostic_lane_screen_summary.json"
+    "compact_summary": "validation/public/airspeed_wind_residual_persistence_v8_diagnostic_lane_confirmation_74401_128_summary.json",
+    "attribution_audit": "validation/public/airspeed_wind_residual_persistence_v8_diagnostic_lane_confirmation_74401_128_audit.json"
   }
 }

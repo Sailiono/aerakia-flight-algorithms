@@ -2990,3 +2990,19 @@ Normal, jittered-normal, calibrated-high-noise normal, structural-gap, and
 diagnostic-only record at age `3 s`. The replay is regression/root-cause
 evidence on an opened screen, not a fresh error-rate confirmation or control
 promotion.
+
+### 2026-08-11 — v8 fresh diagnostic confirmation frozen
+
+Before opening more data, the diagnostic confirmation was pre-registered on
+seeds `74401--74528` (`128` families, `17` cases each, `2,176` replays). This
+volume is intentional: with zero nuisance events, its 97.5% one-sided
+Clopper–Pearson upper bound is `2.8408%`; a 64-family run cannot meet the
+registered `3%` confidence limit.
+
+The selected development comparator is `graded_evidence @ 3 s`. The frozen
+checks require nuisance-family point rate `<=1%`, confidence upper bound
+`<=3%`, persistent descriptive-union family coverage `>=95%`, zero structural-
+gap diagnostic events, and zero `1.5 s` pulse diagnostic events. The `2.0 s`
+pulse remains descriptive. Other policies and ages remain comparators. The run
+is single-use opened development confirmation, not a holdout, and cannot
+promote control authority even if every check passes.

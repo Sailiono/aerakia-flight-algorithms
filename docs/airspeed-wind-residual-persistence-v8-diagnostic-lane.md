@@ -152,3 +152,22 @@ rate for the later protocol, not hidden or promoted.
 Because this paired replay was designed after inspecting the first screen, it
 is root-cause and regression evidence only. A fresh, disjoint confirmation is
 required before accepting even the diagnostic-lane error rates.
+
+### Frozen fresh-confirmation gate
+
+The next confirmation is pre-registered on seeds `74401--74528` (`128`
+independent families, `2,176` replays). The selected development comparator is
+`graded_evidence @ 3 s`; other ages and policies remain descriptive. The gate
+requires:
+
+- diagnostic nuisance-family point rate `<=1%` and 97.5% one-sided
+  Clopper–Pearson upper bound `<=3%` across nominal, calibrated-high-noise,
+  and bounded-jitter nominal cases;
+- clean descriptive-union coverage of all four persistent offset members in
+  at least `95%` of seed families;
+- zero structural-gap diagnostic events;
+- zero `1.5 s` pulse diagnostic events; and
+- retained reporting, but no gate, for the `2.0 s` pulse.
+
+The result must be retained whether it passes or fails. Passing these synthetic
+development checks still cannot authorize FCOne or any control/source action.
