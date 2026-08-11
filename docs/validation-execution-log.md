@@ -2963,3 +2963,30 @@ calibrated-high-noise nominal and structural-gap cases also remained at zero.
 The result is retained as non-promoting development evidence. The descriptive
 union improves logging/triage coverage only and is explicitly not a control
 qualification, source selector, estimator reset, or FCOne authority.
+
+### 2026-08-11 — v8 diagnostic provenance correction and paired replay
+
+The first attribution audit exposed a diagnostic-only provenance loss. If a
+mid-band point expired the normal quiet boundary before a later strict-high
+episode, the normal lane correctly removed authority but the diagnostic lane
+also removed the timestamp proving that a full quiet baseline had existed in
+the current continuous epoch. This caused long high sequences such as seed
+`74354` to remain invisible to the diagnostic output.
+
+The timestamp is now retained in a separate non-authoritative field. Focused
+tests prove that it cannot reactivate a normal boundary, cannot bridge a
+mid-band interruption, and still resets on source/arrival gaps, invalid input,
+epoch changes, and reauthorization.
+
+The exact `1,088` opened streams were paired-replayed from clean commit
+`5568b8e`. All `13,056` primary policy comparisons matched the pre-fix result;
+only diagnostic snapshots changed. At `graded_evidence @ 3 s`, diagnostic-
+clean members increased from `14` to `22`; the descriptive union increased to
+`246/256` members and `61/64` families. The remaining ten members are exactly
+the pre-existing ambiguous episodes in families `74306`, `74349`, and `74352`.
+
+Normal, jittered-normal, calibrated-high-noise normal, structural-gap, and
+`1.5 s` pulse diagnostic counts remain zero. Five `2.0 s` pulses produce a
+diagnostic-only record at age `3 s`. The replay is regression/root-cause
+evidence on an opened screen, not a fresh error-rate confirmation or control
+promotion.

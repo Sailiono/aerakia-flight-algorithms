@@ -116,6 +116,27 @@ The machine-readable audit is
 `validation/public/airspeed_wind_residual_persistence_v8_diagnostic_lane_screen_74301_64_audit.json`.
 Its `descriptive_union_clean` field must never be read as control authority.
 
+### Provenance-retention correction
+
+Review of the six unresolved families showed a second, diagnostic-only
+mechanism. When a stale mid-band point caused the normal lane to retire its
+boundary before the later high episode, the diagnostic lane also erased the
+last full-boundary timestamp. In cases such as `74354`, all 24 post-injection
+samples were high NIS, yet no diagnostic snapshot could start. Retaining that
+timestamp as non-authoritative provenance fixes the omission without changing
+normal qualification.
+
+An exact paired replay verified `13,056/13,056` primary comparator invariants.
+At `graded_evidence @ 3 s`, the clean descriptive union becomes `246/256`
+members and `61/64` families. The only remaining misses are the ten members in
+families `74306`, `74349`, and `74352` whose episodes began before injection.
+They correctly remain ambiguous. This is the maximum clean descriptive
+coverage available on that opened screen without using truth in the runtime.
+
+The paired replay is retained at
+`validation/public/airspeed_wind_residual_persistence_v8_diagnostic_provenance_fix_paired_replay.json`.
+It is not fresh validation and does not authorize the diagnostic lane.
+
 ## Reproduction references
 
 - Full first screen: `build/airspeed_wind_residual_persistence_v8_screen_74101_32.json`

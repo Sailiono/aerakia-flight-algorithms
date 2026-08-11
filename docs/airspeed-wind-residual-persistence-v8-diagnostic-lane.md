@@ -126,3 +126,29 @@ promotion. The result proves that an expired-boundary persistent residual can
 be retained without weakening the primary fail-closed path. It does not prove
 which physical source is wrong, and the descriptive union cannot be used as a
 selector or controller qualification metric.
+
+### Paired provenance-fix replay
+
+The first audit also found a diagnostic implementation defect: when a
+mid-band sample expired the normal quiet boundary before the later strict-high
+episode began, the diagnostic lane lost the prior full-boundary timestamp.
+That timestamp is provenance, not authority, so retaining it separately does
+not weaken the normal lane.
+
+The fix at `0737ee9` was replayed from commit `5568b8e` against the exact
+`1,088` opened streams. All `13,056` primary policy comparisons were identical
+before and after the fix. For `graded_evidence @ 3 s`, diagnostic-clean
+coverage increased from `14` to `22` members and the descriptive union became
+`246/256` members and `61/64` families. The three unresolved families
+(`74306`, `74349`, `74352`) contain the remaining ten pre-existing ambiguous
+members; the runtime cannot reclassify them without importing the offline
+injection boundary.
+
+Nominal, bounded-jitter nominal, calibrated-high-noise nominal, structural-gap,
+and `1.5 s` pulse diagnostic counts remained zero. A `2.0 s` pulse produced
+five diagnostic-only events at age `3 s`; this is retained as a nuisance/log
+rate for the later protocol, not hidden or promoted.
+
+Because this paired replay was designed after inspecting the first screen, it
+is root-cause and regression evidence only. A fresh, disjoint confirmation is
+required before accepting even the diagnostic-lane error rates.
