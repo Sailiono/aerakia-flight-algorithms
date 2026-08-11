@@ -52,6 +52,34 @@ fit still overfits residual/model effects. A future candidate must add full
 15x15 lag covariance, process/preintegration covariance, physical source/arrival
 timing, and a new sealed protocol before another correction is considered.
 
+## 2026-08-11 — full-state nuisance screen rejected
+
+### Reason
+
+The 5D replay candidate could not distinguish a desired tilt/bias correction
+from trajectory residual fitting. The full-state screen tested whether carrying
+all 15 error states and a complete boundary covariance would remove that
+failure mode.
+
+### Evidence and decision
+
+The frozen 60-trial screen recorded 24 trust-region accepted candidates, 34
+truth-free validation rejections, and two perturbation-schedule rejections.
+All accepted cases improved position RMSE, but the intended horizontal-bias
+metric improved in only 12 of 19 nonzero cases. One zero-bias and one
+attitude-RMSE material regression remained. The candidate is rejected; do not
+expand its matrix or promote it to FCOne. Full detail and the compact report are
+in [full-state sensitivity screen](full-state-sensitivity-screen.md).
+
+### Verification
+
+After recording the result, the release CTest suite passed `14/14`, the Python
+suite passed `197/197`, and the ASan/UBSan CTest suite passed `14/14`. The
+sandbox runs processes under ptrace, so LeakSanitizer cannot execute here; the
+sanitizer run used `ASAN_OPTIONS=detect_leaks=0` and therefore does not make a
+leak-detection claim. It still exercises AddressSanitizer and UndefinedBehavior
+Sanitizer for the covered tests.
+
 ## 2026-07-18 — input integrity and timing audit started
 
 ### Reason

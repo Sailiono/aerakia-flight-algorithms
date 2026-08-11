@@ -135,15 +135,17 @@ generalize. The final generic host-only variant, a physically correlated static
 tilt/accelerometer-bias startup prior, was also rejected after a paired 576+576 train/tune campaign:
 aggregate improvement came with 22 zero-bias and five mirror-symmetry regressions. Its complete
 result is [`g0_correlated_static_prior_rejection.json`](../validation/public/g0_correlated_static_prior_rejection.json).
-The first materially different candidate, a no-injection causal 20 s fixed-lag MAP proposal, has
-now also been rejected. It ran 144 causal v2 replays without modifying ESKF; its best scale worsened
-terminal mean/P95 bias error from `0.10189/0.22257` to `0.10291/0.23550 m/s2` and improved only
-`61/144` terminals. The next G0 work is a bounded delayed-GNSS rewind/replay oracle: prove exact
-state/covariance replay before designing another correction transaction. Only then may a new,
-pre-registered causal fixed-lag joint correction be evaluated under a clean v2 protocol and sealed
-holdout. Private FCOne v2 physical IMU interval, source/arrival timestamp, causal-stationarity, and
-source-quality contracts remain required; repeated static-prior or scalar P/Q tuning is not an
-accepted path.
+The first materially different candidate, a no-injection causal 20 s fixed-lag MAP proposal, was
+rejected over 144 causal v2 replays. Two later replay candidates are now also retained as negative
+evidence: a 216-trial 5D complete-injection/replay campaign still had zero-bias and attitude
+regressions, and a 60-trial full-15D nuisance/covariance screen improved navigation fit but not the
+tilt/bias boundary reliably. Their focused records are [fixed-lag replay candidate](fixed-lag-replay-candidate.md)
+and [full-state sensitivity screen](full-state-sensitivity-screen.md). Do not repeat static-prior,
+scalar P/Q, or trust-region sweeps. The next G0 work requires a genuine lag/smoothing formulation
+with full transition and process/preintegration covariance, innovation cross covariance, and
+physical source/arrival timing. FCOne v2 physical IMU interval, causal stationarity, and source
+quality contracts remain required before that work; a new candidate also needs a clean protocol and
+sealed holdout.
 
 The statistical result assumes each calibrated startup residual-bias component lies within three sigma
 (`0.15 m/s²` accelerometer and `0.6 deg/s` gyroscope under the current provisional prior). FCOne

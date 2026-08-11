@@ -78,6 +78,8 @@ is the stable navigation layer rather than a disruptive mass rename.
 - [Fixed-lag replay candidate](fixed-lag-replay-candidate.md): complete
   host-only correction/replay experiment, rejected for promotion after a
   216-trial paired development matrix
+- [Full-state sensitivity screen](full-state-sensitivity-screen.md): full 15D
+  nuisance/covariance diagnostic, rejected after a frozen 60-trial screen
 - The two documents together define the solver boundary and replay-oracle
   prerequisite before another estimator candidate.
 - [Delayed GNSS replay oracle](delayed-gnss-repropagation-oracle.md): the
