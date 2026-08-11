@@ -2813,3 +2813,40 @@ bounded recent quiet boundary or graded causal evidence can improve sensitivity
 without restoring pre-onset episode inheritance. That hypothesis requires a
 new protocol, candidate code, disjoint seed ranges, and fresh pre-registered
 tests.
+
+### 2026-08-11 — v8 policy-shape diagnostics and fresh screen
+
+An independent host-only probe was added without changing v7, the production
+ESKF/Mahony code, or the public API. It compares `recent_boundary`,
+`graded_evidence`, and `bounded_retry` shapes using only source/arrival time,
+epoch, validity, and NIS. Focused semantics cover mid-band onset, expired
+boundaries, source/arrival gaps, invalid input, retry exhaustion, and same-epoch
+requalification after a gap. The first high sample in graded mode now starts
+with zero accumulated high evidence; a focused test locks that rule.
+
+Focused validation completed `7/7` tests and `45` hand-authored policy/case/
+age comparisons. The retained v7 seed `71101` was replayed read-only: v7 did
+not latch, while the unselected candidates latched at source `70.0--70.5 s`.
+
+A separate fresh development screen then ran once on seeds `74101--74132`
+(`32` families, `16` cases per family, `512` replays, `8` workers). It produced
+zero nominal false latches and zero structural-gap latches for all candidates.
+Persistent clean-family passes at recent-boundary ages `1/2/3 s` were:
+
+```text
+recent_boundary: 19/32, 25/32, 27/32
+graded_evidence: 20/32, 26/32, 27/32
+bounded_retry:   19/32, 25/32, 27/32
+```
+
+This is a clear sensitivity improvement over the v7 failure pattern but does
+not meet the provisional `>=95%` clean-attribution screen target. Seed `74123`
+contains a high episode that starts before the offline injection boundary and
+continues through it; it remains an attribution failure by design. At age `3 s`
+the 1.0 s pulse latched `0/32`, the 1.5 s pulse `1/32`, and the 2.0 s pulse
+`28/32`. The screen is therefore retained as non-promoting evidence; no policy
+or age is selected, and no v8 train/tune/holdout has been opened.
+
+The large trace remains under `build/` only. A compact summary with the full
+trace SHA-256, source hashes, seed manifest, and aggregate counts is retained
+in `validation/public/airspeed_wind_residual_persistence_v8_screen_74101_32_summary.json`.

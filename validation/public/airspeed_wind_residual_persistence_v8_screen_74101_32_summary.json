@@ -1,0 +1,341 @@
+{
+  "full_screen_artifact_sha256": "6d1321d57b1cf386314ba93f0bde7f29782480985c9c24fdf9c44ad498142160",
+  "limitations": [
+    "This is a fresh development screen, not a frozen v8 train, tune, or holdout.",
+    "The v7 residual oracle is reused only as a host-side synthetic NIS provider.",
+    "No candidate threshold, policy, estimator state, or FCOne source authority is promoted.",
+    "Fresh seeds are disjoint from the v7 train/tune ranges but are not a protected holdout."
+  ],
+  "manifest": {
+    "boundary_ages_s": [
+      1.0,
+      2.0,
+      3.0
+    ],
+    "case_names": [
+      "nominal",
+      "nominal_high_noise_calibrated",
+      "persistent_tas_offset_positive",
+      "persistent_tas_offset_negative",
+      "persistent_tas_offset_positive_bounded_jitter",
+      "persistent_tas_offset_negative_bounded_jitter",
+      "persistent_tas_scale_positive",
+      "persistent_tas_scale_negative",
+      "persistent_horizontal_wind_step",
+      "persistent_vertical_wind",
+      "tas_offset_pulse_0p25s",
+      "tas_offset_pulse_0p5s",
+      "tas_offset_pulse_1p0s",
+      "tas_offset_pulse_1p5s",
+      "tas_offset_pulse_2p0s",
+      "gap_then_tas_offset_pulse_1p0s"
+    ],
+    "protocol_path": "validation/airspeed_wind_residual_persistence_protocol_v7.json",
+    "protocol_sha256": "3fc033a98efbfd40fc3c459db79370ded3a2d1bdce240ae2e5a9d6801903695d",
+    "record_count": 512,
+    "seed_count": 32,
+    "seed_end": 74132,
+    "seed_start": 74101
+  },
+  "provenance": {
+    "full_trace_path": "build/airspeed_wind_residual_persistence_v8_screen_74101_32.json",
+    "git_commit_before_artifact_commit": "c6736ccfd4b70a3ae2b7defff5f359977a588131",
+    "git_status_before_artifact_commit": " M docs/airspeed-wind-residual-persistence-v8-audit.md\n M docs/validation-execution-log.md\n?? docs/airspeed-wind-residual-persistence-v8-design.md\n?? tests/test_airspeed_wind_residual_persistence_v8_diagnostics.py\n?? validation/diagnose_airspeed_wind_residual_persistence_v8.py\n?? validation/public/airspeed_wind_residual_persistence_v8_screen_74101_32_summary.json\n"
+  },
+  "schema_version": 1,
+  "source_sha256": {
+    "design_doc": "a009dca628db44b0f0dcd425f32ca15991ac4104f8c86fc0190fe318e0c7c854",
+    "diagnostic_runner": "f5fe14d8ef3e1a0e70d1a0de81187b7f24ce8062fb1675923706d9bd47ceda1e",
+    "focused_tests": "8fc3c4d4497a9d7e4348e1b3f6069fa1107a8eb3d3124565a83eb8d422ffa6c9"
+  },
+  "status": "completed_non_promoting_development_screen",
+  "study_id": "aerakia-v8-fresh-development-screen",
+  "summary": {
+    "1s": {
+      "bounded_retry": {
+        "descriptive_latches_by_case": {
+          "persistent_horizontal_wind_step": 23,
+          "persistent_tas_scale_negative": 23,
+          "persistent_tas_scale_positive": 22,
+          "persistent_vertical_wind": 12
+        },
+        "gap_structural_latches": 0,
+        "high_noise_nominal_latches": 0,
+        "nominal_false_latches": 0,
+        "nominal_trials": 32,
+        "persistent_family_failures": [
+          74101,
+          74103,
+          74108,
+          74109,
+          74110,
+          74111,
+          74114,
+          74119,
+          74123,
+          74124,
+          74127,
+          74129,
+          74132
+        ],
+        "persistent_family_passes": 19,
+        "persistent_family_trials": 32,
+        "persistent_member_latches": 84,
+        "persistent_member_trials": 128,
+        "pulse_latches_by_case": {
+          "tas_offset_pulse_1p0s": 0,
+          "tas_offset_pulse_1p5s": 0,
+          "tas_offset_pulse_2p0s": 23
+        }
+      },
+      "graded_evidence": {
+        "descriptive_latches_by_case": {
+          "persistent_horizontal_wind_step": 23,
+          "persistent_tas_scale_negative": 23,
+          "persistent_tas_scale_positive": 22,
+          "persistent_vertical_wind": 14
+        },
+        "gap_structural_latches": 0,
+        "high_noise_nominal_latches": 0,
+        "nominal_false_latches": 0,
+        "nominal_trials": 32,
+        "persistent_family_failures": [
+          74101,
+          74103,
+          74108,
+          74109,
+          74110,
+          74111,
+          74119,
+          74123,
+          74124,
+          74127,
+          74129,
+          74132
+        ],
+        "persistent_family_passes": 20,
+        "persistent_family_trials": 32,
+        "persistent_member_latches": 86,
+        "persistent_member_trials": 128,
+        "pulse_latches_by_case": {
+          "tas_offset_pulse_1p0s": 0,
+          "tas_offset_pulse_1p5s": 0,
+          "tas_offset_pulse_2p0s": 23
+        }
+      },
+      "recent_boundary": {
+        "descriptive_latches_by_case": {
+          "persistent_horizontal_wind_step": 23,
+          "persistent_tas_scale_negative": 23,
+          "persistent_tas_scale_positive": 22,
+          "persistent_vertical_wind": 12
+        },
+        "gap_structural_latches": 0,
+        "high_noise_nominal_latches": 0,
+        "nominal_false_latches": 0,
+        "nominal_trials": 32,
+        "persistent_family_failures": [
+          74101,
+          74103,
+          74108,
+          74109,
+          74110,
+          74111,
+          74114,
+          74119,
+          74123,
+          74124,
+          74127,
+          74129,
+          74132
+        ],
+        "persistent_family_passes": 19,
+        "persistent_family_trials": 32,
+        "persistent_member_latches": 84,
+        "persistent_member_trials": 128,
+        "pulse_latches_by_case": {
+          "tas_offset_pulse_1p0s": 0,
+          "tas_offset_pulse_1p5s": 0,
+          "tas_offset_pulse_2p0s": 23
+        }
+      }
+    },
+    "2s": {
+      "bounded_retry": {
+        "descriptive_latches_by_case": {
+          "persistent_horizontal_wind_step": 26,
+          "persistent_tas_scale_negative": 26,
+          "persistent_tas_scale_positive": 26,
+          "persistent_vertical_wind": 17
+        },
+        "gap_structural_latches": 0,
+        "high_noise_nominal_latches": 0,
+        "nominal_false_latches": 0,
+        "nominal_trials": 32,
+        "persistent_family_failures": [
+          74108,
+          74110,
+          74114,
+          74119,
+          74123,
+          74124,
+          74132
+        ],
+        "persistent_family_passes": 25,
+        "persistent_family_trials": 32,
+        "persistent_member_latches": 102,
+        "persistent_member_trials": 128,
+        "pulse_latches_by_case": {
+          "tas_offset_pulse_1p0s": 0,
+          "tas_offset_pulse_1p5s": 0,
+          "tas_offset_pulse_2p0s": 26
+        }
+      },
+      "graded_evidence": {
+        "descriptive_latches_by_case": {
+          "persistent_horizontal_wind_step": 26,
+          "persistent_tas_scale_negative": 26,
+          "persistent_tas_scale_positive": 26,
+          "persistent_vertical_wind": 18
+        },
+        "gap_structural_latches": 0,
+        "high_noise_nominal_latches": 0,
+        "nominal_false_latches": 0,
+        "nominal_trials": 32,
+        "persistent_family_failures": [
+          74108,
+          74110,
+          74119,
+          74123,
+          74124,
+          74132
+        ],
+        "persistent_family_passes": 26,
+        "persistent_family_trials": 32,
+        "persistent_member_latches": 104,
+        "persistent_member_trials": 128,
+        "pulse_latches_by_case": {
+          "tas_offset_pulse_1p0s": 0,
+          "tas_offset_pulse_1p5s": 0,
+          "tas_offset_pulse_2p0s": 26
+        }
+      },
+      "recent_boundary": {
+        "descriptive_latches_by_case": {
+          "persistent_horizontal_wind_step": 26,
+          "persistent_tas_scale_negative": 26,
+          "persistent_tas_scale_positive": 26,
+          "persistent_vertical_wind": 17
+        },
+        "gap_structural_latches": 0,
+        "high_noise_nominal_latches": 0,
+        "nominal_false_latches": 0,
+        "nominal_trials": 32,
+        "persistent_family_failures": [
+          74108,
+          74110,
+          74114,
+          74119,
+          74123,
+          74124,
+          74132
+        ],
+        "persistent_family_passes": 25,
+        "persistent_family_trials": 32,
+        "persistent_member_latches": 102,
+        "persistent_member_trials": 128,
+        "pulse_latches_by_case": {
+          "tas_offset_pulse_1p0s": 0,
+          "tas_offset_pulse_1p5s": 0,
+          "tas_offset_pulse_2p0s": 26
+        }
+      }
+    },
+    "3s": {
+      "bounded_retry": {
+        "descriptive_latches_by_case": {
+          "persistent_horizontal_wind_step": 28,
+          "persistent_tas_scale_negative": 28,
+          "persistent_tas_scale_positive": 28,
+          "persistent_vertical_wind": 20
+        },
+        "gap_structural_latches": 0,
+        "high_noise_nominal_latches": 0,
+        "nominal_false_latches": 0,
+        "nominal_trials": 32,
+        "persistent_family_failures": [
+          74108,
+          74119,
+          74123,
+          74124,
+          74132
+        ],
+        "persistent_family_passes": 27,
+        "persistent_family_trials": 32,
+        "persistent_member_latches": 112,
+        "persistent_member_trials": 128,
+        "pulse_latches_by_case": {
+          "tas_offset_pulse_1p0s": 0,
+          "tas_offset_pulse_1p5s": 1,
+          "tas_offset_pulse_2p0s": 28
+        }
+      },
+      "graded_evidence": {
+        "descriptive_latches_by_case": {
+          "persistent_horizontal_wind_step": 28,
+          "persistent_tas_scale_negative": 28,
+          "persistent_tas_scale_positive": 28,
+          "persistent_vertical_wind": 23
+        },
+        "gap_structural_latches": 0,
+        "high_noise_nominal_latches": 0,
+        "nominal_false_latches": 0,
+        "nominal_trials": 32,
+        "persistent_family_failures": [
+          74108,
+          74119,
+          74123,
+          74124,
+          74132
+        ],
+        "persistent_family_passes": 27,
+        "persistent_family_trials": 32,
+        "persistent_member_latches": 112,
+        "persistent_member_trials": 128,
+        "pulse_latches_by_case": {
+          "tas_offset_pulse_1p0s": 0,
+          "tas_offset_pulse_1p5s": 1,
+          "tas_offset_pulse_2p0s": 28
+        }
+      },
+      "recent_boundary": {
+        "descriptive_latches_by_case": {
+          "persistent_horizontal_wind_step": 28,
+          "persistent_tas_scale_negative": 28,
+          "persistent_tas_scale_positive": 28,
+          "persistent_vertical_wind": 21
+        },
+        "gap_structural_latches": 0,
+        "high_noise_nominal_latches": 0,
+        "nominal_false_latches": 0,
+        "nominal_trials": 32,
+        "persistent_family_failures": [
+          74108,
+          74119,
+          74123,
+          74124,
+          74132
+        ],
+        "persistent_family_passes": 27,
+        "persistent_family_trials": 32,
+        "persistent_member_latches": 112,
+        "persistent_member_trials": 128,
+        "pulse_latches_by_case": {
+          "tas_offset_pulse_1p0s": 0,
+          "tas_offset_pulse_1p5s": 1,
+          "tas_offset_pulse_2p0s": 28
+        }
+      }
+    }
+  }
+}

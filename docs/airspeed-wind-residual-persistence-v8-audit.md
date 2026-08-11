@@ -13,7 +13,7 @@ The current focused evidence is sound for its declared scope:
 
 - 45 hand-authored policy/scenario comparisons (`3` ages × `5` scenarios ×
   `3` policy shapes);
-- 5 focused Python tests, all passing;
+- 6 focused Python tests, all passing;
 - one read-only replay of v7 seed `71101`, with `117` monitor-fed samples;
 - no changes to the production ESKF, Mahony, public API, v7 protocol, v7
   scorer, or v7 train artifact.
@@ -59,40 +59,25 @@ The next protocol must preserve these v7 audit protections:
 
 ## Findings requiring resolution before protocol freeze
 
-### 1. Graded evidence must not count pre-high elapsed time
+### 1. Graded evidence starts at zero at episode onset
 
-In the current probe, `_advance_graded_high()` adds `elapsed_s` on the first
-high sample. Therefore the interval from the previous quiet/mid-band sample to
-the first high sample can count as graded high evidence. That is defensible
-only if the protocol explicitly defines evidence as *time since high onset*;
-otherwise it is optimistic. The production candidate should either:
+The first implementation credited the interval before the first high sample
+to graded evidence. That was corrected: `_advance_graded_high()` now initializes
+the first high sample with zero evidence and accumulates only subsequent
+source-time intervals. A focused sentinel locks this behavior. The eventual
+v8 protocol must still define whether mid-band decay is integrated over source
+time or observation intervals and must test the choice across supported rates.
 
-- initialize graded evidence to zero at the first high sample and accumulate
-  only subsequent high/decay intervals; or
-- state and test an explicit source-time integration rule that gives the first
-  high sample zero prior high duration.
+### 2. Gap authorization semantics are explicit
 
-Add a focused sentinel where a recent boundary is followed by a long quiet
-interval and one high sample: it must not receive more than one high sample's
-worth of evidence.
-
-### 2. Gap authorization semantics must be frozen explicitly
-
-The v8 probe revokes `authorized_epoch` on source/arrival gaps. The v7 monitor
-resets continuity but retains the authorized source epoch, allowing the same
-epoch to requalify after a bounded gap; invalid source/NIS and explicit epoch
-changes revoke authorization. Neither behavior is automatically correct.
-
-Before v8 freeze, choose and test one contract:
-
-- **strict reauthorization:** every gap requires an explicit upstream
-  reauthorization; or
-- **same-epoch recovery:** a gap clears warmup/boundary/evidence but permits
-  requalification within the same authorized epoch.
-
-The choice must be reflected in the protocol, adapter contract, and recovery
-metrics. It must not be an accidental difference between the diagnostic probe
-and the eventual monitor.
+The probe now matches the v7 transport contract: a source/arrival gap clears
+warmup, quiet, and high evidence but retains the explicitly authorized source
+epoch, so a later valid sample may requalify within that epoch. Invalid source
+data, missing/invalid NIS, non-monotonic timestamps, and an epoch change still
+revoke authorization. Focused tests require a gap to remain fail-closed until
+a complete requalification path is present. The v8 protocol must carry this
+same distinction into the adapter/recovery metrics rather than leaving it as
+an implementation accident.
 
 ### 3. Boundary refresh and retry budget need separate semantics
 
@@ -162,6 +147,27 @@ The `95%`/`3 s` values are deliberately development-screen targets. They must
 be revisited using the observed error bars and declared mission envelope before
 any v8 train or physical-source authority.
 
+## Fresh screen result
+
+The first fresh screen used `32` disjoint families (`74101--74132`), `16`
+synthetic cases per family, and `512` replays. It produced zero nominal false
+latches and zero structural-gap latches for every candidate. Clean persistent
+family passes were `19/32`, `25/32`, and `27/32` for recent-boundary ages `1`,
+`2`, and `3 s` respectively for the recent-boundary and bounded-retry shapes;
+graded evidence produced `20/32`, `26/32`, and `27/32`. These are materially
+better than v7's retained `220/512` family result, but still below the
+provisional `95%` target and are not promotion evidence. The full trace is in
+`build/airspeed_wind_residual_persistence_v8_screen_74101_32.json`; it is not
+committed as a large public trace. A compact non-promoting summary with the
+trace SHA-256 and source hashes is retained in
+`validation/public/airspeed_wind_residual_persistence_v8_screen_74101_32_summary.json`.
+
+The screen also exposed the attribution boundary rather than hiding it. Seed
+`74123` has a high episode beginning before the offline injection boundary and
+continuing through it, so a later latch is correctly rejected as clean
+post-injection evidence. This case must remain an ambiguity failure unless a
+future causal policy can establish a new onset without importing truth.
+
 ## Recommended selection order
 
 1. Fix the two semantic findings above and extend focused tests.
@@ -183,4 +189,3 @@ show that a TAS source is faulty, that wind is observable, that the ESKF should
 gain a wind state, or that any policy is safe to run on FCOne hardware. Those
 claims still require the separate physical air-data, same-input, and hardware
 validation gates already documented elsewhere.
-
