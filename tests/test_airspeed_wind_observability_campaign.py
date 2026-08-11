@@ -29,7 +29,7 @@ class AirspeedWindCampaignTests(unittest.TestCase):
 
     def test_duplicate_confirmation_seed_is_rejected(self) -> None:
         bad = copy.deepcopy(self.campaign)
-        bad["confirmation_seed_splits"]["replication_b"][0] = bad["confirmation_seed_splits"]["replication_a"][0]
+        bad["confirmation_seed_splits"]["replication_b_1"][0] = bad["confirmation_seed_splits"]["replication_a_1"][0]
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "campaign.json"
             path.write_text(json.dumps(bad), encoding="utf-8")
@@ -47,6 +47,20 @@ class AirspeedWindCampaignTests(unittest.TestCase):
         self.assertEqual(result["failure_categories"], {})
         wind_shear = next(item for item in result["scenario_summaries"] if item["name"] == "wind_shear")
         self.assertEqual(wind_shear["terminal_status_counts"], {"source_latched": 2})
+
+    def test_complete_shards_merge_once_without_overlap(self) -> None:
+        small = copy.deepcopy(self.campaign)
+        small["scenario_names"] = ["multi_heading_nominal", "straight_line"]
+        small["confirmation_seed_splits"] = {"replication_a": [101], "replication_b": [202]}
+        shards: list[tuple[str, dict[str, object]]] = []
+        for split in small["confirmation_seed_splits"]:
+            scoped = copy.deepcopy(small)
+            scoped["confirmation_seed_splits"] = {split: small["confirmation_seed_splits"][split]}
+            shards.append((split, campaign_runner.run_campaign(scoped, self.base, jobs=1, include_records=True)))
+        merged = campaign_runner.merge_shard_results(small, self.base, shards)
+        self.assertEqual(merged["status"], "passed")
+        self.assertEqual(merged["totals"]["replication_cases"], 4)
+        self.assertEqual(merged["execution_backend"], "merged_shards")
 
     def test_record_digest_changes_when_a_record_changes(self) -> None:
         records = [{"scenario": "a", "passed": True}, {"scenario": "b", "passed": True}]

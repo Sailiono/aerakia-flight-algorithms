@@ -10,6 +10,10 @@ disjoint confirmation seed windows:
 - `replication_a`: seeds `17001` through `17016`;
 - `replication_b`: seeds `27001` through `27016`.
 
+Each window is split into two independently reproducible eight-seed execution
+shards. Sharding changes neither case nor seed coverage; it makes constrained
+workstations resumable. A merge refuses missing or overlapping records.
+
 Every seed executes every one of the fifteen frozen cases. The campaign has no
 train, tune, or estimator-parameter phase: any failed replication is retained
 as a failure; no threshold, source contract, scenario, or seed is widened or
@@ -39,6 +43,25 @@ The runner rejects any drift before a campaign starts.
 ```bash
 python3 validation/run_airspeed_wind_observability_campaign.py --jobs 4
 python3 -m unittest tests.test_airspeed_wind_observability_campaign -v
+```
+
+On a constrained workstation, create four disposable shard files under
+`build/`, then merge them into one compact public summary:
+
+```bash
+python3 validation/run_airspeed_wind_observability_campaign.py \
+  --split replication_a_1 --include-records --out build/airspeed-wind-a1.json
+python3 validation/run_airspeed_wind_observability_campaign.py \
+  --split replication_a_2 --include-records --out build/airspeed-wind-a2.json
+python3 validation/run_airspeed_wind_observability_campaign.py \
+  --split replication_b_1 --include-records --out build/airspeed-wind-b1.json
+python3 validation/run_airspeed_wind_observability_campaign.py \
+  --split replication_b_2 --include-records --out build/airspeed-wind-b2.json
+python3 validation/run_airspeed_wind_observability_campaign.py \
+  --merge-shard build/airspeed-wind-a1.json \
+  --merge-shard build/airspeed-wind-a2.json \
+  --merge-shard build/airspeed-wind-b1.json \
+  --merge-shard build/airspeed-wind-b2.json
 ```
 
 Passing this campaign means the same synthetic qualification/rejection behavior

@@ -10,13 +10,14 @@ the individual records.
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
 import math
 import os
 import subprocess
 from collections import Counter, defaultdict
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
@@ -139,30 +140,98 @@ def compact_record(split: str, seed: int, result: dict[str, object]) -> dict[str
     }
 
 
+def run_trial(task: tuple[str, int, dict[str, Any], dict[str, Any]]) -> dict[str, object]:
+    """Pickle-safe independent trial used by the process pool."""
+
+    split, seed, case, base_protocol = task
+    return compact_record(split, seed, oracle.evaluate_case(case, base_protocol, synthetic_seed=seed))
+
+
 def run_campaign(
     campaign: dict[str, Any],
     base_protocol: dict[str, Any],
     *,
     jobs: int,
+    include_records: bool = False,
 ) -> dict[str, object]:
     if jobs <= 0:
         raise ValueError("jobs must be positive")
     cases = selected_cases(campaign, base_protocol)
     trials = [
-        (split, seed, case)
+        (split, seed, case, base_protocol)
         for split, seeds in campaign["confirmation_seed_splits"].items()
         for seed in seeds
         for case in cases
     ]
-
-    def run_one(item: tuple[str, int, dict[str, Any]]) -> dict[str, object]:
-        split, seed, case = item
-        return compact_record(split, seed, oracle.evaluate_case(case, base_protocol, synthetic_seed=seed))
-
-    with ThreadPoolExecutor(max_workers=jobs) as executor:
-        records = list(executor.map(run_one, trials))
+    backend = "serial"
+    if jobs == 1:
+        records = [run_trial(item) for item in trials]
+    else:
+        try:
+            with ProcessPoolExecutor(max_workers=jobs) as executor:
+                records = list(executor.map(run_trial, trials))
+            backend = "process"
+        except PermissionError:
+            # Managed desktop sandboxes can forbid a forkserver socket. The
+            # documented shard mode remains deterministic and lets that
+            # environment execute the exact same workload without widening
+            # the campaign or silently reducing its seed set.
+            with ThreadPoolExecutor(max_workers=jobs) as executor:
+                records = list(executor.map(run_trial, trials))
+            backend = "thread_fallback"
     records.sort(key=lambda item: (str(item["split"]), int(item["seed"]), str(item["scenario"])))
-    return summarize_records(campaign, records)
+    result = summarize_records(campaign, records)
+    result["execution_backend"] = backend
+    if include_records:
+        result["records"] = records
+    return result
+
+
+def merge_shard_results(
+    campaign: dict[str, Any],
+    base_protocol: dict[str, Any],
+    shard_results: list[tuple[str, dict[str, object]]],
+) -> dict[str, object]:
+    """Validate complete non-overlapping build shards and form one compact result."""
+
+    cases = selected_cases(campaign, base_protocol)
+    expected = {
+        (split, int(seed), str(case["name"]))
+        for split, seeds in campaign["confirmation_seed_splits"].items()
+        for seed in seeds
+        for case in cases
+    }
+    records: list[dict[str, object]] = []
+    shard_metadata: list[dict[str, object]] = []
+    for path, result in shard_results:
+        contained = result.get("records")
+        if not isinstance(contained, list):
+            raise ValueError(f"shard {path} does not retain merge records")
+        for item in contained:
+            if not isinstance(item, dict):
+                raise ValueError(f"shard {path} has a malformed record")
+            records.append(item)
+        shard_metadata.append({
+            "path": path,
+            "record_count": len(contained),
+            "record_sha256": oracle.canonical_sha256(contained),
+            "status": result.get("status"),
+        })
+    actual = {
+        (str(record["split"]), int(record["seed"]), str(record["scenario"]))
+        for record in records
+    }
+    if len(actual) != len(records):
+        raise ValueError("campaign shard records overlap")
+    if actual != expected:
+        missing = len(expected - actual)
+        extra = len(actual - expected)
+        raise ValueError(f"campaign shard coverage mismatch: missing={missing}, extra={extra}")
+    records.sort(key=lambda item: (str(item["split"]), int(item["seed"]), str(item["scenario"])))
+    merged = summarize_records(campaign, records)
+    merged["execution_backend"] = "merged_shards"
+    merged["merged_shards"] = shard_metadata
+    return merged
 
 
 def summarize_records(campaign: dict[str, Any], records: list[dict[str, object]]) -> dict[str, object]:
@@ -256,11 +325,51 @@ def main() -> int:
         default=ROOT / "validation" / "public" / "airspeed_wind_observability_campaign_v1.json",
     )
     parser.add_argument("--jobs", type=int, default=min(4, max(1, os.cpu_count() or 1)))
+    parser.add_argument(
+        "--split", action="append", default=[],
+        help="execute only this named frozen seed split; repeat for multiple splits",
+    )
+    parser.add_argument(
+        "--include-records", action="store_true",
+        help="retain individual compact records for a disposable build shard; never use for public output",
+    )
+    parser.add_argument(
+        "--merge-shard", action="append", default=[], type=Path,
+        help="merge one or more completed --include-records shard JSON files",
+    )
     args = parser.parse_args()
     campaign_path = args.campaign_protocol.resolve()
     campaign = load_campaign_protocol(campaign_path)
     base_protocol_path, base_protocol = resolve_base_protocol(campaign)
-    result = run_campaign(campaign, base_protocol, jobs=args.jobs)
+    if args.merge_shard:
+        if args.split:
+            parser.error("--split cannot be used while merging shards")
+        if args.include_records:
+            parser.error("--include-records cannot be used while merging shards")
+        shard_results: list[tuple[str, dict[str, object]]] = []
+        for path in args.merge_shard:
+            resolved = path.resolve()
+            loaded = json.loads(resolved.read_text(encoding="utf-8"))
+            shard_results.append((str(resolved), loaded))
+        result = merge_shard_results(campaign, base_protocol, shard_results)
+    else:
+        selected_split_names = [str(name) for name in args.split] or list(
+            campaign["confirmation_seed_splits"]
+        )
+        if len(set(selected_split_names)) != len(selected_split_names):
+            parser.error("--split values must be unique")
+        unknown = [
+            name for name in selected_split_names
+            if name not in campaign["confirmation_seed_splits"]
+        ]
+        if unknown:
+            parser.error(f"unknown --split: {', '.join(unknown)}")
+        scoped = copy.deepcopy(campaign)
+        scoped["confirmation_seed_splits"] = {
+            name: campaign["confirmation_seed_splits"][name] for name in selected_split_names
+        }
+        result = run_campaign(scoped, base_protocol, jobs=args.jobs, include_records=args.include_records)
+        result["executed_splits"] = selected_split_names
     result["campaign_protocol"] = {
         "path": (
             str(campaign_path.relative_to(ROOT)) if campaign_path.is_relative_to(ROOT) else str(campaign_path)
