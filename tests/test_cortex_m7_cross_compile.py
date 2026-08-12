@@ -24,6 +24,9 @@ SPEC.loader.exec_module(MODULE)
 
 
 class CortexM7CrossCompileTests(unittest.TestCase):
+    def test_all_portable_library_sources_are_cross_compiled(self) -> None:
+        self.assertIn("src/static_imu_calibration.c", MODULE.SOURCES)
+
     def test_section_parser_aggregates_subsections_and_ignores_metadata(self) -> None:
         sections = MODULE.parse_sections(
             """\

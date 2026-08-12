@@ -28,6 +28,7 @@ SOURCES = (
     "src/eskf_models.c",
     "src/mag_gate.c",
     "src/mahony.c",
+    "src/static_imu_calibration.c",
 )
 FLOAT_CORE_SOURCES = (
     "src/eskf.c",

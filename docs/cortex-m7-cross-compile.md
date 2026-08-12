@@ -22,7 +22,7 @@ sums, and external dependencies without retaining generated objects.
 
 ## Method
 
-The script compiles all seven portable C translation units with
+The script compiles all eight portable C translation units with
 `arm-none-eabi-gcc 14.2.1`, `-mcpu=cortex-m7`, Thumb-2, hard-float ABI, and
 `-mfpu=fpv5-d16`. Every compile uses strict C99 and warnings-as-errors.
 
@@ -41,11 +41,21 @@ The float profile additionally compiles `eskf.c`, `eskf_math.c`, and
 
 | Measure | Reviewed double | Float candidate | Interpretation |
 | --- | ---: | ---: | --- |
-| Portable `.text` section sum | 24,954 B | 23,580 B | Object-section sum only; float is 1,374 B (5.5%) smaller before final linking. |
-| `AerakiaEskf` layout | 2,912 B | 1,824 B | 1,088 B (37.4%) smaller. |
+| Portable `.text` section sum | 28,780 B | 27,580 B | Object-section sum only; the full eight-unit float candidate is 1,200 B (4.2%) smaller before final linking. |
+| `AerakiaEskf` layout | 2,928 B | 1,840 B | 1,088 B (37.2%) smaller. |
 | `ESKF_Handle` layout | 2,136 B | 1,068 B | Core state/covariance is exactly half-sized. |
 | `AerakiaNavigationEstimate` layout | 504 B | 504 B | Public diagnostic/output layout is intentionally unchanged. |
 | Float-core promotion check | N/A | pass | The ESKF core has no compiler-detected float-to-double arithmetic promotion. |
+
+The translation-unit set includes the multi-pose static IMU calibration
+calculator, preventing the target preflight from silently omitting a newly
+added public algorithm source.
+
+That calculator deliberately remains double-precision in both profiles: it is
+a bounded pre-arm/offline operation, not the 100 Hz propagation path. Its
+`fabs`/`sqrt` dependencies are therefore visible in the float-profile report.
+This does not authorize running it in a time-critical task; FCOne validates and
+applies an accepted result before the first estimator sample.
 
 The preflight also exposed and corrected a material problem in the previous
 float candidate: `eskf.c`, `eskf_math.c`, and `eskf_models.c` used double

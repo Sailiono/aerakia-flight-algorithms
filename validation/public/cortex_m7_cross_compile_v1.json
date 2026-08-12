@@ -19,7 +19,7 @@
     "path": "/usr/bin/arm-none-eabi-gcc",
     "version": "arm-none-eabi-gcc (15:14.2.rel1-1) 14.2.1 20241119"
   },
-  "git_commit": "0ec315a31daf9a0f4029e7794f976c1dc195979c",
+  "git_commit": "8e815c696dddeb3504a9ca2e6e0de1e3f744b6da",
   "limitations": [
     "This compiles and archives the portable library only; no FCOne application image is linked.",
     "Archive section sums are not final Flash/RAM use after linker garbage collection, startup, HAL, RTOS, logging, or application code.",
@@ -92,6 +92,12 @@
             "memset",
             "sinf",
             "sqrtf"
+          ],
+          "src/static_imu_calibration.c": [
+            "fabs",
+            "memcpy",
+            "memset",
+            "sqrt"
           ]
         },
         "categories": {
@@ -152,14 +158,14 @@
           "sqrtf"
         ]
       },
-      "library_archive_bytes": 58406,
+      "library_archive_bytes": 65904,
       "library_section_sum_bytes": {
         "bss": 0,
         "data": 0,
         "other": 0,
-        "reported_total": 24954,
+        "reported_total": 28780,
         "rodata": 0,
-        "text": 24954
+        "text": 28780
       },
       "objects": [
         {
@@ -175,26 +181,26 @@
           "source": "src/barometer_supervisor.c"
         },
         {
-          "object_bytes": 13168,
+          "object_bytes": 13464,
           "sections": {
             "bss": 0,
             "data": 0,
             "other": 0,
-            "reported_total": 5758,
+            "reported_total": 5754,
             "rodata": 0,
-            "text": 5758
+            "text": 5754
           },
           "source": "src/eskf.c"
         },
         {
-          "object_bytes": 16928,
+          "object_bytes": 18828,
           "sections": {
             "bss": 0,
             "data": 0,
             "other": 0,
-            "reported_total": 9090,
+            "reported_total": 9888,
             "rodata": 0,
-            "text": 9090
+            "text": 9888
           },
           "source": "src/eskf_adapter.c"
         },
@@ -245,21 +251,33 @@
             "text": 3640
           },
           "source": "src/mahony.c"
+        },
+        {
+          "object_bytes": 4876,
+          "sections": {
+            "bss": 0,
+            "data": 0,
+            "other": 0,
+            "reported_total": 3032,
+            "rodata": 0,
+            "text": 3032
+          },
+          "source": "src/static_imu_calibration.c"
         }
       ],
       "preprocessor_definitions": [],
       "profile": "double",
-      "relocatable_object_bytes": 48824,
+      "relocatable_object_bytes": 55024,
       "relocatable_section_sum_bytes": {
         "bss": 0,
         "data": 0,
         "other": 0,
-        "reported_total": 24954,
+        "reported_total": 28780,
         "rodata": 0,
-        "text": 24954
+        "text": 28780
       },
       "target_layout_bytes": {
-        "aerakia_eskf_bytes": 2912,
+        "aerakia_eskf_bytes": 2928,
         "eskf_handle_bytes": 2136,
         "navigation_estimate_bytes": 504
       }
@@ -327,6 +345,12 @@
             "memset",
             "sinf",
             "sqrtf"
+          ],
+          "src/static_imu_calibration.c": [
+            "fabs",
+            "memcpy",
+            "memset",
+            "sqrt"
           ]
         },
         "categories": {
@@ -339,7 +363,10 @@
             "memcpy",
             "memset"
           ],
-          "libm_double": [],
+          "libm_double": [
+            "fabs",
+            "sqrt"
+          ],
           "libm_float": [
             "asinf",
             "atan2f",
@@ -360,6 +387,7 @@
           "asinf",
           "atan2f",
           "cosf",
+          "fabs",
           "fabsf",
           "fmaxf",
           "fminf",
@@ -367,6 +395,7 @@
           "memcpy",
           "memset",
           "sinf",
+          "sqrt",
           "sqrtf"
         ]
       },
@@ -382,14 +411,14 @@
         ],
         "status": "passed"
       },
-      "library_archive_bytes": 57094,
+      "library_archive_bytes": 64620,
       "library_section_sum_bytes": {
         "bss": 0,
         "data": 0,
         "other": 0,
-        "reported_total": 23580,
+        "reported_total": 27580,
         "rodata": 0,
-        "text": 23580
+        "text": 27580
       },
       "objects": [
         {
@@ -405,26 +434,26 @@
           "source": "src/barometer_supervisor.c"
         },
         {
-          "object_bytes": 12560,
+          "object_bytes": 12948,
           "sections": {
             "bss": 0,
             "data": 0,
             "other": 0,
-            "reported_total": 5012,
+            "reported_total": 5246,
             "rodata": 0,
-            "text": 5012
+            "text": 5246
           },
           "source": "src/eskf.c"
         },
         {
-          "object_bytes": 16404,
+          "object_bytes": 18240,
           "sections": {
             "bss": 0,
             "data": 0,
             "other": 0,
-            "reported_total": 8604,
+            "reported_total": 9338,
             "rodata": 0,
-            "text": 8604
+            "text": 9338
           },
           "source": "src/eskf_adapter.c"
         },
@@ -475,23 +504,35 @@
             "text": 3640
           },
           "source": "src/mahony.c"
+        },
+        {
+          "object_bytes": 4876,
+          "sections": {
+            "bss": 0,
+            "data": 0,
+            "other": 0,
+            "reported_total": 3032,
+            "rodata": 0,
+            "text": 3032
+          },
+          "source": "src/static_imu_calibration.c"
         }
       ],
       "preprocessor_definitions": [
         "AERAKIA_ESKF_CORE_USE_FLOAT=1"
       ],
       "profile": "float",
-      "relocatable_object_bytes": 47364,
+      "relocatable_object_bytes": 53632,
       "relocatable_section_sum_bytes": {
         "bss": 0,
         "data": 0,
         "other": 0,
-        "reported_total": 23580,
+        "reported_total": 27580,
         "rodata": 0,
-        "text": 23580
+        "text": 27580
       },
       "target_layout_bytes": {
-        "aerakia_eskf_bytes": 1824,
+        "aerakia_eskf_bytes": 1840,
         "eskf_handle_bytes": 1068,
         "navigation_estimate_bytes": 504
       }
@@ -505,11 +546,11 @@
     },
     {
       "path": "src/eskf.c",
-      "sha256": "1d2500036bff3f729a644a18d046cb7a1139ffaad9153e28de30d362c497ec57"
+      "sha256": "87fc3d0591238c35a1cc3b884e2c5b250ca481c8456e76b577d8a6fd4a5af35e"
     },
     {
       "path": "src/eskf_adapter.c",
-      "sha256": "74419769e1422de120523c120c29360316067edbc0fb24f92d0ab06531e18dfb"
+      "sha256": "55203a96de572800e8a5bc773867443c1633a471f984b0131f6bd3155de8b713"
     },
     {
       "path": "src/eskf_math.c",
@@ -526,9 +567,13 @@
     {
       "path": "src/mahony.c",
       "sha256": "33a3538974e61682b270637da9e186a12480140311c70bc0cec0b349b03e913a"
+    },
+    {
+      "path": "src/static_imu_calibration.c",
+      "sha256": "fe1a4495155ecb7d90c8d3f95abe3f69e30fbf4984e5bcde954eee0a1594c70d"
     }
   ],
-  "source_manifest_sha256": "408fc4eb4beb836c719f764bfc3aef27d0114b022d24fc0f9ac0b57a1b6a625d",
+  "source_manifest_sha256": "0d554c79ae29501b2387700f975ac707f7b9a34b86905d1b78b5421da769f1bb",
   "status": "cross_compile_preflight_not_target_runtime_qualification",
   "target": {
     "cpu": "cortex-m7",
