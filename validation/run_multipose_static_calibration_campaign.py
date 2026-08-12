@@ -5,7 +5,9 @@ The candidate receives only a six-pose stationary calibration CSV.  Its seed
 is produced by the public C calibration CLI, never by copying simulator truth
 directly into the ESKF.  This is synthetic development evidence: it verifies
 the implementation and its declared fault envelope, not a physical IMU
-calibration or flight qualification.
+calibration or flight qualification. The same runner also supports a
+pre-registered sealed holdout, where case/noise protocol and source identity
+are frozen before its holdout seeds are opened.
 """
 
 from __future__ import annotations
@@ -14,6 +16,7 @@ import argparse
 import hashlib
 import json
 import math
+import platform
 import subprocess
 import sys
 import tempfile
@@ -30,6 +33,7 @@ import run_residual_bias_boundary as boundary
 ROOT = Path(__file__).resolve().parents[1]
 GENERATOR = ROOT / "simulation" / "tools" / "generate_synthetic_imu.py"
 ANALYZER = ROOT / "validation" / "analyze_results.py"
+CAMPAIGN_RUNNER = ROOT / "validation" / "run_multipose_static_calibration_campaign.py"
 
 # Six orthogonal gravity directions are easy to collect with a fixture and
 # leave no direction unobserved in the static sphere fit.
@@ -49,6 +53,12 @@ def sha256_file(path: Path) -> str:
         for block in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
+
+
+def canonical_sha256(value: object) -> str:
+    """Hash a JSON-compatible protocol independently of formatting."""
+    encoded = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return hashlib.sha256(encoded.encode("ascii")).hexdigest()
 
 
 def git_commit(root: Path) -> str | None:
@@ -73,23 +83,121 @@ def git_worktree_status(root: Path) -> list[str] | None:
     return completed.stdout.splitlines()
 
 
-def source_manifest(root: Path) -> dict[str, str]:
-    """Hash all source inputs that define a campaign result, including dirty files."""
-    paths = (
+def require_clean_worktree(root: Path) -> None:
+    status = git_worktree_status(root)
+    if status is None:
+        raise ValueError("could not determine Git worktree status")
+    if status:
+        raise ValueError("sealed holdout requires a clean Git worktree")
+
+
+def campaign_source_paths(root: Path) -> tuple[Path, ...]:
+    """Return every checked-in source input that can change this campaign.
+
+    The holdout must bind more than the newly introduced calibration files:
+    ESKF math, model code, and public declarations can all alter a replay. The
+    native executable hash is retained separately in the result, while this
+    manifest freezes the source/build contract that produced it.
+    """
+    fixed = (
+        root / "CMakeLists.txt",
+        root / "requirements.txt",
+        CAMPAIGN_RUNNER,
         GENERATOR,
         ANALYZER,
         root / "validation" / "run_residual_bias_boundary.py",
         root / "validation" / "thresholds.json",
         root / "validation" / "validation_runner.c",
+        root / "validation" / "eskf_joint_covariance.h",
         root / "validation" / "static_imu_calibration_cli.c",
-        root / "src" / "static_imu_calibration.c",
-        root / "src" / "eskf_adapter.c",
-        root / "src" / "eskf.c",
-        root / "include" / "aerakia" / "static_imu_calibration.h",
-        root / "include" / "aerakia" / "eskf_adapter.h",
-        root / "include" / "aerakia" / "eskf.h",
     )
+    library_sources = tuple(sorted((root / "src").glob("*.c")))
+    library_private_headers = tuple(sorted((root / "src").glob("*.h")))
+    library_public_headers = tuple(sorted((root / "include" / "aerakia").glob("*.h")))
+    paths = fixed + library_sources + library_private_headers + library_public_headers
+    if len(set(paths)) != len(paths) or any(not path.is_file() for path in paths):
+        raise ValueError("multi-pose source manifest has missing or duplicate inputs")
+    return paths
+
+
+def source_manifest(root: Path) -> dict[str, str]:
+    """Hash all source inputs that define a campaign result, including dirty files."""
+    paths = campaign_source_paths(root)
     return {str(path.relative_to(root)): sha256_file(path) for path in paths}
+
+
+def load_protocol(path: Path) -> dict[str, Any]:
+    """Load a deliberately narrow, immutable multi-pose campaign protocol."""
+    protocol = json.loads(path.read_text(encoding="utf-8"))
+    if protocol.get("schema_version") != 1:
+        raise ValueError("unsupported multi-pose protocol schema")
+    if protocol.get("protocol_id") != "aerakia-g0-multipose-static-calibration-v1":
+        raise ValueError("unexpected multi-pose protocol id")
+    status = protocol.get("status")
+    if status not in {"development_only", "sealed_holdout"}:
+        raise ValueError("multi-pose protocol must declare development_only or sealed_holdout")
+    scope = protocol.get("scope")
+    if (not isinstance(scope, dict)
+            or scope.get("production_eskf") != "unchanged_16_nominal_15_error_state"):
+        raise ValueError("multi-pose protocol must not claim a production ESKF change")
+    candidate = protocol.get("candidate")
+    if not isinstance(candidate, dict):
+        raise ValueError("multi-pose protocol candidate is missing")
+    expected_candidate = {
+        "pose_count": 6,
+        "pose_directions": POSE_DIRECTIONS.tolist(),
+        "samples_per_pose": 400,
+        "accel_noise_m_s2": 0.02,
+        "gyro_noise_deg_s": 0.05,
+        "stationarity_source": "causal_imu_window",
+        "stationarity_window_s": 0.5,
+    }
+    for key, expected in expected_candidate.items():
+        if candidate.get(key) != expected:
+            raise ValueError(f"multi-pose protocol candidate {key} differs from frozen value")
+    trajectory = protocol.get("trajectory")
+    expected_trajectory = {
+        "motion": "bias_excitation",
+        "anomaly": "none",
+        "rate_hz": 100.0,
+        "duration_s": 40.0,
+        "accel_bias_std_m_s2": 0.08,
+        "gyro_bias_std_deg_s": 0.30,
+        "rate_invariant_streams": True,
+    }
+    if (not isinstance(trajectory, dict)
+            or any(trajectory.get(key) != expected
+                   for key, expected in expected_trajectory.items())):
+        raise ValueError("multi-pose trajectory differs from frozen contract")
+    seed_sets = protocol.get("seed_sets")
+    expected_sets = {"development"} if status == "development_only" else {"sealed_holdout"}
+    if not isinstance(seed_sets, dict) or set(seed_sets) != expected_sets:
+        raise ValueError("multi-pose protocol seed sets do not match its status")
+    for name, seeds in seed_sets.items():
+        invalid_seed = (not isinstance(seeds, list) or not seeds
+                        or any(not isinstance(seed, int) or seed < 0
+                               or seed > 0xFFFF_FFFF for seed in seeds)
+                        or len(set(seeds)) != len(seeds))
+        if invalid_seed:
+            raise ValueError(
+                f"multi-pose {name} seeds must be unique unsigned 32-bit integers")
+    cases = protocol.get("case_matrix")
+    if (not isinstance(cases, dict)
+            or cases.get("kind") != "residual_bias_boundary_full_137"
+            or cases.get("expected_case_count") != 137):
+        raise ValueError("multi-pose protocol must retain 137 frozen boundary cases")
+    sources = protocol.get("sources")
+    if (not isinstance(sources, dict)
+            or not isinstance(sources.get("source_manifest"), dict)
+            or not isinstance(sources.get("source_manifest_sha256"), str)
+            or len(str(sources["source_manifest_sha256"])) != 64):
+        raise ValueError("multi-pose protocol source manifest is incomplete")
+    current_manifest = source_manifest(ROOT)
+    if sources["source_manifest"] != current_manifest:
+        raise ValueError("multi-pose source manifest differs from frozen protocol")
+    if sources["source_manifest_sha256"] != canonical_sha256(current_manifest):
+        raise ValueError("multi-pose source-manifest digest differs from frozen protocol")
+    return protocol
 
 
 def run_checked(command: list[str], timeout_s: float) -> subprocess.CompletedProcess[str]:
@@ -100,6 +208,21 @@ def run_checked(command: list[str], timeout_s: float) -> subprocess.CompletedPro
         timeout=timeout_s,
         check=False,
     )
+
+
+def capture_version(command: list[str]) -> str | None:
+    """Return one short tool-version line without making provenance fatal."""
+    completed = subprocess.run(
+        command,
+        capture_output=True,
+        text=True,
+        timeout=10.0,
+        check=False,
+    )
+    if completed.returncode != 0:
+        return None
+    lines = (completed.stdout or completed.stderr).splitlines()
+    return lines[0].strip() if lines else None
 
 
 def calibration_noise_seed(validation_seed: int) -> int:
@@ -419,6 +542,17 @@ def main() -> None:
     parser.add_argument("--runner", type=Path, required=True)
     parser.add_argument("--calibrator", type=Path, required=True)
     parser.add_argument("--out-dir", type=Path, default=Path("build/g0-multipose-static-calibration"))
+    parser.add_argument(
+        "--protocol", type=Path,
+        help=(
+            "frozen development or sealed-holdout protocol; when supplied it owns "
+            "all case, seed, noise, and trajectory settings"
+        ),
+    )
+    parser.add_argument(
+        "--phase", choices=("development", "sealed_holdout"), default="development",
+        help="validation phase; sealed_holdout additionally requires a clean worktree",
+    )
     parser.add_argument("--seeds", default="41001,41003,41009,41021")
     parser.add_argument("--case-ids", default="", help="optional comma-separated development cases")
     parser.add_argument("--rate", type=float, default=100.0)
@@ -429,14 +563,44 @@ def main() -> None:
     parser.add_argument("--accel-noise-m-s2", type=float, default=0.02)
     parser.add_argument("--gyro-noise-deg-s", type=float, default=0.05)
     args = parser.parse_args()
+    protocol: dict[str, Any] | None = None
+    protocol_path: Path | None = None
+    if args.protocol is not None:
+        protocol_path = args.protocol.resolve()
+        if not protocol_path.is_file():
+            parser.error("multi-pose protocol must be an existing JSON file")
+        try:
+            protocol = load_protocol(protocol_path)
+        except (OSError, ValueError, json.JSONDecodeError) as error:
+            parser.error(str(error))
+        expected_phase = "development" if protocol["status"] == "development_only" else "sealed_holdout"
+        if args.phase != expected_phase:
+            parser.error(
+                f"protocol status {protocol['status']} only permits --phase {expected_phase}")
+        if args.phase == "sealed_holdout":
+            try:
+                require_clean_worktree(ROOT)
+            except ValueError as error:
+                parser.error(str(error))
+        candidate = protocol["candidate"]
+        trajectory = protocol["trajectory"]
+        seeds = [int(value) for value in protocol["seed_sets"][args.phase]]
+        args.rate = float(trajectory["rate_hz"])
+        args.duration = float(trajectory["duration_s"])
+        args.samples_per_pose = int(candidate["samples_per_pose"])
+        args.accel_noise_m_s2 = float(candidate["accel_noise_m_s2"])
+        args.gyro_noise_deg_s = float(candidate["gyro_noise_deg_s"])
+        if args.case_ids:
+            parser.error("--case-ids is not permitted with a frozen multi-pose protocol")
+    else:
+        try:
+            seeds = parse_seed_list(args.seeds)
+        except ValueError as error:
+            parser.error(str(error))
     if args.rate <= 0.0 or args.duration <= 2.0 or args.jobs < 1 or args.timeout_s <= 0.0:
         parser.error("rate, duration, jobs, and timeout must be positive; duration must exceed 2 s")
     if args.samples_per_pose < 1 or args.accel_noise_m_s2 < 0.0 or args.gyro_noise_deg_s < 0.0:
         parser.error("calibration samples must be positive and noise values non-negative")
-    try:
-        seeds = parse_seed_list(args.seeds)
-    except ValueError as error:
-        parser.error(str(error))
     runner = args.runner.resolve()
     calibrator = args.calibrator.resolve()
     if not runner.is_file() or not calibrator.is_file():
@@ -500,10 +664,13 @@ def main() -> None:
         and aggregate["regressed_from_pass"] == 0
     )
     summary = {
-        "schema_version": 1,
+        "schema_version": 2,
         "status": "passed" if all_candidate_pass else "failed",
         "scope": {
-            "kind": "synthetic opened-development A/B",
+            "kind": (
+                "synthetic sealed holdout A/B" if args.phase == "sealed_holdout"
+                else "synthetic opened-development A/B"
+            ),
             "candidate": "explicit six-pose static gravity-sphere calibration before cold start",
             "baseline": "existing one-pose static tilt/bias initialization",
             "candidate_information_boundary": (
@@ -512,7 +679,7 @@ def main() -> None:
             ),
             "not_claimed": [
                 "physical FCOne calibration accuracy", "temperature, scale, or misalignment compensation",
-                "sealed holdout closure", "flight readiness or airworthiness",
+                "flight readiness or airworthiness",
             ],
         },
         "provenance": {
@@ -523,8 +690,18 @@ def main() -> None:
             "calibrator_sha256": sha256_file(calibrator),
             "generator_sha256": sha256_file(GENERATOR),
             "analyzer_sha256": sha256_file(ANALYZER),
+            "environment": {
+                "python": sys.version.replace("\n", " "),
+                "platform": platform.platform(),
+                "cmake": capture_version(["cmake", "--version"]),
+                "compiler": capture_version(["cc", "--version"]),
+            },
         },
         "protocol": {
+            "phase": args.phase,
+            "path": None if protocol_path is None else str(protocol_path.relative_to(ROOT)),
+            "file_sha256": None if protocol_path is None else sha256_file(protocol_path),
+            "semantic_sha256": None if protocol is None else canonical_sha256(protocol),
             "case_count_per_seed": len(cases), "seed_count": len(seeds), "seeds": seeds,
             "rate_hz": args.rate, "duration_s": args.duration,
             "samples_per_pose": args.samples_per_pose,

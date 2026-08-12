@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import json
 import sys
 import tempfile
 import unittest
@@ -93,8 +94,42 @@ class MultiPoseStaticCalibrationCampaignTests(unittest.TestCase):
     def test_campaign_provenance_captures_dirty_source_inputs(self) -> None:
         manifest = campaign.source_manifest(ROOT)
         self.assertIn("src/static_imu_calibration.c", manifest)
+        self.assertIn("src/eskf_models.c", manifest)
+        self.assertIn("include/aerakia/types.h", manifest)
+        self.assertIn("CMakeLists.txt", manifest)
         self.assertIn("validation/static_imu_calibration_cli.c", manifest)
         self.assertEqual(len(manifest["src/static_imu_calibration.c"]), 64)
+
+    def test_sealed_protocol_freezes_every_replay_relevant_source(self) -> None:
+        path = ROOT / "validation" / "multipose_static_calibration_protocol_v1.json"
+        protocol = campaign.load_protocol(path)
+        self.assertEqual(protocol["status"], "sealed_holdout")
+        self.assertEqual(set(protocol["seed_sets"]), {"sealed_holdout"})
+        self.assertEqual(protocol["seed_sets"]["sealed_holdout"], [
+            51001, 51003, 51009, 51021, 51031, 51043, 51059, 51071,
+        ])
+        self.assertEqual(protocol["case_matrix"]["expected_case_count"], 137)
+        self.assertEqual(
+            protocol["sources"]["source_manifest_sha256"],
+            campaign.canonical_sha256(campaign.source_manifest(ROOT)),
+        )
+
+    def test_protocol_rejects_a_source_or_candidate_change(self) -> None:
+        source = ROOT / "validation" / "multipose_static_calibration_protocol_v1.json"
+        original = json.loads(source.read_text(encoding="utf-8"))
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "broken.json"
+            broken = json.loads(json.dumps(original))
+            broken["candidate"]["stationarity_window_s"] = 1.0
+            path.write_text(json.dumps(broken), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "stationarity_window_s"):
+                campaign.load_protocol(path)
+
+            broken = json.loads(json.dumps(original))
+            broken["sources"]["source_manifest"]["src/eskf.c"] = "0" * 64
+            path.write_text(json.dumps(broken), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "source manifest"):
+                campaign.load_protocol(path)
 
 
 if __name__ == "__main__":

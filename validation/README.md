@@ -10,8 +10,10 @@ portable C library and from FCOne-specific integration code.
 - `run_multipose_static_calibration_campaign.py`: paired development A/B of
   one-pose startup versus the public C99 six-pose calibration path. It retains
   compact results only, uses causal-IMU stationarity for replay startup, and is
-  not a physical calibration or flight claim. Its provenance records both the
-  Git commit and hashes of dirty source inputs.
+  not a physical calibration or flight claim. Its v1 sealed protocol fixes
+  cases, unopened seeds, source hashes, and parameters before execution;
+  sealed mode rejects a dirty source tree or identity mismatch. Its provenance
+  records both the Git commit and hashes of dirty source inputs.
 - `scan_static_imu_calibration_outlier_boundary.py`: deterministic diagnostic
   scan of tangential/radial single-pose contamination against the frozen
   calibration gates. It reports accepted-but-biased cases explicitly and does

@@ -56,6 +56,22 @@ leak detection disabled for this environment. The full campaign output remains
 outside Git under `/tmp/aerakia-multipose-548-causal/`; its compact protocol and
 source manifest are recorded when the candidate is committed.
 
+### Sealed-holdout preparation
+
+The opened result is deliberately not promoted by re-running it with a new
+label. `validation/multipose_static_calibration_protocol_v1.json` freezes a
+new eight-seed `51001..51071` holdout, the complete 137-case residual-bias
+matrix, six-pose/400-sample collection, causal quantized-IMU stationarity,
+100 Hz/40 s replay, and every C/Python source input that can change the
+result. The campaign runner compares its live source manifest against the
+protocol and rejects a dirty worktree before it reads a sealed seed.
+
+The holdout result is intentionally not written here yet. It must be executed
+once from the clean commit that introduces the protocol; either outcome will
+be retained with its source/binary/environment hashes. This prevents the
+synthetic G0 result from becoming a moving target while FCOne v2 hardware is
+still unavailable.
+
 ### Follow-up audit — end-to-end contract and outlier boundary
 
 The public API test was tightened so it now constructs six raw stationary pose

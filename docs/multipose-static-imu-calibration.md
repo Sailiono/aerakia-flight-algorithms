@@ -126,7 +126,26 @@ temperature performance, cross-IMU transferability, or flight readiness.
 
 Before any FCOne promotion, require:
 
-- a new sealed synthetic holdout that was not used for threshold selection;
+- the pre-registered sealed synthetic holdout in
+  `validation/multipose_static_calibration_protocol_v1.json`. It freezes the
+  full 137-case residual-bias boundary, eight unused seeds, the C/Python
+  source manifest, the quantized causal stationarity contract, and all
+  evaluated noise/duration settings. Run it only from a clean commit:
+
+  ```bash
+  cmake -S . -B build/multipose-sealed -DCMAKE_BUILD_TYPE=Release
+  cmake --build build/multipose-sealed --parallel
+  python3 validation/run_multipose_static_calibration_campaign.py \
+    --runner build/multipose-sealed/aerakia_validation_runner \
+    --calibrator build/multipose-sealed/aerakia_static_imu_calibration_cli \
+    --protocol validation/multipose_static_calibration_protocol_v1.json \
+    --phase sealed_holdout \
+    --out-dir build/multipose-static-calibration-sealed
+  ```
+
+  The runner refuses a dirty tree or a source/protocol hash mismatch. A pass
+  closes only this bounded synthetic holdout; a failure is retained and must
+  not be replaced by changing this v1 protocol.
 - near-threshold geometry/noise/outlier false-accept and false-reject studies;
 - per-IMU static multi-orientation hardware data across a declared temperature
   range;

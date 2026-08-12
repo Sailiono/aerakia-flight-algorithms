@@ -1,0 +1,126 @@
+{
+  "acceptance": {
+    "all_candidate_trials_must_pass_existing_bias_convergence_limits": true,
+    "all_trials_must_complete": true,
+    "candidate_must_not_regress_any_baseline_pass": true,
+    "interpretation": "A pass closes only this bounded synthetic holdout. It does not promote the procedure into FCOne control code or change the physical pre-arm quality gates."
+  },
+  "candidate": {
+    "accel_noise_m_s2": 0.02,
+    "gyro_noise_deg_s": 0.05,
+    "pose_count": 6,
+    "pose_directions": [
+      [
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        -1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        -1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0
+      ],
+      [
+        0.0,
+        0.0,
+        -1.0
+      ]
+    ],
+    "samples_per_pose": 400,
+    "stationarity_source": "causal_imu_window",
+    "stationarity_window_s": 0.5
+  },
+  "case_matrix": {
+    "coverage": {
+      "axis": 12,
+      "full_corner": 64,
+      "nominal": 1,
+      "pairwise": 60
+    },
+    "expected_case_count": 137,
+    "kind": "residual_bias_boundary_full_137"
+  },
+  "protocol_id": "aerakia-g0-multipose-static-calibration-v1",
+  "schema_version": 1,
+  "scope": {
+    "candidate": "validation-only six-pose static gravity-sphere bias seed before ESKF cold start",
+    "not_claimed": [
+      "physical FCOne IMU calibration accuracy",
+      "temperature, scale, non-orthogonality, vibration, or mounting compensation",
+      "flight readiness, control authority, or airworthiness"
+    ],
+    "production_eskf": "unchanged_16_nominal_15_error_state"
+  },
+  "seed_sets": {
+    "sealed_holdout": [
+      51001,
+      51003,
+      51009,
+      51021,
+      51031,
+      51043,
+      51059,
+      51071
+    ]
+  },
+  "sources": {
+    "source_manifest": {
+      "CMakeLists.txt": "e23add988a1ae2e1b0206d9c2fe38d6efe05ce02ee470e8d0f8d19cb25e6f400",
+      "include/aerakia/barometer_supervisor.h": "7c777da345dc628a20a87c26f34ff1cca804a6feefb1695bf8524d0172dc9eb9",
+      "include/aerakia/eskf.h": "8f732a45d6e90dd70830b7f45cf9ea1ab456e76ab6345e50c2ea49e0af724132",
+      "include/aerakia/eskf_adapter.h": "0abd883d54ad3396096e5699732ced8f5d60174b8eec885206662bb6442dc566",
+      "include/aerakia/eskf_types.h": "e9193a2dbc073e4511f9a034b66d9d069278c20bec448c26b7544a06ad2cf2b8",
+      "include/aerakia/mag_gate.h": "058c2a1beb1c3479e4f5c08e0405d3f5ec3810e8c70ce138a14105735d180e8c",
+      "include/aerakia/mahony.h": "2726b5ff6f71b5748335bb3f87f538e2cc5c4633d9a8fb41641df00e925de60f",
+      "include/aerakia/static_imu_calibration.h": "b8a846290f58db10071e0badfdaa48bfb41d002be95ed0697857295db8d0d2ab",
+      "include/aerakia/types.h": "6954f15f23f3da61801802df7d0106df91ffdf3779076050643c1a42b7f22241",
+      "include/aerakia/version.h": "9fcb04200ddb5cd2a9fb938fb0651ad6bf0848ad46dd1d380ef1c7b44172022a",
+      "requirements.txt": "cec845c0d866b6f7f08bb517d81aa44e5caf87df9a62dbcc3be1b8ed47629c27",
+      "simulation/tools/generate_synthetic_imu.py": "324c927a3df2cc4fbca77e16e075fb1a8ebbaecf8c8875b5d7f529570e8fe81c",
+      "src/barometer_supervisor.c": "c68f46787695a40a7c3d26ff2dda6ac0a833f1b4acd48a47b0fd8efeeb243984",
+      "src/eskf.c": "87fc3d0591238c35a1cc3b884e2c5b250ca481c8456e76b577d8a6fd4a5af35e",
+      "src/eskf_adapter.c": "55203a96de572800e8a5bc773867443c1633a471f984b0131f6bd3155de8b713",
+      "src/eskf_internal.h": "065b0909234ed01ff4e368780e74b6a7926f9973a7c1392babc2e6f619c209f0",
+      "src/eskf_math.c": "11412cad83c735ab42e0c8ca2b1d2fea3cb5fe92dab738128f6b6d03302f060b",
+      "src/eskf_math.h": "2ba6a200aa542ff0cf5b346c91463e97016f76efd90fa75c0adf0c62440614b1",
+      "src/eskf_models.c": "49d1698f8c6f01b1b8ca333f51b561cc65b875cda43e896d22b90ccfc805a800",
+      "src/eskf_models.h": "513a33e541c1f2224887f1542a76f7d9e303b6d2c44500a5bc091d0c465adcfb",
+      "src/mag_gate.c": "d5b110f69c4f2508059e501869c400afdd3f49ccbc3f561dbd4923d551ab1169",
+      "src/mahony.c": "33a3538974e61682b270637da9e186a12480140311c70bc0cec0b349b03e913a",
+      "src/static_imu_calibration.c": "fe1a4495155ecb7d90c8d3f95abe3f69e30fbf4984e5bcde954eee0a1594c70d",
+      "validation/analyze_results.py": "511570e0da9a0e40c07c7c603e790173fed95c833144ed77c2a543709bd81ed6",
+      "validation/eskf_joint_covariance.h": "2c5ed009c3efc720ad4233ee441ff75b005bae7c7dde94de71db152d4464fa33",
+      "validation/run_multipose_static_calibration_campaign.py": "55bdf7302c9950862ac37a683083a51bf7d28c3192349ddd09b2798250684c51",
+      "validation/run_residual_bias_boundary.py": "453e78393eb7b50da09e8c7629d85a0b364deaa3049e48e1523950bc1702ff67",
+      "validation/static_imu_calibration_cli.c": "e86d574bd4de93fc9060dabbd5a7d3e4437d0ab64f55203c790113214d9cf1f2",
+      "validation/thresholds.json": "bb6c04721304c6742c314ab4101d2d7b3356ed50502ea00d7365f4f233c136a6",
+      "validation/validation_runner.c": "f32716f75e0369a69cf2a05d246b80d7daa030ce5e81e176181a411eb5adfb84"
+    },
+    "source_manifest_sha256": "1f01b77ee80c39b281d53d014c100da7c37db0ef7c122217caf8f2f837f001b2"
+  },
+  "status": "sealed_holdout",
+  "trajectory": {
+    "accel_bias_std_m_s2": 0.08,
+    "anomaly": "none",
+    "duration_s": 40.0,
+    "gyro_bias_std_deg_s": 0.3,
+    "motion": "bias_excitation",
+    "rate_hz": 100.0,
+    "rate_invariant_streams": true
+  }
+}
