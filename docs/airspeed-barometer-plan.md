@@ -36,9 +36,11 @@ b_baro_dot = random_walk
 
 Before adding a barometer-bias state, the adapter layer can safely own pressure-to-height
 conversion, startup datum, GNSS/barometer datum alignment, quality checks, and a frozen datum during
-GNSS outage. The current experimental source supervisor covers physical time, jump, quantization-
-aware freeze, latch, two-stage fused-baseline commit, and externally authorized return-to-baseline
-recovery. Thermal
+GNSS outage. The current source supervisor covers physical time, jump, quantization-aware freeze,
+latch, two-stage fused-baseline commit, and externally authorized return-to-baseline recovery. The
+public `aerakia_eskf_update_supervised_barometer_observation()` API now binds that evaluation to
+the timestamped ESKF update and commits the supervisor only when the core accepts the same sample.
+This is an integration contract, not a claim that the source is physically qualified. Thermal
 drift, pressure conversion, redundant-source voting, and real full-state failover remain open.
 
 ### Airspeed and wind
@@ -88,7 +90,9 @@ transition regimes.
 
 ### A1: barometer qualification
 
-- Add pressure-to-relative-height and datum management outside the core.
+- Use the supervised transaction API from the private adapter after pressure-to-relative-height
+  conversion and datum management; keep source selection, reset identity, and recovery
+  authorization private.
 - Test bias, random walk, weather step, temperature drift, freeze, delay, reset, and recovery.
 - Compare IMU-only and IMU+barometer with identical truth/noise across 5/10/30/60/120 s GNSS
   outages.

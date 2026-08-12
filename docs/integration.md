@@ -117,6 +117,32 @@ heading_status = aerakia_eskf_update_heading_observation(&navigation_filter, &he
 barometer_status = aerakia_eskf_update_barometer_observation(&navigation_filter, &barometer);
 ```
 
+When the application wants the optional causal barometer source guard, use the
+single transaction API so the guard and ESKF observe the same sample exactly
+once:
+
+```c
+AerakiaSupervisedBarometerObservation supervised_baro = {
+    .measurement = barometer,
+    .source_id = selected_baro_id,
+    .source_generation = selected_baro_generation,
+    .quality_sequence = selected_baro_quality_sequence,
+};
+AerakiaBarometerSupervisorDecision baro_decision;
+barometer_status = aerakia_eskf_update_supervised_barometer_observation(
+    &navigation_filter, &barometer_supervisor, &supervised_baro, &baro_decision
+);
+```
+
+This call captures the ESKF prediction before fusion, evaluates the source,
+and commits the supervisor baseline only when the ESKF core also accepts the
+measurement. A supervisor rejection leaves the ESKF state and covariance
+unchanged; a core innovation rejection leaves the source baseline unchanged.
+The returned status distinguishes malformed input, timestamp/staleness faults,
+and source-supervisor rejection. The private application still owns pressure
+conversion, source selection, independent vertical-reference authorization,
+and any complete-state shadow handoff.
+
 The barometer ESKF update is intentionally a measurement model, not a complete physical-source
 monitor. The optional hardware-neutral `AerakiaBarometerSupervisor` can be called before fusion
 with the physical sample timestamp and the ESKF's pre-update height/vertical-velocity prediction.

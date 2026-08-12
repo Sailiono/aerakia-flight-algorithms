@@ -1066,6 +1066,77 @@ AerakiaStatus aerakia_eskf_update_barometer_observation(
     return AERAKIA_STATUS_OK;
 }
 
+static AerakiaStatus barometer_supervisor_status(
+    uint32_t fault_flags
+)
+{
+    if ((fault_flags & AERAKIA_BARO_FAULT_INVALID) != 0U) {
+        return AERAKIA_STATUS_MISSING_MEASUREMENT;
+    }
+    if ((fault_flags & AERAKIA_BARO_FAULT_TIMESTAMP) != 0U) {
+        return AERAKIA_STATUS_TIMESTAMP_ERROR;
+    }
+    if ((fault_flags & AERAKIA_BARO_FAULT_STALE) != 0U) {
+        return AERAKIA_STATUS_STALE_MEASUREMENT;
+    }
+    return AERAKIA_STATUS_RECOVERY_REJECTED;
+}
+
+AerakiaStatus aerakia_eskf_update_supervised_barometer_observation(
+    AerakiaEskf *filter,
+    AerakiaBarometerSupervisor *supervisor,
+    const AerakiaSupervisedBarometerObservation *observation,
+    AerakiaBarometerSupervisorDecision *decision
+)
+{
+    AerakiaBarometerSupervisorObservation supervised_observation;
+    AerakiaBarometerSupervisorDecision local_decision;
+    AerakiaStatus status;
+    AerakiaNavigationEstimate estimate;
+
+    if (filter == NULL || supervisor == NULL || observation == NULL) {
+        return AERAKIA_STATUS_INVALID_ARGUMENT;
+    }
+    if (!filter->has_timestamp) {
+        filter->barometer_accepted = false;
+        if (decision != NULL) memset(decision, 0, sizeof(*decision));
+        return AERAKIA_STATUS_NOT_READY;
+    }
+
+    /* Capture the prediction before the core can mutate p/v or its covariance. */
+    aerakia_eskf_get_estimate(filter, &estimate);
+    memset(&supervised_observation, 0, sizeof(supervised_observation));
+    supervised_observation.sample_timestamp_us = observation->measurement.timestamp_us;
+    supervised_observation.evaluation_timestamp_us = filter->last_timestamp_us;
+    supervised_observation.height_up_m = observation->measurement.height_up_m;
+    supervised_observation.variance_m2 = observation->measurement.variance_m2;
+    supervised_observation.predicted_height_up_m = -estimate.position_ned_m.z;
+    supervised_observation.predicted_vertical_velocity_up_m_s = -estimate.velocity_ned_m_s.z;
+    supervised_observation.source_id = observation->source_id;
+    supervised_observation.source_generation = observation->source_generation;
+    supervised_observation.quality_sequence = observation->quality_sequence;
+
+    local_decision = aerakia_barometer_supervisor_evaluate(
+        supervisor, &supervised_observation
+    );
+    if (!local_decision.accepted) {
+        aerakia_eskf_note_barometer_rejection(filter);
+        if (decision != NULL) *decision = local_decision;
+        return barometer_supervisor_status(local_decision.fault_flags);
+    }
+
+    status = aerakia_eskf_update_barometer_observation(
+        filter, &observation->measurement
+    );
+    aerakia_barometer_supervisor_commit(
+        supervisor,
+        status == AERAKIA_STATUS_OK && filter->barometer_accepted,
+        &local_decision
+    );
+    if (decision != NULL) *decision = local_decision;
+    return status;
+}
+
 void aerakia_eskf_note_barometer_rejection(AerakiaEskf *filter)
 {
     if (filter == NULL) return;

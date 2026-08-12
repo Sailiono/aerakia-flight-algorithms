@@ -561,6 +561,195 @@ static void test_eskf_timestamped_aiding_integrity(void)
                "barometer recovers after rejected aiding faults");
 }
 
+static void process_level_imu_at(
+    AerakiaEskf *filter,
+    uint64_t timestamp_us,
+    AerakiaNavigationEstimate *estimate
+)
+{
+    AerakiaImuSample sample = level_sample(timestamp_us);
+    (void)aerakia_eskf_process_imu(filter, &sample, estimate);
+}
+
+static AerakiaSupervisedBarometerObservation supervised_barometer(
+    uint64_t timestamp_us,
+    float height_up_m,
+    uint32_t source_generation
+)
+{
+    AerakiaSupervisedBarometerObservation observation;
+    memset(&observation, 0, sizeof(observation));
+    observation.measurement.timestamp_us = timestamp_us;
+    observation.measurement.height_up_m = height_up_m;
+    observation.measurement.variance_m2 = 0.25f;
+    observation.source_id = 17U;
+    observation.source_generation = source_generation;
+    observation.quality_sequence = 23U;
+    return observation;
+}
+
+static void init_supervised_barometer_filter(
+    AerakiaEskf *filter,
+    AerakiaBarometerSupervisor *supervisor,
+    const AerakiaBarometerSupervisorConfig *supervisor_config,
+    AerakiaNavigationEstimate *estimate
+)
+{
+    AerakiaEskfConfig config;
+    aerakia_eskf_default_config(&config);
+    config.enable_static_alignment = false;
+    aerakia_eskf_init(filter, &config, NULL, NULL);
+    aerakia_barometer_supervisor_init(supervisor, supervisor_config);
+    process_level_imu_at(filter, 0U, estimate);
+    process_level_imu_at(filter, 10000U, estimate);
+}
+
+static void test_eskf_supervised_barometer_transaction(void)
+{
+    AerakiaEskf filter;
+    AerakiaEskf before;
+    AerakiaNavigationEstimate estimate;
+    AerakiaBarometerSupervisor supervisor;
+    AerakiaBarometerSupervisorConfig supervisor_config;
+    AerakiaBarometerSupervisorDecision decision;
+    AerakiaSupervisedBarometerObservation observation;
+    AerakiaBarometerDatumRecoveryAuthorization authorization;
+    AerakiaStatus status;
+
+    aerakia_barometer_supervisor_default_config(&supervisor_config);
+    /* Keep the source jump threshold deliberately loose here so the test can
+     * exercise the core NIS gate independently from source supervision. */
+    supervisor_config.jump_minimum_threshold_m = 10.0f;
+    supervisor_config.jump_sigma_multiplier = 100.0f;
+    init_supervised_barometer_filter(
+        &filter, &supervisor, &supervisor_config, &estimate
+    );
+
+    observation = supervised_barometer(10000U, 0.0f, 4U);
+    status = aerakia_eskf_update_supervised_barometer_observation(
+        &filter, &supervisor, &observation, &decision
+    );
+    check_true(status == AERAKIA_STATUS_OK && decision.accepted
+                   && filter.barometer_accepted,
+               "supervised barometer commits an initially accepted sample");
+
+    /* A positive-up measurement must correct the NED down position negatively. */
+    process_level_imu_at(&filter, 20000U, &estimate);
+    observation = supervised_barometer(20000U, 2.0f, 4U);
+    status = aerakia_eskf_update_supervised_barometer_observation(
+        &filter, &supervisor, &observation, &decision
+    );
+    aerakia_eskf_get_estimate(&filter, &estimate);
+    check_true(status == AERAKIA_STATUS_OK && decision.accepted
+                   && filter.barometer_accepted && estimate.position_ned_m.z < 0.0f,
+               "supervised positive-up barometer update moves NED down position upward");
+
+    /* A source rejection must not mutate the estimator state or covariance. */
+    process_level_imu_at(&filter, 30000U, &estimate);
+    observation = supervised_barometer(30000U, NAN, 4U);
+    before = filter;
+    status = aerakia_eskf_update_supervised_barometer_observation(
+        &filter, &supervisor, &observation, &decision
+    );
+    check_true(status == AERAKIA_STATUS_MISSING_MEASUREMENT
+                   && (decision.fault_flags & AERAKIA_BARO_FAULT_INVALID)
+                   && !decision.accepted && !filter.barometer_accepted
+                   && eskf_core_unchanged(&filter, &before),
+               "supervisor rejection leaves ESKF state and covariance unchanged");
+
+    /* Duplicate source time is rejected before the core and leaves it unchanged. */
+    observation = supervised_barometer(20000U, 2.0f, 4U);
+    before = filter;
+    status = aerakia_eskf_update_supervised_barometer_observation(
+        &filter, &supervisor, &observation, &decision
+    );
+    check_true(status == AERAKIA_STATUS_TIMESTAMP_ERROR
+                   && (decision.fault_flags & AERAKIA_BARO_FAULT_TIMESTAMP)
+                   && eskf_core_unchanged(&filter, &before),
+               "supervised duplicate timestamp is rejected before ESKF fusion");
+
+    /* Make the core NIS gate, rather than the supervisor, reject a sample. */
+    aerakia_barometer_supervisor_default_config(&supervisor_config);
+    supervisor_config.jump_minimum_threshold_m = 10000.0f;
+    supervisor_config.jump_sigma_multiplier = 10000.0f;
+    init_supervised_barometer_filter(
+        &filter, &supervisor, &supervisor_config, &estimate
+    );
+    observation = supervised_barometer(10000U, 0.0f, 4U);
+    check_true(aerakia_eskf_update_supervised_barometer_observation(
+                   &filter, &supervisor, &observation, &decision
+               ) == AERAKIA_STATUS_OK && decision.accepted,
+               "core-NIS transaction establishes a fused barometer baseline");
+    process_level_imu_at(&filter, 20000U, &estimate);
+    observation = supervised_barometer(20000U, 1000.0f, 4U);
+    before = filter;
+    status = aerakia_eskf_update_supervised_barometer_observation(
+        &filter, &supervisor, &observation, &decision
+    );
+    check_true(status == AERAKIA_STATUS_OK && !decision.accepted
+                   && !filter.barometer_accepted
+                   && fabsf(supervisor.last_accepted_height_up_m) < 1.0e-6f
+                   && eskf_core_unchanged(&filter, &before),
+               "core NIS rejection does not commit the supervisor baseline");
+
+    /* Re-establish a normal source and exercise the explicit jump recovery path. */
+    aerakia_barometer_supervisor_default_config(&supervisor_config);
+    supervisor_config.recovery_min_samples = 2U;
+    supervisor_config.recovery_min_duration_s = 0.0f;
+    supervisor_config.recovery_max_gap_s = 0.2f;
+    init_supervised_barometer_filter(
+        &filter, &supervisor, &supervisor_config, &estimate
+    );
+    observation = supervised_barometer(10000U, 0.0f, 4U);
+    (void)aerakia_eskf_update_supervised_barometer_observation(
+        &filter, &supervisor, &observation, &decision
+    );
+    process_level_imu_at(&filter, 20000U, &estimate);
+    observation = supervised_barometer(20000U, 3.0f, 4U);
+    status = aerakia_eskf_update_supervised_barometer_observation(
+        &filter, &supervisor, &observation, &decision
+    );
+    check_true(status == AERAKIA_STATUS_RECOVERY_REJECTED
+                   && !decision.fault_latched,
+               "first barometer jump is rejected without immediate latch");
+    process_level_imu_at(&filter, 30000U, &estimate);
+    observation = supervised_barometer(30000U, 3.0f, 4U);
+    status = aerakia_eskf_update_supervised_barometer_observation(
+        &filter, &supervisor, &observation, &decision
+    );
+    check_true(status == AERAKIA_STATUS_RECOVERY_REJECTED
+                   && decision.fault_latched
+                   && (decision.fault_flags & AERAKIA_BARO_FAULT_JUMP),
+               "persistent barometer jump latches the source");
+
+    memset(&authorization, 0, sizeof(authorization));
+    authorization.authorization_timestamp_us = 40000U;
+    authorization.valid_until_timestamp_us = 100000U;
+    authorization.source_id = 17U;
+    authorization.source_generation = 4U;
+    authorization.quality_sequence = 23U;
+    authorization.source_quality_verified = true;
+    check_true(aerakia_barometer_supervisor_authorize_datum_recovery(
+                   &supervisor, &authorization),
+               "independent source-quality authorization enables recovery");
+    process_level_imu_at(&filter, 40000U, &estimate);
+    observation = supervised_barometer(40000U, 0.0f, 4U);
+    status = aerakia_eskf_update_supervised_barometer_observation(
+        &filter, &supervisor, &observation, &decision
+    );
+    check_true(status == AERAKIA_STATUS_RECOVERY_REJECTED
+                   && decision.recovery_probationary && decision.fault_latched,
+               "authorized recovery remains probationary before its sample count");
+    process_level_imu_at(&filter, 50000U, &estimate);
+    observation = supervised_barometer(50000U, 0.0f, 4U);
+    status = aerakia_eskf_update_supervised_barometer_observation(
+        &filter, &supervisor, &observation, &decision
+    );
+    check_true(status == AERAKIA_STATUS_OK && decision.accepted
+                   && !decision.fault_latched && filter.barometer_accepted,
+               "authorized recovery commits only after probationary samples");
+}
+
 static void test_eskf_independent_navigation_observations(void)
 {
     AerakiaEskf filter;
@@ -1288,6 +1477,7 @@ int main(void)
     test_eskf_magnetic_reference_validation();
     test_eskf_input_integrity();
     test_eskf_timestamped_aiding_integrity();
+    test_eskf_supervised_barometer_transaction();
     test_eskf_independent_navigation_observations();
     test_eskf_horizontal_navigation_validity_timeout();
     test_eskf_aiding_numeric_exhaustive();

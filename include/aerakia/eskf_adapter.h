@@ -8,6 +8,7 @@
 
 #include <aerakia/eskf.h>
 #include <aerakia/mag_gate.h>
+#include <aerakia/barometer_supervisor.h>
 #include <aerakia/types.h>
 
 typedef struct {
@@ -93,6 +94,19 @@ typedef struct {
     float height_up_m;
     float variance_m2;
 } AerakiaBarometerObservation;
+
+/**
+ * A barometer observation with the source identity required by the optional
+ * causal supervisor.  The adapter evaluates the source against the latest
+ * processed IMU timestamp; callers must process the corresponding IMU stream
+ * before submitting lower-rate aiding.
+ */
+typedef struct {
+    AerakiaBarometerObservation measurement;
+    uint32_t source_id;
+    uint32_t source_generation;
+    uint64_t quality_sequence;
+} AerakiaSupervisedBarometerObservation;
 
 /**
  * One-shot authorization from the private estimator supervisor.
@@ -322,6 +336,23 @@ void aerakia_eskf_update_barometer(
 AerakiaStatus aerakia_eskf_update_barometer_observation(
     AerakiaEskf *filter,
     const AerakiaBarometerObservation *observation
+);
+
+/**
+ * Evaluate and fuse one barometer observation as an atomic supervisor/core
+ * transaction.  The supervisor sees the ESKF prediction immediately before
+ * fusion, and its fused-source baseline advances only when the core accepts
+ * the same observation.  A source rejection never changes the ESKF state.
+ *
+ * The optional supervisor remains hardware-neutral; source selection,
+ * pressure conversion, independent vertical truth, and recovery authorization
+ * belong to the application layer.
+ */
+AerakiaStatus aerakia_eskf_update_supervised_barometer_observation(
+    AerakiaEskf *filter,
+    AerakiaBarometerSupervisor *supervisor,
+    const AerakiaSupervisedBarometerObservation *observation,
+    AerakiaBarometerSupervisorDecision *decision
 );
 
 void aerakia_eskf_note_barometer_rejection(AerakiaEskf *filter);
