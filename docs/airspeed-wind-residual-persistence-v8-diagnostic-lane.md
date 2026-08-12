@@ -171,3 +171,33 @@ requires:
 
 The result must be retained whether it passes or fails. Passing these synthetic
 development checks still cannot authorize FCOne or any control/source action.
+
+### Fresh confirmation result: failed (2026-08-12)
+
+The frozen confirmation ran once on seeds `74401--74528`: `128` independent
+families, `17` cases each, and `2,176` replays. Its full trace is retained
+outside Git at
+`build/airspeed_wind_residual_persistence_v8_diagnostic_lane_confirmation_74401_128.json`
+with SHA-256
+`c89cf80e62033b6d4c116b815024ffdf67efb3440bee9d80e4b95fa477f055b2`.
+The committed compact summary and attribution audit retain the exact command,
+commit, protocol hash, implementation hash, and trace hash.
+
+For the registered `graded_evidence @ 3 s` comparator:
+
+| Registered check | Result | Verdict |
+| --- | ---: | --- |
+| Nominal diagnostic family rate | `0/128`; 97.5% upper bound `2.8408%` | Pass (`<=3%`) |
+| Structural-gap diagnostic events | `0` | Pass |
+| Persistent descriptive-union families | `117/128 = 91.40625%` | **Fail** (`>=95%` required) |
+| `1.5 s` pulse diagnostic events | `2` | **Fail** (zero required) |
+
+The diagnostic descriptive union contains `438/512` clean normal-control
+members plus `32/512` diagnostic-clean members, or `470/512` members. The
+confirmation is therefore failed development evidence and must not be retuned
+on these seeds. It does not promote any policy, threshold, estimator state,
+FCOne authority, source selection, or control action.
+
+In this document's historical filename, `v8` is an artifact identifier. In
+new prose this is the **TAS residual persistence experiment R8**, not an FCOne
+hardware or firmware version; see [Naming and version boundaries](versioning.md).

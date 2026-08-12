@@ -2,6 +2,11 @@
 
 ## Current verdict
 
+**Naming note.** `FCOne-HW-v1` and `FCOne-HW-v2` are the only FCOne hardware
+generations. Historical `v4`--`v8` strings in TAS residual-study artifact names
+are frozen experiment labels; this document calls those studies `R4`--`R8` when
+describing them as experiments. See [Naming and version boundaries](versioning.md).
+
 The portable estimator core is suitable for FCOne integration work and further bench testing,
 but it is not yet justified to claim that the complete flight-estimation system is verified.
 The current evidence establishes deterministic host behavior, measurement integrity handling,
@@ -70,6 +75,23 @@ float until a square-root/UD or bounded PSD-repair policy is evidenced. See
 | Output qualification | Numerical health is distinct from independently aged horizontal position/velocity, heading, vertical-position, and vertical-velocity validity; only accepted applicable constraints refresh each age | Passing public API and UrbanNav outage gates; position-only, velocity-only, and ZUPT semantics are explicit, and startup alignment is not treated as continuing observability |
 | FCOne-neutral adapter | Physical timestamp preservation, FRD sentinel axes, g/deg/s/gauss conversion, independent validity bits, missing data, duplicate/gap recovery, and future/stale aiding | Passing executable mock-publication contract; exact v2 message and scheduler remain open |
 | Private replay | Sanitized relative GNSS, reset events, GSF diagnostics, and native C replay across the selected ULog suite | Operational; PX4 remains an engineering reference |
+
+### TAS residual persistence experiment R8 (2026-08-12)
+
+The pre-registered fresh diagnostic confirmation on seeds `74401--74528`
+completed `2,176` replays (`128` independent families, `17` cases each). The
+selected `graded_evidence @ 3 s` comparator **failed** its development gate:
+the nominal diagnostic rate was `0/128` with a 97.5% one-sided upper bound of
+`2.8408%`, and structural-gap diagnostics were `0`, but persistent descriptive
+union coverage was only `117/128 = 91.40625%` versus the required `95%`; two
+`1.5 s` pulse diagnostic events also violated the zero-event gate. The retained
+coverage is `438/512` clean control members plus `32` diagnostic-clean members,
+or `470/512` in the diagnostic descriptive union.
+
+This is a retained failed host-side experiment. It changes no production ESKF,
+Mahony, public API, FCOne adapter, selector, supervisor, control authority, or
+wind-state decision. The compact evidence and full-trace hash are recorded in
+[the R8 diagnostic-lane record](airspeed-wind-residual-persistence-v8-diagnostic-lane.md).
 
 ## P0 work before hardware flight tests
 

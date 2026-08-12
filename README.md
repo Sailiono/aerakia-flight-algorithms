@@ -7,6 +7,10 @@ Portable C99 flight-estimation algorithms with a reproducible PC validation plat
 Current pre-1.0 public API: **v0.3.0**. Existing integrations should review the
 [v0.3 migration guide](docs/api-migration-v0.3.md).
 
+> Naming boundary: FCOne hardware generations are only `FCOne-HW-v1` and
+> `FCOne-HW-v2`. This API version and validation-study revisions are independent;
+> see [Naming and version boundaries](docs/versioning.md).
+
 > 中文简介：这是 Aerakia 的公开算法层和验证工具，不包含飞控硬件、CubeMX、HAL/RTOS、传感器驱动、板级 HIL 协议或产品控制逻辑。
 
 ## What this repository demonstrates

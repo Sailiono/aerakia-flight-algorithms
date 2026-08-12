@@ -3006,3 +3006,31 @@ gap diagnostic events, and zero `1.5 s` pulse diagnostic events. The `2.0 s`
 pulse remains descriptive. Other policies and ages remain comparators. The run
 is single-use opened development confirmation, not a holdout, and cannot
 promote control authority even if every check passes.
+
+### 2026-08-12 — TAS residual persistence experiment R8 fresh confirmation failed
+
+The pre-registered confirmation ran once from frozen commit `5213c53` on seeds
+`74401--74528`: `128` independent families, `17` cases per family, and `2,176`
+replays. The complete trace remains outside Git at
+`build/airspeed_wind_residual_persistence_v8_diagnostic_lane_confirmation_74401_128.json`
+with SHA-256
+`c89cf80e62033b6d4c116b815024ffdf67efb3440bee9d80e4b95fa477f055b2`.
+The compact screen summary and independent streamed attribution audit are
+retained under `validation/public/`.
+
+The selected `graded_evidence @ 3 s` comparator did **not** pass the registered
+development gate. Nominal diagnostic events were `0/128`, giving a 97.5%
+one-sided Clopper-Pearson upper bound of `2.8408%`, and structural-gap
+diagnostic events were `0`; both checks pass. Persistent descriptive-union
+coverage was `117/128 = 91.40625%`, below the required `95%`, and the `1.5 s`
+pulse produced two diagnostic events, violating the zero-event check. The
+descriptive union contains `438/512` clean normal-control members and `32/512`
+additional diagnostic-clean members, for `470/512` members total. Eleven
+families therefore remain unresolved.
+
+This failure is preserved without retuning against these seeds. It authorizes
+no source switch, wind state, estimator reset, private FCOne supervisor action,
+or flight-control decision. `R8` is an experiment revision only; it is not an
+FCOne hardware or firmware version. The next hypothesis must introduce
+independent physical corroboration rather than another stale-boundary policy
+tune.

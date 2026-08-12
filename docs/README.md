@@ -4,6 +4,10 @@ This directory records decisions, evidence, and known limits for the portable
 algorithm layer. It is not a substitute for the private FCOne product safety
 case or board-level verification.
 
+Use [Naming and version boundaries](versioning.md) before interpreting any
+version-like label: FCOne hardware, public API, and validation studies use
+separate numbering systems.
+
 ## Start Here
 
 - [Algorithm status](algorithm-status.md): current capability, quantitative
