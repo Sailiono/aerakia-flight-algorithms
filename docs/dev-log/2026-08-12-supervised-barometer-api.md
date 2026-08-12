@@ -57,8 +57,11 @@ adapter, integrity, and multi-lane handoff contracts. This is a software
 boundary result; no FCOne hardware or pressure-source qualification is
 claimed.
 
-The sanitizer build also compiled successfully and the new public API and
-supervisor binaries passed with leak detection disabled. Full sanitizer CTest
-was not usable in this Work execution environment because LeakSanitizer is
-blocked by the host's ptrace policy; this is recorded as an environment limit,
-not a passing sanitizer campaign.
+The sanitizer build also compiled successfully. A default sanitizer CTest run
+was blocked by this Work execution environment's ptrace policy in
+LeakSanitizer; rerunning with `ASAN_OPTIONS=detect_leaks=0
+LSAN_OPTIONS=detect_leaks=0` completed the full `17/17` sanitizer CTest suite,
+including the new public API and the 1,020,000-attempt input-integrity
+campaign. Leak detection itself therefore remains an environment-limited
+follow-up, while AddressSanitizer and UndefinedBehaviorSanitizer execution
+passed for the full suite.
