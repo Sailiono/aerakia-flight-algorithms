@@ -146,6 +146,9 @@ Before any FCOne promotion, require:
   The runner refuses a dirty tree or a source/protocol hash mismatch. A pass
   closes only this bounded synthetic holdout; a failure is retained and must
   not be replaced by changing this v1 protocol.
+
+  The v1 sealed run is now recorded in
+  [the sealed-holdout result](multipose-static-calibration-sealed-holdout.md).
 - near-threshold geometry/noise/outlier false-accept and false-reject studies;
 - per-IMU static multi-orientation hardware data across a declared temperature
   range;

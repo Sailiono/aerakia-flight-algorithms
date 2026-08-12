@@ -72,6 +72,21 @@ be retained with its source/binary/environment hashes. This prevents the
 synthetic G0 result from becoming a moving target while FCOne v2 hardware is
 still unavailable.
 
+### Sealed-holdout execution
+
+The frozen protocol was then executed once from clean commit `2593f63`, after
+an `18/18` CTest build. All `1,096` paired trials completed: the one-pose
+baseline passed `482`, the six-pose candidate passed `1,096`, `614` baseline
+failures improved to candidate passes, and no baseline pass regressed. The
+candidate calibration accelerometer-bias error norm was
+`0.001233/0.002044/0.002044 m/s²` mean/P95/maximum. The result is retained as
+[`g0_multipose_static_calibration_sealed_v1.json`](../validation/public/g0_multipose_static_calibration_sealed_v1.json)
+and explained in [the focused holdout record](multipose-static-calibration-sealed-holdout.md).
+
+This closes only the registered synthetic holdout. It does not replace the
+private FCOne per-IMU pre-arm quality gates or establish a physical IMU,
+switching, navigation, or flight claim.
+
 ### Follow-up audit — end-to-end contract and outlier boundary
 
 The public API test was tightened so it now constructs six raw stationary pose

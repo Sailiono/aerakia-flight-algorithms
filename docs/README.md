@@ -93,6 +93,9 @@ is the stable navigation layer rather than a disruptive mass rename.
 - [Fixed-lag measurement cross covariance](fixed-lag-measurement-cross-covariance.md):
   double-precision P/V transaction passes; host float exposes an augmented-PSD
   limitation that blocks a naive embedded lag implementation
+- [Multi-pose static calibration sealed holdout](multipose-static-calibration-sealed-holdout.md):
+  the bounded synthetic evidence for a per-IMU six-pose cold-start seed; not a
+  physical calibration or flight qualification
 - [Barometer multi-lane handoff contract](barometer-multilane-handoff-contract.md):
   host-only complete active-to-shadow ESKF image transfer and fail-closed
   transaction evidence after a barometer source latch
