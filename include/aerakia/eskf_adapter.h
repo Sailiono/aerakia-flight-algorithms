@@ -295,6 +295,18 @@ AerakiaStatus aerakia_eskf_update_gps_observation(
 );
 
 /**
+ * Invalidate controller-facing GNSS continuity after a private source,
+ * generation, or quality-lifecycle boundary changes.
+ *
+ * The nominal state, covariance, learned IMU biases, and per-source timestamp
+ * watermarks are preserved. Pending recovery evidence and horizontal/vertical
+ * GNSS-derived validity are cleared so a newly qualified source must build
+ * fresh evidence. Independent aiding can qualify its own output again on a
+ * later accepted observation.
+ */
+void aerakia_eskf_break_gps_source_continuity(AerakiaEskf *filter);
+
+/**
  * Apply a bounded, explicitly authorized re-anchor to the latest consistent rejected GNSS pair.
  * The resulting navigation output remains invalid until probationary accepted updates complete.
  */
@@ -326,6 +338,12 @@ AerakiaStatus aerakia_eskf_update_heading_observation(
     AerakiaEskf *filter,
     const AerakiaHeadingObservation *observation
 );
+
+/**
+ * Invalidate controller-facing trusted-heading continuity without resetting
+ * attitude, covariance, learned biases, or timestamp integrity watermarks.
+ */
+void aerakia_eskf_break_heading_source_continuity(AerakiaEskf *filter);
 
 void aerakia_eskf_update_barometer(
     AerakiaEskf *filter,

@@ -1466,6 +1466,96 @@ static void test_eskf_heading_and_vertical_validity(void)
                "expired outputs retain inspectable aiding ages");
 }
 
+static void test_eskf_source_continuity_breaks(void)
+{
+    AerakiaEskf filter;
+    AerakiaEskfConfig config;
+    AerakiaNavigationEstimate estimate;
+    AerakiaImuSample sample = level_sample(0U);
+    AerakiaGpsObservation gps = {
+        10000U,
+        {1.0f, -2.0f, 0.5f},
+        {0.1f, 0.0f, -0.1f},
+        4.0f,
+        1.0f,
+        17U,
+        3U,
+        9U
+    };
+    AerakiaHeadingObservation heading = {10000U, 0.2f, 0.01f};
+    ESKF_NominalState state_before;
+    eskf_float_t covariance_before[ESKF_ERROR_STATE_DIM][ESKF_ERROR_STATE_DIM];
+    uint64_t gps_timestamp_before;
+    uint64_t heading_timestamp_before;
+
+    aerakia_eskf_default_config(&config);
+    config.enable_static_alignment = false;
+    aerakia_eskf_init(&filter, &config, NULL, NULL);
+    (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
+    sample.timestamp_us = 10000U;
+    (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
+    check_true(aerakia_eskf_update_gps_observation(&filter, &gps)
+                   == AERAKIA_STATUS_OK,
+               "source continuity test accepts initial GNSS");
+    check_true(aerakia_eskf_update_heading_observation(&filter, &heading)
+                   == AERAKIA_STATUS_OK,
+               "source continuity test accepts initial heading");
+    aerakia_eskf_get_estimate(&filter, &estimate);
+    check_true(estimate.horizontal_navigation_valid
+                   && estimate.vertical_navigation_valid
+                   && estimate.heading_valid,
+               "accepted sources qualify navigation axes and heading before break");
+
+    state_before = filter.core.state;
+    memcpy(covariance_before, filter.core.P, sizeof(covariance_before));
+    gps_timestamp_before = filter.last_gps_timestamp_us;
+    heading_timestamp_before = filter.last_heading_timestamp_us;
+    filter.has_recovery_candidate = true;
+    filter.recovery_candidate_consistent_observations = 4U;
+    filter.navigation_recovery_probationary = true;
+    filter.navigation_recovery_probation_acceptances = 2U;
+
+    aerakia_eskf_break_gps_source_continuity(&filter);
+    aerakia_eskf_break_heading_source_continuity(&filter);
+    aerakia_eskf_get_estimate(&filter, &estimate);
+    check_true(!estimate.horizontal_navigation_valid
+                   && !estimate.vertical_position_valid
+                   && !estimate.vertical_velocity_valid
+                   && !estimate.vertical_navigation_valid
+                   && !estimate.heading_valid,
+               "source continuity break invalidates GNSS-derived controller-facing outputs");
+    check_true(!filter.has_recovery_candidate
+                   && !filter.navigation_recovery_probationary
+                   && filter.recovery_candidate_consistent_observations == 0U,
+               "GNSS continuity break clears pending recovery evidence");
+    check_true(memcmp(&filter.core.state, &state_before, sizeof(state_before)) == 0
+                   && memcmp(filter.core.P, covariance_before,
+                             sizeof(covariance_before)) == 0,
+               "continuity break preserves nominal state covariance and biases");
+    check_true(filter.last_gps_timestamp_us == gps_timestamp_before
+                   && filter.last_heading_timestamp_us == heading_timestamp_before,
+               "continuity break preserves timestamp anti-replay watermarks");
+
+    sample.timestamp_us = 20000U;
+    (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
+    {
+        const AerakiaBarometerObservation barometer = {20000U, 0.0f, 1.0f};
+        const AerakiaVelocityObservation velocity = {
+            20000U, {0.0f, 0.0f, 0.0f}, 1.0f
+        };
+        check_true(aerakia_eskf_update_barometer_observation(&filter, &barometer)
+                       == AERAKIA_STATUS_OK,
+                   "independent barometer remains usable after GNSS break");
+        check_true(aerakia_eskf_update_velocity_observation(&filter, &velocity)
+                       == AERAKIA_STATUS_OK,
+                   "independent velocity remains usable after GNSS break");
+        aerakia_eskf_get_estimate(&filter, &estimate);
+        check_true(estimate.vertical_navigation_valid
+                       && !estimate.horizontal_position_valid,
+                   "fresh independent aiding rebuilds only its own validity");
+    }
+}
+
 int main(void)
 {
     test_mahony_level_initialization();
@@ -1487,6 +1577,7 @@ int main(void)
     test_eskf_navigation_recovery_and_heading();
     test_eskf_cold_start_attitude_alignment();
     test_eskf_heading_and_vertical_validity();
+    test_eskf_source_continuity_breaks();
 
     if (failures != 0) {
         fprintf(stderr, "%d public API assertion(s) failed\n", failures);

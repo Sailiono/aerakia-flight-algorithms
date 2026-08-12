@@ -124,6 +124,40 @@ static void clear_recovery_candidate(AerakiaEskf *filter)
     filter->has_recovery_candidate = false;
 }
 
+void aerakia_eskf_break_gps_source_continuity(AerakiaEskf *filter)
+{
+    if (filter == NULL) return;
+    clear_recovery_candidate(filter);
+    filter->position_accepted = false;
+    filter->velocity_accepted = false;
+    filter->navigation_recovered = false;
+    filter->has_horizontal_position_aiding_timestamp = false;
+    filter->has_horizontal_velocity_aiding_timestamp = false;
+    /* A paired GPS observation updates all three position and velocity axes.
+     * Until aiding provenance is represented per axis/source, retaining its
+     * vertical validity across a receiver lifecycle boundary would claim
+     * evidence that the private supervisor has explicitly revoked.  A later
+     * independent barometer or velocity observation can qualify its own axis
+     * again without resetting the nominal state. */
+    filter->has_vertical_position_aiding_timestamp = false;
+    filter->has_vertical_velocity_aiding_timestamp = false;
+    filter->horizontal_position_initialized = false;
+    filter->navigation_recovery_probationary = false;
+    filter->navigation_recovery_probation_acceptances = 0U;
+    filter->navigation_recovery_probation_start_timestamp_us = 0U;
+    filter->navigation_recovery_probation_last_timestamp_us = 0U;
+    filter->navigation_recovery_source_id = 0U;
+    filter->navigation_recovery_source_generation = 0U;
+    filter->navigation_recovery_quality_sequence = 0U;
+}
+
+void aerakia_eskf_break_heading_source_continuity(AerakiaEskf *filter)
+{
+    if (filter == NULL) return;
+    filter->heading_accepted = false;
+    filter->has_heading_aiding_timestamp = false;
+}
+
 static bool recovery_candidate_is_quality_bounded(
     const AerakiaEskf *filter,
     const AerakiaGpsObservation *observation
