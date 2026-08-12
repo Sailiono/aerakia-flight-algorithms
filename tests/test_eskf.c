@@ -2,6 +2,7 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 
 static int failures = 0;
 
@@ -384,6 +385,37 @@ static void test_static_bias_alignment(void)
                "stationary gyro bias alignment is confident");
 }
 
+static void test_explicit_imu_bias_seed(void)
+{
+    ESKF_Handle filter;
+    const eskf_float_t accelerometer_bias[3] = {0.12, -0.08, 0.05};
+    const eskf_float_t gyroscope_bias[3] = {0.006, -0.004, 0.002};
+    const eskf_float_t invalid_bias[3] = {NAN, 0.0, 0.0};
+    ESKF_Handle before;
+
+    eskf_init(&filter, NULL, NULL);
+    check_true(eskf_seed_imu_biases(
+                   &filter, accelerometer_bias, gyroscope_bias, 0.0025, 0.000025
+               ),
+               "explicit preflight IMU-bias seed is accepted");
+    check_true(near(filter.state.ab[0], accelerometer_bias[0], 1e-12),
+               "explicit seed sets accelerometer bias");
+    check_true(near(filter.state.gb[1], gyroscope_bias[1], 1e-12),
+               "explicit seed sets gyroscope bias");
+    check_true(near(filter.P[ESKF_IDX_DAB][ESKF_IDX_DAB], 0.0025, 1e-12),
+               "explicit seed applies accelerometer covariance");
+    check_true(near(filter.P[ESKF_IDX_DGB][ESKF_IDX_DGB], 0.000025, 1e-12),
+               "explicit seed applies gyroscope covariance");
+
+    before = filter;
+    check_true(!eskf_seed_imu_biases(
+                    &filter, invalid_bias, gyroscope_bias, 0.0025, 0.000025
+                ),
+               "non-finite explicit seed is rejected");
+    check_true(memcmp(&filter, &before, sizeof(filter)) == 0,
+               "rejected explicit seed leaves ESKF image unchanged");
+}
+
 static void test_static_attitude_alignment(void)
 {
     ESKF_Handle filter;
@@ -469,6 +501,7 @@ int main(void)
     test_joseph_covariance_stays_psd();
     test_navigation_reset_preserves_attitude_and_biases();
     test_static_bias_alignment();
+    test_explicit_imu_bias_seed();
     test_static_attitude_alignment();
     test_attitude_covariance_reset();
 

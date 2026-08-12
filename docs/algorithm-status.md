@@ -46,6 +46,32 @@ Therefore a naive covariance-form lag buffer is explicitly blocked for STM32H7
 float until a square-root/UD or bounded PSD-repair policy is evidenced. See
 [fixed-lag measurement cross covariance](fixed-lag-measurement-cross-covariance.md).
 
+## Current G0 Candidate: Multi-Pose Static IMU Calibration
+
+The feature branch `feature/g0-multipose-static-calibration` contains the first
+candidate that changes an estimator input rather than only adding diagnostics.
+It uses six causal-IMU stationary pose means and a gravity-sphere fit to seed
+constant accelerometer and gyroscope biases before the first ESKF sample. The
+ESKF removes that accepted seed before tilt alignment, and its one-shot adapter
+guard prevents a later call from mutating the image.
+
+The opened-development paired campaign covered **548 trials** (137 cases at
+each of seeds `41001, 41003, 41009, 41021`, 100 Hz, 40 s). The candidate passed
+`548/548`, the one-pose baseline passed `246/548`, and the candidate moved
+`302` trials from fail to pass with **zero regressions**. The recovered
+accelerometer-bias error norm had mean `0.000685 m/s^2`, P95
+`0.001305 m/s^2`, and maximum `0.001305 m/s^2` under the declared synthetic
+pose-noise model. This is a real synthetic cold-start improvement over the
+current baseline, not a claim about physical calibration, temperature, scale,
+vibration, or flight.
+
+The candidate also rejects a material single-pose influence through a
+leave-one-pose-out bias-change gate. This protects the preflight path from one
+moderately corrupted pose being silently absorbed by least squares, but it is
+not a universal outlier detector. The default influence threshold and seed
+covariance still require a new sealed holdout and FCOne per-IMU data before
+promotion. Public `main` is unchanged until that evidence exists.
+
 ## Evidence completed
 
 | Area | Evidence | Status |

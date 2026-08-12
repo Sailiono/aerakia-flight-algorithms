@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "status": "opened_development_pass",
+  "candidate": "six-pose gravity-sphere static IMU bias seed before ESKF cold start",
+  "baseline": "existing one-pose static tilt/bias initialization",
+  "hardware_generation": "FCOne-HW-v2 target; no physical board data",
+  "protocol": {
+    "cases_per_seed": 137,
+    "seeds": [41001, 41003, 41009, 41021],
+    "trials": 548,
+    "rate_hz": 100,
+    "duration_s": 40,
+    "pose_count": 6,
+    "samples_per_pose": 400,
+    "stationarity": "past-only causal IMU window"
+  },
+  "result": {
+    "baseline_passed": 246,
+    "candidate_passed": 548,
+    "improved_to_pass": 302,
+    "regressed_from_pass": 0,
+    "execution_failures": 0,
+    "accelerometer_bias_error_norm_m_s2": {
+      "mean": 0.0006850934567187094,
+      "p95": 0.0013047836936252645,
+      "maximum": 0.001304871909647624
+    }
+  },
+  "evidence_limits": [
+    "synthetic opened-development evidence only",
+    "not a sealed holdout",
+    "not physical IMU calibration or temperature/scale/misalignment characterization",
+    "not flight readiness or control-authority evidence"
+  ],
+  "full_report_sha256": "7e8b03506fcc49ac72905f5b4377aa734e386ac1ae51c148cb5713469eea41bf",
+  "full_summary_sha256": "82cf1f0a8d27eeec93be02705b070bc75a40efb47d9d45ebe37587d12d1c0809"
+}

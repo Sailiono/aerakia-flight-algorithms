@@ -4,6 +4,58 @@ This append-only log records why each hardware-independent validation step was s
 changed, which evidence was produced, and what remains unresolved. Generated raw outputs stay under
 `build/`; reviewed conclusions and reproduction commands remain in Git.
 
+## 2026-08-12 — G0 multi-pose static calibration candidate
+
+### Reason
+
+The existing one-pose startup cannot distinguish a horizontal accelerometer
+bias from a small roll/pitch error. Earlier scalar-prior, process-noise, and
+host replay-correction candidates were rejected for failing to generalize. The
+next bounded hypothesis is an explicit preflight procedure with multiple
+stationary gravity directions, before any ESKF stream exists.
+
+### Changes
+
+- Added a hardware-neutral C99 gravity-sphere solver for six or more stationary
+  pose means, with gyro-bias averaging and fail-closed geometry, residual,
+  stationarity, and gyro-scatter gates.
+- Added a leave-one-pose-out influence gate so a materially corrupted pose is
+  not silently absorbed by the all-pairs least-squares fit.
+- Added a one-shot ESKF adapter API. It seeds biases before streaming, removes
+  the accepted accelerometer seed before tilt alignment, preserves the seed
+  against one-pose overwrite, and rejects repeated/late application without
+  changing the ESKF image.
+- Made both calibration CLI and replay runner enforce the exact CSV schema and
+  integer `sample_count` contract. The campaign uses past-only causal IMU
+  stationarity rather than a trajectory-derived static hint.
+- Added C, Python, CLI malformed-input, influence, and provenance tests plus
+  documentation of the per-IMU FCOne collection boundary.
+
+### Evidence and decision
+
+The opened-development campaign ran `548` paired trials: 137 boundary cases at
+each of four seeds (`41001, 41003, 41009, 41021`), 100 Hz, 40 s, six pose means,
+and 400 samples per pose. The baseline passed `246/548`; the multi-pose
+candidate passed `548/548`, with `302` fail-to-pass improvements and `0`
+pass-to-fail regressions. Estimated accelerometer-bias error norm was
+`0.000685/0.001305/0.001305 m/s^2` mean/P95/maximum. The candidate therefore
+shows a material **synthetic cold-start** improvement for the known constant
+bias boundary.
+
+This remains opened-development evidence. It does not close hardware accuracy,
+temperature, scale/misalignment, vibration, three-IMU independence, physical
+heading, GNSS-denied navigation, or flight authority. A new sealed synthetic
+holdout and per-IMU FCOne six-pose/thermal/vibration collection are required
+before changing public `main` or enabling the path in FCOne control code.
+
+### Verification
+
+The feature branch strict build passed all `18/18` CTest targets and `319/319`
+Python tests. A fresh ASan/UBSan build passed all `18/18` CTest targets with
+leak detection disabled for this environment. The full campaign output remains
+outside Git under `/tmp/aerakia-multipose-548-causal/`; its compact protocol and
+source manifest are recorded when the candidate is committed.
+
 ## 2026-08-11 — TAS/wind causal observability prerequisite
 
 ### Reason

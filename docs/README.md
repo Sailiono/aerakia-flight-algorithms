@@ -66,6 +66,9 @@ is the stable navigation layer rather than a disruptive mass rename.
   [G0 correlated static-prior rejection](g0-correlated-static-prior.md): the
   retained cold-start horizontal accelerometer-bias boundary and rejected
   shortcut.
+- [Multi-pose static IMU calibration](multipose-static-imu-calibration.md):
+  explicit preflight gravity-sphere calibration candidate, its hard limits,
+  and the per-IMU FCOne collection protocol.
 - [G0 v2 input contract](bias-observability-v2-input-contract.md): causal
   stationarity and interval delta semantics that precede the next estimator
   hypothesis.

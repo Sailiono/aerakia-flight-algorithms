@@ -9,6 +9,7 @@
 #include <aerakia/eskf.h>
 #include <aerakia/mag_gate.h>
 #include <aerakia/barometer_supervisor.h>
+#include <aerakia/static_imu_calibration.h>
 #include <aerakia/types.h>
 
 typedef struct {
@@ -53,6 +54,9 @@ typedef struct {
     uint32_t static_alignment_min_samples;
     float static_tilt_uncertainty_rad;
     float static_heading_uncertainty_rad;
+    /** Opt-in variance assigned after an accepted multi-pose calibration seed. */
+    float multi_pose_accelerometer_bias_variance_m2_s4;
+    float multi_pose_gyroscope_bias_variance_rad2_s2;
     float stationary_gyro_threshold_rad_s;
     float stationary_acceleration_tolerance_m_s2;
     float zero_velocity_interval_s;
@@ -155,6 +159,8 @@ typedef struct {
     bool static_alignment_complete;
     bool static_tilt_alignment_complete;
     bool static_heading_alignment_complete;
+    /** True only if an explicit multi-pose seed was accepted before streaming. */
+    bool multi_pose_static_calibration_applied;
     bool stationary_detected;
     bool zero_velocity_update_applied;
     uint32_t static_alignment_samples;
@@ -227,6 +233,7 @@ typedef struct {
     bool static_alignment_complete;
     bool static_tilt_alignment_complete;
     bool static_heading_alignment_complete;
+    bool multi_pose_static_calibration_applied;
     bool stationary_detected;
     bool zero_velocity_update_applied;
     bool attitude_seeded;
@@ -253,6 +260,16 @@ void aerakia_eskf_init(
     const AerakiaEskfConfig *config,
     const double initial_position_ned_m[3],
     const double initial_quaternion_wxyz[4]
+);
+
+/**
+ * Apply an accepted multi-pose preflight calibration before the first IMU
+ * sample. This is opt-in, one-shot, and cannot be called after streaming begins.
+ * Rejection leaves the ESKF nominal state and covariance unchanged.
+ */
+AerakiaStatus aerakia_eskf_apply_static_imu_calibration(
+    AerakiaEskf *filter,
+    const AerakiaStaticImuCalibrationResult *calibration
 );
 
 /** Predict from one driver-published IMU sample and optionally fuse its mag. */

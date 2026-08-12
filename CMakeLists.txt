@@ -51,6 +51,7 @@ add_library(aerakia_algorithms STATIC
     src/eskf_models.c
     src/mag_gate.c
     src/mahony.c
+    src/static_imu_calibration.c
 )
 add_library(Aerakia::Algorithms ALIAS aerakia_algorithms)
 set_target_properties(aerakia_algorithms PROPERTIES
@@ -114,6 +115,10 @@ if(AERAKIA_BUILD_TESTS)
     add_executable(test_validation_covariance tests/test_validation_covariance.c)
     target_link_libraries(test_validation_covariance PRIVATE Aerakia::Algorithms)
     add_test(NAME validation_covariance COMMAND test_validation_covariance)
+
+    add_executable(test_static_imu_calibration tests/test_static_imu_calibration.c)
+    target_link_libraries(test_static_imu_calibration PRIVATE Aerakia::Algorithms)
+    add_test(NAME static_imu_calibration COMMAND test_static_imu_calibration)
 
     add_executable(aerakia_input_integrity_campaign validation/input_integrity_campaign.c)
     target_link_libraries(aerakia_input_integrity_campaign PRIVATE Aerakia::Algorithms)
@@ -197,4 +202,9 @@ if(AERAKIA_BUILD_VALIDATION)
     add_executable(aerakia_validation_runner validation/validation_runner.c)
     target_include_directories(aerakia_validation_runner PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_link_libraries(aerakia_validation_runner PRIVATE Aerakia::Algorithms)
+
+    add_executable(aerakia_static_imu_calibration_cli
+        validation/static_imu_calibration_cli.c
+    )
+    target_link_libraries(aerakia_static_imu_calibration_cli PRIVATE Aerakia::Algorithms)
 endif()

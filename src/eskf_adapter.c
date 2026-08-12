@@ -308,12 +308,19 @@ static void reset_static_collection(AerakiaEskf *filter)
 
 static bool sample_is_stationary(const AerakiaEskf *filter, const AerakiaImuSample *sample)
 {
+    AerakiaVec3f corrected_acceleration;
     if ((sample->flags & AERAKIA_SAMPLE_STATIONARY) == 0U) {
         return false;
     }
+    corrected_acceleration = sample->acceleration_m_s2;
+    if (filter->multi_pose_static_calibration_applied) {
+        corrected_acceleration.x -= (float)filter->core.state.ab[0];
+        corrected_acceleration.y -= (float)filter->core.state.ab[1];
+        corrected_acceleration.z -= (float)filter->core.state.ab[2];
+    }
     return vector_norm(sample->angular_rate_rad_s)
             <= filter->config.stationary_gyro_threshold_rad_s
-        && fabsf(vector_norm(sample->acceleration_m_s2) - AERAKIA_GRAVITY_M_S2)
+        && fabsf(vector_norm(corrected_acceleration) - AERAKIA_GRAVITY_M_S2)
             <= filter->config.stationary_acceleration_tolerance_m_s2;
 }
 
@@ -360,18 +367,31 @@ static void collect_static_sample(AerakiaEskf *filter, const AerakiaImuSample *s
 
     if (static_alignment_ready(filter, sample->timestamp_us)) {
         eskf_float_t acceleration_mean[3];
+        eskf_float_t tilt_acceleration_mean[3];
         eskf_float_t angular_rate_mean[3];
         const double inverse_count = 1.0 / (double)filter->static_alignment_samples;
         for (axis = 0; axis < 3; ++axis) {
             acceleration_mean[axis] = filter->static_acceleration_sum[axis] * inverse_count;
+            tilt_acceleration_mean[axis] = acceleration_mean[axis];
             angular_rate_mean[axis] = filter->static_angular_rate_sum[axis] * inverse_count;
+        }
+        /*
+         * A multi-pose seed estimates the constant body-frame accelerometer
+         * offset before this one-pose gravity alignment.  Aligning raw means
+         * would reintroduce the exact bias-as-tilt ambiguity the calibration
+         * is intended to remove.
+         */
+        if (filter->multi_pose_static_calibration_applied) {
+            for (axis = 0; axis < 3; ++axis) {
+                tilt_acceleration_mean[axis] -= filter->core.state.ab[axis];
+            }
         }
         if (filter->config.static_align_attitude && !filter->attitude_seeded) {
             eskf_float_t attitude_variance[3] = {
                 filter->core.P[0][0], filter->core.P[1][1], filter->core.P[2][2]
             };
             filter->static_tilt_alignment_complete =
-                eskf_align_static_tilt(&filter->core, acceleration_mean);
+                eskf_align_static_tilt(&filter->core, tilt_acceleration_mean);
             if (filter->static_tilt_alignment_complete) {
                 const eskf_float_t tilt_variance =
                     filter->config.static_tilt_uncertainty_rad
@@ -400,7 +420,9 @@ static void collect_static_sample(AerakiaEskf *filter, const AerakiaImuSample *s
                 (void)eskf_reset_attitude_covariance(&filter->core, attitude_variance);
             }
         }
-        eskf_align_static_bias_means(&filter->core, acceleration_mean, angular_rate_mean);
+        if (!filter->multi_pose_static_calibration_applied) {
+            eskf_align_static_bias_means(&filter->core, acceleration_mean, angular_rate_mean);
+        }
         filter->static_alignment_complete = true;
         filter->last_zero_velocity_timestamp_us = sample->timestamp_us;
     }
@@ -453,6 +475,9 @@ void aerakia_eskf_default_config(AerakiaEskfConfig *config)
     /* Conservative floors include residual calibration and mounting error. */
     config->static_tilt_uncertainty_rad = 2.0f * AERAKIA_PI_F / 180.0f;
     config->static_heading_uncertainty_rad = 10.0f * AERAKIA_PI_F / 180.0f;
+    /* Do not claim calibration precision until FCOne characterization exists. */
+    config->multi_pose_accelerometer_bias_variance_m2_s4 = 4.0e-2f;
+    config->multi_pose_gyroscope_bias_variance_rad2_s2 = 1.0e-4f;
     config->stationary_gyro_threshold_rad_s = 0.05f;
     config->stationary_acceleration_tolerance_m_s2 = 0.20f * AERAKIA_GRAVITY_M_S2;
     config->zero_velocity_interval_s = 0.10f;
@@ -548,6 +573,42 @@ void aerakia_eskf_init(
         filter->config.magnetic_reference_ned[1] = defaults.magnetic_reference_ned[1];
         filter->config.magnetic_reference_ned[2] = defaults.magnetic_reference_ned[2];
     }
+}
+
+AerakiaStatus aerakia_eskf_apply_static_imu_calibration(
+    AerakiaEskf *filter,
+    const AerakiaStaticImuCalibrationResult *calibration
+)
+{
+    eskf_float_t accelerometer_bias[3];
+    eskf_float_t gyroscope_bias[3];
+    if (filter == NULL || calibration == NULL || !calibration->accepted
+        || calibration->status != AERAKIA_STATIC_IMU_CALIBRATION_OK
+        || filter->has_timestamp || filter->static_alignment_complete
+        || filter->multi_pose_static_calibration_applied
+        || !isfinite(filter->config.multi_pose_accelerometer_bias_variance_m2_s4)
+        || !isfinite(filter->config.multi_pose_gyroscope_bias_variance_rad2_s2)
+        || filter->config.multi_pose_accelerometer_bias_variance_m2_s4 <= 0.0f
+        || filter->config.multi_pose_gyroscope_bias_variance_rad2_s2 <= 0.0f) {
+        return AERAKIA_STATUS_INVALID_ARGUMENT;
+    }
+    accelerometer_bias[0] = calibration->accelerometer_bias_m_s2.x;
+    accelerometer_bias[1] = calibration->accelerometer_bias_m_s2.y;
+    accelerometer_bias[2] = calibration->accelerometer_bias_m_s2.z;
+    gyroscope_bias[0] = calibration->gyroscope_bias_rad_s.x;
+    gyroscope_bias[1] = calibration->gyroscope_bias_rad_s.y;
+    gyroscope_bias[2] = calibration->gyroscope_bias_rad_s.z;
+    if (!eskf_seed_imu_biases(
+            &filter->core,
+            accelerometer_bias,
+            gyroscope_bias,
+            (eskf_float_t)filter->config.multi_pose_accelerometer_bias_variance_m2_s4,
+            (eskf_float_t)filter->config.multi_pose_gyroscope_bias_variance_rad2_s2
+        )) {
+        return AERAKIA_STATUS_INVALID_ARGUMENT;
+    }
+    filter->multi_pose_static_calibration_applied = true;
+    return AERAKIA_STATUS_OK;
 }
 
 AerakiaStatus aerakia_eskf_process_imu(
@@ -1274,6 +1335,8 @@ void aerakia_eskf_get_estimate(
     estimate->static_alignment_complete = filter->static_alignment_complete;
     estimate->static_tilt_alignment_complete = filter->static_tilt_alignment_complete;
     estimate->static_heading_alignment_complete = filter->static_heading_alignment_complete;
+    estimate->multi_pose_static_calibration_applied =
+        filter->multi_pose_static_calibration_applied;
     estimate->stationary_detected = filter->stationary_detected;
     estimate->zero_velocity_update_applied = filter->zero_velocity_update_applied;
     estimate->static_alignment_samples = filter->static_alignment_samples;

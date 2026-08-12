@@ -248,6 +248,22 @@ void eskf_align_static_bias_means(ESKF_Handle *h,
                                   const eskf_float_t acceleration_mean_m_s2[3],
                                   const eskf_float_t angular_rate_mean_rad_s[3]);
 
+/**
+ * Apply an accepted explicit preflight IMU-bias seed.
+ *
+ * This is intentionally separate from one-pose static alignment. Callers
+ * must obtain the values from an independently reviewed calibration process.
+ * The covariance values express the uncertainty of that process and must be
+ * positive and finite. No attitude, position, or velocity state is changed.
+ */
+bool eskf_seed_imu_biases(
+    ESKF_Handle *h,
+    const eskf_float_t accelerometer_bias_m_s2[3],
+    const eskf_float_t gyroscope_bias_rad_s[3],
+    eskf_float_t accelerometer_bias_variance_m2_s4,
+    eskf_float_t gyroscope_bias_variance_rad2_s2
+);
+
 /* ============================================================================
  * State Access
  * ============================================================================ */

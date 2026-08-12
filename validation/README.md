@@ -7,6 +7,11 @@ portable C library and from FCOne-specific integration code.
 ## Primary Entrypoints
 
 - `run_suite.py`: deterministic synthetic host regression.
+- `run_multipose_static_calibration_campaign.py`: paired development A/B of
+  one-pose startup versus the public C99 six-pose calibration path. It retains
+  compact results only, uses causal-IMU stationarity for replay startup, and is
+  not a physical calibration or flight claim. Its provenance records both the
+  Git commit and hashes of dirty source inputs.
 - `run_public_dataset_suite.py`: public-dataset conversion and replay suite;
   it requires separately obtained source data.
 - `run_ulog_suite.py`: private PX4 ULog replay suite; it requires a private
@@ -93,6 +98,9 @@ portable C library and from FCOne-specific integration code.
 
 - `validation_runner.c`: native C replay runner for the same library used by
   embedded integration.
+- `static_imu_calibration_cli.c`: converts stationary pose means to an
+  inspectable preflight seed. It does not collect raw sensor windows or own
+  private per-IMU calibration persistence.
 - `fcone_adapter_contract.c` and `estimator_supervisor_contract.c`: neutral
   boundary tests.  They intentionally do not contain private FCOne drivers,
   sensor selection, or control policy.

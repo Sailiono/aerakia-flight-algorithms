@@ -1411,6 +1411,87 @@ static void test_eskf_cold_start_attitude_alignment(void)
                "cold start recovers yaw");
 }
 
+static void test_eskf_multi_pose_static_calibration_seed(void)
+{
+    AerakiaEskf filter;
+    AerakiaEskfConfig config;
+    AerakiaNavigationEstimate estimate;
+    AerakiaImuSample sample;
+    AerakiaStaticImuCalibrationResult calibration;
+    AerakiaStaticImuCalibrationResult rejected;
+    AerakiaEskf before_second_apply;
+    const float acceleration_bias[3] = {0.12f, -0.08f, 0.05f};
+    const float gyroscope_bias[3] = {0.006f, -0.004f, 0.002f};
+    const float roll = 18.0f * AERAKIA_PI_F / 180.0f;
+    const float pitch = -12.0f * AERAKIA_PI_F / 180.0f;
+    const float yaw = 0.0f;
+    const AerakiaVec3f acceleration_ned = {0.0f, 0.0f, -AERAKIA_GRAVITY_M_S2};
+    float attitude[4];
+    int index;
+
+    memset(&calibration, 0, sizeof(calibration));
+    calibration.accepted = true;
+    calibration.status = AERAKIA_STATIC_IMU_CALIBRATION_OK;
+    calibration.accelerometer_bias_m_s2.x = acceleration_bias[0];
+    calibration.accelerometer_bias_m_s2.y = acceleration_bias[1];
+    calibration.accelerometer_bias_m_s2.z = acceleration_bias[2];
+    calibration.gyroscope_bias_rad_s.x = gyroscope_bias[0];
+    calibration.gyroscope_bias_rad_s.y = gyroscope_bias[1];
+    calibration.gyroscope_bias_rad_s.z = gyroscope_bias[2];
+    aerakia_eskf_default_config(&config);
+    config.static_alignment_duration_s = 0.08f;
+    config.static_alignment_min_samples = 10U;
+    euler_quaternion(roll, pitch, yaw, attitude);
+    memset(&sample, 0, sizeof(sample));
+    sample.acceleration_m_s2 = ned_to_body(attitude, acceleration_ned);
+    sample.flags = AERAKIA_SAMPLE_ACCEL_VALID | AERAKIA_SAMPLE_GYRO_VALID
+        | AERAKIA_SAMPLE_STATIONARY;
+    sample.acceleration_m_s2.x += acceleration_bias[0];
+    sample.acceleration_m_s2.y += acceleration_bias[1];
+    sample.acceleration_m_s2.z += acceleration_bias[2];
+    sample.angular_rate_rad_s.x = gyroscope_bias[0];
+    sample.angular_rate_rad_s.y = gyroscope_bias[1];
+    sample.angular_rate_rad_s.z = gyroscope_bias[2];
+    aerakia_eskf_init(&filter, &config, NULL, NULL);
+    check_true(aerakia_eskf_apply_static_imu_calibration(&filter, &calibration)
+                   == AERAKIA_STATUS_OK,
+               "accepted multi-pose calibration applies before streaming");
+    before_second_apply = filter;
+    check_true(aerakia_eskf_apply_static_imu_calibration(&filter, &calibration)
+                   == AERAKIA_STATUS_INVALID_ARGUMENT,
+               "multi-pose calibration is a one-shot preflight action");
+    check_true(memcmp(&filter, &before_second_apply, sizeof(filter)) == 0,
+               "second multi-pose application leaves the complete adapter image unchanged");
+    aerakia_eskf_get_estimate(&filter, &estimate);
+    check_true(estimate.multi_pose_static_calibration_applied,
+               "estimate exposes accepted multi-pose calibration state");
+    for (index = 0; index < 10; ++index) {
+        sample.timestamp_us = (uint64_t)index * 10000U;
+        (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
+    }
+    check_true(estimate.static_alignment_complete,
+               "ordinary static tilt alignment still completes after multi-pose seed");
+    check_true(near(estimate.attitude.euler_rad.x, roll, 2.0e-5f),
+               "multi-pose bias correction preserves tilted roll alignment");
+    check_true(near(estimate.attitude.euler_rad.y, pitch, 2.0e-5f),
+               "multi-pose bias correction preserves tilted pitch alignment");
+    check_true(near(estimate.accelerometer_bias_m_s2.x, acceleration_bias[0], 1.0e-5f),
+               "one-pose alignment does not overwrite multi-pose accelerometer seed");
+    check_true(near(estimate.gyroscope_bias_rad_s.z, gyroscope_bias[2], 1.0e-5f),
+               "one-pose alignment does not overwrite multi-pose gyro seed");
+
+    rejected = calibration;
+    rejected.accepted = false;
+    aerakia_eskf_init(&filter, &config, NULL, NULL);
+    check_true(aerakia_eskf_apply_static_imu_calibration(&filter, &rejected)
+                   == AERAKIA_STATUS_INVALID_ARGUMENT,
+               "unaccepted calibration is rejected");
+    (void)aerakia_eskf_process_imu(&filter, &sample, &estimate);
+    check_true(aerakia_eskf_apply_static_imu_calibration(&filter, &calibration)
+                   == AERAKIA_STATUS_INVALID_ARGUMENT,
+               "calibration cannot mutate a streaming ESKF");
+}
+
 static void test_eskf_heading_and_vertical_validity(void)
 {
     AerakiaEskf filter;
@@ -1576,6 +1657,7 @@ int main(void)
     test_eskf_static_supervisor();
     test_eskf_navigation_recovery_and_heading();
     test_eskf_cold_start_attitude_alignment();
+    test_eskf_multi_pose_static_calibration_seed();
     test_eskf_heading_and_vertical_validity();
     test_eskf_source_continuity_breaks();
 

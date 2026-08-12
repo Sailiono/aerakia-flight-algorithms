@@ -6,11 +6,13 @@
 #include <aerakia/eskf_adapter.h>
 #include <aerakia/mahony.h>
 #include <aerakia/barometer_supervisor.h>
+#include <aerakia/static_imu_calibration.h>
 
 #include "eskf_joint_covariance.h"
 #include "eskf_internal.h"
 
 #include <errno.h>
+#include <float.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,6 +21,12 @@
 
 #define MAX_LINE_LENGTH 16384
 #define MAX_COLUMNS 128
+#define STATIC_POSE_COLUMNS 7
+
+static const char *const STATIC_POSE_HEADER[STATIC_POSE_COLUMNS] = {
+    "acc_x_m_s2", "acc_y_m_s2", "acc_z_m_s2",
+    "gyro_x_rad_s", "gyro_y_rad_s", "gyro_z_rad_s", "sample_count"
+};
 
 static FILE *open_portable_file(const char *path, const char *mode)
 {
@@ -178,6 +186,85 @@ static int parse_cli_double(const char *text, double *value)
     if (errno != 0 || end == text || *end != '\0' || !isfinite(parsed)) return 0;
     *value = parsed;
     return 1;
+}
+
+static int parse_cli_float3(const char *const text[3], float values[3])
+{
+    int axis;
+    for (axis = 0; axis < 3; ++axis) {
+        double parsed;
+        if (!parse_cli_double(text[axis], &parsed)
+            || parsed < -(double)FLT_MAX || parsed > (double)FLT_MAX) {
+            return 0;
+        }
+        values[axis] = (float)parsed;
+    }
+    return 1;
+}
+
+static int load_static_pose_means_csv(
+    const char *path,
+    AerakiaStaticImuPoseMean poses[AERAKIA_STATIC_IMU_CALIBRATION_MAX_POSES],
+    uint32_t *pose_count
+)
+{
+    FILE *input;
+    char line[MAX_LINE_LENGTH];
+    uint32_t count = 0U;
+    if (path == NULL || poses == NULL || pose_count == NULL) return 0;
+    input = open_portable_file(path, "r");
+    if (input == NULL) return 0;
+    if (fgets(line, sizeof(line), input) == NULL) {
+        fclose(input);
+        return 0;
+    }
+    {
+        char *header_columns[STATIC_POSE_COLUMNS];
+        int header_index;
+        if (split_csv(line, header_columns, STATIC_POSE_COLUMNS) != STATIC_POSE_COLUMNS) {
+            fclose(input);
+            return 0;
+        }
+        for (header_index = 0; header_index < STATIC_POSE_COLUMNS; ++header_index) {
+            if (strcmp(header_columns[header_index], STATIC_POSE_HEADER[header_index]) != 0) {
+                fclose(input);
+                return 0;
+            }
+        }
+    }
+    while (fgets(line, sizeof(line), input) != NULL) {
+        char *columns[7];
+        double values[7];
+        int index;
+        if (count >= AERAKIA_STATIC_IMU_CALIBRATION_MAX_POSES
+            || split_csv(line, columns, 7) != 7) {
+            fclose(input);
+            return 0;
+        }
+        for (index = 0; index < 7; ++index) {
+            if (!parse_cli_double(columns[index], &values[index])
+                || values[index] < -(double)FLT_MAX || values[index] > (double)FLT_MAX) {
+                fclose(input);
+                return 0;
+            }
+        }
+        if (values[6] < 1.0 || values[6] > (double)UINT32_MAX
+            || floor(values[6]) != values[6]) {
+            fclose(input);
+            return 0;
+        }
+        poses[count].acceleration_m_s2.x = (float)values[0];
+        poses[count].acceleration_m_s2.y = (float)values[1];
+        poses[count].acceleration_m_s2.z = (float)values[2];
+        poses[count].angular_rate_rad_s.x = (float)values[3];
+        poses[count].angular_rate_rad_s.y = (float)values[4];
+        poses[count].angular_rate_rad_s.z = (float)values[5];
+        poses[count].sample_count = (uint32_t)values[6];
+        count++;
+    }
+    fclose(input);
+    *pose_count = count;
+    return count > 0U;
 }
 
 static int write_state_snapshot(
@@ -378,11 +465,17 @@ int main(int argc, char *argv[])
     int state_injection_applied = 0;
     int snapshot_enabled = 0;
     int snapshot_written = 0;
+    int multipose_bias_seed_enabled = 0;
+    int multipose_pose_means_enabled = 0;
     float stationary_gyro_threshold_rad_s = -1.0f;
     float maximum_aiding_age_s = NAN;
     double state_injection_at_s = NAN;
     double state_injection[ESKF_ERROR_STATE_DIM] = {0.0};
     double snapshot_at_s = NAN;
+    float multipose_accel_bias_m_s2[3] = {0.0f, 0.0f, 0.0f};
+    float multipose_gyro_bias_rad_s[3] = {0.0f, 0.0f, 0.0f};
+    const char *multipose_pose_means_path = NULL;
+    AerakiaStaticImuCalibrationResult multipose_calibration;
     const char *snapshot_output_path = NULL;
     int input_argument;
     int output_argument;
@@ -400,6 +493,9 @@ int main(int argc, char *argv[])
                 "DTHETA_X DTHETA_Y DTHETA_Z DV_X DV_Y DV_Z DP_X DP_Y DP_Z "
                 "DAB_X DAB_Y DAB_Z DGB_X DGB_Y DGB_Z] "
                 "[--snapshot-at-s VALUE --snapshot-out PATH] "
+                "[--multipose-bias-seed ACCEL_X ACCEL_Y ACCEL_Z "
+                "GYRO_X GYRO_Y GYRO_Z] "
+                "[--multipose-pose-means POSE_MEANS.csv] "
                 "INPUT_REPLAY_CSV OUTPUT_RESULTS_CSV\n",
                 argv[0]);
         return 2;
@@ -478,6 +574,37 @@ int main(int argc, char *argv[])
                 }
             }
             state_injection_enabled = 1;
+        } else if (strcmp(argv[argument], "--multipose-bias-seed") == 0) {
+            const char *accelerometer_text[3];
+            const char *gyroscope_text[3];
+            int axis;
+            for (axis = 0; axis < 3; ++axis) {
+                if (++argument >= input_argument) {
+                    fputs("Missing multi-pose accelerometer bias seed\n", stderr);
+                    return 2;
+                }
+                accelerometer_text[axis] = argv[argument];
+            }
+            for (axis = 0; axis < 3; ++axis) {
+                if (++argument >= input_argument) {
+                    fputs("Missing multi-pose gyroscope bias seed\n", stderr);
+                    return 2;
+                }
+                gyroscope_text[axis] = argv[argument];
+            }
+            if (!parse_cli_float3(accelerometer_text, multipose_accel_bias_m_s2)
+                || !parse_cli_float3(gyroscope_text, multipose_gyro_bias_rad_s)) {
+                fputs("Invalid multi-pose IMU bias seed\n", stderr);
+                return 2;
+            }
+            multipose_bias_seed_enabled = 1;
+        } else if (strcmp(argv[argument], "--multipose-pose-means") == 0) {
+            if (++argument >= input_argument || argv[argument][0] == '\0') {
+                fputs("Missing multi-pose means CSV path\n", stderr);
+                return 2;
+            }
+            multipose_pose_means_path = argv[argument];
+            multipose_pose_means_enabled = 1;
         } else {
             fprintf(stderr, "Unknown option: %s\n", argv[argument]);
             return 2;
@@ -494,6 +621,21 @@ int main(int argc, char *argv[])
     if (snapshot_enabled && (!isfinite(snapshot_at_s) || snapshot_output_path == NULL)) {
         fputs("Snapshot requires --snapshot-at-s and --snapshot-out\n", stderr);
         return 2;
+    }
+    if (multipose_bias_seed_enabled && multipose_pose_means_enabled) {
+        fputs("Use either --multipose-bias-seed or --multipose-pose-means, not both\n", stderr);
+        return 2;
+    }
+    memset(&multipose_calibration, 0, sizeof(multipose_calibration));
+    if (multipose_pose_means_enabled) {
+        AerakiaStaticImuPoseMean poses[AERAKIA_STATIC_IMU_CALIBRATION_MAX_POSES];
+        uint32_t pose_count;
+        if (!load_static_pose_means_csv(multipose_pose_means_path, poses, &pose_count)
+            || aerakia_static_imu_calibrate(poses, pose_count, NULL, &multipose_calibration)
+                != AERAKIA_STATIC_IMU_CALIBRATION_OK) {
+            fputs("Multi-pose calibration CSV was rejected\n", stderr);
+            return 2;
+        }
     }
     input = open_portable_file(argv[input_argument], "r");
     if (input == NULL) { perror("open input"); return 2; }
@@ -732,6 +874,26 @@ int main(int argc, char *argv[])
             aerakia_eskf_init(
                 &eskf, &eskf_config, NULL, cold_start ? NULL : reference_q
             );
+            if (multipose_bias_seed_enabled || multipose_pose_means_enabled) {
+                AerakiaStaticImuCalibrationResult calibration = multipose_calibration;
+                if (multipose_bias_seed_enabled) {
+                    calibration.accepted = true;
+                    calibration.status = AERAKIA_STATIC_IMU_CALIBRATION_OK;
+                    calibration.accelerometer_bias_m_s2.x = multipose_accel_bias_m_s2[0];
+                    calibration.accelerometer_bias_m_s2.y = multipose_accel_bias_m_s2[1];
+                    calibration.accelerometer_bias_m_s2.z = multipose_accel_bias_m_s2[2];
+                    calibration.gyroscope_bias_rad_s.x = multipose_gyro_bias_rad_s[0];
+                    calibration.gyroscope_bias_rad_s.y = multipose_gyro_bias_rad_s[1];
+                    calibration.gyroscope_bias_rad_s.z = multipose_gyro_bias_rad_s[2];
+                }
+                if (aerakia_eskf_apply_static_imu_calibration(&eskf, &calibration)
+                    != AERAKIA_STATUS_OK) {
+                    fputs("Failed to apply explicit multi-pose IMU bias seed\n", stderr);
+                    fclose(input);
+                    fclose(output);
+                    return 2;
+                }
+            }
             eskf_initialized = 1;
         }
         if (reference_attitude_init && !mahony_reference_seeded) {

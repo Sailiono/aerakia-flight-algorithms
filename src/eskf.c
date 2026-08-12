@@ -992,6 +992,47 @@ void eskf_align_static_bias_means(ESKF_Handle *h,
     }
 }
 
+bool eskf_seed_imu_biases(
+    ESKF_Handle *h,
+    const eskf_float_t accelerometer_bias_m_s2[3],
+    const eskf_float_t gyroscope_bias_rad_s[3],
+    eskf_float_t accelerometer_bias_variance_m2_s4,
+    eskf_float_t gyroscope_bias_variance_rad2_s2
+) {
+    int state_axis;
+    int covariance_axis;
+    if (h == NULL || !h->initialized || accelerometer_bias_m_s2 == NULL
+        || gyroscope_bias_rad_s == NULL
+        || !isfinite(accelerometer_bias_variance_m2_s4)
+        || !isfinite(gyroscope_bias_variance_rad2_s2)
+        || accelerometer_bias_variance_m2_s4 <= ESKF_SCALAR(0.0)
+        || gyroscope_bias_variance_rad2_s2 <= ESKF_SCALAR(0.0)) {
+        return false;
+    }
+    for (state_axis = 0; state_axis < 3; ++state_axis) {
+        if (!isfinite(accelerometer_bias_m_s2[state_axis])
+            || !isfinite(gyroscope_bias_rad_s[state_axis])) {
+            return false;
+        }
+    }
+    for (state_axis = 0; state_axis < 3; ++state_axis) {
+        const int accel_index = ESKF_IDX_DAB + state_axis;
+        const int gyro_index = ESKF_IDX_DGB + state_axis;
+        h->state.ab[state_axis] = accelerometer_bias_m_s2[state_axis];
+        h->state.gb[state_axis] = gyroscope_bias_rad_s[state_axis];
+        for (covariance_axis = 0; covariance_axis < ESKF_ERROR_STATE_DIM;
+             ++covariance_axis) {
+            h->P[accel_index][covariance_axis] = ESKF_SCALAR(0.0);
+            h->P[covariance_axis][accel_index] = ESKF_SCALAR(0.0);
+            h->P[gyro_index][covariance_axis] = ESKF_SCALAR(0.0);
+            h->P[covariance_axis][gyro_index] = ESKF_SCALAR(0.0);
+        }
+        h->P[accel_index][accel_index] = accelerometer_bias_variance_m2_s4;
+        h->P[gyro_index][gyro_index] = gyroscope_bias_variance_rad2_s2;
+    }
+    return true;
+}
+
 /* ============================================================================
  * State Access
  * ============================================================================ */
