@@ -56,6 +56,24 @@ leak detection disabled for this environment. The full campaign output remains
 outside Git under `/tmp/aerakia-multipose-548-causal/`; its compact protocol and
 source manifest are recorded when the candidate is committed.
 
+### Follow-up audit — end-to-end contract and outlier boundary
+
+The public API test was tightened so it now constructs six raw stationary pose
+means, calls `aerakia_static_imu_calibrate()`, and passes that actual result to
+`aerakia_eskf_apply_static_imu_calibration()`. A hand-filled accepted result is
+no longer sufficient for the integration test. The full native CTest suite
+remains `18/18` passing.
+
+The new diagnostic scan
+`validation/scan_static_imu_calibration_outlier_boundary.py` was run with the
+frozen default configuration. It found an asymmetric boundary: radial
+contamination of `0.03 m/s²` is accepted with approximately `0.0150 m/s²`
+fitted-bias error, while `0.04 m/s²` is rejected; tangential contamination of
+`0.8 m/s²` is accepted with approximately `0.0163 m/s²` error, while `1.0
+m/s²` is rejected. This confirms that the leave-one-out gate is not a general
+outlier detector. The result is retained as diagnostic evidence and does not
+justify threshold tuning or physical-calibration claims.
+
 ## 2026-08-11 — TAS/wind causal observability prerequisite
 
 ### Reason

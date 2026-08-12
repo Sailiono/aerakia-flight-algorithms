@@ -12,6 +12,10 @@ portable C library and from FCOne-specific integration code.
   compact results only, uses causal-IMU stationarity for replay startup, and is
   not a physical calibration or flight claim. Its provenance records both the
   Git commit and hashes of dirty source inputs.
+- `scan_static_imu_calibration_outlier_boundary.py`: deterministic diagnostic
+  scan of tangential/radial single-pose contamination against the frozen
+  calibration gates. It reports accepted-but-biased cases explicitly and does
+  not tune thresholds or serve as a runtime quality decision.
 - `run_public_dataset_suite.py`: public-dataset conversion and replay suite;
   it requires separately obtained source data.
 - `run_ulog_suite.py`: private PX4 ULog replay suite; it requires a private

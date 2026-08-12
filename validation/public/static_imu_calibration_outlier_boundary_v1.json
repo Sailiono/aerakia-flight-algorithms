@@ -1,0 +1,380 @@
+{
+  "calibrator_sha256": "b343bd8da943383181ccccf9574cf1b54ec1b2faf79c2e74d0df4a0345e5ccfe",
+  "cases": [
+    {
+      "accepted": true,
+      "amplitude_m_s2": 0.0,
+      "bias_error_norm_m_s2": 3.4169672225667673e-07,
+      "gravity_residual_max_abs_m_s2": 4.76837158e-07,
+      "leave_one_out_bias_delta_m_s2": 4.76837158e-07,
+      "mode": "tangential",
+      "returncode": 0,
+      "status": 0
+    },
+    {
+      "accepted": true,
+      "amplitude_m_s2": 0.01,
+      "bias_error_norm_m_s2": 2.374389378345597e-06,
+      "gravity_residual_max_abs_m_s2": 2.54933843e-06,
+      "leave_one_out_bias_delta_m_s2": 2.78775815e-06,
+      "mode": "tangential",
+      "returncode": 0,
+      "status": 0
+    },
+    {
+      "accepted": true,
+      "amplitude_m_s2": 0.02,
+      "bias_error_norm_m_s2": 1.0009347859381984e-05,
+      "gravity_residual_max_abs_m_s2": 1.01972491e-05,
+      "leave_one_out_bias_delta_m_s2": 1.0435685e-05,
+      "mode": "tangential",
+      "returncode": 0,
+      "status": 0
+    },
+    {
+      "accepted": true,
+      "amplitude_m_s2": 0.03,
+      "bias_error_norm_m_s2": 2.2754983605579634e-05,
+      "gravity_residual_max_abs_m_s2": 2.29437173e-05,
+      "leave_one_out_bias_delta_m_s2": 2.31822214e-05,
+      "mode": "tangential",
+      "returncode": 0,
+      "status": 0
+    },
+    {
+      "accepted": true,
+      "amplitude_m_s2": 0.04,
+      "bias_error_norm_m_s2": 4.059840097208569e-05,
+      "gravity_residual_max_abs_m_s2": 4.0788731e-05,
+      "leave_one_out_bias_delta_m_s2": 4.10274151e-05,
+      "mode": "tangential",
+      "returncode": 0,
+      "status": 0
+    },
+    {
+      "accepted": true,
+      "amplitude_m_s2": 0.05,
+      "bias_error_norm_m_s2": 6.35420629760319e-05,
+      "gravity_residual_max_abs_m_s2": 6.37322446e-05,
+      "leave_one_out_bias_delta_m_s2": 6.39713107e-05,
+      "mode": "tangential",
+      "returncode": 0,
+      "status": 0
+    },
+    {
+      "accepted": true,
+      "amplitude_m_s2": 0.06,
+      "bias_error_norm_m_s2": 9.15822344193498e-05,
+      "gravity_residual_max_abs_m_s2": 9.17741636e-05,
+      "leave_one_out_bias_delta_m_s2": 9.20139282e-05,
+      "mode": "tangential",
+      "returncode": 0,
+      "status": 0
+    },
+    {
+      "accepted": true,
+      "amplitude_m_s2": 0.07,
+      "bias_error_norm_m_s2": 0.00012472245099419822,
+      "gravity_residual_max_abs_m_s2": 0.000124914513,
+      "leave_one_out_bias_delta_m_s2": 0.00012515542,
+      "mode": "tangential",
+      "returncode": 0,
+      "status": 0
+    },
+    {
+      "accepted": true,
+      "amplitude_m_s2": 0.08,
+      "bias_error_norm_m_s2": 0.0001629626988896885,
+      "gravity_residual_max_abs_m_s2": 0.000163153192,
+      "leave_one_out_bias_delta_m_s2": 0.00016339586,
+      "mode": "tangential",
+      "returncode": 0,
+      "status": 0
+    },
+    {
+      "accepted": true,
+      "amplitude_m_s2": 0.09,
+      "bias_error_norm_m_s2": 0.00020629927429722684,
+      "gravity_residual_max_abs_m_s2": 0.000206490062,
+      "leave_one_out_bias_delta_m_s2": 0.000206735262,
+      "mode": "tangential",
+      "returncode": 0,
+      "status": 0
+    },
+    {
+      "accepted": true,
+      "amplitude_m_s2": 0.1,
+      "bias_error_norm_m_s2": 0.0002547359006641198,
+      "gravity_residual_max_abs_m_s2": 0.000254925137,
+      "leave_one_out_bias_delta_m_s2": 0.000255173887,
+      "mode": "tangential",
+      "returncode": 0,
+      "status": 0
+    },
+    {
+      "accepted": true,
+      "amplitude_m_s2": 0.12,
+      "bias_error_norm_m_s2": 0.00036690217580897724,
+      "gravity_residual_max_abs_m_s2": 0.000367089233,
+      "leave_one_out_bias_delta_m_s2": 0.000367349072,
+      "mode": "tangential",
+      "returncode": 0,
+      "status": 0
+    },
+    {
+      "accepted": true,
+      "amplitude_m_s2": 0.15,
+      "bias_error_norm_m_s2": 0.0005733843609074933,
+      "gravity_residual_max_abs_m_s2": 0.000573568745,
+      "leave_one_out_bias_delta_m_s2": 0.000573859375,
+      "mode": "tangential",
+      "returncode": 0,
+      "status": 0
+    },
+    {
+      "accepted": true,
+      "amplitude_m_s2": 0.2,
+      "bias_error_norm_m_s2": 0.0010194776878000326,
+      "gravity_residual_max_abs_m_s2": 0.00101964665,
+      "leave_one_out_bias_delta_m_s2": 0.00102005003,
+      "mode": "tangential",
+      "returncode": 0,
+      "status": 0
+    },
+    {
+      "accepted": true,
+      "amplitude_m_s2": 0.3,
+      "bias_error_norm_m_s2": 0.0022939315402130565,
+      "gravity_residual_max_abs_m_s2": 0.00229400513,
+      "leave_one_out_bias_delta_m_s2": 0.00229507871,
+      "mode": "tangential",
+      "returncode": 0,
+      "status": 0
+    },
+    {
+      "accepted": true,
+      "amplitude_m_s2": 0.5,
+      "bias_error_norm_m_s2": 0.006371197627151246,
+      "gravity_residual_max_abs_m_s2": 0.00637046993,
+      "leave_one_out_bias_delta_m_s2": 0.00637714751,
+      "mode": "tangential",
+      "returncode": 0,
+      "status": 0
+    },
+    {
+      "accepted": true,
+      "amplitude_m_s2": 0.8,
+      "bias_error_norm_m_s2": 0.016303216408705377,
+      "gravity_residual_max_abs_m_s2": 0.0162973963,
+      "leave_one_out_bias_delta_m_s2": 0.0163397882,
+      "mode": "tangential",
+      "returncode": 0,
+      "status": 0
+    },
+    {
+      "accepted": false,
+      "amplitude_m_s2": 1.0,
+      "bias_error_norm_m_s2": 0.025463309949256847,
+      "gravity_residual_max_abs_m_s2": 0.0254488457,
+      "leave_one_out_bias_delta_m_s2": 0.0255519021,
+      "mode": "tangential",
+      "returncode": 1,
+      "status": -9
+    },
+    {
+      "accepted": true,
+      "amplitude_m_s2": 0.0,
+      "bias_error_norm_m_s2": 3.4169672225667673e-07,
+      "gravity_residual_max_abs_m_s2": 4.76837158e-07,
+      "leave_one_out_bias_delta_m_s2": 4.76837158e-07,
+      "mode": "radial",
+      "returncode": 0,
+      "status": 0
+    },
+    {
+      "accepted": true,
+      "amplitude_m_s2": 0.01,
+      "bias_error_norm_m_s2": 0.005001622408036411,
+      "gravity_residual_max_abs_m_s2": 0.00500181224,
+      "leave_one_out_bias_delta_m_s2": 0.00500205066,
+      "mode": "radial",
+      "returncode": 0,
+      "status": 0
+    },
+    {
+      "accepted": true,
+      "amplitude_m_s2": 0.02,
+      "bias_error_norm_m_s2": 0.010006821904016772,
+      "gravity_residual_max_abs_m_s2": 0.0100070136,
+      "leave_one_out_bias_delta_m_s2": 0.010007252,
+      "mode": "radial",
+      "returncode": 0,
+      "status": 0
+    },
+    {
+      "accepted": true,
+      "amplitude_m_s2": 0.03,
+      "bias_error_norm_m_s2": 0.015014923402677013,
+      "gravity_residual_max_abs_m_s2": 0.015015115,
+      "leave_one_out_bias_delta_m_s2": 0.0150153534,
+      "mode": "radial",
+      "returncode": 0,
+      "status": 0
+    },
+    {
+      "accepted": false,
+      "amplitude_m_s2": 0.04,
+      "bias_error_norm_m_s2": 0.020026871202007062,
+      "gravity_residual_max_abs_m_s2": 0.0200270619,
+      "leave_one_out_bias_delta_m_s2": 0.0200273003,
+      "mode": "radial",
+      "returncode": 1,
+      "status": -9
+    },
+    {
+      "accepted": false,
+      "amplitude_m_s2": 0.05,
+      "bias_error_norm_m_s2": 0.0250421774016051,
+      "gravity_residual_max_abs_m_s2": 0.0250423681,
+      "leave_one_out_bias_delta_m_s2": 0.0250426065,
+      "mode": "radial",
+      "returncode": 1,
+      "status": -9
+    },
+    {
+      "accepted": false,
+      "amplitude_m_s2": 0.06,
+      "bias_error_norm_m_s2": 0.030060830701337127,
+      "gravity_residual_max_abs_m_s2": 0.0300610214,
+      "leave_one_out_bias_delta_m_s2": 0.0300612599,
+      "mode": "radial",
+      "returncode": 1,
+      "status": -9
+    },
+    {
+      "accepted": false,
+      "amplitude_m_s2": 0.07,
+      "bias_error_norm_m_s2": 0.03508234140114574,
+      "gravity_residual_max_abs_m_s2": 0.0350825302,
+      "leave_one_out_bias_delta_m_s2": 0.0350827686,
+      "mode": "radial",
+      "returncode": 1,
+      "status": -9
+    },
+    {
+      "accepted": false,
+      "amplitude_m_s2": 0.08,
+      "bias_error_norm_m_s2": 0.04010765739100218,
+      "gravity_residual_max_abs_m_s2": 0.04010785,
+      "leave_one_out_bias_delta_m_s2": 0.0401080884,
+      "mode": "radial",
+      "returncode": 1,
+      "status": -9
+    },
+    {
+      "accepted": false,
+      "amplitude_m_s2": 0.09,
+      "bias_error_norm_m_s2": 0.04513629125089053,
+      "gravity_residual_max_abs_m_s2": 0.0451364815,
+      "leave_one_out_bias_delta_m_s2": 0.0451367199,
+      "mode": "radial",
+      "returncode": 1,
+      "status": -9
+    },
+    {
+      "accepted": false,
+      "amplitude_m_s2": 0.1,
+      "bias_error_norm_m_s2": 0.050168231389801206,
+      "gravity_residual_max_abs_m_s2": 0.0501684211,
+      "leave_one_out_bias_delta_m_s2": 0.0501686595,
+      "mode": "radial",
+      "returncode": 1,
+      "status": -9
+    },
+    {
+      "accepted": false,
+      "amplitude_m_s2": 0.12,
+      "bias_error_norm_m_s2": 0.06024151030066723,
+      "gravity_residual_max_abs_m_s2": 0.0602416992,
+      "leave_one_out_bias_delta_m_s2": 0.0602419376,
+      "mode": "radial",
+      "returncode": 1,
+      "status": -9
+    },
+    {
+      "accepted": false,
+      "amplitude_m_s2": 0.15,
+      "bias_error_norm_m_s2": 0.07537621370053327,
+      "gravity_residual_max_abs_m_s2": 0.0753764063,
+      "leave_one_out_bias_delta_m_s2": 0.0753766447,
+      "mode": "radial",
+      "returncode": 1,
+      "status": -9
+    },
+    {
+      "accepted": false,
+      "amplitude_m_s2": 0.2,
+      "bias_error_norm_m_s2": 0.1006658219003993,
+      "gravity_residual_max_abs_m_s2": 0.100666016,
+      "leave_one_out_bias_delta_m_s2": 0,
+      "mode": "radial",
+      "returncode": 1,
+      "status": -7
+    },
+    {
+      "accepted": false,
+      "amplitude_m_s2": 0.3,
+      "bias_error_norm_m_s2": 0.15148351600026216,
+      "gravity_residual_max_abs_m_s2": 0.151483715,
+      "leave_one_out_bias_delta_m_s2": 0,
+      "mode": "radial",
+      "returncode": 1,
+      "status": -7
+    },
+    {
+      "accepted": false,
+      "amplitude_m_s2": 0.5,
+      "bias_error_norm_m_s2": 0.2540383520001564,
+      "gravity_residual_max_abs_m_s2": 0.254038543,
+      "leave_one_out_bias_delta_m_s2": 0,
+      "mode": "radial",
+      "returncode": 1,
+      "status": -7
+    },
+    {
+      "accepted": false,
+      "amplitude_m_s2": 0.8,
+      "bias_error_norm_m_s2": 0.41003077000009563,
+      "gravity_residual_max_abs_m_s2": 0.410030961,
+      "leave_one_out_bias_delta_m_s2": 0,
+      "mode": "radial",
+      "returncode": 1,
+      "status": -7
+    },
+    {
+      "accepted": false,
+      "amplitude_m_s2": 1.0,
+      "bias_error_norm_m_s2": 0.5153620120000761,
+      "gravity_residual_max_abs_m_s2": 0.515362203,
+      "leave_one_out_bias_delta_m_s2": 0,
+      "mode": "radial",
+      "returncode": 1,
+      "status": -7
+    }
+  ],
+  "contaminated_pose": "+Y",
+  "git_commit": "72323449f4068eecc263d02750b9df9346f1df13",
+  "interpretation": [
+    "This scan characterizes the frozen default gates; it does not tune them.",
+    "Accepted cases with non-zero bias error are false accepts for a stricter calibration-accuracy contract.",
+    "The result does not establish physical IMU calibration accuracy or flight readiness."
+  ],
+  "schema_version": 1,
+  "status": "diagnostic_only",
+  "study_id": "aerakia-static-imu-calibration-outlier-boundary-v1",
+  "true_bias_m_s2": [
+    0.1,
+    -0.05,
+    0.03
+  ]
+}

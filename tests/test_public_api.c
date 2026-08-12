@@ -1417,6 +1417,7 @@ static void test_eskf_multi_pose_static_calibration_seed(void)
     AerakiaEskfConfig config;
     AerakiaNavigationEstimate estimate;
     AerakiaImuSample sample;
+    AerakiaStaticImuPoseMean poses[6];
     AerakiaStaticImuCalibrationResult calibration;
     AerakiaStaticImuCalibrationResult rejected;
     AerakiaEskf before_second_apply;
@@ -1429,15 +1430,40 @@ static void test_eskf_multi_pose_static_calibration_seed(void)
     float attitude[4];
     int index;
 
-    memset(&calibration, 0, sizeof(calibration));
-    calibration.accepted = true;
-    calibration.status = AERAKIA_STATIC_IMU_CALIBRATION_OK;
-    calibration.accelerometer_bias_m_s2.x = acceleration_bias[0];
-    calibration.accelerometer_bias_m_s2.y = acceleration_bias[1];
-    calibration.accelerometer_bias_m_s2.z = acceleration_bias[2];
-    calibration.gyroscope_bias_rad_s.x = gyroscope_bias[0];
-    calibration.gyroscope_bias_rad_s.y = gyroscope_bias[1];
-    calibration.gyroscope_bias_rad_s.z = gyroscope_bias[2];
+    /*
+     * Exercise the complete public path: construct raw stationary pose means,
+     * run the actual sphere-fit/gyro-mean calibrator, then pass its result to
+     * the ESKF adapter.  This must not be replaced with a hand-filled result;
+     * otherwise the integration contract can regress while the test remains
+     * green.
+     */
+    for (index = 0; index < 6; ++index) {
+        const float directions[6][3] = {
+            {1.0f, 0.0f, 0.0f}, {-1.0f, 0.0f, 0.0f},
+            {0.0f, 1.0f, 0.0f}, {0.0f, -1.0f, 0.0f},
+            {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, -1.0f}
+        };
+        poses[index].acceleration_m_s2.x =
+            acceleration_bias[0] + directions[index][0] * AERAKIA_GRAVITY_M_S2;
+        poses[index].acceleration_m_s2.y =
+            acceleration_bias[1] + directions[index][1] * AERAKIA_GRAVITY_M_S2;
+        poses[index].acceleration_m_s2.z =
+            acceleration_bias[2] + directions[index][2] * AERAKIA_GRAVITY_M_S2;
+        poses[index].angular_rate_rad_s.x = gyroscope_bias[0];
+        poses[index].angular_rate_rad_s.y = gyroscope_bias[1];
+        poses[index].angular_rate_rad_s.z = gyroscope_bias[2];
+        poses[index].sample_count = 400U;
+    }
+    check_true(
+        aerakia_static_imu_calibrate(poses, 6U, NULL, &calibration)
+            == AERAKIA_STATIC_IMU_CALIBRATION_OK
+            && calibration.accepted,
+        "public multi-pose calibrator produces an accepted result for ESKF"
+    );
+    check_true(near(calibration.accelerometer_bias_m_s2.x, acceleration_bias[0], 1.0e-5f),
+               "calibrator result carries accelerometer x bias into adapter test");
+    check_true(near(calibration.gyroscope_bias_rad_s.z, gyroscope_bias[2], 1.0e-6f),
+               "calibrator result carries gyro z bias into adapter test");
     aerakia_eskf_default_config(&config);
     config.static_alignment_duration_s = 0.08f;
     config.static_alignment_min_samples = 10U;
