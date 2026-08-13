@@ -20,6 +20,12 @@ The generated compact evidence is
 It records source hashes, the exact compiler version, flags, layouts, section
 sums, and external dependencies without retaining generated objects.
 
+The `git_commit` field identifies the reviewed source revision whose tree
+produced the recorded source manifest. The unit test
+`tests/test_cortex_m7_cross_compile.py` rejects a checked-in report when that
+manifest no longer matches either the current portable source set or the named
+commit, so evidence must be regenerated after any portable source change.
+
 ## Method
 
 The script compiles all eight portable C translation units with

@@ -27,6 +27,20 @@ class CortexM7CrossCompileTests(unittest.TestCase):
     def test_all_portable_library_sources_are_cross_compiled(self) -> None:
         self.assertIn("src/static_imu_calibration.c", MODULE.SOURCES)
 
+    def test_evidence_manifest_matches_reported_source_commit(self) -> None:
+        report = MODULE.load_evidence_report(
+            ROOT / "validation" / "public" / "cortex_m7_cross_compile_v1.json"
+        )
+        self.assertEqual(report["source_manifest"], MODULE.build_source_manifest())
+        self.assertEqual(
+            report["source_manifest_sha256"],
+            MODULE.source_manifest_sha256(report["source_manifest"]),
+        )
+        self.assertEqual(
+            report["source_manifest"],
+            MODULE.source_manifest_for_commit(str(report["git_commit"])),
+        )
+
     def test_section_parser_aggregates_subsections_and_ignores_metadata(self) -> None:
         sections = MODULE.parse_sections(
             """\

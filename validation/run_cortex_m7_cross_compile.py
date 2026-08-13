@@ -80,6 +80,50 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def build_source_manifest(
+    sources: Iterable[str] = SOURCES,
+    root: Path = ROOT,
+) -> list[dict[str, str]]:
+    return [{"path": source, "sha256": sha256(root / source)} for source in sources]
+
+
+def source_manifest_sha256(source_manifest: Iterable[dict[str, str]]) -> str:
+    normalized = [dict(item) for item in source_manifest]
+    return hashlib.sha256(
+        json.dumps(normalized, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
+def git_show(commit: str, path: str) -> bytes:
+    completed = subprocess.run(
+        ["git", "show", f"{commit}:{path}"],
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError(
+            f"git show {commit}:{path} failed: "
+            f"{completed.stderr.decode('utf-8', errors='replace')}"
+        )
+    return completed.stdout
+
+
+def source_manifest_for_commit(
+    commit: str,
+    sources: Iterable[str] = SOURCES,
+) -> list[dict[str, str]]:
+    return [
+        {"path": source, "sha256": hashlib.sha256(git_show(commit, source)).hexdigest()}
+        for source in sources
+    ]
+
+
+def load_evidence_report(path: Path) -> dict[str, object]:
+    with path.open("r", encoding="utf-8") as stream:
+        return json.load(stream)
+
+
 def relative(path: Path) -> str:
     try:
         return str(path.resolve().relative_to(ROOT))
@@ -408,9 +452,7 @@ def main() -> int:
     try:
         for profile, flags in PROFILES.items():
             profiles.append(build_profile(profile, flags, toolchain, work_root))
-        source_manifest = [
-            {"path": source, "sha256": sha256(ROOT / source)} for source in SOURCES
-        ]
+        source_manifest = build_source_manifest()
         result = {
             "schema_version": 1,
             "status": "cross_compile_preflight_not_target_runtime_qualification",
@@ -426,9 +468,7 @@ def main() -> int:
             },
             "base_flags": list(BASE_FLAGS),
             "source_manifest": source_manifest,
-            "source_manifest_sha256": hashlib.sha256(
-                json.dumps(source_manifest, sort_keys=True, separators=(",", ":")).encode("utf-8")
-            ).hexdigest(),
+            "source_manifest_sha256": source_manifest_sha256(source_manifest),
             "profiles": profiles,
             "limitations": [
                 "This compiles and archives the portable library only; no FCOne application image is linked.",
