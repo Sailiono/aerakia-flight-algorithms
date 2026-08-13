@@ -19,7 +19,7 @@
     "path": "/usr/bin/arm-none-eabi-gcc",
     "version": "arm-none-eabi-gcc (15:14.2.rel1-1) 14.2.1 20241119"
   },
-  "git_commit": "8e815c696dddeb3504a9ca2e6e0de1e3f744b6da",
+  "git_commit": "853474de229556e9ec2433f3d750b49a16083046",
   "limitations": [
     "This compiles and archives the portable library only; no FCOne application image is linked.",
     "Archive section sums are not final Flash/RAM use after linker garbage collection, startup, HAL, RTOS, logging, or application code.",
