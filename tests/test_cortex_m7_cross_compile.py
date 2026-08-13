@@ -7,7 +7,9 @@ cross-compilation evidence is produced by the validation script itself.
 from __future__ import annotations
 
 import importlib.util
+import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -40,6 +42,32 @@ class CortexM7CrossCompileTests(unittest.TestCase):
             report["source_manifest"],
             MODULE.source_manifest_for_commit(str(report["git_commit"])),
         )
+
+    def test_evidence_source_status_detects_uncommitted_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.com"],
+                cwd=repo,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Codex Test"],
+                cwd=repo,
+                check=True,
+            )
+            source = repo / "source.c"
+            source.write_text("int value;\n", encoding="utf-8")
+            subprocess.run(["git", "add", "source.c"], cwd=repo, check=True)
+            subprocess.run(
+                ["git", "commit", "-qm", "baseline"],
+                cwd=repo,
+                check=True,
+            )
+            self.assertEqual(MODULE.git_status_lines(["source.c"], repo), [])
+            source.write_text("int changed;\n", encoding="utf-8")
+            self.assertNotEqual(MODULE.git_status_lines(["source.c"], repo), [])
 
     def test_section_parser_aggregates_subsections_and_ignores_metadata(self) -> None:
         sections = MODULE.parse_sections(

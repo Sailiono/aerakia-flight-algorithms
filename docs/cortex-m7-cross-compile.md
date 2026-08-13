@@ -24,7 +24,9 @@ The `git_commit` field identifies the reviewed source revision whose tree
 produced the recorded source manifest. The unit test
 `tests/test_cortex_m7_cross_compile.py` rejects a checked-in report when that
 manifest no longer matches either the current portable source set or the named
-commit, so evidence must be regenerated after any portable source change.
+commit, so evidence must be regenerated after any portable source change. The
+runner also refuses to generate evidence while a portable source or the
+script itself has uncommitted changes.
 
 ## Method
 

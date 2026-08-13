@@ -35,6 +35,7 @@ FLOAT_CORE_SOURCES = (
     "src/eskf_math.c",
     "src/eskf_models.c",
 )
+EVIDENCE_SOURCES = (*SOURCES, "validation/run_cortex_m7_cross_compile.py")
 BASE_FLAGS = (
     "-mcpu=cortex-m7",
     "-mthumb",
@@ -122,6 +123,22 @@ def source_manifest_for_commit(
 def load_evidence_report(path: Path) -> dict[str, object]:
     with path.open("r", encoding="utf-8") as stream:
         return json.load(stream)
+
+
+def git_status_lines(
+    paths: Iterable[str],
+    cwd: Path = ROOT,
+) -> list[str]:
+    completed = subprocess.run(
+        ["git", "status", "--porcelain", "--", *paths],
+        cwd=cwd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError(f"git status failed: {completed.stderr}")
+    return [line for line in completed.stdout.splitlines() if line.strip()]
 
 
 def relative(path: Path) -> str:
@@ -423,6 +440,12 @@ def main() -> int:
     )
     parser.add_argument("--keep-work", action="store_true")
     args = parser.parse_args()
+    dirty = git_status_lines(EVIDENCE_SOURCES)
+    if dirty:
+        parser.error(
+            "refusing to generate evidence from a dirty source tree: "
+            + ", ".join(dirty)
+        )
     try:
         toolchain = Toolchain(
             compiler=resolve_tool(args.compiler),
