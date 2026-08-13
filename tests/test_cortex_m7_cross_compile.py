@@ -28,6 +28,7 @@ SPEC.loader.exec_module(MODULE)
 class CortexM7CrossCompileTests(unittest.TestCase):
     def test_all_portable_library_sources_are_cross_compiled(self) -> None:
         self.assertIn("src/static_imu_calibration.c", MODULE.SOURCES)
+        self.assertIn("include/aerakia/eskf_types.h", MODULE.EVIDENCE_MANIFEST_SOURCES)
 
     def test_evidence_manifest_matches_reported_source_commit(self) -> None:
         report = MODULE.load_evidence_report(

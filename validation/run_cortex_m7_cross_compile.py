@@ -35,7 +35,22 @@ FLOAT_CORE_SOURCES = (
     "src/eskf_math.c",
     "src/eskf_models.c",
 )
-EVIDENCE_SOURCES = (*SOURCES, "validation/run_cortex_m7_cross_compile.py")
+EVIDENCE_HEADER_SOURCES = (
+    "include/aerakia/barometer_supervisor.h",
+    "include/aerakia/eskf.h",
+    "include/aerakia/eskf_adapter.h",
+    "include/aerakia/eskf_types.h",
+    "include/aerakia/mag_gate.h",
+    "include/aerakia/mahony.h",
+    "include/aerakia/static_imu_calibration.h",
+    "include/aerakia/types.h",
+    "include/aerakia/version.h",
+    "src/eskf_internal.h",
+    "src/eskf_math.h",
+    "src/eskf_models.h",
+)
+EVIDENCE_MANIFEST_SOURCES = (*SOURCES, *EVIDENCE_HEADER_SOURCES)
+EVIDENCE_SOURCES = (*EVIDENCE_MANIFEST_SOURCES, "validation/run_cortex_m7_cross_compile.py")
 BASE_FLAGS = (
     "-mcpu=cortex-m7",
     "-mthumb",
@@ -82,10 +97,13 @@ def sha256(path: Path) -> str:
 
 
 def build_source_manifest(
-    sources: Iterable[str] = SOURCES,
+    sources: Iterable[str] = EVIDENCE_MANIFEST_SOURCES,
     root: Path = ROOT,
 ) -> list[dict[str, str]]:
-    return [{"path": source, "sha256": sha256(root / source)} for source in sources]
+    return sorted(
+        [{"path": source, "sha256": sha256(root / source)} for source in sources],
+        key=lambda item: item["path"],
+    )
 
 
 def source_manifest_sha256(source_manifest: Iterable[dict[str, str]]) -> str:
@@ -112,12 +130,18 @@ def git_show(commit: str, path: str) -> bytes:
 
 def source_manifest_for_commit(
     commit: str,
-    sources: Iterable[str] = SOURCES,
+    sources: Iterable[str] = EVIDENCE_MANIFEST_SOURCES,
 ) -> list[dict[str, str]]:
-    return [
-        {"path": source, "sha256": hashlib.sha256(git_show(commit, source)).hexdigest()}
-        for source in sources
-    ]
+    return sorted(
+        [
+            {
+                "path": source,
+                "sha256": hashlib.sha256(git_show(commit, source)).hexdigest(),
+            }
+            for source in sources
+        ],
+        key=lambda item: item["path"],
+    )
 
 
 def load_evidence_report(path: Path) -> dict[str, object]:
