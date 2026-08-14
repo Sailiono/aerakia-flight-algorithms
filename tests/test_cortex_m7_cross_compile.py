@@ -52,8 +52,8 @@ class CortexM7CrossCompileTests(unittest.TestCase):
         tracked_headers = sorted(
             str(path.relative_to(ROOT))
             for path in (
-                *ROOT.glob("include/aerakia/*.h"),
-                *ROOT.glob("src/*.h"),
+                *ROOT.glob("include/aerakia/**/*.h"),
+                *ROOT.glob("src/**/*.h"),
             )
         )
         manifest_headers = sorted(

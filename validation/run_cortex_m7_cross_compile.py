@@ -35,19 +35,14 @@ FLOAT_CORE_SOURCES = (
     "src/eskf_math.c",
     "src/eskf_models.c",
 )
-EVIDENCE_HEADER_SOURCES = (
-    "include/aerakia/barometer_supervisor.h",
-    "include/aerakia/eskf.h",
-    "include/aerakia/eskf_adapter.h",
-    "include/aerakia/eskf_types.h",
-    "include/aerakia/mag_gate.h",
-    "include/aerakia/mahony.h",
-    "include/aerakia/static_imu_calibration.h",
-    "include/aerakia/types.h",
-    "include/aerakia/version.h",
-    "src/eskf_internal.h",
-    "src/eskf_math.h",
-    "src/eskf_models.h",
+EVIDENCE_HEADER_SOURCES = tuple(
+    str(path.relative_to(ROOT))
+    for path in sorted(
+        (
+            *ROOT.glob("include/aerakia/**/*.h"),
+            *ROOT.glob("src/**/*.h"),
+        )
+    )
 )
 EVIDENCE_MANIFEST_SOURCES = (*SOURCES, *EVIDENCE_HEADER_SOURCES)
 EVIDENCE_SOURCES = (*EVIDENCE_MANIFEST_SOURCES, "validation/run_cortex_m7_cross_compile.py")
