@@ -19,6 +19,15 @@ static int near(float actual, float expected, float tolerance)
     return fabsf(actual - expected) <= tolerance;
 }
 
+static void expect_rejected(
+    const AerakiaStaticImuCalibrationResult *result,
+    AerakiaStaticImuCalibrationStatus status,
+    const char *message)
+{
+    check_true(result->status == status, message);
+    check_true(!result->accepted, "rejected result must not be accepted");
+}
+
 static AerakiaStaticImuPoseMean make_pose(
     float direction_x,
     float direction_y,
@@ -145,17 +154,20 @@ static void test_rejection_paths(void)
     status = aerakia_static_imu_calibrate(poses, 1U, NULL, &result);
     check_true(status == AERAKIA_STATIC_IMU_CALIBRATION_INSUFFICIENT_POSES,
                "one pose is rejected before attempting a sphere fit");
+    expect_rejected(&result, status, "insufficient poses are not accepted");
     status = aerakia_static_imu_calibrate(
         poses, AERAKIA_STATIC_IMU_CALIBRATION_MAX_POSES + 1U, NULL, &result
     );
     check_true(status == AERAKIA_STATIC_IMU_CALIBRATION_TOO_MANY_POSES,
                "unbounded preflight pose count is rejected");
+    expect_rejected(&result, status, "excessive pose count is not accepted");
 
     aerakia_static_imu_calibration_default_config(&config);
     config.minimum_pose_count = AERAKIA_STATIC_IMU_CALIBRATION_MAX_POSES + 1U;
     status = aerakia_static_imu_calibrate(poses, 6U, &config, &result);
     check_true(status == AERAKIA_STATIC_IMU_CALIBRATION_INVALID_ARGUMENT,
                "impossible configured pose count is rejected as invalid configuration");
+    expect_rejected(&result, status, "invalid configuration is not accepted");
 
     aerakia_static_imu_calibration_default_config(&config);
     config.minimum_pose_count = 4U;
@@ -166,6 +178,7 @@ static void test_rejection_paths(void)
     status = aerakia_static_imu_calibrate(poses, 4U, &config, &result);
     check_true(status == AERAKIA_STATIC_IMU_CALIBRATION_DEGENERATE_GEOMETRY,
                "coplanar gravity directions are rejected");
+    expect_rejected(&result, status, "degenerate geometry is not accepted");
 
     make_six_axis_poses(poses, accelerometer_bias, gyroscope_bias);
     aerakia_static_imu_calibration_default_config(&config);
@@ -175,12 +188,21 @@ static void test_rejection_paths(void)
     status = aerakia_static_imu_calibrate(poses, 6U, &config, &result);
     check_true(status == AERAKIA_STATIC_IMU_CALIBRATION_GRAVITY_RESIDUAL_EXCEEDED,
                "a large accelerometer outlier rejects the complete calibration");
+    expect_rejected(&result, status, "gravity residual failure is not accepted");
 
     make_six_axis_poses(poses, accelerometer_bias, gyroscope_bias);
     poses[5].angular_rate_rad_s.x = 0.08f;
     status = aerakia_static_imu_calibrate(poses, 6U, NULL, &result);
     check_true(status == AERAKIA_STATIC_IMU_CALIBRATION_NONSTATIONARY_INPUT,
                "nonstationary gyro mean is rejected");
+    expect_rejected(&result, status, "nonstationary input is not accepted");
+
+    make_six_axis_poses(poses, accelerometer_bias, gyroscope_bias);
+    poses[3].acceleration_m_s2.x = NAN;
+    status = aerakia_static_imu_calibrate(poses, 6U, NULL, &result);
+    check_true(status == AERAKIA_STATIC_IMU_CALIBRATION_NONFINITE_INPUT,
+               "non-finite accelerometer mean is rejected");
+    expect_rejected(&result, status, "non-finite input is not accepted");
 
     make_six_axis_poses(poses, accelerometer_bias, gyroscope_bias);
     poses[0].angular_rate_rad_s.x += 0.040f;
@@ -188,6 +210,7 @@ static void test_rejection_paths(void)
     status = aerakia_static_imu_calibrate(poses, 6U, NULL, &result);
     check_true(status == AERAKIA_STATIC_IMU_CALIBRATION_GYROSCOPE_RESIDUAL_EXCEEDED,
                "inconsistent stationary gyro means are rejected");
+    expect_rejected(&result, status, "gyroscope residual failure is not accepted");
 }
 
 static void test_near_threshold_geometry_and_noise(void)
