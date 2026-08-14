@@ -27,6 +27,8 @@ manifest no longer matches either the current portable source set or the named
 commit, so evidence must be regenerated after any portable source or header
 change. The runner also refuses to generate evidence while a portable source,
 header, or the script itself has uncommitted changes.
+The report also records `runner_sha256`, binding each evidence record to the
+exact validation runner that produced it.
 
 ## Method
 

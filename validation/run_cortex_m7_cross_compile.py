@@ -513,6 +513,7 @@ def main() -> int:
                 "path": toolchain.compiler,
                 "version": first_line(run([toolchain.compiler, "--version"])),
             },
+            "runner_sha256": sha256(ROOT / "validation/run_cortex_m7_cross_compile.py"),
             "base_flags": list(BASE_FLAGS),
             "source_manifest": source_manifest,
             "source_manifest_sha256": source_manifest_sha256(source_manifest),

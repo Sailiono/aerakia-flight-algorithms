@@ -34,6 +34,10 @@ class CortexM7CrossCompileTests(unittest.TestCase):
         report = MODULE.load_evidence_report(
             ROOT / "validation" / "public" / "cortex_m7_cross_compile_v1.json"
         )
+        self.assertEqual(
+            report["runner_sha256"],
+            MODULE.sha256(ROOT / "validation" / "run_cortex_m7_cross_compile.py"),
+        )
         self.assertEqual(report["source_manifest"], MODULE.build_source_manifest())
         self.assertEqual(
             report["source_manifest_sha256"],
@@ -43,6 +47,20 @@ class CortexM7CrossCompileTests(unittest.TestCase):
             report["source_manifest"],
             MODULE.source_manifest_for_commit(str(report["git_commit"])),
         )
+
+    def test_evidence_manifest_includes_every_portable_header(self) -> None:
+        tracked_headers = sorted(
+            str(path.relative_to(ROOT))
+            for path in (
+                *ROOT.glob("include/aerakia/*.h"),
+                *ROOT.glob("src/*.h"),
+            )
+        )
+        manifest_headers = sorted(
+            path for path in MODULE.EVIDENCE_MANIFEST_SOURCES
+            if path.endswith(".h")
+        )
+        self.assertEqual(manifest_headers, tracked_headers)
 
     def test_evidence_source_status_detects_uncommitted_changes(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
