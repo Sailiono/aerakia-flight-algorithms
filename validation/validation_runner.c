@@ -456,6 +456,7 @@ int main(int argc, char *argv[])
         [AERAKIA_TILT_ACCEL_BIAS_DIM][AERAKIA_TILT_ACCEL_BIAS_DIM];
     unsigned long samples = 0U, malformed = 0U, gps_updates = 0U, heading_updates = 0U;
     unsigned long zupt_updates = 0U;
+    unsigned int total_recoveries = 0U;
     int eskf_initialized = 0, mag_reference_initialized = 0, mahony_reference_seeded = 0;
     int cold_start = 0;
     int reference_attitude_init = 0;
@@ -1056,6 +1057,7 @@ int main(int argc, char *argv[])
             );
         }
         if (eskf_estimate.zero_velocity_update_applied) zupt_updates++;
+        total_recoveries = eskf.navigation_recovery_count;
 
         if (compact_output) {
             fprintf(
@@ -1246,7 +1248,7 @@ int main(int argc, char *argv[])
         "replayed=%lu malformed=%lu gps_updates=%lu heading_updates=%lu "
         "zupt_updates=%lu recoveries=%u cpu_ms=%.3f\n",
         samples, malformed, gps_updates, heading_updates, zupt_updates,
-        eskf_initialized ? eskf.navigation_recovery_count : 0U,
+        total_recoveries,
         (double)(clock() - start_clock) * 1000.0 / (double)CLOCKS_PER_SEC
     );
     fclose(input); fclose(output);

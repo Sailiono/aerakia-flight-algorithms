@@ -638,6 +638,8 @@ static void test_randomized_heading_models(void)
                    "random trusted-heading geometry is observable");
         for (axis = 0; axis < 3; ++axis) {
             double derivative;
+            plus_heading = 0.0;
+            minus_heading = 0.0;
             perturbation[0] = 0.0;
             perturbation[1] = 0.0;
             perturbation[2] = 0.0;
