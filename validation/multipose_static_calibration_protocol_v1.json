@@ -80,7 +80,7 @@
   },
   "sources": {
     "source_manifest": {
-      "CMakeLists.txt": "0ff9ed9b4c01ae0e01c766a5837c740e2a978801b48a5fe17c501ce2f03a4406",
+      "CMakeLists.txt": "e95f62852a0926845d7e3632ca5ff92aa83e07979ea5c8c8a21854345a7a3885",
       "requirements.txt": "cec845c0d866b6f7f08bb517d81aa44e5caf87df9a62dbcc3be1b8ed47629c27",
       "validation/run_multipose_static_calibration_campaign.py": "55bdf7302c9950862ac37a683083a51bf7d28c3192349ddd09b2798250684c51",
       "simulation/tools/generate_synthetic_imu.py": "324c927a3df2cc4fbca77e16e075fb1a8ebbaecf8c8875b5d7f529570e8fe81c",
@@ -89,7 +89,7 @@
       "validation/thresholds.json": "bb6c04721304c6742c314ab4101d2d7b3356ed50502ea00d7365f4f233c136a6",
       "validation/validation_runner.c": "f32716f75e0369a69cf2a05d246b80d7daa030ce5e81e176181a411eb5adfb84",
       "validation/eskf_joint_covariance.h": "2c5ed009c3efc720ad4233ee441ff75b005bae7c7dde94de71db152d4464fa33",
-      "validation/static_imu_calibration_cli.c": "e86d574bd4de93fc9060dabbd5a7d3e4437d0ab64f55203c790113214d9cf1f2",
+      "validation/static_imu_calibration_cli.c": "6c8537a4e4799dbf8efd5d49d516d6524c9111edbb1a85f5fe09c6466a793dd5",
       "src/barometer_supervisor.c": "c68f46787695a40a7c3d26ff2dda6ac0a833f1b4acd48a47b0fd8efeeb243984",
       "src/eskf.c": "87fc3d0591238c35a1cc3b884e2c5b250ca481c8456e76b577d8a6fd4a5af35e",
       "src/eskf_adapter.c": "55203a96de572800e8a5bc773867443c1633a471f984b0131f6bd3155de8b713",
@@ -111,7 +111,7 @@
       "include/aerakia/types.h": "6954f15f23f3da61801802df7d0106df91ffdf3779076050643c1a42b7f22241",
       "include/aerakia/version.h": "9fcb04200ddb5cd2a9fb938fb0651ad6bf0848ad46dd1d380ef1c7b44172022a"
     },
-    "source_manifest_sha256": "3f75c9d7bfbfb03df1afd453cd8249edb80d7c8c61636a48a84ce077736043d2"
+    "source_manifest_sha256": "4316ec7264e1300add00cf9aa69104a63afd28a36cab3b0fa81c75d2bc5e3a36"
   },
   "status": "sealed_holdout",
   "trajectory": {

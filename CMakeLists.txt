@@ -28,8 +28,8 @@ if(NOT AERAKIA_ESKF_CORE_PRECISION STREQUAL "double"
 endif()
 
 if(MSVC)
-    add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
-    add_compile_options(/W4)
+    add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+    add_compile_options(/W4 /wd4996)
     if(AERAKIA_WARNINGS_AS_ERRORS)
         add_compile_options(/WX)
     endif()

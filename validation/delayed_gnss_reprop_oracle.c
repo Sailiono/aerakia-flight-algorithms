@@ -1,3 +1,4 @@
+#define _CRT_SECURE_NO_WARNINGS
 /**
  * @file delayed_gnss_reprop_oracle.c
  * @brief Host-only isolated delayed-GNSS rewind/repropagation oracle.
