@@ -80,7 +80,7 @@
   },
   "sources": {
     "source_manifest": {
-      "CMakeLists.txt": "e95f62852a0926845d7e3632ca5ff92aa83e07979ea5c8c8a21854345a7a3885",
+      "CMakeLists.txt": "c01c32027366bcf0feb3021e1a72af932c19e899d338d728f08bfc546aa6f514",
       "requirements.txt": "cec845c0d866b6f7f08bb517d81aa44e5caf87df9a62dbcc3be1b8ed47629c27",
       "validation/run_multipose_static_calibration_campaign.py": "55bdf7302c9950862ac37a683083a51bf7d28c3192349ddd09b2798250684c51",
       "simulation/tools/generate_synthetic_imu.py": "324c927a3df2cc4fbca77e16e075fb1a8ebbaecf8c8875b5d7f529570e8fe81c",
@@ -111,7 +111,7 @@
       "include/aerakia/types.h": "6954f15f23f3da61801802df7d0106df91ffdf3779076050643c1a42b7f22241",
       "include/aerakia/version.h": "9fcb04200ddb5cd2a9fb938fb0651ad6bf0848ad46dd1d380ef1c7b44172022a"
     },
-    "source_manifest_sha256": "4316ec7264e1300add00cf9aa69104a63afd28a36cab3b0fa81c75d2bc5e3a36"
+    "source_manifest_sha256": "b87e270bdab7de5bd648618d7db3600cd8354731336bb1c01a542fb7cc68fdd3"
   },
   "status": "sealed_holdout",
   "trajectory": {
