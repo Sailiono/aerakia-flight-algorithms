@@ -87,9 +87,9 @@
       "validation/analyze_results.py": "511570e0da9a0e40c07c7c603e790173fed95c833144ed77c2a543709bd81ed6",
       "validation/run_residual_bias_boundary.py": "453e78393eb7b50da09e8c7629d85a0b364deaa3049e48e1523950bc1702ff67",
       "validation/thresholds.json": "bb6c04721304c6742c314ab4101d2d7b3356ed50502ea00d7365f4f233c136a6",
-      "validation/validation_runner.c": "f32716f75e0369a69cf2a05d246b80d7daa030ce5e81e176181a411eb5adfb84",
+      "validation/validation_runner.c": "febd373cd3e28bb46d1a7e3a063d4fbc69bc1324b47b666746dfd681219d574f",
       "validation/eskf_joint_covariance.h": "2c5ed009c3efc720ad4233ee441ff75b005bae7c7dde94de71db152d4464fa33",
-      "validation/static_imu_calibration_cli.c": "6c8537a4e4799dbf8efd5d49d516d6524c9111edbb1a85f5fe09c6466a793dd5",
+      "validation/static_imu_calibration_cli.c": "e86d574bd4de93fc9060dabbd5a7d3e4437d0ab64f55203c790113214d9cf1f2",
       "src/barometer_supervisor.c": "c68f46787695a40a7c3d26ff2dda6ac0a833f1b4acd48a47b0fd8efeeb243984",
       "src/eskf.c": "87fc3d0591238c35a1cc3b884e2c5b250ca481c8456e76b577d8a6fd4a5af35e",
       "src/eskf_adapter.c": "55203a96de572800e8a5bc773867443c1633a471f984b0131f6bd3155de8b713",
@@ -111,7 +111,7 @@
       "include/aerakia/types.h": "6954f15f23f3da61801802df7d0106df91ffdf3779076050643c1a42b7f22241",
       "include/aerakia/version.h": "9fcb04200ddb5cd2a9fb938fb0651ad6bf0848ad46dd1d380ef1c7b44172022a"
     },
-    "source_manifest_sha256": "b87e270bdab7de5bd648618d7db3600cd8354731336bb1c01a542fb7cc68fdd3"
+    "source_manifest_sha256": "b4fee0d07f607e92c9769ddeac3837f4205398e39ef0fc4244208f816be7b86f"
   },
   "status": "sealed_holdout",
   "trajectory": {

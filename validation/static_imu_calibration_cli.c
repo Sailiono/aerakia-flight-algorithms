@@ -1,4 +1,3 @@
-#define _CRT_SECURE_NO_WARNINGS
 /**
  * @file static_imu_calibration_cli.c
  * @brief Host utility converting stationary IMU pose means into an auditable seed.

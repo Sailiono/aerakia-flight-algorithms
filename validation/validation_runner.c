@@ -445,11 +445,11 @@ int main(int argc, char *argv[])
     ColumnMap map;
     AerakiaMahony standard, robust;
     AerakiaMahonyConfig standard_config, robust_config;
-    AerakiaEskf eskf;
+    AerakiaEskf eskf = {0};
     AerakiaEskfConfig eskf_config;
-    AerakiaBarometerSupervisor barometer_supervisor;
+    AerakiaBarometerSupervisor barometer_supervisor = {0};
     AerakiaBarometerSupervisorConfig barometer_supervisor_config;
-    AerakiaBarometerSupervisorDecision last_barometer_decision;
+    AerakiaBarometerSupervisorDecision last_barometer_decision = {0};
     AerakiaAttitudeEstimate standard_estimate, robust_estimate;
     AerakiaNavigationEstimate eskf_estimate;
     eskf_float_t tilt_accel_bias_covariance
