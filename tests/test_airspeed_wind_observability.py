@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import dataclasses
 import json
 import sys
 import tempfile
@@ -61,7 +62,7 @@ class AirspeedWindObservabilityTests(unittest.TestCase):
         for observation in observations[:32]:
             oracle.step(observation)
         baseline = oracle.summary(observations[31].arrival_timestamp_us)
-        delayed = copy.replace(observations[32], arrival_timestamp_us=observations[32].tas_timestamp_us + 600_000)
+        delayed = dataclasses.replace(observations[32], arrival_timestamp_us=observations[32].tas_timestamp_us + 600_000)
         event = oracle.step(delayed)
         after = oracle.summary(delayed.arrival_timestamp_us)
         self.assertFalse(event.accepted)
