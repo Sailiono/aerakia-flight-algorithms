@@ -1,4 +1,5 @@
 #include "eskf_models.h"
+#include "eskf_math.h"
 
 #include <aerakia/eskf.h>
 
@@ -792,6 +793,37 @@ static void test_dimension_aware_nis_limits(void)
                "1D NIS above 9 fails the scalar three-sigma limit");
 }
 
+static void test_scale_aware_mat3_inverse(void)
+{
+    eskf_float_t small_spd[3][3] = {
+        {1.0e-6, 2.0e-8, 0.0},
+        {2.0e-8, 2.0e-6, 1.0e-8},
+        {0.0, 1.0e-8, 3.0e-6}
+    };
+    eskf_float_t singular[3][3] = {
+        {1.0e-9, 0.0, 0.0},
+        {0.0, 1.0e-9, 0.0},
+        {0.0, 0.0, 0.0}
+    };
+    eskf_float_t inverse[3][3];
+    eskf_float_t product[3][3];
+    int row;
+    int column;
+
+    check_true(eskf_mat3_inv(small_spd, inverse),
+               "small well-conditioned covariance is invertible independent of units");
+    eskf_mat3_mul_mat3(small_spd, inverse, product);
+    for (row = 0; row < 3; ++row) {
+        for (column = 0; column < 3; ++column) {
+            const double expected = row == column ? 1.0 : 0.0;
+            check_true(fabs(product[row][column] - expected) < 1.0e-12,
+                       "scale-aware 3x3 inverse reconstructs identity");
+        }
+    }
+    check_true(!eskf_mat3_inv(singular, inverse),
+               "scale-aware 3x3 inverse still rejects a singular covariance");
+}
+
 int main(void)
 {
     test_randomized_prediction_transition();
@@ -801,6 +833,7 @@ int main(void)
     test_randomized_heading_models();
     test_heading_observability_boundaries();
     test_dimension_aware_nis_limits();
+    test_scale_aware_mat3_inverse();
     if (failures != 0) {
         fprintf(stderr, "%d ESKF model assertion(s) failed\n", failures);
         return 1;

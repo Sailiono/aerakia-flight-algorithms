@@ -244,31 +244,71 @@ bool eskf_mat3_inv(eskf_float_t A[3][3], eskf_float_t out[3][3]) {
      *
      * inv(A) = (1/det(A)) * adj(A)
      * where adj(A) is the adjugate (transpose of cofactor matrix)
+     *
+     * Scale first so the singularity test is relative to matrix magnitude.
+     * An absolute determinant threshold incorrectly rejects a well-conditioned
+     * covariance such as diag(1e-6, 1e-6, 1e-6), whose determinant is small
+     * only because of units.  The normalized determinant instead measures
+     * conditioning while retaining deterministic closed-form execution.
      */
 
+    eskf_float_t scale = ESKF_SCALAR(0.0);
+    eskf_float_t normalized[3][3];
+    int i;
+    int j;
+
+    for (i = 0; i < 3; ++i) {
+        for (j = 0; j < 3; ++j) {
+            if (!isfinite(A[i][j])) {
+                eskf_mat3_identity(out);
+                return false;
+            }
+            scale = ESKF_MAX(scale, ESKF_ABS(A[i][j]));
+        }
+    }
+    if (!isfinite(scale) || scale <= ESKF_SCALAR(0.0)) {
+        eskf_mat3_identity(out);
+        return false;
+    }
+    for (i = 0; i < 3; ++i) {
+        for (j = 0; j < 3; ++j) {
+            normalized[i][j] = A[i][j] / scale;
+        }
+    }
+
     /* Compute cofactors */
-    eskf_float_t c00 = A[1][1]*A[2][2] - A[1][2]*A[2][1];
-    eskf_float_t c01 = A[1][2]*A[2][0] - A[1][0]*A[2][2];
-    eskf_float_t c02 = A[1][0]*A[2][1] - A[1][1]*A[2][0];
+    eskf_float_t c00 = normalized[1][1]*normalized[2][2]
+        - normalized[1][2]*normalized[2][1];
+    eskf_float_t c01 = normalized[1][2]*normalized[2][0]
+        - normalized[1][0]*normalized[2][2];
+    eskf_float_t c02 = normalized[1][0]*normalized[2][1]
+        - normalized[1][1]*normalized[2][0];
 
-    eskf_float_t c10 = A[0][2]*A[2][1] - A[0][1]*A[2][2];
-    eskf_float_t c11 = A[0][0]*A[2][2] - A[0][2]*A[2][0];
-    eskf_float_t c12 = A[0][1]*A[2][0] - A[0][0]*A[2][1];
+    eskf_float_t c10 = normalized[0][2]*normalized[2][1]
+        - normalized[0][1]*normalized[2][2];
+    eskf_float_t c11 = normalized[0][0]*normalized[2][2]
+        - normalized[0][2]*normalized[2][0];
+    eskf_float_t c12 = normalized[0][1]*normalized[2][0]
+        - normalized[0][0]*normalized[2][1];
 
-    eskf_float_t c20 = A[0][1]*A[1][2] - A[0][2]*A[1][1];
-    eskf_float_t c21 = A[0][2]*A[1][0] - A[0][0]*A[1][2];
-    eskf_float_t c22 = A[0][0]*A[1][1] - A[0][1]*A[1][0];
+    eskf_float_t c20 = normalized[0][1]*normalized[1][2]
+        - normalized[0][2]*normalized[1][1];
+    eskf_float_t c21 = normalized[0][2]*normalized[1][0]
+        - normalized[0][0]*normalized[1][2];
+    eskf_float_t c22 = normalized[0][0]*normalized[1][1]
+        - normalized[0][1]*normalized[1][0];
 
     /* Compute determinant */
-    eskf_float_t det = A[0][0]*c00 + A[0][1]*c01 + A[0][2]*c02;
+    eskf_float_t det = normalized[0][0]*c00
+        + normalized[0][1]*c01 + normalized[0][2]*c02;
 
-    if (ESKF_ABS(det) < ESKF_SCALAR(ESKF_EPSILON)) {
+    if (!isfinite(det) || ESKF_ABS(det) < ESKF_SCALAR(ESKF_EPSILON)) {
         /* Singular matrix */
         eskf_mat3_identity(out);
         return false;
     }
 
-    eskf_float_t inv_det = ESKF_SCALAR(1.0) / det;
+    eskf_float_t inv_det = ESKF_SCALAR(1.0) / (det * scale);
 
     /* Adjugate matrix (transpose of cofactor) */
     out[0][0] = c00 * inv_det;
@@ -282,6 +322,15 @@ bool eskf_mat3_inv(eskf_float_t A[3][3], eskf_float_t out[3][3]) {
     out[2][0] = c02 * inv_det;
     out[2][1] = c12 * inv_det;
     out[2][2] = c22 * inv_det;
+
+    for (i = 0; i < 3; ++i) {
+        for (j = 0; j < 3; ++j) {
+            if (!isfinite(out[i][j])) {
+                eskf_mat3_identity(out);
+                return false;
+            }
+        }
+    }
 
     return true;
 }
