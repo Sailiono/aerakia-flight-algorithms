@@ -169,6 +169,35 @@ void eskf_update_baro(ESKF_Handle *h,
 void eskf_update_static_constraint(ESKF_Handle *h, eskf_float_t R_zupt);
 
 /**
+ * @brief Zero Angular Rate Update (ZARU)
+ *
+ * Corrects the three gyroscope-bias states from a body-frame angular-rate
+ * mean collected while the application independently knows the vehicle is
+ * stationary.  The core does not infer stationarity: authorization, window
+ * integrity, motion rejection, and source continuity remain caller duties.
+ *
+ * Observation model while stationary:
+ *   angular_rate_mean = gyroscope_bias + noise
+ *
+ * Each measurement variance is the uncertainty of the corresponding mean,
+ * not the variance of an individual IMU sample.  The update uses the normal
+ * error-state injection and Joseph covariance transaction.
+ *
+ * @param h                                  Pointer to filter handle
+ * @param angular_rate_mean_rad_s             Stationary body-rate mean [rad/s]
+ * @param measurement_variance_rad2_s2        Positive diagonal variances
+ * @param result                              Innovation result (can be NULL)
+ * @return true only when the observation passed validation/NIS gating and
+ *         the complete state/covariance update was applied
+ */
+bool eskf_update_zero_angular_rate(
+    ESKF_Handle *h,
+    const eskf_float_t angular_rate_mean_rad_s[3],
+    const eskf_float_t measurement_variance_rad2_s2[3],
+    ESKF_InnovResult *result
+);
+
+/**
  * Re-anchor only position and velocity after persistent navigation rejection.
  * Attitude and learned IMU biases are deliberately preserved.
  */

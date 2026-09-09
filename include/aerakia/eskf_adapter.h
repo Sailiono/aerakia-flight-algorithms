@@ -100,6 +100,18 @@ typedef struct {
 } AerakiaBarometerObservation;
 
 /**
+ * Application-authorized stationary body-rate mean for a ZARU transaction.
+ * The timestamp must identify the latest processed IMU sample.  Variances are
+ * per-axis uncertainties of the mean, not individual-sample variances.
+ */
+typedef struct {
+    uint64_t timestamp_us;
+    AerakiaVec3f angular_rate_mean_rad_s;
+    AerakiaVec3f measurement_variance_rad2_s2;
+    bool known_stationary;
+} AerakiaZeroAngularRateObservation;
+
+/**
  * A barometer observation with the source identity required by the optional
  * causal supervisor.  The adapter evaluates the source against the latest
  * processed IMU timestamp; callers must process the corresponding IMU stream
@@ -192,6 +204,7 @@ typedef struct {
     uint64_t last_velocity_timestamp_us;
     uint64_t last_heading_timestamp_us;
     uint64_t last_barometer_timestamp_us;
+    uint64_t last_zero_angular_rate_timestamp_us;
     uint64_t last_horizontal_position_aiding_timestamp_us;
     uint64_t last_horizontal_velocity_aiding_timestamp_us;
     uint64_t last_heading_aiding_timestamp_us;
@@ -243,6 +256,7 @@ typedef struct {
     bool has_velocity_timestamp;
     bool has_heading_timestamp;
     bool has_barometer_timestamp;
+    bool has_zero_angular_rate_timestamp;
     bool has_horizontal_position_aiding_timestamp;
     bool has_horizontal_velocity_aiding_timestamp;
     bool has_heading_aiding_timestamp;
@@ -393,6 +407,19 @@ AerakiaStatus aerakia_eskf_update_supervised_barometer_observation(
 void aerakia_eskf_note_barometer_rejection(AerakiaEskf *filter);
 
 void aerakia_eskf_apply_zero_velocity(AerakiaEskf *filter, float variance_m2_s2);
+
+/**
+ * Apply one anti-replay ZARU transaction at the latest IMU timestamp.
+ * A valid observation may be NIS-rejected while the function still returns
+ * AERAKIA_STATUS_OK; inspect result->accepted to distinguish application from
+ * an integrity-gate rejection.  Invalid/replayed observations leave the core
+ * state and covariance unchanged.
+ */
+AerakiaStatus aerakia_eskf_update_zero_angular_rate_observation(
+    AerakiaEskf *filter,
+    const AerakiaZeroAngularRateObservation *observation,
+    ESKF_InnovResult *result
+);
 
 void aerakia_eskf_get_estimate(
     const AerakiaEskf *filter,

@@ -1166,6 +1166,73 @@ static void test_eskf_static_supervisor(void)
     check_true(estimate.zero_velocity_update_count >= 2U, "stationary supervisor applies periodic ZUPT");
 }
 
+static void test_eskf_zero_angular_rate_observation(void)
+{
+    AerakiaEskf filter;
+    AerakiaEskfConfig config;
+    AerakiaNavigationEstimate estimate;
+    AerakiaImuSample sample = level_sample(10000U);
+    AerakiaZeroAngularRateObservation observation = {
+        10000U,
+        {0.006f, -0.004f, 0.002f},
+        {1.0e-6f, 1.0e-6f, 1.0e-6f},
+        false
+    };
+    ESKF_InnovResult result;
+    AerakiaEskf before;
+
+    aerakia_eskf_default_config(&config);
+    config.enable_static_alignment = false;
+    aerakia_eskf_init(&filter, &config, NULL, NULL);
+    check_true(aerakia_eskf_process_imu(&filter, &sample, &estimate)
+                   == AERAKIA_STATUS_INITIALIZED,
+               "ZARU adapter test initializes IMU timestamp");
+
+    before = filter;
+    check_true(aerakia_eskf_update_zero_angular_rate_observation(
+                   &filter, &observation, &result)
+                   == AERAKIA_STATUS_NOT_READY,
+               "ZARU adapter requires explicit known-stationary authorization");
+    check_true(eskf_core_unchanged(&filter, &before),
+               "unauthorized ZARU leaves core state and covariance unchanged");
+
+    observation.known_stationary = true;
+    observation.timestamp_us = 9999U;
+    check_true(aerakia_eskf_update_zero_angular_rate_observation(
+                   &filter, &observation, &result)
+                   == AERAKIA_STATUS_TIMESTAMP_ERROR,
+               "ZARU adapter rejects a mean not bound to the latest IMU sample");
+    check_true(eskf_core_unchanged(&filter, &before),
+               "stale ZARU leaves core state and covariance unchanged");
+
+    observation.timestamp_us = 10000U;
+    observation.angular_rate_mean_rad_s.x = NAN;
+    check_true(aerakia_eskf_update_zero_angular_rate_observation(
+                   &filter, &observation, &result)
+                   == AERAKIA_STATUS_MISSING_MEASUREMENT,
+               "ZARU adapter rejects non-finite window evidence");
+    check_true(eskf_core_unchanged(&filter, &before),
+               "invalid ZARU evidence leaves core state and covariance unchanged");
+
+    observation.angular_rate_mean_rad_s.x = 0.006f;
+    check_true(aerakia_eskf_update_zero_angular_rate_observation(
+                   &filter, &observation, &result)
+                   == AERAKIA_STATUS_OK,
+               "authorized latest-timestamp ZARU is evaluated");
+    check_true(result.accepted, "authorized ZARU passes innovation gate");
+    aerakia_eskf_get_estimate(&filter, &estimate);
+    check_true(near(estimate.gyroscope_bias_rad_s.z, 0.002f, 5.0e-5f),
+               "adapter ZARU corrects gyro bias through the public API");
+
+    before = filter;
+    check_true(aerakia_eskf_update_zero_angular_rate_observation(
+                   &filter, &observation, &result)
+                   == AERAKIA_STATUS_TIMESTAMP_ERROR,
+               "ZARU adapter rejects replay at the same timestamp");
+    check_true(eskf_core_unchanged(&filter, &before),
+               "replayed ZARU leaves core state and covariance unchanged");
+}
+
 static void test_eskf_navigation_recovery_and_heading(void)
 {
     AerakiaEskf filter;
@@ -1681,6 +1748,7 @@ int main(void)
     test_eskf_adapter_stationary();
     test_eskf_health_covers_state_and_covariance();
     test_eskf_static_supervisor();
+    test_eskf_zero_angular_rate_observation();
     test_eskf_navigation_recovery_and_heading();
     test_eskf_cold_start_attitude_alignment();
     test_eskf_multi_pose_static_calibration_seed();

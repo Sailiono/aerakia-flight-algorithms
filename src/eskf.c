@@ -776,6 +776,39 @@ void eskf_update_static_constraint(ESKF_Handle *h, eskf_float_t R_zupt) {
     _measurement_update_3d(h, z, H, R, ESKF_SCALAR(0.0), NULL);
 }
 
+bool eskf_update_zero_angular_rate(
+    ESKF_Handle *h,
+    const eskf_float_t angular_rate_mean_rad_s[3],
+    const eskf_float_t measurement_variance_rad2_s2[3],
+    ESKF_InnovResult *result
+) {
+    eskf_float_t residual[3];
+    eskf_float_t H[3][15] = {{ESKF_SCALAR(0.0)}};
+    eskf_float_t R[3][3] = {{ESKF_SCALAR(0.0)}};
+    int axis;
+
+    if (result != NULL) {
+        memset(result, 0, sizeof(*result));
+    }
+    if (h == NULL || !h->initialized || angular_rate_mean_rad_s == NULL
+        || measurement_variance_rad2_s2 == NULL) {
+        return false;
+    }
+    for (axis = 0; axis < 3; ++axis) {
+        if (!isfinite(angular_rate_mean_rad_s[axis])
+            || !isfinite(measurement_variance_rad2_s2[axis])
+            || measurement_variance_rad2_s2[axis] <= ESKF_SCALAR(0.0)
+            || !isfinite(h->state.gb[axis])) {
+            return false;
+        }
+        residual[axis] = angular_rate_mean_rad_s[axis] - h->state.gb[axis];
+        H[axis][ESKF_IDX_DGB + axis] = ESKF_SCALAR(1.0);
+        R[axis][axis] = measurement_variance_rad2_s2[axis];
+    }
+    return _measurement_update_3d(
+        h, residual, H, R, ESKF_NIS_LIMIT_3D_3SIGMA, result);
+}
+
 void eskf_reset_navigation(ESKF_Handle *h,
                            const eskf_float_t position_ned_m[3],
                            const eskf_float_t velocity_ned_m_s[3],

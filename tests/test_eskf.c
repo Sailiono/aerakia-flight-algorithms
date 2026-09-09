@@ -416,6 +416,63 @@ static void test_explicit_imu_bias_seed(void)
                "rejected explicit seed leaves ESKF image unchanged");
 }
 
+static void test_zero_angular_rate_update(void)
+{
+    ESKF_Handle filter;
+    ESKF_Handle before;
+    ESKF_InnovResult result;
+    const eskf_float_t stationary_mean[3] = {0.006, -0.004, 0.002};
+    const eskf_float_t variance[3] = {1.0e-6, 2.0e-6, 3.0e-6};
+    const eskf_float_t invalid_mean[3] = {NAN, 0.0, 0.0};
+    const eskf_float_t invalid_variance[3] = {1.0e-6, 0.0, 1.0e-6};
+    const eskf_float_t impossible_mean[3] = {10.0, 0.0, 0.0};
+    eskf_float_t prior_bias_variance;
+
+    eskf_init(&filter, NULL, NULL);
+    prior_bias_variance = filter.P[ESKF_IDX_DGB][ESKF_IDX_DGB];
+    check_true(
+        eskf_update_zero_angular_rate(
+            &filter, stationary_mean, variance, &result),
+        "known-stationary angular-rate mean updates gyro bias");
+    check_true(result.accepted, "zero-angular-rate innovation is accepted");
+    check_true(filter.state.gb[0] > 0.0,
+               "positive stationary mean corrects gyro bias with positive sign");
+    check_true(filter.state.gb[1] < 0.0,
+               "negative stationary mean corrects gyro bias with negative sign");
+    check_true(near(filter.state.gb[2], stationary_mean[2], 7.0e-5),
+               "zero-angular-rate update converges z gyro bias toward the mean");
+    check_true(filter.P[ESKF_IDX_DGB][ESKF_IDX_DGB] < prior_bias_variance,
+               "zero-angular-rate update reduces gyro-bias covariance");
+    check_true(covariance_is_symmetric_psd(filter.P),
+               "zero-angular-rate Joseph update keeps covariance PSD");
+
+    before = filter;
+    check_true(!eskf_update_zero_angular_rate(
+                   &filter, invalid_mean, variance, &result),
+               "zero-angular-rate update rejects non-finite means");
+    check_true(memcmp(&filter, &before, sizeof(filter)) == 0,
+               "invalid zero-angular-rate mean leaves ESKF unchanged");
+    check_true(!eskf_update_zero_angular_rate(
+                   &filter, stationary_mean, invalid_variance, &result),
+               "zero-angular-rate update rejects non-positive variance");
+    check_true(memcmp(&filter, &before, sizeof(filter)) == 0,
+               "invalid zero-angular-rate variance leaves ESKF unchanged");
+
+    check_true(!eskf_update_zero_angular_rate(
+                   &filter, impossible_mean, variance, &result),
+               "zero-angular-rate NIS gate rejects impossible mean");
+    check_true(!result.accepted && result.test_ratio > 1.0f,
+               "rejected zero-angular-rate update exposes NIS evidence");
+    check_true(memcmp(&filter, &before, sizeof(filter)) == 0,
+               "NIS-rejected zero-angular-rate update leaves ESKF unchanged");
+
+    check_true(eskf_update_zero_angular_rate(
+                   &filter, stationary_mean, variance, &result),
+               "repeated high-confidence zero-angular-rate update remains numerically usable");
+    check_true(result.accepted && covariance_is_symmetric_psd(filter.P),
+               "repeated zero-angular-rate update remains accepted and PSD");
+}
+
 static void test_static_attitude_alignment(void)
 {
     ESKF_Handle filter;
@@ -502,6 +559,7 @@ int main(void)
     test_navigation_reset_preserves_attitude_and_biases();
     test_static_bias_alignment();
     test_explicit_imu_bias_seed();
+    test_zero_angular_rate_update();
     test_static_attitude_alignment();
     test_attitude_covariance_reset();
 

@@ -1250,6 +1250,65 @@ void aerakia_eskf_apply_zero_velocity(AerakiaEskf *filter, float variance_m2_s2)
     }
 }
 
+AerakiaStatus aerakia_eskf_update_zero_angular_rate_observation(
+    AerakiaEskf *filter,
+    const AerakiaZeroAngularRateObservation *observation,
+    ESKF_InnovResult *result
+)
+{
+    ESKF_InnovResult local_result;
+    eskf_float_t angular_rate_mean[3];
+    eskf_float_t measurement_variance[3];
+    bool applied;
+
+    if (result != NULL) {
+        memset(result, 0, sizeof(*result));
+    }
+    if (filter == NULL || observation == NULL) {
+        return AERAKIA_STATUS_INVALID_ARGUMENT;
+    }
+    if (!observation->known_stationary) {
+        return AERAKIA_STATUS_NOT_READY;
+    }
+    if (!vector_is_finite(observation->angular_rate_mean_rad_s)
+        || !vector_is_finite(observation->measurement_variance_rad2_s2)
+        || observation->measurement_variance_rad2_s2.x <= 0.0f
+        || observation->measurement_variance_rad2_s2.y <= 0.0f
+        || observation->measurement_variance_rad2_s2.z <= 0.0f) {
+        return AERAKIA_STATUS_MISSING_MEASUREMENT;
+    }
+    if (!filter->has_timestamp
+        || observation->timestamp_us != filter->last_timestamp_us
+        || (filter->has_zero_angular_rate_timestamp
+            && observation->timestamp_us
+                <= filter->last_zero_angular_rate_timestamp_us)) {
+        return AERAKIA_STATUS_TIMESTAMP_ERROR;
+    }
+
+    angular_rate_mean[0] = observation->angular_rate_mean_rad_s.x;
+    angular_rate_mean[1] = observation->angular_rate_mean_rad_s.y;
+    angular_rate_mean[2] = observation->angular_rate_mean_rad_s.z;
+    measurement_variance[0] = observation->measurement_variance_rad2_s2.x;
+    measurement_variance[1] = observation->measurement_variance_rad2_s2.y;
+    measurement_variance[2] = observation->measurement_variance_rad2_s2.z;
+    memset(&local_result, 0, sizeof(local_result));
+    applied = eskf_update_zero_angular_rate(
+        &filter->core,
+        angular_rate_mean,
+        measurement_variance,
+        &local_result
+    );
+    filter->last_zero_angular_rate_timestamp_us = observation->timestamp_us;
+    filter->has_zero_angular_rate_timestamp = true;
+    if (result != NULL) {
+        *result = local_result;
+    }
+    if (applied || (!local_result.accepted && local_result.test_ratio > 1.0f)) {
+        return AERAKIA_STATUS_OK;
+    }
+    return AERAKIA_STATUS_NUMERICAL_ERROR;
+}
+
 void aerakia_eskf_get_estimate(
     const AerakiaEskf *filter,
     AerakiaNavigationEstimate *estimate
