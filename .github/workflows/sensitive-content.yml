@@ -1,0 +1,36 @@
+name: Sensitive content guard
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: sensitive-content-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  guard:
+    if: github.event.deleted != true
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Read repository history without executing project code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: source
+          fetch-depth: 0
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - name: Read scanner from the default branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: trusted
+          persist-credentials: false
+          sparse-checkout: .github/security
+      - name: Install verified scanner
+        working-directory: trusted/.github/security
+        run: python3 install_gitleaks.py
+      - name: Inspect submitted changes
+        run: python3 trusted/.github/security/gate.py
