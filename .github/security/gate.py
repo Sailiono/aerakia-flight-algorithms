@@ -4,7 +4,7 @@ import os
 import pathlib
 import re
 import sys
-from scanlib import scan
+from scanlib import command, scan
 
 def revision(value):
     if not re.fullmatch(r"[a-f0-9]{40}", value or ""):
@@ -28,7 +28,14 @@ def options(event, event_name):
 
 def main():
     event = json.loads(pathlib.Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
-    findings = scan(pathlib.Path("source").resolve(), log_opts=options(event, os.environ["GITHUB_EVENT_NAME"]))
+    source = pathlib.Path("source").resolve()
+    event_name = os.environ["GITHUB_EVENT_NAME"]
+    opts = options(event, event_name)
+    if event_name == "push" and event["before"] != "0" * 40:
+        old_exists = command(["git", "-C", str(source), "cat-file", "-e", revision(event["before"])], allowed=(0, 1, 128))
+        if old_exists.returncode:
+            opts = "--full-history -m " + revision(event["after"])
+    findings = scan(source, log_opts=opts)
     secrets = sum(x["classification"] == "secret-review" for x in findings.values())
     privacy = len(findings) - secrets
     summary = f"Sensitive content check: {secrets} secret candidates; {privacy} privacy candidates.\n"
