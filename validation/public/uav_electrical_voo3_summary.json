@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "dataset": "UAV Surveying - Electrical Transmission Infrastructure",
+  "sequence": "voo_3_electrical",
+  "source_doi": "10.5281/zenodo.8092105",
+  "source_license": "CC-BY-4.0",
+  "archive": {
+    "bytes": 2199738167,
+    "publisher_md5": "ccb69193138b5b7f5ae1e44bde81228d",
+    "checksum_verified": true
+  },
+  "reference_kind": "external_reference_with_shared_onboard_attitude",
+  "evidence_boundary": "DJI GPS position is estimator aiding. Separately recorded RTK position and velocity score navigation. DJI onboard orientation shares onboard measurements and is not independent attitude truth.",
+  "intake": {
+    "common_overlap_s": 41.3926,
+    "dji_imu_samples": 16673,
+    "dji_imu_effective_rate_hz": 400.0374,
+    "dji_gps_position_samples": 2084,
+    "dji_gps_position_effective_rate_hz": 49.9952,
+    "rtk_position_samples": 208,
+    "rtk_velocity_samples": 208,
+    "rtk_effective_rate_hz": 5.0009,
+    "selected_rtk_velocity_frame": "ned_xyz",
+    "rtk_velocity_3d_differentiated_position_rmse_m_s": 0.1967116786,
+    "dji_gps_vs_rtk_horizontal_rmse_m": 0.1094906705,
+    "dji_gps_vs_rtk_horizontal_p95_m": 0.1489654997,
+    "dji_gps_vs_rtk_horizontal_max_m": 0.1932688442,
+    "maximum_gyro_norm_rad_s": 1.6776879404,
+    "maximum_acceleration_norm_m_s2": 10.5000548873
+  },
+  "replay": {
+    "samples": 16560,
+    "duration_s": 41.392388,
+    "physical_gps_position_updates": 2070,
+    "physical_gps_velocity_updates": 0,
+    "declared_position_variance_m2": 4.0,
+    "eskf_geodesic_rmse_deg_vs_onboard_attitude": 2.7663054984,
+    "eskf_tilt_rmse_deg_vs_onboard_attitude": 0.9663234793,
+    "eskf_yaw_rmse_deg_vs_onboard_attitude": 2.6007861844,
+    "position_rmse_m_vs_rtk": 0.1794432454,
+    "position_p95_m_vs_rtk": 0.276727328,
+    "velocity_rmse_m_s_vs_rtk": 0.2630442922,
+    "position_acceptance_ratio": 1.0,
+    "position_nis_mean": 0.001069696,
+    "healthy_ratio": 1.0,
+    "mahony_robust_geodesic_rmse_deg": 136.7702491601,
+    "mahony_robust_tilt_rmse_deg": 1.6293688421
+  },
+  "not_accepted_for": [
+    "physical drone-GPS velocity aiding",
+    "independent absolute attitude accuracy",
+    "metrology-grade absolute position truth",
+    "long-duration yaw performance"
+  ]
+}

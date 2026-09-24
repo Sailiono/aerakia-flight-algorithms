@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "dataset": "Blackbird UAV",
+  "source_doi": "arXiv:1810.01987",
+  "source_license": "MIT (license included with MathWorks redistributed package)",
+  "converter": "simulation/tools/convert_blackbird_to_replay.py",
+  "reference_kind": "independent_truth",
+  "default_absolute_tolerance": 0.0001,
+  "default_relative_tolerance": 0.00001,
+  "interpretation": [
+    "All three tracks replay the same 26,995 immutable recorded IMU samples. Tracks increase algorithm-path coverage, not physical data volume.",
+    "Motion-capture pose is independent physical truth for attitude and position. Synthetic GNSS is generated from that truth and is not receiver evidence.",
+    "The package contains no magnetometer or trusted-heading sensor. Long Mahony yaw drift is retained and bounds its use to continuity-gated, time-limited degradation rather than indefinite backup navigation.",
+    "The static-bias-corrected track isolates propagation behavior; it is not online bias-observability evidence."
+  ],
+  "sequences": [
+    {
+      "id": "nyc_subway_winter",
+      "relative_path": "BlackbirdVIOData",
+      "baseline": "validation/public/blackbird_nyc_subway_winter_summary.json",
+      "required_sha256": {
+        "data.mat": "58b852a823d13afa0bcc5064c28b9de599a4adc5e191e4979bd10fef66b154b9"
+      },
+      "tracks": [
+        {
+          "id": "raw_imu_cold_start_tilt_only",
+          "converter_args": ["--synthetic-gnss-rate-hz", "10", "--seed", "7", "--static-hint-duration-s", "5"],
+          "runner_args": ["--cold-start", "--stationary-gyro-threshold-rad-s", "0.15"],
+          "metric_paths": {
+            "tilt_alignment_time_s": "cold_start_alignment.tilt_alignment_time_s",
+            "post_tilt_alignment_tilt_rmse_deg": "cold_start_alignment.post_tilt_alignment_tilt_rmse_deg",
+            "heading_alignment_completed": "cold_start_alignment.heading_alignment_completed",
+            "position_rmse_m": "navigation.position_rmse_m",
+            "velocity_rmse_m_s": "navigation.velocity_rmse_m_s",
+            "navigation_nees_mean": "eskf_consistency.navigation_nees.mean",
+            "healthy_ratio": "eskf_integrity.healthy_ratio",
+            "navigation_recoveries": "eskf_integrity.navigation_recoveries"
+          }
+        },
+        {
+          "id": "raw_imu_trusted_attitude_init",
+          "converter_args": ["--synthetic-gnss-rate-hz", "10", "--seed", "7", "--static-hint-duration-s", "5"],
+          "runner_args": ["--reference-attitude-init"],
+          "metric_paths": {
+            "mahony_robust_attitude_rmse_deg": "algorithms.mahony_robust.overall_attitude_rmse_deg",
+            "mahony_robust_tilt_rmse_deg": "algorithms.mahony_robust.tilt_rmse_deg",
+            "eskf_attitude_rmse_deg": "algorithms.eskf.overall_attitude_rmse_deg",
+            "eskf_tilt_rmse_deg": "algorithms.eskf.tilt_rmse_deg",
+            "eskf_yaw_rmse_deg": "algorithms.eskf.axes.yaw.rmse_deg",
+            "position_rmse_m": "navigation.position_rmse_m",
+            "velocity_rmse_m_s": "navigation.velocity_rmse_m_s",
+            "position_nis_mean": "eskf_consistency.position_nis.mean",
+            "velocity_nis_mean": "eskf_consistency.velocity_nis.mean",
+            "navigation_nees_mean": "eskf_consistency.navigation_nees.mean",
+            "healthy_ratio": "eskf_integrity.healthy_ratio",
+            "navigation_recoveries": "eskf_integrity.navigation_recoveries",
+            "fallback_first_exceeds_10_deg_s": "mahony_fallback_envelope.first_exceedance_s.10_deg",
+            "fallback_10_deg_entry_1_s_max_deg": "mahony_fallback_envelope.entry_envelopes.10_deg.1_s.maximum_peak_error_deg"
+          }
+        },
+        {
+          "id": "static_reference_bias_corrected_trusted_attitude_init",
+          "converter_args": ["--synthetic-gnss-rate-hz", "10", "--seed", "7", "--static-hint-duration-s", "5", "--apply-static-reference-bias"],
+          "runner_args": ["--reference-attitude-init"],
+          "metric_paths": {
+            "mahony_robust_attitude_rmse_deg": "algorithms.mahony_robust.overall_attitude_rmse_deg",
+            "mahony_robust_tilt_rmse_deg": "algorithms.mahony_robust.tilt_rmse_deg",
+            "eskf_attitude_rmse_deg": "algorithms.eskf.overall_attitude_rmse_deg",
+            "eskf_tilt_rmse_deg": "algorithms.eskf.tilt_rmse_deg",
+            "eskf_yaw_rmse_deg": "algorithms.eskf.axes.yaw.rmse_deg",
+            "position_rmse_m": "navigation.position_rmse_m",
+            "velocity_rmse_m_s": "navigation.velocity_rmse_m_s",
+            "navigation_nees_mean": "eskf_consistency.navigation_nees.mean"
+          }
+        }
+      ]
+    }
+  ]
+}

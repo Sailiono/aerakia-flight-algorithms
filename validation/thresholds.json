@@ -25,5 +25,25 @@
     "velocity_nis_mean": 5.00,
     "velocity_nis_mean_min": 1.00,
     "velocity_rmse_m_s": 0.30
+  },
+  "trusted_heading_recovery": {
+    "eskf_post_alignment": 1.00,
+    "heading_normal_acceptance_ratio_min": 0.95,
+    "heading_fault_rejection_ratio_min": 1.00,
+    "heading_dropout_max_abs_yaw_error_deg": 2.50,
+    "heading_recovery_time_s": 0.15,
+    "heading_post_recovery_yaw_rmse_deg": 1.00
+  },
+  "bias_convergence": {
+    "eskf_post_alignment": 1.25,
+    "bias_accel_final_error_m_s2": 0.05,
+    "bias_accel_error_reduction_ratio_min": 0.60,
+    "bias_accel_settling_time_below_0_05_m_s2_s": 35.0,
+    "bias_gyro_final_error_rad_s": 0.001,
+    "bias_gyro_settling_time_below_0_001_rad_s_s": 25.0,
+    "position_rmse_m": 0.30,
+    "velocity_rmse_m_s": 0.15,
+    "navigation_nees_mean": 10.0,
+    "navigation_nees_mean_min": 1.5
   }
 }

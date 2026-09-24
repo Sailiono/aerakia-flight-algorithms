@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "dataset": "UrbanNav Hong Kong",
+  "source_doi": "10.33012/navi.602",
+  "source_license": "Dataset page provides attribution/contact terms; no SPDX license",
+  "converter": "simulation/tools/convert_urbannav_to_replay.py",
+  "reference_kind": "independent_truth",
+  "default_absolute_tolerance": 0.0001,
+  "default_relative_tolerance": 0.00001,
+  "interpretation": [
+    "Both tracks replay the same 314,185 immutable Xsens IMU samples. Tracks increase initialization-path coverage, not physical data volume.",
+    "The u-blox F9P NMEA stream supplies 655 recorded position fixes and contains one 131 s position-aiding gap; SPAN-CPT post-processing supplies the independent navigation reference.",
+    "RMC/VTG course is blank, so receiver velocity is not invented. Position-only fusion is intentionally a harsher and less observable case than the paired position/velocity FCOne contract.",
+    "Overall position RMSE is dominated by the 131 s unaided interval. Aided accuracy, outage peak, first-update reacquisition, and consistency are reported separately.",
+    "The cold-start track has no magnetometer or trusted heading. Its large yaw error is retained as an observability result, not treated as flight-ready cold-start performance.",
+    "The platform is a ground vehicle; EuRoC, Blackbird, INSANE, and PX4 ULog remain complementary aircraft-motion and heading evidence."
+  ],
+  "sequences": [
+    {
+      "id": "hk_medium_urban_1",
+      "relative_path": "UrbanNav-HK-Medium-Urban-1",
+      "baseline": "validation/public/urbannav_hk_medium_urban_1_summary.json",
+      "required_sha256": {
+        "xsense_imu_medium_urban1_update.txt": "5c329bcafd781e9d00aca41b42d7e5822a8861f3b9d439666ea005f8613e802d",
+        "UrbanNav-HK-Medium-Urban-1.ublox.f9p.nmea": "ff2f53a63ddc13d81bebbeba4808f468bddf07ce6941ec2ed11ec2876c812876",
+        "UrbanNav_TST_GT_raw.txt": "9d48bb497878aafbd17290789560394c72ecafec20c9e0eaff448418695d92bf"
+      },
+      "tracks": [
+        {
+          "id": "recorded_position_reference_attitude_init",
+          "converter_args": [],
+          "runner_args": ["--reference-attitude-init"],
+          "metric_paths": {
+            "eskf_attitude_rmse_deg": "algorithms.eskf.overall_attitude_rmse_deg",
+            "eskf_tilt_rmse_deg": "algorithms.eskf.tilt_rmse_deg",
+            "eskf_yaw_rmse_deg": "algorithms.eskf.axes.yaw.rmse_deg",
+            "mahony_robust_attitude_rmse_deg": "algorithms.mahony_robust.overall_attitude_rmse_deg",
+            "aided_position_rmse_m": "navigation_aiding_gaps.aided_position_rmse_m",
+            "outage_peak_position_error_m": "navigation_aiding_gaps.longest_gap.peak_position_error_m",
+            "first_resume_position_error_m": "navigation_aiding_gaps.longest_gap.position_error_after_first_resume_update_m",
+            "sustained_recovery_time_s": "navigation_aiding_gaps.longest_gap.sustained_recovery_time_s",
+            "position_nis_mean": "eskf_consistency.position_nis.mean",
+            "navigation_nees_mean": "eskf_consistency.navigation_nees.mean",
+            "healthy_ratio": "eskf_integrity.healthy_ratio",
+            "horizontal_navigation_valid_ratio": "eskf_integrity.horizontal_navigation_valid_ratio",
+            "horizontal_navigation_valid_samples": "eskf_integrity.horizontal_navigation_valid_samples",
+            "navigation_recoveries": "eskf_integrity.navigation_recoveries"
+          }
+        },
+        {
+          "id": "recorded_position_cold_start_tilt_only",
+          "converter_args": ["--static-hint-duration-s", "5"],
+          "runner_args": ["--cold-start", "--stationary-gyro-threshold-rad-s", "0.15"],
+          "metric_paths": {
+            "tilt_alignment_time_s": "cold_start_alignment.tilt_alignment_time_s",
+            "heading_alignment_completed": "cold_start_alignment.heading_alignment_completed",
+            "post_tilt_alignment_tilt_rmse_deg": "cold_start_alignment.post_tilt_alignment_tilt_rmse_deg",
+            "eskf_attitude_rmse_deg": "algorithms.eskf.overall_attitude_rmse_deg",
+            "eskf_yaw_rmse_deg": "algorithms.eskf.axes.yaw.rmse_deg",
+            "aided_position_rmse_m": "navigation_aiding_gaps.aided_position_rmse_m",
+            "outage_peak_position_error_m": "navigation_aiding_gaps.longest_gap.peak_position_error_m",
+            "first_resume_position_error_m": "navigation_aiding_gaps.longest_gap.position_error_after_first_resume_update_m",
+            "sustained_recovery_time_s": "navigation_aiding_gaps.longest_gap.sustained_recovery_time_s",
+            "position_nis_mean": "eskf_consistency.position_nis.mean",
+            "navigation_nees_mean": "eskf_consistency.navigation_nees.mean",
+            "healthy_ratio": "eskf_integrity.healthy_ratio",
+            "horizontal_navigation_valid_ratio": "eskf_integrity.horizontal_navigation_valid_ratio",
+            "horizontal_navigation_valid_samples": "eskf_integrity.horizontal_navigation_valid_samples"
+          }
+        }
+      ]
+    }
+  ]
+}

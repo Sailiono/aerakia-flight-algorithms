@@ -313,11 +313,17 @@ AerakiaStatus aerakia_mahony_update(
     }
 
     dt = (float)(sample->timestamp_us - filter->last_timestamp_us) * 1.0e-6f;
-    filter->last_timestamp_us = sample->timestamp_us;
-    if (dt < filter->config.minimum_dt_s || dt > filter->config.maximum_dt_s) {
+    if (dt < filter->config.minimum_dt_s) {
         filter->rejected_samples++;
         return AERAKIA_STATUS_TIMESTAMP_ERROR;
     }
+    if (dt > filter->config.maximum_dt_s) {
+        /* Re-anchor after a forward transport gap; never integrate across it. */
+        filter->last_timestamp_us = sample->timestamp_us;
+        filter->rejected_samples++;
+        return AERAKIA_STATUS_TIMESTAMP_ERROR;
+    }
+    filter->last_timestamp_us = sample->timestamp_us;
 
     accelerometer = sample->acceleration_m_s2;
     angular_rate = sample->angular_rate_rad_s;

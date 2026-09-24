@@ -1,0 +1,70 @@
+{
+  "dataset": "UrbanNav Hong Kong",
+  "paper": "10.33012/navi.602",
+  "license": "Dataset page provides attribution/contact terms; no SPDX license",
+  "sequence": "UrbanNav-HK-Medium-Urban-1",
+  "samples": 314185,
+  "duration_s": 785.450502,
+  "recorded_sensor_coverage": {
+    "nmea_position_updates": 655,
+    "maximum_position_update_interval_s": 131.0,
+    "speed_p95_m_s": 10.201597,
+    "speed_max_m_s": 11.502352,
+    "gyro_norm_p95_rad_s": 0.225299,
+    "gyro_norm_max_rad_s": 0.675195
+  },
+  "raw_receiver_accuracy": {
+    "horizontal_rmse_m": 2.889513,
+    "horizontal_p95_m": 5.035876,
+    "horizontal_max_m": 6.183274,
+    "three_dimensional_rmse_m": 6.450078,
+    "evidence_boundary": "Direct recorded u-blox NMEA position versus interpolated SPAN-CPT truth before ESKF fusion"
+  },
+  "frame_validation": {
+    "truth_velocity_vs_position_difference_correlation_n": 0.999920,
+    "truth_velocity_vs_position_difference_correlation_e": 0.999894,
+    "truth_velocity_vs_position_difference_horizontal_rmse_m_s": 0.074522
+  },
+  "tracks": {
+    "recorded_position_reference_attitude_init": {
+      "eskf_attitude_rmse_deg": 1.534085,
+      "eskf_tilt_rmse_deg": 0.772056,
+      "eskf_yaw_rmse_deg": 1.328350,
+      "mahony_robust_attitude_rmse_deg": 44.710716,
+      "aided_position_rmse_m": 6.517990,
+      "outage_peak_position_error_m": 1471.514779,
+      "first_resume_position_error_m": 5.394546,
+      "sustained_recovery_time_s": 0.0,
+      "position_nis_mean": 0.011279,
+      "navigation_nees_mean": 12.912064,
+      "healthy_ratio": 1.0,
+      "horizontal_navigation_valid_ratio": 0.839012,
+      "horizontal_navigation_valid_samples": 263605,
+      "navigation_recoveries": 0
+    },
+    "recorded_position_cold_start_tilt_only": {
+      "tilt_alignment_time_s": 1.000241,
+      "heading_alignment_completed": false,
+      "post_tilt_alignment_tilt_rmse_deg": 2.211018,
+      "eskf_attitude_rmse_deg": 36.722157,
+      "eskf_yaw_rmse_deg": 36.647468,
+      "aided_position_rmse_m": 6.794283,
+      "outage_peak_position_error_m": 1283.522014,
+      "first_resume_position_error_m": 5.373663,
+      "sustained_recovery_time_s": 0.0,
+      "position_nis_mean": 0.339475,
+      "navigation_nees_mean": 16.274916,
+      "healthy_ratio": 1.0,
+      "horizontal_navigation_valid_ratio": 0.839012,
+      "horizontal_navigation_valid_samples": 263605
+    }
+  },
+  "limitations": [
+    "The platform is a ground vehicle, not an aircraft.",
+    "Receiver velocity/course is absent and is not synthesized; only recorded position is fused.",
+    "The SPAN-CPT reference is a separate high-grade post-processed GNSS/INS solution, not a laboratory motion-capture system.",
+    "The 131 s outage dominates overall trajectory RMSE, so nominal aided and outage metrics must be read separately.",
+    "The position-only track is statistically over-conservative in position NIS and over-confident in combined navigation NEES; noise modeling is not yet closed.",
+    "The published antenna lever-arm transform is not applied until its direction is independently resolved."
+  ]
+}

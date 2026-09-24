@@ -15,24 +15,24 @@
     "raw_imu_trusted_attitude_init": {
       "mahony_robust_attitude_rmse_deg": 105.519930,
       "mahony_robust_yaw_rmse_deg": 107.077229,
-      "eskf_attitude_rmse_deg": 8.804369,
-      "eskf_yaw_rmse_deg": 8.145577,
-      "position_rmse_m": 0.131396,
-      "velocity_rmse_m_s": 0.086339,
-      "position_nis_mean": 3.079728,
-      "velocity_nis_mean": 2.584504,
-      "navigation_nees_mean": 5.294182
+      "eskf_attitude_rmse_deg": 8.406217,
+      "eskf_yaw_rmse_deg": 7.824328,
+      "position_rmse_m": 0.127606,
+      "velocity_rmse_m_s": 0.085374,
+      "position_nis_mean": 3.077281,
+      "velocity_nis_mean": 2.572951,
+      "navigation_nees_mean": 5.192251
     },
     "reference_bias_corrected_trusted_attitude_init": {
       "mahony_robust_attitude_rmse_deg": 2.982805,
       "mahony_robust_yaw_rmse_deg": 3.595834,
-      "eskf_attitude_rmse_deg": 3.253793,
-      "eskf_yaw_rmse_deg": 3.280106,
-      "position_rmse_m": 0.131427,
-      "velocity_rmse_m_s": 0.082237,
-      "position_nis_mean": 3.078448,
-      "velocity_nis_mean": 2.537104,
-      "navigation_nees_mean": 5.192173
+      "eskf_attitude_rmse_deg": 2.974415,
+      "eskf_yaw_rmse_deg": 3.034302,
+      "position_rmse_m": 0.126172,
+      "velocity_rmse_m_s": 0.082212,
+      "position_nis_mean": 3.076097,
+      "velocity_nis_mean": 2.534924,
+      "navigation_nees_mean": 5.031966
     }
   },
   "limitations": [

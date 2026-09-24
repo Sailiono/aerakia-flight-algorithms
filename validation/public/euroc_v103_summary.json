@@ -19,33 +19,49 @@
       "static_hint_duration_s": 1.2,
       "stationary_gyro_threshold_rad_s": 0.15,
       "tilt_alignment_time_s": 1.0,
-      "post_tilt_alignment_tilt_rmse_deg": 1.230283,
+      "post_tilt_alignment_tilt_rmse_deg": 0.859815,
       "heading_alignment_completed": false,
-      "position_rmse_m": 0.137081,
-      "velocity_rmse_m_s": 0.085612,
-      "navigation_nees_mean": 5.618810
+      "position_rmse_m": 0.122904,
+      "velocity_rmse_m_s": 0.083968,
+      "navigation_nees_mean": 4.941634
+    },
+    "raw_imu_cold_start_reference_derived_heading": {
+      "alignment_time_s": 1.000000,
+      "post_alignment_attitude_rmse_deg": 1.548655,
+      "post_alignment_tilt_rmse_deg": 0.828553,
+      "heading_alignment_completed": true,
+      "heading_normal_acceptance_ratio": 0.997436,
+      "heading_fault_rejection_ratio": 1.000000,
+      "heading_observable_yaw_rmse_deg": 0.919920,
+      "heading_dropout_max_abs_yaw_error_deg": 5.100237,
+      "heading_recovery_time_s": 0.995000,
+      "heading_post_recovery_yaw_rmse_deg": 0.890175,
+      "heading_geometry_unobservable_samples": 4582,
+      "position_rmse_m": 0.123197,
+      "velocity_rmse_m_s": 0.082373,
+      "navigation_nees_mean": 4.978319
     },
     "raw_imu_trusted_attitude_init": {
       "mahony_robust_attitude_rmse_deg": 95.507551,
       "mahony_robust_tilt_rmse_deg": 3.359699,
-      "eskf_attitude_rmse_deg": 4.101947,
-      "eskf_tilt_rmse_deg": 1.046592,
-      "position_rmse_m": 0.136319,
-      "velocity_rmse_m_s": 0.091216,
-      "position_nis_mean": 3.066152,
-      "velocity_nis_mean": 2.506098,
-      "navigation_nees_mean": 5.702095
+      "eskf_attitude_rmse_deg": 4.087541,
+      "eskf_tilt_rmse_deg": 1.041100,
+      "position_rmse_m": 0.123517,
+      "velocity_rmse_m_s": 0.089115,
+      "position_nis_mean": 3.056746,
+      "velocity_nis_mean": 2.499833,
+      "navigation_nees_mean": 5.069619
     },
     "reference_bias_corrected_trusted_attitude_init": {
       "mahony_robust_attitude_rmse_deg": 2.874530,
       "mahony_robust_tilt_rmse_deg": 2.845144,
-      "eskf_attitude_rmse_deg": 2.473928,
-      "eskf_tilt_rmse_deg": 0.828635,
-      "position_rmse_m": 0.137133,
-      "velocity_rmse_m_s": 0.086047,
-      "position_nis_mean": 3.065393,
-      "velocity_nis_mean": 2.426695,
-      "navigation_nees_mean": 5.628264
+      "eskf_attitude_rmse_deg": 2.571978,
+      "eskf_tilt_rmse_deg": 0.828860,
+      "position_rmse_m": 0.122985,
+      "velocity_rmse_m_s": 0.084812,
+      "position_nis_mean": 3.056712,
+      "velocity_nis_mean": 2.431047,
+      "navigation_nees_mean": 4.949790
     }
   },
   "metric_definition": {

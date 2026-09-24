@@ -43,6 +43,10 @@ def main() -> None:
                 value = float(by_scenario[scenario]["eskf_consistency"]["velocity_nis"]["mean"])
             elif metric == "navigation_nees_mean":
                 value = float(by_scenario[scenario]["eskf_consistency"]["navigation_nees"]["mean"])
+            elif metric.startswith("heading_"):
+                value = float(by_scenario[scenario]["trusted_heading"][metric[len("heading_"):]])
+            elif metric.startswith("bias_"):
+                value = float(by_scenario[scenario]["bias_estimation"][metric[len("bias_"):]])
             else:
                 value = float(algorithms[metric]["overall_attitude_rmse_deg"])
             failed = value < float(limit) if minimum_check else value > float(limit)

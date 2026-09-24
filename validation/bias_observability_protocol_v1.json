@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "protocol_id": "aerakia-horizontal-accelerometer-bias-observability-v1",
+  "status": "frozen",
+  "frozen_date": "2026-07-18",
+  "purpose": "Cross-validate horizontal accelerometer-bias observability without reusing the legacy multisine bias-convergence trajectory.",
+  "coordinate_contract": {
+    "body_frame": "FRD",
+    "navigation_frame": "NED",
+    "accelerometer_unit": "m/s^2",
+    "gyroscope_unit": "deg/s",
+    "acceleration_time_semantics": "interval_start_zoh",
+    "truth_kinematics_time_semantics": "row_i acceleration is held on (t[i-1], t[i]] and endpoint velocity/position truth is integrated with the same held value",
+    "truth_usage": "analysis_only",
+    "initialization": "cold_start_from_sensor_stream_and_static_hint_only"
+  },
+  "residual_bias_contract": {
+    "accelerometer_sigma_m_s2": 0.05,
+    "gyroscope_vector_deg_s": [0.0, 0.0, 0.0],
+    "sigma_limit": 3.0,
+    "vectors": [
+      {"id": "zero", "accel_sigma_multipliers": [0, 0, 0]},
+      {"id": "x_neg", "accel_sigma_multipliers": [-3, 0, 0]},
+      {"id": "x_pos", "accel_sigma_multipliers": [3, 0, 0]},
+      {"id": "y_neg", "accel_sigma_multipliers": [0, -3, 0]},
+      {"id": "y_pos", "accel_sigma_multipliers": [0, 3, 0]},
+      {"id": "xy_neg_neg", "accel_sigma_multipliers": [-3, -3, 0]},
+      {"id": "xy_neg_pos", "accel_sigma_multipliers": [-3, 3, 0]},
+      {"id": "xy_pos_neg", "accel_sigma_multipliers": [3, -3, 0]},
+      {"id": "xy_pos_pos", "accel_sigma_multipliers": [3, 3, 0]}
+    ]
+  },
+  "noise": {
+    "accel_noise_m_s2": 0.02,
+    "gyro_noise_deg_s": 0.05,
+    "mag_noise_ut": 0.2,
+    "gps_position_noise_m": 0.5,
+    "gps_velocity_noise_m_s": 0.1,
+    "rate_hz": 100.0,
+    "rate_invariant_streams": true
+  },
+  "splits": {
+    "train": {"seed_start": 0, "seed_stop": 16},
+    "tune": {"seed_start": 1000, "seed_stop": 1032},
+    "holdout": {"seed_start": 30000, "seed_stop": 30064}
+  },
+  "trajectories": [
+    {
+      "id": "hover_axis_pulses",
+      "motion": "bias_cv_hover_axis_pulses",
+      "split": "train",
+      "duration_s": 32.0,
+      "description": "Axis-separated and diagonal minimum-jerk hover position corrections with fixed yaw."
+    },
+    {
+      "id": "takeoff_box_land",
+      "motion": "bias_cv_takeoff_box_land",
+      "split": "train",
+      "duration_s": 38.0,
+      "description": "Minimum-jerk takeoff, N/E/S/W hover box, descent, touchdown, and final static dwell."
+    },
+    {
+      "id": "yaw_quadrant_hover",
+      "motion": "bias_cv_yaw_quadrant_hover",
+      "split": "tune",
+      "duration_s": 40.0,
+      "description": "The same NED hover correction repeated at yaw 0, 90, 180, and 270 degrees."
+    },
+    {
+      "id": "early_transition_s_curve",
+      "motion": "bias_cv_early_transition_s_curve",
+      "split": "holdout",
+      "duration_s": 42.0,
+      "description": "VTOL takeoff, acceleration to forward flight, shallow S-turn, braking, hover, and landing."
+    },
+    {
+      "id": "landing_gust_recovery",
+      "motion": "bias_cv_landing_gust_recovery",
+      "split": "holdout",
+      "duration_s": 36.0,
+      "description": "Hover followed by deterministic crosswind-like lateral displacement, descent, flare, and touchdown dwell."
+    }
+  ],
+  "metrics": {
+    "settling_window_s": 5.0,
+    "candidate_step_s": 0.1,
+    "terminal_window_s": 5.0,
+    "per_axis_p95_limit_m_s2": 0.04,
+    "horizontal_norm_p95_limit_m_s2": 0.05
+  },
+  "gates": {
+    "horizontal_settling_time_max_s": 35.0,
+    "horizontal_terminal_p95_max_m_s2": 0.05,
+    "post_alignment_attitude_rmse_max_deg": 1.25,
+    "position_rmse_max_m": 0.3,
+    "velocity_rmse_max_m_s": 0.15,
+    "navigation_nees_mean_min": 1.5,
+    "navigation_nees_mean_max": 10.0,
+    "healthy_ratio_min": 1.0,
+    "navigation_recoveries_max": 0
+  },
+  "execution": {
+    "release_trial_count": 1728,
+    "smoke_vectors": ["zero", "x_pos", "xy_pos_neg"],
+    "smoke_seed_offset": 0,
+    "release_requires_metric_gates": true,
+    "smoke_reports_metric_gates_without_enforcing_them": true
+  },
+  "anti_overfit_rules": [
+    "The protocol file and semantic SHA-256 are recorded before estimator tuning.",
+    "Train, tune, and holdout seed ranges must be pairwise disjoint.",
+    "Truth attitude, position, velocity, and bias are analyzer-only and must not initialize the filter.",
+    "A candidate source SHA is selected before release holdout execution.",
+    "Holdout failures cannot be tuned against; further tuning requires a new protocol version while retaining v1 results.",
+    "Gates apply per trajectory and exact bias vector; aggregate averages cannot hide a failing direction.",
+    "Right-censored non-settling trials remain failures and cannot be removed from percentile reports."
+  ]
+}

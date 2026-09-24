@@ -226,6 +226,57 @@ def _quaternion_to_euler_deg(quaternion: np.ndarray) -> np.ndarray:
     return np.degrees(np.column_stack((roll, pitch, yaw)))
 
 
+def _reference_heading_profile(
+    timestamp_us: np.ndarray,
+    reference_yaw_rad: np.ndarray,
+    horizontal_projection: np.ndarray,
+    rate_hz: float,
+    sigma_deg: float,
+    seed: int,
+    dropout_start_s: float,
+    dropout_duration_s: float,
+    fault_start_s: float,
+    fault_count: int,
+    minimum_horizontal_projection: float,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Build a deterministic heading-aiding profile from external pose truth.
+
+    This is deliberately labelled reference-derived rather than recorded heading. It exercises
+    the estimator's heading contract under physical motion while preserving the evidence boundary.
+    """
+    count = len(timestamp_us)
+    valid = np.zeros(count, dtype=np.int64)
+    update = np.zeros(count, dtype=np.int64)
+    heading = np.asarray(reference_yaw_rad, dtype=np.float64).copy()
+    variance = np.full(count, math.radians(sigma_deg) ** 2, dtype=np.float64)
+    fault = np.zeros(count, dtype=np.int64)
+    if rate_hz <= 0.0:
+        return valid, update, heading, variance, fault
+
+    period_us = max(1, int(round(1.0e6 / rate_hz)))
+    buckets = timestamp_us // period_us
+    update[0] = 1
+    update[1:] = buckets[1:] != buckets[:-1]
+    valid[:] = np.asarray(horizontal_projection) >= minimum_horizontal_projection
+    elapsed_s = timestamp_us.astype(np.float64) * 1.0e-6
+    dropout = (
+        (elapsed_s >= dropout_start_s)
+        & (elapsed_s < dropout_start_s + dropout_duration_s)
+    )
+    valid[dropout] = 0
+    update[dropout] = 0
+
+    rng = np.random.default_rng(seed ^ 0x48454144)
+    heading += rng.normal(0.0, math.radians(sigma_deg), count)
+    update[valid == 0] = 0
+    candidates = np.flatnonzero((update > 0) & (elapsed_s >= fault_start_s))
+    selected = candidates[:fault_count]
+    heading[selected] += math.radians(90.0)
+    fault[selected] = 1
+    heading = (heading + math.pi) % (2.0 * math.pi) - math.pi
+    return valid, update, heading, variance, fault
+
+
 def _rotation_from_quaternion(quaternion: np.ndarray) -> np.ndarray:
     w, x, y, z = quaternion.T
     result = np.empty((len(quaternion), 3, 3), dtype=np.float64)
@@ -253,11 +304,28 @@ def convert_euroc(
     pose_source: str = "batch",
     pose_time_offset_us: float = 0.0,
     static_hint_duration_s: float = 0.0,
+    reference_heading_rate_hz: float = 0.0,
+    reference_heading_sigma_deg: float = 1.0,
+    reference_heading_dropout_start_s: float = 40.0,
+    reference_heading_dropout_duration_s: float = 4.0,
+    reference_heading_fault_start_s: float = 60.0,
+    reference_heading_fault_count: int = 2,
+    reference_heading_minimum_horizontal_projection: float = 0.25,
 ) -> dict[str, object]:
     if not math.isfinite(pose_time_offset_us):
         raise ValueError("pose time offset must be finite")
     if not math.isfinite(static_hint_duration_s) or static_hint_duration_s < 0.0:
         raise ValueError("static hint duration must be finite and non-negative")
+    if not math.isfinite(reference_heading_rate_hz) or reference_heading_rate_hz < 0.0:
+        raise ValueError("reference heading rate must be finite and non-negative")
+    if not math.isfinite(reference_heading_sigma_deg) or reference_heading_sigma_deg <= 0.0:
+        raise ValueError("reference heading sigma must be finite and positive")
+    if reference_heading_dropout_start_s < 0.0 or reference_heading_dropout_duration_s < 0.0:
+        raise ValueError("reference heading dropout parameters must be non-negative")
+    if reference_heading_fault_start_s < 0.0 or reference_heading_fault_count < 0:
+        raise ValueError("reference heading fault parameters must be non-negative")
+    if not 0.0 < reference_heading_minimum_horizontal_projection <= 1.0:
+        raise ValueError("reference heading minimum horizontal projection must be in (0, 1]")
     mav0 = sequence_dir / "mav0"
     imu_path = mav0 / "imu0" / "data.csv"
     imu_yaml_path = mav0 / "imu0" / "sensor.yaml"
@@ -351,6 +419,21 @@ def convert_euroc(
     static_hint = timestamp_us <= int(round(static_hint_duration_s * 1.0e6))
     if static_hint_duration_s == 0.0:
         static_hint[:] = False
+    heading_valid, heading_update, heading_rad, heading_variance, heading_fault = (
+        _reference_heading_profile(
+            timestamp_us,
+            np.radians(euler_deg[:, 2]),
+            np.abs(np.cos(np.radians(euler_deg[:, 1]))),
+            reference_heading_rate_hz,
+            reference_heading_sigma_deg,
+            seed,
+            reference_heading_dropout_start_s,
+            reference_heading_dropout_duration_s,
+            reference_heading_fault_start_s,
+            reference_heading_fault_count,
+            reference_heading_minimum_horizontal_projection,
+        )
+    )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     header = [
@@ -368,6 +451,8 @@ def convert_euroc(
         "gps_position_n_m", "gps_position_e_m", "gps_position_d_m",
         "gps_velocity_n_m_s", "gps_velocity_e_m_s", "gps_velocity_d_m_s",
         "gps_position_variance_m2", "gps_velocity_variance_m2_s2", "static_hint",
+        "gnss_heading_valid", "gnss_heading_update", "gnss_heading_rad",
+        "gnss_heading_variance_rad2", "gnss_heading_fault",
     ]
     with output_path.open("w", encoding="utf-8", newline="") as stream:
         writer = csv.writer(stream)
@@ -385,12 +470,15 @@ def convert_euroc(
                     *gps_position[index], *gps_velocity[index],
                     synthetic_position_sigma_m**2, synthetic_velocity_sigma_m_s**2,
                     int(static_hint[index]),
+                    int(heading_valid[index]), int(heading_update[index]), heading_rad[index],
+                    heading_variance[index], int(heading_fault[index]),
                 ]
             )
 
     limitations = [
         "EuRoC contains no magnetometer or GNSS measurements used by this replay.",
         "Synthetic GNSS, when enabled, is generated from truth and is not a recorded sensor.",
+        "Reference-derived heading, when enabled, is generated from external pose truth and is not a recorded dual-antenna or vision observation.",
         "Reference-bias correction, when enabled, validates propagation/update math but not online bias observability.",
     ]
     if pose_source == "batch":
@@ -446,6 +534,23 @@ def convert_euroc(
             "samples": int(np.count_nonzero(static_hint)),
             "source": "explicit converter argument; must be justified from external motion truth",
         },
+        "reference_derived_heading": {
+            "enabled": bool(reference_heading_rate_hz > 0.0),
+            "source": "external pose yaw with deterministic Gaussian noise and declared faults",
+            "rate_hz": reference_heading_rate_hz,
+            "sigma_deg": reference_heading_sigma_deg,
+            "updates": int(np.count_nonzero(heading_update)),
+            "fault_updates": int(np.count_nonzero(heading_fault)),
+            "dropout_start_s": reference_heading_dropout_start_s,
+            "dropout_duration_s": reference_heading_dropout_duration_s,
+            "fault_start_s": reference_heading_fault_start_s,
+            "minimum_body_forward_horizontal_projection": reference_heading_minimum_horizontal_projection,
+            "geometry_invalid_samples": int(np.count_nonzero(
+                np.abs(np.cos(np.radians(euler_deg[:, 1])))
+                < reference_heading_minimum_horizontal_projection
+            )),
+            "evidence_class": "physical motion truth plus derived observation; not physical heading-sensor evidence",
+        },
         "reference_bias_correction": {
             "applied": apply_reference_bias,
             "source": "interpolated EuRoC batch-estimated b_w_RS_S and b_a_RS_S",
@@ -492,6 +597,15 @@ def main() -> None:
         default=0.0,
         help="mark only this initial externally verified stationary interval",
     )
+    parser.add_argument("--reference-heading-rate-hz", type=float, default=0.0)
+    parser.add_argument("--reference-heading-sigma-deg", type=float, default=1.0)
+    parser.add_argument("--reference-heading-dropout-start-s", type=float, default=40.0)
+    parser.add_argument("--reference-heading-dropout-duration-s", type=float, default=4.0)
+    parser.add_argument("--reference-heading-fault-start-s", type=float, default=60.0)
+    parser.add_argument("--reference-heading-fault-count", type=int, default=2)
+    parser.add_argument(
+        "--reference-heading-minimum-horizontal-projection", type=float, default=0.25
+    )
     args = parser.parse_args()
     if args.synthetic_gnss_rate_hz < 0.0:
         parser.error("--synthetic-gnss-rate-hz must be non-negative")
@@ -509,6 +623,13 @@ def main() -> None:
         args.pose_source,
         args.pose_time_offset_us,
         args.static_hint_duration_s,
+        args.reference_heading_rate_hz,
+        args.reference_heading_sigma_deg,
+        args.reference_heading_dropout_start_s,
+        args.reference_heading_dropout_duration_s,
+        args.reference_heading_fault_start_s,
+        args.reference_heading_fault_count,
+        args.reference_heading_minimum_horizontal_projection,
     )
     print(json.dumps(metadata, indent=2, sort_keys=True))
 
